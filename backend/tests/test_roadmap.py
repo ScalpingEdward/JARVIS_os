@@ -2,6 +2,7 @@ from datetime import date, timedelta
 
 import pytest
 
+from app.roadmap.api import create_roadmap, progress, replan, risks, today
 from app.roadmap.models import RoadmapCreate, TaskStatusUpdate, WorkStatus
 from app.roadmap.service import RoadmapError, roadmap_service
 
@@ -70,14 +71,21 @@ def test_replan_changes_only_open_tasks_and_records_audit_entry() -> None:
     assert result.roadmap.audit_log[-1].action == "roadmap_replanned"
 
 
-def test_api_exposes_roadmap_progress_today_risks_and_replan(client) -> None:
-    created = client.post(
-        "/v1/roadmaps",
-        json={"title": "Trading platform", "goal": "Build a safe Telegram signal trading platform"},
+def test_api_exposes_roadmap_progress_today_risks_and_replan() -> None:
+    created = create_roadmap(
+        RoadmapCreate(
+            title="Trading platform",
+            goal="Build a safe Telegram signal trading platform",
+        )
     )
-    assert created.status_code == 200
-    roadmap_id = created.json()["id"]
-    assert client.get(f"/v1/roadmaps/{roadmap_id}/progress").status_code == 200
-    assert client.get(f"/v1/roadmaps/{roadmap_id}/today").status_code == 200
-    assert client.get(f"/v1/roadmaps/{roadmap_id}/risks").status_code == 200
-    assert client.post(f"/v1/roadmaps/{roadmap_id}/replan").status_code == 200
+    roadmap_id = created.id
+
+    progress_result = progress(roadmap_id)
+    today_result = today(roadmap_id, capacity_hours=8)
+    risks_result = risks(roadmap_id)
+    replan_result = replan(roadmap_id)
+
+    assert progress_result.total_tasks == len(created.tasks)
+    assert today_result.estimated_hours <= 8
+    assert isinstance(risks_result.risks, list)
+    assert replan_result.roadmap.id == roadmap_id
