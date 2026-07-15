@@ -1,5 +1,7 @@
+from app.config import get_settings
+
 from .contracts import ModelProvider, ModelRequest, ModelResponse
-from .mock_provider import MockModelProvider
+from .provider_loader import load_providers
 
 
 class UnknownProviderError(ValueError):
@@ -10,7 +12,7 @@ class ModelRouter:
     """Selects a registered model provider without coupling callers to vendors."""
 
     def __init__(self, providers: list[ModelProvider] | None = None) -> None:
-        configured = providers or [MockModelProvider()]
+        configured = providers if providers is not None else load_providers(get_settings())
         self._providers = {provider.name: provider for provider in configured}
 
     def available_providers(self) -> list[str]:
