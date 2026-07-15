@@ -21,3 +21,15 @@ class CommandResponse(BaseModel):
     status: str
     message: str
     data: dict[str, Any] = Field(default_factory=dict)
+
+
+class NaturalLanguageRequest(BaseModel):
+    text: str = Field(min_length=1, max_length=5000)
+    execute: bool = True
+
+
+class NaturalLanguageResponse(BaseModel):
+    recognized: bool
+    confidence: float = Field(ge=0.0, le=1.0)
+    command: CommandRequest
+    result: CommandResponse | None = None
