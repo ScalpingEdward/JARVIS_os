@@ -4,6 +4,7 @@ from fastapi import FastAPI, HTTPException, Query, Response, status
 
 from .agent_adapters.api import router as agent_adapters_router
 from .approvals.api import router as approvals_router
+from .autofix.api import router as autofix_router
 from .collaboration.api import router as collaboration_router
 from .commands.api import router as commands_router
 from .config import get_settings
@@ -37,6 +38,7 @@ settings = get_settings()
 app = FastAPI(title=settings.app_name, version=settings.version)
 app.include_router(agent_adapters_router)
 app.include_router(approvals_router)
+app.include_router(autofix_router)
 app.include_router(collaboration_router)
 app.include_router(commands_router)
 app.include_router(execution_router)
