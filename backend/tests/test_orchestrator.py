@@ -1,3 +1,5 @@
+from collections.abc import Callable
+
 from fastapi.testclient import TestClient
 
 from app.main import app
@@ -6,7 +8,7 @@ from app.orchestrator.service import orchestrator_service
 client = TestClient(app)
 
 
-def setup_function() -> None:
+def setup_function(function: Callable[..., object] | None = None) -> None:
     orchestrator_service.reset()
 
 
