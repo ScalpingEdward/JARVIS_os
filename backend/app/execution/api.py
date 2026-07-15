@@ -1,13 +1,17 @@
 import os
+from pathlib import Path
 from uuid import UUID
 
 from fastapi import APIRouter, HTTPException
+from fastapi.responses import FileResponse
 
 from .models import WorkflowCreate, WorkflowListResponse, WorkflowRecord, WorkflowTickResponse
 from .scheduler import workflow_scheduler
 from .service import ExecutionError, autonomous_execution_service
 
 router = APIRouter(prefix="/v1/execution", tags=["execution"])
+_ui_dir = Path(__file__).resolve().parent.parent / "ui"
+_ui_assets = {"app.js": "application/javascript", "styles.css": "text/css"}
 
 
 @router.on_event("startup")
@@ -26,6 +30,19 @@ def _call(operation):
         return operation()
     except ExecutionError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.get("/control-center", include_in_schema=False)
+def control_center() -> FileResponse:
+    return FileResponse(_ui_dir / "index.html", media_type="text/html")
+
+
+@router.get("/control-center/assets/{asset_name}", include_in_schema=False)
+def control_center_asset(asset_name: str) -> FileResponse:
+    media_type = _ui_assets.get(asset_name)
+    if media_type is None:
+        raise HTTPException(status_code=404, detail="UI asset not found")
+    return FileResponse(_ui_dir / asset_name, media_type=media_type)
 
 
 @router.post("/workflows", response_model=WorkflowRecord)
