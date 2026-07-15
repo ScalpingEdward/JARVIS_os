@@ -1,3 +1,4 @@
+import os
 from uuid import UUID
 
 from fastapi import APIRouter, HTTPException
@@ -7,6 +8,17 @@ from .scheduler import workflow_scheduler
 from .service import ExecutionError, autonomous_execution_service
 
 router = APIRouter(prefix="/v1/execution", tags=["execution"])
+
+
+@router.on_event("startup")
+def start_configured_scheduler() -> None:
+    if os.getenv("JARVIS_SCHEDULER_ENABLED", "false").lower() in {"1", "true", "yes"}:
+        workflow_scheduler.start()
+
+
+@router.on_event("shutdown")
+def stop_configured_scheduler() -> None:
+    workflow_scheduler.stop()
 
 
 def _call(operation):
