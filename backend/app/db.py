@@ -16,9 +16,18 @@ engine = create_engine(settings.database_url, pool_pre_ping=True, connect_args=c
 SessionLocal = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
 
 
+def initialize_database() -> None:
+    from . import db_models  # noqa: F401
+
+    Base.metadata.create_all(engine)
+
+
 def get_db() -> Generator[Session, None, None]:
     session = SessionLocal()
     try:
         yield session
     finally:
         session.close()
+
+
+initialize_database()
