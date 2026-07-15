@@ -2,10 +2,14 @@ import json
 
 import httpx
 import pytest
+from fastapi.testclient import TestClient
 
 from app.github_remote.service import GitHubRemoteError, GitHubRemoteExecutor
+from app.main import app
 from app.workspace.models import WorkspaceCreate, WorkspaceDecision, WorkspaceFileChange, WorkspacePatch
 from app.workspace.service import workspace_executor_service
+
+api_client = TestClient(app)
 
 
 def setup_function() -> None:
@@ -87,7 +91,7 @@ def test_sync_ci_records_success_without_merging() -> None:
     assert record.reviewer_approved is None
 
 
-def test_status_endpoint_never_advertises_auto_merge(client) -> None:
-    response = client.get("/v1/github-remote/status")
+def test_status_endpoint_never_advertises_auto_merge() -> None:
+    response = api_client.get("/v1/github-remote/status")
     assert response.status_code == 200
     assert response.json()["automatic_merge"] is False
