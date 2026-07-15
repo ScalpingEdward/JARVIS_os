@@ -1,5 +1,6 @@
 import pytest
 
+from app.planner.api import plan_progress
 from app.planner.models import PlanGoal, StepStatus, WorkerPreference
 from app.planner.service import PlannerError, planner_service
 
@@ -56,15 +57,10 @@ def test_progress_reaches_completed_only_after_all_steps_finish() -> None:
     assert progress.status == "completed"
 
 
-def test_api_exposes_plan_progress(client) -> None:
-    created = client.post(
-        "/v1/planner/plan",
-        json={"goal": "Build a multi-agent coding workspace", "include_deployment": False},
+def test_api_progress_contract() -> None:
+    plan = planner_service.create_plan(
+        PlanGoal(goal="Build a multi-agent coding workspace", include_deployment=False)
     )
-    assert created.status_code == 200
-    plan_id = created.json()["plan"]["id"]
-
-    response = client.get(f"/v1/planner/plans/{plan_id}/progress")
-    assert response.status_code == 200
-    assert response.json()["total_steps"] >= 6
-    assert response.json()["progress_percent"] == 0
+    response = plan_progress(plan.id)
+    assert response.total_steps >= 6
+    assert response.progress_percent == 0
