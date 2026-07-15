@@ -1,3 +1,6 @@
+from fastapi import Response
+
+from app.sandbox.api import claim_next_run
 from app.sandbox.models import SandboxRunCreate
 from app.sandbox.service import sandbox_service
 from app.workspace.models import WorkspaceCreate, WorkspaceDecision, WorkspaceFileChange, WorkspacePatch
@@ -46,9 +49,11 @@ def test_claim_next_returns_none_when_queue_empty() -> None:
     assert sandbox_service.claim_next() is None
 
 
-def test_worker_endpoint_returns_204_when_idle(client) -> None:
-    response = client.post("/v1/sandbox/worker/claim-next")
+def test_worker_endpoint_returns_204_when_idle() -> None:
+    response = claim_next_run()
+    assert isinstance(response, Response)
     assert response.status_code == 204
+    assert response.body == b""
 
 
 def test_worker_source_enforces_network_namespace_and_limits() -> None:
