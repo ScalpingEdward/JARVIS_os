@@ -63,6 +63,15 @@ class SandboxService:
         run.started_at = datetime.now(timezone.utc)
         return run
 
+    def claim_next(self) -> SandboxRunRecord | None:
+        queued = sorted(
+            (run for run in self._runs.values() if run.status == SandboxStatus.queued),
+            key=lambda item: item.created_at,
+        )
+        if not queued:
+            return None
+        return self.claim(queued[0].id)
+
     def complete(self, run_id: UUID, result: SandboxResultIn) -> SandboxRunRecord:
         run = self.get(run_id)
         if run.status != SandboxStatus.running:
