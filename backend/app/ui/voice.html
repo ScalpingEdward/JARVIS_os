@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#090d16">
+  <title>JARVIS Mobile Voice</title>
+  <link rel="stylesheet" href="/v1/execution/control-center/assets/styles.css">
+  <style>
+    body{min-height:100vh}.voice-shell{max-width:720px;margin:auto;padding:24px 16px 48px}.voice-orb{width:180px;height:180px;border-radius:50%;margin:28px auto;display:grid;place-items:center;border:1px solid rgba(120,180,255,.45);box-shadow:0 0 55px rgba(60,140,255,.22);background:radial-gradient(circle,rgba(48,133,255,.28),rgba(8,15,28,.92));font-size:54px;cursor:pointer;touch-action:manipulation}.voice-orb.listening{animation:pulse 1.1s infinite;box-shadow:0 0 80px rgba(70,190,255,.65)}@keyframes pulse{50%{transform:scale(1.06)}}.voice-controls{display:grid;gap:12px}.voice-controls select,.voice-controls textarea{width:100%}.voice-controls textarea{min-height:120px}.mobile-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px}.status-line{text-align:center;min-height:28px}.answer{white-space:pre-wrap;min-height:120px}.hint{font-size:.9rem;opacity:.75}.danger-note{border-left:3px solid #f0b84a;padding-left:12px}
+  </style>
+</head>
+<body>
+  <main class="voice-shell">
+    <section class="panel">
+      <p class="eyebrow">JARVIS MOBILE LINK</p>
+      <h1>Sprich mit JARVIS</h1>
+      <p class="hint">Dein Handy übernimmt Mikrofon und Sprachausgabe. Der Laptop braucht kein Mikrofon.</p>
+      <button id="voice-orb" class="voice-orb" aria-label="Push to talk">🎙️</button>
+      <div id="voice-status" class="status-line">Bereit</div>
+      <div class="voice-controls">
+        <label>Sprache
+          <select id="language"><option value="de-DE">Deutsch</option><option value="en-US">English</option></select>
+        </label>
+        <textarea id="transcript" placeholder="Gesprochener oder getippter Befehl"></textarea>
+        <div class="mobile-actions">
+          <button id="send">An JARVIS senden</button>
+          <button id="speak-answer" type="button">Antwort vorlesen</button>
+        </div>
+        <label><input id="preview" type="checkbox" checked> Erst nur Vorschau</label>
+      </div>
+    </section>
+    <section class="panel">
+      <h2>JARVIS Antwort</h2>
+      <pre id="answer" class="answer">Noch keine Anfrage.</pre>
+    </section>
+    <section class="panel danger-note">
+      Kritische Aktionen bleiben durch Approval geschützt. Sprache allein bestätigt keine riskante Aktion.
+    </section>
+  </main>
+  <script src="/v1/execution/control-center/assets/voice.js" defer></script>
+</body>
+</html>
