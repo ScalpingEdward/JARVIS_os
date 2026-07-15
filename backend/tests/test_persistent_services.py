@@ -13,7 +13,7 @@ def test_memory_survives_service_reconstruction() -> None:
             content="Persistent JARVIS memory",
             category="project",
             tags=["jarvis"],
-            priority=90,
+            priority=4,
         )
     )
 
