@@ -1,6 +1,8 @@
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, Response, status
+from fastapi.encoders import jsonable_encoder
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from .models import SandboxResultIn, SandboxRunCreate, SandboxRunList, SandboxRunRecord
@@ -40,6 +42,21 @@ def create_run(payload: SandboxRunCreate) -> SandboxRunRecord:
 def list_runs() -> SandboxRunList:
     items = sandbox_service.list_all()
     return SandboxRunList(items=items, count=len(items))
+
+
+@router.post(
+    "/worker/claim-next",
+    response_model=None,
+    responses={
+        200: {"model": SandboxRunRecord, "description": "Queued job claimed"},
+        204: {"description": "No queued job"},
+    },
+)
+def claim_next_run() -> Response:
+    run = sandbox_service.claim_next()
+    if run is None:
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
+    return JSONResponse(status_code=status.HTTP_200_OK, content=jsonable_encoder(run))
 
 
 @router.get("/runs/{run_id}", response_model=SandboxRunRecord)
