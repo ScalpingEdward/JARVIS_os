@@ -12,6 +12,7 @@ from .execution.api import router as execution_router
 from .github_remote.api import router as github_remote_router
 from .memory.models import MemoryCreate, MemoryListResponse, MemoryRecord
 from .memory.service import memory_service
+from .mobile.api import router as mobile_router
 from .models.api import GenerateRequest, GenerateResponse, ProvidersResponse
 from .models.contracts import ModelRequest
 from .models.router import UnknownProviderError, model_router
@@ -44,6 +45,7 @@ app.include_router(collaboration_router)
 app.include_router(commands_router)
 app.include_router(execution_router)
 app.include_router(github_remote_router)
+app.include_router(mobile_router)
 app.include_router(planner_router)
 app.include_router(roadmap_router)
 app.include_router(runtime_router)
