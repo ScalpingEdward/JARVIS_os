@@ -11,7 +11,11 @@ from .service import ExecutionError, autonomous_execution_service
 
 router = APIRouter(prefix="/v1/execution", tags=["execution"])
 _ui_dir = Path(__file__).resolve().parent.parent / "ui"
-_ui_assets = {"app.js": "application/javascript", "styles.css": "text/css"}
+_ui_assets = {
+    "app.js": "application/javascript",
+    "voice.js": "application/javascript",
+    "styles.css": "text/css",
+}
 
 
 @router.on_event("startup")
@@ -35,6 +39,11 @@ def _call(operation):
 @router.get("/control-center", include_in_schema=False)
 def control_center() -> FileResponse:
     return FileResponse(_ui_dir / "index.html", media_type="text/html")
+
+
+@router.get("/mobile-voice", include_in_schema=False)
+def mobile_voice() -> FileResponse:
+    return FileResponse(_ui_dir / "voice.html", media_type="text/html")
 
 
 @router.get("/control-center/assets/{asset_name}", include_in_schema=False)
