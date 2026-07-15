@@ -8,6 +8,7 @@ from .collaboration.api import router as collaboration_router
 from .commands.api import router as commands_router
 from .config import get_settings
 from .execution.api import router as execution_router
+from .github_remote.api import router as github_remote_router
 from .memory.models import MemoryCreate, MemoryListResponse, MemoryRecord
 from .memory.service import memory_service
 from .models.api import GenerateRequest, GenerateResponse, ProvidersResponse
@@ -38,6 +39,7 @@ app.include_router(approvals_router)
 app.include_router(collaboration_router)
 app.include_router(commands_router)
 app.include_router(execution_router)
+app.include_router(github_remote_router)
 app.include_router(planner_router)
 app.include_router(runtime_router)
 app.include_router(tools_router)
