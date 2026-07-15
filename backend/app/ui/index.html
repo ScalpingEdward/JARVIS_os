@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>JARVIS Control Center</title>
-  <link rel="stylesheet" href="/ui/assets/styles.css">
+  <link rel="stylesheet" href="/v1/execution/control-center/assets/styles.css">
 </head>
 <body>
   <header class="topbar">
@@ -20,14 +20,12 @@
       </form>
       <pre id="command-output">Ready.</pre>
     </section>
-
     <section class="metrics" id="metrics">
       <article class="panel"><span>Workflows</span><strong id="workflow-count">–</strong></article>
       <article class="panel"><span>Workers</span><strong id="worker-count">–</strong></article>
       <article class="panel"><span>Pending approvals</span><strong id="approval-count">–</strong></article>
       <article class="panel"><span>Scheduler</span><strong id="scheduler-state">–</strong></article>
     </section>
-
     <section class="grid">
       <article class="panel"><div class="panel-head"><h2>Workflows</h2><button data-refresh="workflows">Refresh</button></div><div id="workflows" class="list"></div></article>
       <article class="panel"><div class="panel-head"><h2>Runtime workers</h2><button data-refresh="workers">Refresh</button></div><div id="workers" class="list"></div></article>
@@ -36,6 +34,6 @@
     </section>
   </main>
   <div id="toast" role="status"></div>
-  <script src="/ui/assets/app.js" defer></script>
+  <script src="/v1/execution/control-center/assets/app.js" defer></script>
 </body>
 </html>
