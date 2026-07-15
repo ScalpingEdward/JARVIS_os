@@ -2,6 +2,7 @@ from uuid import UUID
 
 from fastapi import FastAPI, HTTPException, Query, Response, status
 
+from .approvals.api import router as approvals_router
 from .commands.api import router as commands_router
 from .config import get_settings
 from .memory.models import MemoryCreate, MemoryListResponse, MemoryRecord
@@ -25,6 +26,7 @@ from .workers.api import router as workers_router
 
 settings = get_settings()
 app = FastAPI(title=settings.app_name, version=settings.version)
+app.include_router(approvals_router)
 app.include_router(commands_router)
 app.include_router(workers_router)
 
