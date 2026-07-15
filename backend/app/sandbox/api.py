@@ -1,6 +1,7 @@
 from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, status
+from pydantic import BaseModel
 
 from .models import SandboxResultIn, SandboxRunCreate, SandboxRunList, SandboxRunRecord
 from .service import SandboxError, sandbox_service
@@ -8,15 +9,23 @@ from .service import SandboxError, sandbox_service
 router = APIRouter(prefix="/v1/sandbox", tags=["sandbox"])
 
 
-@router.get("/status")
-def status_info() -> dict[str, object]:
-    return {
-        "execution_location": "external_isolated_runner",
-        "shell_in_api_process": False,
-        "network_default": False,
-        "privileged_containers": False,
-        "allowed_images": sorted(sandbox_service.ALLOWED_IMAGES),
-    }
+class SandboxStatusResponse(BaseModel):
+    execution_location: str
+    shell_in_api_process: bool
+    network_default: bool
+    privileged_containers: bool
+    allowed_images: list[str]
+
+
+@router.get("/status", response_model=SandboxStatusResponse)
+def status_info() -> SandboxStatusResponse:
+    return SandboxStatusResponse(
+        execution_location="external_isolated_runner",
+        shell_in_api_process=False,
+        network_default=False,
+        privileged_containers=False,
+        allowed_images=sorted(str(image) for image in sandbox_service.ALLOWED_IMAGES),
+    )
 
 
 @router.post("/runs", response_model=SandboxRunRecord, status_code=status.HTTP_201_CREATED)
