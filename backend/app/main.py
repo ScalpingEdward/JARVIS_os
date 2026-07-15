@@ -22,6 +22,7 @@ from .orchestrator.models import (
     TaskStatusUpdate,
 )
 from .orchestrator.service import orchestrator_service
+from .planner.api import router as planner_router
 from .runtime.api import router as runtime_router
 from .workers.api import router as workers_router
 
@@ -29,6 +30,7 @@ settings = get_settings()
 app = FastAPI(title=settings.app_name, version=settings.version)
 app.include_router(approvals_router)
 app.include_router(commands_router)
+app.include_router(planner_router)
 app.include_router(runtime_router)
 app.include_router(workers_router)
 
