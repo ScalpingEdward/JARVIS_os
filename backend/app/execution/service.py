@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+from threading import RLock
 from uuid import UUID
 
 from app.runtime.models import RunStatus, RuntimeRunCreate
@@ -12,6 +13,7 @@ from .models import (
     WorkflowStatus,
     WorkflowTickResponse,
 )
+from .storage import WorkflowStore
 
 
 class ExecutionError(ValueError):
@@ -19,28 +21,39 @@ class ExecutionError(ValueError):
 
 
 class AutonomousExecutionService:
-    def __init__(self) -> None:
-        self._workflows: dict[UUID, WorkflowRecord] = {}
+    def __init__(self, store: WorkflowStore | None = None) -> None:
+        self._store = store or WorkflowStore()
+        self._lock = RLock()
+        self._workflows: dict[UUID, WorkflowRecord] = self._store.load()
 
     def reset(self) -> None:
-        self._workflows.clear()
+        with self._lock:
+            self._workflows.clear()
+            self._store.clear()
+
+    def reload(self) -> None:
+        with self._lock:
+            self._workflows = self._store.load()
 
     def create(self, payload: WorkflowCreate) -> WorkflowRecord:
-        workflow = WorkflowRecord(
-            plan=payload.plan,
-            auto_dispatch=payload.auto_dispatch,
-            max_parallel_steps=payload.max_parallel_steps,
-            stop_on_failure=payload.stop_on_failure,
-            steps=[
-                StepExecutionRecord(step_id=step.id, title=step.title)
-                for step in payload.plan.steps
-            ],
-        )
-        self._workflows[workflow.id] = workflow
-        return workflow
+        with self._lock:
+            workflow = WorkflowRecord(
+                plan=payload.plan,
+                auto_dispatch=payload.auto_dispatch,
+                max_parallel_steps=payload.max_parallel_steps,
+                stop_on_failure=payload.stop_on_failure,
+                steps=[
+                    StepExecutionRecord(step_id=step.id, title=step.title)
+                    for step in payload.plan.steps
+                ],
+            )
+            self._workflows[workflow.id] = workflow
+            self._save()
+            return workflow
 
     def list_workflows(self) -> list[WorkflowRecord]:
-        return sorted(self._workflows.values(), key=lambda item: item.created_at, reverse=True)
+        with self._lock:
+            return sorted(self._workflows.values(), key=lambda item: item.created_at, reverse=True)
 
     def get(self, workflow_id: UUID) -> WorkflowRecord:
         workflow = self._workflows.get(workflow_id)
@@ -49,100 +62,117 @@ class AutonomousExecutionService:
         return workflow
 
     def start(self, workflow_id: UUID) -> WorkflowRecord:
-        workflow = self.get(workflow_id)
-        if workflow.status not in {WorkflowStatus.created, WorkflowStatus.paused}:
-            raise ExecutionError("Workflow cannot be started from its current status")
-        workflow.status = WorkflowStatus.running
-        workflow.updated_at = datetime.now(timezone.utc)
-        return workflow
+        with self._lock:
+            workflow = self.get(workflow_id)
+            if workflow.status not in {WorkflowStatus.created, WorkflowStatus.paused}:
+                raise ExecutionError("Workflow cannot be started from its current status")
+            workflow.status = WorkflowStatus.running
+            workflow.updated_at = datetime.now(timezone.utc)
+            self._save()
+            return workflow
 
     def pause(self, workflow_id: UUID) -> WorkflowRecord:
-        workflow = self.get(workflow_id)
-        if workflow.status != WorkflowStatus.running:
-            raise ExecutionError("Only a running workflow can be paused")
-        workflow.status = WorkflowStatus.paused
-        workflow.updated_at = datetime.now(timezone.utc)
-        return workflow
+        with self._lock:
+            workflow = self.get(workflow_id)
+            if workflow.status != WorkflowStatus.running:
+                raise ExecutionError("Only a running workflow can be paused")
+            workflow.status = WorkflowStatus.paused
+            workflow.updated_at = datetime.now(timezone.utc)
+            self._save()
+            return workflow
 
     def cancel(self, workflow_id: UUID) -> WorkflowRecord:
-        workflow = self.get(workflow_id)
-        if workflow.status in {WorkflowStatus.completed, WorkflowStatus.cancelled}:
-            raise ExecutionError("Workflow is already terminal")
-        workflow.status = WorkflowStatus.cancelled
-        workflow.updated_at = datetime.now(timezone.utc)
-        return workflow
+        with self._lock:
+            workflow = self.get(workflow_id)
+            if workflow.status in {WorkflowStatus.completed, WorkflowStatus.cancelled}:
+                raise ExecutionError("Workflow is already terminal")
+            workflow.status = WorkflowStatus.cancelled
+            workflow.updated_at = datetime.now(timezone.utc)
+            self._save()
+            return workflow
 
     def approve_step(self, workflow_id: UUID, step_id: UUID) -> WorkflowRecord:
-        workflow = self.get(workflow_id)
-        step = self._step(workflow, step_id)
-        planned = self._planned_step(workflow, step_id)
-        if not planned.approval_required:
-            raise ExecutionError("Step does not require approval")
-        step.approval_granted = True
-        if step.status == StepExecutionStatus.waiting_approval:
-            step.status = StepExecutionStatus.ready
-        workflow.status = WorkflowStatus.running
-        workflow.updated_at = datetime.now(timezone.utc)
-        return workflow
+        with self._lock:
+            workflow = self.get(workflow_id)
+            step = self._step(workflow, step_id)
+            planned = self._planned_step(workflow, step_id)
+            if not planned.approval_required:
+                raise ExecutionError("Step does not require approval")
+            step.approval_granted = True
+            if step.status == StepExecutionStatus.waiting_approval:
+                step.status = StepExecutionStatus.ready
+            workflow.status = WorkflowStatus.running
+            workflow.updated_at = datetime.now(timezone.utc)
+            self._save()
+            return workflow
 
     def tick(self, workflow_id: UUID) -> WorkflowTickResponse:
-        workflow = self.get(workflow_id)
-        if workflow.status != WorkflowStatus.running:
-            raise ExecutionError("Workflow must be running")
+        with self._lock:
+            workflow = self.get(workflow_id)
+            if workflow.status != WorkflowStatus.running:
+                raise ExecutionError("Workflow must be running")
 
-        self._sync_runtime(workflow)
-        queued: list[UUID] = []
-        waiting: list[UUID] = []
-        active = sum(
-            step.status in {StepExecutionStatus.queued, StepExecutionStatus.running}
-            for step in workflow.steps
-        )
+            self._sync_runtime(workflow)
+            queued: list[UUID] = []
+            waiting: list[UUID] = []
+            active = sum(
+                step.status in {StepExecutionStatus.queued, StepExecutionStatus.running}
+                for step in workflow.steps
+            )
 
-        for step in workflow.steps:
-            if step.status not in {StepExecutionStatus.pending, StepExecutionStatus.ready}:
-                continue
-            planned = self._planned_step(workflow, step.step_id)
-            dependencies = [self._step(workflow, item) for item in planned.depends_on]
-            if any(item.status == StepExecutionStatus.failed for item in dependencies):
-                step.status = StepExecutionStatus.skipped
-                step.error = "Dependency failed"
-                continue
-            if not all(item.status == StepExecutionStatus.completed for item in dependencies):
-                continue
-            if planned.approval_required and not step.approval_granted:
-                step.status = StepExecutionStatus.waiting_approval
-                waiting.append(step.step_id)
-                continue
-            step.status = StepExecutionStatus.ready
-            if workflow.auto_dispatch and active < workflow.max_parallel_steps:
-                run = agent_runtime_service.create_run(
-                    RuntimeRunCreate(
-                        title=planned.title,
-                        payload={
-                            "workflow_id": str(workflow.id),
-                            "step_id": str(step.step_id),
-                            "description": planned.description,
-                            "preferred_worker": planned.preferred_worker.value,
-                        },
-                        required_capabilities=planned.required_capabilities,
+            for step in workflow.steps:
+                if step.status not in {StepExecutionStatus.pending, StepExecutionStatus.ready}:
+                    continue
+                planned = self._planned_step(workflow, step.step_id)
+                dependencies = [self._step(workflow, item) for item in planned.depends_on]
+                if any(item.status == StepExecutionStatus.failed for item in dependencies):
+                    step.status = StepExecutionStatus.skipped
+                    step.error = "Dependency failed"
+                    continue
+                if not all(item.status == StepExecutionStatus.completed for item in dependencies):
+                    continue
+                if planned.approval_required and not step.approval_granted:
+                    step.status = StepExecutionStatus.waiting_approval
+                    waiting.append(step.step_id)
+                    continue
+                step.status = StepExecutionStatus.ready
+                if workflow.auto_dispatch and active < workflow.max_parallel_steps:
+                    run = agent_runtime_service.create_run(
+                        RuntimeRunCreate(
+                            title=planned.title,
+                            payload={
+                                "workflow_id": str(workflow.id),
+                                "step_id": str(step.step_id),
+                                "description": planned.description,
+                                "preferred_worker": planned.preferred_worker.value,
+                            },
+                            required_capabilities=planned.required_capabilities,
+                        )
                     )
-                )
-                step.runtime_run_id = run.id
-                step.status = StepExecutionStatus.queued
-                queued.append(step.step_id)
-                active += 1
-                try:
-                    agent_runtime_service.dispatch_next()
-                except RuntimeError:
-                    pass
+                    step.runtime_run_id = run.id
+                    step.status = StepExecutionStatus.queued
+                    queued.append(step.step_id)
+                    active += 1
+                    try:
+                        agent_runtime_service.dispatch_next()
+                    except RuntimeError:
+                        pass
 
-        self._refresh_workflow_status(workflow)
-        workflow.updated_at = datetime.now(timezone.utc)
-        return WorkflowTickResponse(
-            workflow=workflow,
-            queued_step_ids=queued,
-            waiting_approval_step_ids=waiting,
-        )
+            self._refresh_workflow_status(workflow)
+            workflow.updated_at = datetime.now(timezone.utc)
+            self._save()
+            return WorkflowTickResponse(
+                workflow=workflow,
+                queued_step_ids=queued,
+                waiting_approval_step_ids=waiting,
+            )
+
+    def tick_active(self) -> list[WorkflowTickResponse]:
+        results: list[WorkflowTickResponse] = []
+        for workflow in list(self.list_workflows()):
+            if workflow.status == WorkflowStatus.running:
+                results.append(self.tick(workflow.id))
+        return results
 
     def _sync_runtime(self, workflow: WorkflowRecord) -> None:
         runs = {run.id: run for run in agent_runtime_service.list_runs()}
@@ -176,6 +206,9 @@ class AutonomousExecutionService:
             status in {StepExecutionStatus.queued, StepExecutionStatus.running} for status in statuses
         ):
             workflow.status = WorkflowStatus.waiting_approval
+
+    def _save(self) -> None:
+        self._store.save(self._workflows)
 
     @staticmethod
     def _step(workflow: WorkflowRecord, step_id: UUID) -> StepExecutionRecord:

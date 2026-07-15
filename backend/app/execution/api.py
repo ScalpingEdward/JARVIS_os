@@ -1,11 +1,24 @@
+import os
 from uuid import UUID
 
 from fastapi import APIRouter, HTTPException
 
 from .models import WorkflowCreate, WorkflowListResponse, WorkflowRecord, WorkflowTickResponse
+from .scheduler import workflow_scheduler
 from .service import ExecutionError, autonomous_execution_service
 
 router = APIRouter(prefix="/v1/execution", tags=["execution"])
+
+
+@router.on_event("startup")
+def start_configured_scheduler() -> None:
+    if os.getenv("JARVIS_SCHEDULER_ENABLED", "false").lower() in {"1", "true", "yes"}:
+        workflow_scheduler.start()
+
+
+@router.on_event("shutdown")
+def stop_configured_scheduler() -> None:
+    workflow_scheduler.stop()
 
 
 def _call(operation):
@@ -57,3 +70,26 @@ def tick_workflow(workflow_id: UUID) -> WorkflowTickResponse:
 )
 def approve_step(workflow_id: UUID, step_id: UUID) -> WorkflowRecord:
     return _call(lambda: autonomous_execution_service.approve_step(workflow_id, step_id))
+
+
+@router.get("/scheduler/status")
+def scheduler_status() -> dict[str, object]:
+    return workflow_scheduler.status()
+
+
+@router.post("/scheduler/start")
+def scheduler_start() -> dict[str, object]:
+    workflow_scheduler.start()
+    return workflow_scheduler.status()
+
+
+@router.post("/scheduler/stop")
+def scheduler_stop() -> dict[str, object]:
+    workflow_scheduler.stop()
+    return workflow_scheduler.status()
+
+
+@router.post("/scheduler/run-once")
+def scheduler_run_once() -> dict[str, object]:
+    processed = workflow_scheduler.run_once()
+    return {**workflow_scheduler.status(), "processed_workflows": processed}
