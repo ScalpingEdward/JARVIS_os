@@ -3,8 +3,10 @@ from uuid import UUID
 
 import httpx
 
+from app.db import SessionLocal
 from app.orchestrator.models import TaskStatus
 from app.orchestrator.service import orchestrator_service
+from app.persistence import PersistenceRepository
 
 from .models import (
     DispatchRecord,
@@ -21,15 +23,13 @@ class WorkerGatewayError(RuntimeError):
 
 
 class WorkerGatewayService:
-    """Registers worker endpoints and dispatches orchestrator tasks safely."""
+    """Registers worker endpoints and persists every dispatch lifecycle."""
 
     def __init__(self) -> None:
         self._workers: dict[UUID, WorkerEndpointRecord] = {}
-        self._dispatches: dict[UUID, DispatchRecord] = {}
 
     def reset(self) -> None:
         self._workers.clear()
-        self._dispatches.clear()
 
     def register(self, payload: WorkerEndpointCreate) -> WorkerEndpointRecord:
         if payload.worker_type != WorkerType.mock and payload.endpoint_url is None:
@@ -42,7 +42,21 @@ class WorkerGatewayService:
         return sorted(self._workers.values(), key=lambda item: item.created_at)
 
     def list_dispatches(self) -> list[DispatchRecord]:
-        return sorted(self._dispatches.values(), key=lambda item: item.created_at)
+        with SessionLocal() as session:
+            rows = PersistenceRepository(session).list_worker_runs()
+            return [
+                DispatchRecord(
+                    id=UUID(row.id),
+                    task_id=UUID(row.task_id),
+                    worker_id=UUID(row.worker_name),
+                    status=DispatchStatus(row.status),
+                    external_run_id=row.external_run_id,
+                    output=row.result,
+                    created_at=row.created_at,
+                    updated_at=row.updated_at,
+                )
+                for row in rows
+            ]
 
     def dispatch(self, task_id: UUID, worker_id: UUID) -> DispatchRecord:
         task = orchestrator_service.get_task(task_id)
@@ -51,12 +65,10 @@ class WorkerGatewayService:
             raise WorkerGatewayError("Task not found")
         if worker is None or not worker.enabled:
             raise WorkerGatewayError("Worker not found or disabled")
-        required = set(task.required_capabilities)
-        if not required.issubset(set(worker.capabilities)):
+        if not set(task.required_capabilities).issubset(set(worker.capabilities)):
             raise WorkerGatewayError("Worker lacks required capabilities")
 
         record = DispatchRecord(task_id=task.id, worker_id=worker.id)
-        self._dispatches[record.id] = record
         orchestrator_service.update_task_status(task.id, TaskStatus.in_progress)
 
         if worker.worker_type == WorkerType.mock:
@@ -78,13 +90,15 @@ class WorkerGatewayService:
                 record.status = DispatchStatus.failed
                 record.error = str(exc)
                 orchestrator_service.update_task_status(task.id, TaskStatus.failed)
+                self._save_dispatch(record, worker.worker_type.value)
                 raise WorkerGatewayError("Worker dispatch failed") from exc
 
         record.updated_at = datetime.now(timezone.utc)
+        self._save_dispatch(record, worker.worker_type.value)
         return record
 
     def callback(self, dispatch_id: UUID, payload: WorkerCallback) -> DispatchRecord | None:
-        record = self._dispatches.get(dispatch_id)
+        record = next((item for item in self.list_dispatches() if item.id == dispatch_id), None)
         if record is None:
             return None
         record.status = payload.status
@@ -99,7 +113,26 @@ class WorkerGatewayService:
             DispatchStatus.accepted: TaskStatus.assigned,
         }
         orchestrator_service.update_task_status(record.task_id, mapped[payload.status])
+        worker = self._workers.get(record.worker_id)
+        self._save_dispatch(record, worker.worker_type.value if worker else "unknown")
         return record
+
+    @staticmethod
+    def _save_dispatch(record: DispatchRecord, provider: str) -> None:
+        with SessionLocal() as session:
+            PersistenceRepository(session).save_worker_run(
+                {
+                    "id": str(record.id),
+                    "task_id": str(record.task_id),
+                    "worker_name": str(record.worker_id),
+                    "provider": provider,
+                    "external_run_id": record.external_run_id,
+                    "status": record.status.value,
+                    "result": record.output or record.error,
+                    "created_at": record.created_at,
+                    "updated_at": record.updated_at,
+                }
+            )
 
 
 worker_gateway_service = WorkerGatewayService()
