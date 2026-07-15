@@ -1,3 +1,4 @@
+from app.autofix.api import status_info
 from app.autofix.models import AutoFixCreate, AutoFixPatch
 from app.autofix.service import AutoFixError, autofix_service
 from app.sandbox.models import SandboxResultIn, SandboxRunCreate
@@ -79,8 +80,8 @@ def test_max_attempts_escalates_to_human() -> None:
     assert "Maximum fix attempts" in result.escalation_reason
 
 
-def test_loop_never_advertises_automatic_merge(client) -> None:
-    response = client.get("/v1/autofix/status")
-    assert response.status_code == 200
-    assert response.json()["automatic_merge"] is False
-    assert response.json()["human_escalation"] is True
+def test_loop_never_advertises_automatic_merge() -> None:
+    body = status_info()
+    assert body["automatic_merge"] is False
+    assert body["human_escalation"] is True
+    assert body["shell_in_api_process"] is False
