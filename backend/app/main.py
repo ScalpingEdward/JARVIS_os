@@ -28,6 +28,7 @@ from .orchestrator.models import (
 )
 from .orchestrator.service import orchestrator_service
 from .planner.api import router as planner_router
+from .roadmap.api import router as roadmap_router
 from .runtime.api import router as runtime_router
 from .sandbox.api import router as sandbox_router
 from .tools.api import router as tools_router
@@ -44,6 +45,7 @@ app.include_router(commands_router)
 app.include_router(execution_router)
 app.include_router(github_remote_router)
 app.include_router(planner_router)
+app.include_router(roadmap_router)
 app.include_router(runtime_router)
 app.include_router(sandbox_router)
 app.include_router(tools_router)
