@@ -20,9 +20,11 @@ from .orchestrator.models import (
     TaskStatusUpdate,
 )
 from .orchestrator.service import orchestrator_service
+from .workers.api import router as workers_router
 
 settings = get_settings()
 app = FastAPI(title=settings.app_name, version=settings.version)
+app.include_router(workers_router)
 
 
 @app.get("/", tags=["system"])
