@@ -42,7 +42,14 @@ def list_runs() -> SandboxRunList:
     return SandboxRunList(items=items, count=len(items))
 
 
-@router.post("/worker/claim-next", response_model=SandboxRunRecord, responses={204: {"description": "No queued job"}})
+@router.post(
+    "/worker/claim-next",
+    response_model=None,
+    responses={
+        200: {"model": SandboxRunRecord, "description": "Queued job claimed"},
+        204: {"description": "No queued job"},
+    },
+)
 def claim_next_run() -> SandboxRunRecord | Response:
     run = sandbox_service.claim_next()
     if run is None:
