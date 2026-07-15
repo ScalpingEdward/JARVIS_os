@@ -7,6 +7,7 @@ class Settings(BaseSettings):
     app_name: str = "JARVIS OS"
     environment: str = "development"
     version: str = "0.1.0"
+    database_url: str = "sqlite:///./jarvis.db"
 
     anthropic_enabled: bool = False
     anthropic_api_key: str | None = None
