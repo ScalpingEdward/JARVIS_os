@@ -17,7 +17,7 @@ def test_mobile_voice_console_is_served() -> None:
     assert response.status_code == 200
     assert "JARVIS Mobile Voice" in response.text
     assert "Sprich mit JARVIS" in response.text
-    assert "kritische Aktion" in response.text.lower()
+    assert "kritische aktion" in response.text.lower()
 
 
 def test_control_center_assets_are_served_and_unknown_assets_are_blocked() -> None:
