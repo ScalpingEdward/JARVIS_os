@@ -33,6 +33,7 @@ from .roadmap.api import router as roadmap_router
 from .runtime.api import router as runtime_router
 from .sandbox.api import router as sandbox_router
 from .tools.api import router as tools_router
+from .trading.api import router as trading_router
 from .vision.api import router as vision_router
 from .voice.api import router as voice_router
 from .workers.api import router as workers_router
@@ -53,6 +54,7 @@ app.include_router(roadmap_router)
 app.include_router(runtime_router)
 app.include_router(sandbox_router)
 app.include_router(tools_router)
+app.include_router(trading_router)
 app.include_router(vision_router)
 app.include_router(voice_router)
 app.include_router(workers_router)
