@@ -2,6 +2,7 @@ from uuid import UUID
 
 from fastapi import FastAPI, HTTPException, Query, Response, status
 
+from .agent_adapters.api import router as agent_adapters_router
 from .approvals.api import router as approvals_router
 from .collaboration.api import router as collaboration_router
 from .commands.api import router as commands_router
@@ -31,6 +32,7 @@ from .workers.api import router as workers_router
 
 settings = get_settings()
 app = FastAPI(title=settings.app_name, version=settings.version)
+app.include_router(agent_adapters_router)
 app.include_router(approvals_router)
 app.include_router(collaboration_router)
 app.include_router(commands_router)
