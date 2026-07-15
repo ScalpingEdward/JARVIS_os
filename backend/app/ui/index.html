@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>JARVIS Control Center</title>
+  <link rel="stylesheet" href="/ui/assets/styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div><strong>JARVIS</strong><span>Control Center</span></div>
+    <div id="connection" class="status">Connecting…</div>
+  </header>
+  <main>
+    <section class="hero panel">
+      <div><p class="eyebrow">MASTER COMMAND</p><h1>What should JARVIS do?</h1></div>
+      <form id="command-form">
+        <textarea id="command" placeholder="Example: Show project status" required></textarea>
+        <div class="actions"><label><input id="preview" type="checkbox"> Preview only</label><button>Execute</button></div>
+      </form>
+      <pre id="command-output">Ready.</pre>
+    </section>
+
+    <section class="metrics" id="metrics">
+      <article class="panel"><span>Workflows</span><strong id="workflow-count">–</strong></article>
+      <article class="panel"><span>Workers</span><strong id="worker-count">–</strong></article>
+      <article class="panel"><span>Pending approvals</span><strong id="approval-count">–</strong></article>
+      <article class="panel"><span>Scheduler</span><strong id="scheduler-state">–</strong></article>
+    </section>
+
+    <section class="grid">
+      <article class="panel"><div class="panel-head"><h2>Workflows</h2><button data-refresh="workflows">Refresh</button></div><div id="workflows" class="list"></div></article>
+      <article class="panel"><div class="panel-head"><h2>Runtime workers</h2><button data-refresh="workers">Refresh</button></div><div id="workers" class="list"></div></article>
+      <article class="panel"><div class="panel-head"><h2>Approvals</h2><button data-refresh="approvals">Refresh</button></div><div id="approvals" class="list"></div></article>
+      <article class="panel"><div class="panel-head"><h2>Scheduler</h2><div><button id="scheduler-start">Start</button><button id="scheduler-stop">Stop</button><button id="scheduler-run">Run once</button></div></div><pre id="scheduler-output">Loading…</pre></article>
+    </section>
+  </main>
+  <div id="toast" role="status"></div>
+  <script src="/ui/assets/app.js" defer></script>
+</body>
+</html>
