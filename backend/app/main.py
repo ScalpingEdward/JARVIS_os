@@ -25,6 +25,7 @@ from .orchestrator.models import (
 from .orchestrator.service import orchestrator_service
 from .planner.api import router as planner_router
 from .runtime.api import router as runtime_router
+from .tools.api import router as tools_router
 from .workers.api import router as workers_router
 
 settings = get_settings()
@@ -34,24 +35,18 @@ app.include_router(commands_router)
 app.include_router(execution_router)
 app.include_router(planner_router)
 app.include_router(runtime_router)
+app.include_router(tools_router)
 app.include_router(workers_router)
 
 
 @app.get("/", tags=["system"])
 def root() -> dict[str, str]:
-    return {
-        "name": settings.app_name,
-        "version": settings.version,
-        "status": "online",
-    }
+    return {"name": settings.app_name, "version": settings.version, "status": "online"}
 
 
 @app.get("/health", tags=["system"])
 def health() -> dict[str, str]:
-    return {
-        "status": "healthy",
-        "environment": settings.environment,
-    }
+    return {"status": "healthy", "environment": settings.environment}
 
 
 @app.get("/v1/models/providers", response_model=ProvidersResponse, tags=["models"])
@@ -68,20 +63,10 @@ def generate_model_response(payload: GenerateRequest) -> GenerateResponse:
         )
     except UnknownProviderError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-
-    return GenerateResponse(
-        provider=result.provider,
-        model=result.model,
-        content=result.content,
-    )
+    return GenerateResponse(provider=result.provider, model=result.model, content=result.content)
 
 
-@app.post(
-    "/v1/memory",
-    response_model=MemoryRecord,
-    status_code=status.HTTP_201_CREATED,
-    tags=["memory"],
-)
+@app.post("/v1/memory", response_model=MemoryRecord, status_code=status.HTTP_201_CREATED, tags=["memory"])
 def create_memory(payload: MemoryCreate) -> MemoryRecord:
     return memory_service.create(payload)
 
@@ -93,31 +78,19 @@ def list_memories(category: str | None = None) -> MemoryListResponse:
 
 
 @app.get("/v1/memory/search", response_model=MemoryListResponse, tags=["memory"])
-def search_memories(
-    q: str = Query(min_length=1, max_length=500),
-    category: str | None = None,
-) -> MemoryListResponse:
+def search_memories(q: str = Query(min_length=1, max_length=500), category: str | None = None) -> MemoryListResponse:
     items = memory_service.search(query=q, category=category)
     return MemoryListResponse(items=items, count=len(items))
 
 
-@app.delete(
-    "/v1/memory/{memory_id}",
-    status_code=status.HTTP_204_NO_CONTENT,
-    tags=["memory"],
-)
+@app.delete("/v1/memory/{memory_id}", status_code=status.HTTP_204_NO_CONTENT, tags=["memory"])
 def delete_memory(memory_id: UUID) -> Response:
     if not memory_service.delete(memory_id):
         raise HTTPException(status_code=404, detail="Memory not found")
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
-@app.post(
-    "/v1/agents",
-    response_model=AgentRecord,
-    status_code=status.HTTP_201_CREATED,
-    tags=["orchestrator"],
-)
+@app.post("/v1/agents", response_model=AgentRecord, status_code=status.HTTP_201_CREATED, tags=["orchestrator"])
 def register_agent(payload: AgentCreate) -> AgentRecord:
     return orchestrator_service.register_agent(payload)
 
@@ -128,12 +101,7 @@ def list_agents() -> AgentListResponse:
     return AgentListResponse(items=items, count=len(items))
 
 
-@app.post(
-    "/v1/tasks",
-    response_model=TaskRecord,
-    status_code=status.HTTP_201_CREATED,
-    tags=["orchestrator"],
-)
+@app.post("/v1/tasks", response_model=TaskRecord, status_code=status.HTTP_201_CREATED, tags=["orchestrator"])
 def create_task(payload: TaskCreate) -> TaskRecord:
     return orchestrator_service.create_task(payload)
 
@@ -160,10 +128,6 @@ def assign_next_task() -> TaskRecord:
     return task
 
 
-@app.get(
-    "/v1/orchestrator/status",
-    response_model=OrchestratorStatus,
-    tags=["orchestrator"],
-)
+@app.get("/v1/orchestrator/status", response_model=OrchestratorStatus, tags=["orchestrator"])
 def orchestrator_status() -> OrchestratorStatus:
     return orchestrator_service.status()
