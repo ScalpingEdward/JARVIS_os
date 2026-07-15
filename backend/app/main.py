@@ -5,6 +5,7 @@ from fastapi import FastAPI, HTTPException, Query, Response, status
 from .approvals.api import router as approvals_router
 from .commands.api import router as commands_router
 from .config import get_settings
+from .execution.api import router as execution_router
 from .memory.models import MemoryCreate, MemoryListResponse, MemoryRecord
 from .memory.service import memory_service
 from .models.api import GenerateRequest, GenerateResponse, ProvidersResponse
@@ -30,6 +31,7 @@ settings = get_settings()
 app = FastAPI(title=settings.app_name, version=settings.version)
 app.include_router(approvals_router)
 app.include_router(commands_router)
+app.include_router(execution_router)
 app.include_router(planner_router)
 app.include_router(runtime_router)
 app.include_router(workers_router)
