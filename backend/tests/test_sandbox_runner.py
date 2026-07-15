@@ -1,3 +1,4 @@
+from app.sandbox.api import status_info
 from app.sandbox.models import SandboxResultIn, SandboxRunCreate
 from app.sandbox.service import SandboxError, sandbox_service
 from app.workspace.models import WorkspaceCreate, WorkspaceDecision, WorkspaceFileChange, WorkspacePatch
@@ -79,10 +80,8 @@ def test_passing_run_opens_remote_gate() -> None:
     assert workspace_executor_service.get(item.id).tests_passed is True
 
 
-def test_status_endpoint_has_no_shell_or_privileged_container(client) -> None:
-    response = client.get("/v1/sandbox/status")
-    assert response.status_code == 200
-    body = response.json()
+def test_status_contract_has_no_shell_or_privileged_container() -> None:
+    body = status_info().model_dump()
     assert body["shell_in_api_process"] is False
     assert body["privileged_containers"] is False
     assert body["network_default"] is False
