@@ -8,6 +8,18 @@ from .memory.service import memory_service
 from .models.api import GenerateRequest, GenerateResponse, ProvidersResponse
 from .models.contracts import ModelRequest
 from .models.router import UnknownProviderError, model_router
+from .orchestrator.models import (
+    AgentCreate,
+    AgentListResponse,
+    AgentRecord,
+    OrchestratorStatus,
+    TaskCreate,
+    TaskListResponse,
+    TaskRecord,
+    TaskStatus,
+    TaskStatusUpdate,
+)
+from .orchestrator.service import orchestrator_service
 
 settings = get_settings()
 app = FastAPI(title=settings.app_name, version=settings.version)
@@ -86,3 +98,60 @@ def delete_memory(memory_id: UUID) -> Response:
     if not memory_service.delete(memory_id):
         raise HTTPException(status_code=404, detail="Memory not found")
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@app.post(
+    "/v1/agents",
+    response_model=AgentRecord,
+    status_code=status.HTTP_201_CREATED,
+    tags=["orchestrator"],
+)
+def register_agent(payload: AgentCreate) -> AgentRecord:
+    return orchestrator_service.register_agent(payload)
+
+
+@app.get("/v1/agents", response_model=AgentListResponse, tags=["orchestrator"])
+def list_agents() -> AgentListResponse:
+    items = orchestrator_service.list_agents()
+    return AgentListResponse(items=items, count=len(items))
+
+
+@app.post(
+    "/v1/tasks",
+    response_model=TaskRecord,
+    status_code=status.HTTP_201_CREATED,
+    tags=["orchestrator"],
+)
+def create_task(payload: TaskCreate) -> TaskRecord:
+    return orchestrator_service.create_task(payload)
+
+
+@app.get("/v1/tasks", response_model=TaskListResponse, tags=["orchestrator"])
+def list_tasks(task_status: TaskStatus | None = None) -> TaskListResponse:
+    items = orchestrator_service.list_tasks(status=task_status)
+    return TaskListResponse(items=items, count=len(items))
+
+
+@app.patch("/v1/tasks/{task_id}/status", response_model=TaskRecord, tags=["orchestrator"])
+def update_task_status(task_id: UUID, payload: TaskStatusUpdate) -> TaskRecord:
+    task = orchestrator_service.update_task_status(task_id, payload.status)
+    if task is None:
+        raise HTTPException(status_code=404, detail="Task not found")
+    return task
+
+
+@app.post("/v1/orchestrator/assign-next", response_model=TaskRecord, tags=["orchestrator"])
+def assign_next_task() -> TaskRecord:
+    task = orchestrator_service.assign_next()
+    if task is None:
+        raise HTTPException(status_code=409, detail="No compatible task and agent available")
+    return task
+
+
+@app.get(
+    "/v1/orchestrator/status",
+    response_model=OrchestratorStatus,
+    tags=["orchestrator"],
+)
+def orchestrator_status() -> OrchestratorStatus:
+    return orchestrator_service.status()
