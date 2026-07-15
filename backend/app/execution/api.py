@@ -1,0 +1,59 @@
+from uuid import UUID
+
+from fastapi import APIRouter, HTTPException
+
+from .models import WorkflowCreate, WorkflowListResponse, WorkflowRecord, WorkflowTickResponse
+from .service import ExecutionError, autonomous_execution_service
+
+router = APIRouter(prefix="/v1/execution", tags=["execution"])
+
+
+def _call(operation):
+    try:
+        return operation()
+    except ExecutionError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/workflows", response_model=WorkflowRecord)
+def create_workflow(payload: WorkflowCreate) -> WorkflowRecord:
+    return autonomous_execution_service.create(payload)
+
+
+@router.get("/workflows", response_model=WorkflowListResponse)
+def list_workflows() -> WorkflowListResponse:
+    items = autonomous_execution_service.list_workflows()
+    return WorkflowListResponse(items=items, count=len(items))
+
+
+@router.get("/workflows/{workflow_id}", response_model=WorkflowRecord)
+def get_workflow(workflow_id: UUID) -> WorkflowRecord:
+    return _call(lambda: autonomous_execution_service.get(workflow_id))
+
+
+@router.post("/workflows/{workflow_id}/start", response_model=WorkflowRecord)
+def start_workflow(workflow_id: UUID) -> WorkflowRecord:
+    return _call(lambda: autonomous_execution_service.start(workflow_id))
+
+
+@router.post("/workflows/{workflow_id}/pause", response_model=WorkflowRecord)
+def pause_workflow(workflow_id: UUID) -> WorkflowRecord:
+    return _call(lambda: autonomous_execution_service.pause(workflow_id))
+
+
+@router.post("/workflows/{workflow_id}/cancel", response_model=WorkflowRecord)
+def cancel_workflow(workflow_id: UUID) -> WorkflowRecord:
+    return _call(lambda: autonomous_execution_service.cancel(workflow_id))
+
+
+@router.post("/workflows/{workflow_id}/tick", response_model=WorkflowTickResponse)
+def tick_workflow(workflow_id: UUID) -> WorkflowTickResponse:
+    return _call(lambda: autonomous_execution_service.tick(workflow_id))
+
+
+@router.post(
+    "/workflows/{workflow_id}/steps/{step_id}/approve",
+    response_model=WorkflowRecord,
+)
+def approve_step(workflow_id: UUID, step_id: UUID) -> WorkflowRecord:
+    return _call(lambda: autonomous_execution_service.approve_step(workflow_id, step_id))
