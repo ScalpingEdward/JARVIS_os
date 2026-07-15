@@ -53,7 +53,7 @@ class MobileControlService:
             return self._reply(command, f"Paused: {status.paused} | active: {status.active_tasks} | blocked: {status.blocked_tasks} | approvals: {status.pending_approvals}")
         if command == MobileCommand.today:
             plans = []
-            for roadmap in roadmap_service.list_all():
+            for roadmap in list(roadmap_service._items.values()):
                 plan = roadmap_service.today(roadmap.id, capacity_hours=8)
                 plans.append(f"{roadmap.title}: {len(plan.task_ids)} task(s), {plan.estimated_hours}h")
             return self._reply(command, "\n".join(plans) if plans else "No roadmaps available")
@@ -64,7 +64,11 @@ class MobileControlService:
         if command in {MobileCommand.approve, MobileCommand.reject}:
             if len(parts) != 2:
                 raise MobileControlError(f"Usage: /{command.value} APPROVAL_ID")
-            return self._decide(command, UUID(parts[1]), update.telegram_user_id)
+            try:
+                approval_id = UUID(parts[1])
+            except ValueError as exc:
+                raise MobileControlError("Approval ID must be a valid UUID") from exc
+            return self._decide(command, approval_id, update.telegram_user_id)
         if command == MobileCommand.pause:
             self._paused = True
             return self._reply(command, "Agent execution paused. Read-only status commands remain available.")
