@@ -5,6 +5,7 @@ from fastapi import APIRouter, HTTPException, Query, status
 from ..autonomous_research.api import router as autonomous_research_router
 from ..collaboration_mesh.api import router as collaboration_mesh_router
 from ..live_integrations.api import router as live_integrations_router
+from ..notification_hub.api import router as notification_hub_router
 from ..personal_ceo.api import router as personal_ceo_router
 from ..proactive_operations.api import router as proactive_operations_router
 from .models import MarketVisionCreate, MarketVisionListResponse, MarketVisionRecord, MarketVisionStatus
@@ -51,3 +52,4 @@ router.include_router(personal_ceo_router)
 router.include_router(live_integrations_router)
 router.include_router(collaboration_mesh_router)
 router.include_router(proactive_operations_router)
+router.include_router(notification_hub_router)
