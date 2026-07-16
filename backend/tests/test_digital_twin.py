@@ -61,8 +61,8 @@ def test_scenario_recommendation_is_explainable_and_human_gated() -> None:
 def test_learning_requires_explicit_consent() -> None:
     profile = digital_twin_service.configure(TwinProfileCreate(evidence_threshold=0.72))
     options = [
-        ScenarioOption(title="A", description="First option", domain=TwinDomain.business),
-        ScenarioOption(title="B", description="Second option", domain=TwinDomain.business),
+        ScenarioOption(title="Option A", description="First option", domain=TwinDomain.business),
+        ScenarioOption(title="Option B", description="Second option", domain=TwinDomain.business),
     ]
     recommendation = digital_twin_service.evaluate(ScenarioRequest(question="Choose option", options=options))
     no_consent = digital_twin_service.add_feedback(
