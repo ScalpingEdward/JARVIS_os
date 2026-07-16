@@ -17,6 +17,7 @@ from .decision_engine.api import router as decision_engine_router
 from .execution.api import router as execution_router
 from .github_remote.api import router as github_remote_router
 from .live_analysis.api import router as live_analysis_router
+from .long_term_memory.api import router as long_term_memory_router
 from .memory.models import MemoryCreate, MemoryListResponse, MemoryRecord
 from .memory.service import memory_service
 from .mobile.api import router as mobile_router
@@ -66,6 +67,7 @@ app.include_router(decision_engine_router)
 app.include_router(execution_router)
 app.include_router(github_remote_router)
 app.include_router(live_analysis_router)
+app.include_router(long_term_memory_router)
 app.include_router(mobile_router)
 app.include_router(mt5_bridge_router)
 app.include_router(planner_router)
