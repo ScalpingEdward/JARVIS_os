@@ -25,9 +25,10 @@ class GoalExecutionService:
             raise ValueError("Plan already has an execution bridge")
 
         record = BridgeRecord(plan_id=plan.id, approved_by=payload.approved_by)
+        # Store the bridge before materialization so the initial sync can resolve it.
+        self._bridges[record.id] = record
         if payload.approved_by:
             self._materialize(record, payload)
-        self._bridges[record.id] = record
         return record
 
     def approve(self, bridge_id: UUID, payload: BridgeApproval) -> BridgeRecord | None:
@@ -96,20 +97,36 @@ class GoalExecutionService:
         for link in record.links:
             mission = company_runtime_service.get(link.mission_id)
             if mission is None:
+                link.progress = 0
                 link.blocker = "Runtime mission missing"
                 continue
-            link.progress = 1 if mission.status == RuntimeStatus.completed else 0
+
+            # A mission is complete only after the runtime's human approval gate has
+            # moved it from waiting_approval to completed. Audit fallback makes the
+            # synchronization resilient to a stale serialized status object.
+            approved_in_audit = any(
+                entry.action == "human_approved"
+                for entry in company_runtime_service.audit(link.mission_id)
+            )
+            mission_completed = mission.status == RuntimeStatus.completed or approved_in_audit
+            link.progress = 1 if mission_completed else 0
+
             if mission.status in {RuntimeStatus.failed, RuntimeStatus.dead_letter, RuntimeStatus.blocked}:
                 link.blocker = f"Mission status: {mission.status.value}"
                 strategic_planner_service.update_milestone(
                     plan.id, link.milestone_id, MilestoneUpdate(state=MilestoneState.blocked, blocker=link.blocker)
                 )
-            elif mission.status == RuntimeStatus.completed:
+            elif mission_completed:
                 link.blocker = None
                 strategic_planner_service.update_milestone(
                     plan.id, link.milestone_id, MilestoneUpdate(state=MilestoneState.completed, progress=1)
                 )
-            elif mission.status in {RuntimeStatus.assigned, RuntimeStatus.working, RuntimeStatus.waiting_review, RuntimeStatus.waiting_approval}:
+            elif mission.status in {
+                RuntimeStatus.assigned,
+                RuntimeStatus.working,
+                RuntimeStatus.waiting_review,
+                RuntimeStatus.waiting_approval,
+            }:
                 strategic_planner_service.update_milestone(
                     plan.id, link.milestone_id, MilestoneUpdate(state=MilestoneState.active)
                 )
