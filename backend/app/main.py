@@ -11,6 +11,7 @@ from .company.api import router as company_router
 from .company_runtime.api import router as company_runtime_router
 from .config import get_settings
 from .connector_runtime.api import router as connector_runtime_router
+from .connector_setup.api import router as connector_setup_router
 from .connectors.api import router as connectors_router
 from .execution.api import router as execution_router
 from .github_remote.api import router as github_remote_router
@@ -57,6 +58,7 @@ app.include_router(commands_router)
 app.include_router(company_router)
 app.include_router(company_runtime_router)
 app.include_router(connector_runtime_router)
+app.include_router(connector_setup_router)
 app.include_router(connectors_router)
 app.include_router(execution_router)
 app.include_router(github_remote_router)
