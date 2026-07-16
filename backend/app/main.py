@@ -31,6 +31,7 @@ from .orchestrator.models import (
 )
 from .orchestrator.service import orchestrator_service
 from .planner.api import router as planner_router
+from .radar.api import router as radar_router
 from .roadmap.api import router as roadmap_router
 from .runtime.api import router as runtime_router
 from .sandbox.api import router as sandbox_router
@@ -55,6 +56,7 @@ app.include_router(live_analysis_router)
 app.include_router(mobile_router)
 app.include_router(mt5_bridge_router)
 app.include_router(planner_router)
+app.include_router(radar_router)
 app.include_router(roadmap_router)
 app.include_router(runtime_router)
 app.include_router(sandbox_router)
