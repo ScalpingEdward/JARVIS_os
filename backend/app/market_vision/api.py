@@ -9,6 +9,7 @@ from ..config_control.api import router as config_control_router
 from ..decision_memory.api import router as decision_memory_router
 from ..digital_twin.api import router as digital_twin_router
 from ..live_integrations.api import router as live_integrations_router
+from ..multi_broker.api import router as multi_broker_router
 from ..notification_hub.api import router as notification_hub_router
 from ..personal_ceo.api import router as personal_ceo_router
 from ..portfolio_risk.api import router as portfolio_risk_router
@@ -69,3 +70,4 @@ router.include_router(strategic_planning_router)
 router.include_router(predictive_intelligence_router)
 router.include_router(portfolio_risk_router)
 router.include_router(capital_allocation_router)
+router.include_router(multi_broker_router)
