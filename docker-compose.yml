@@ -17,6 +17,19 @@ services:
       retries: 10
     networks: [jarvis_internal]
 
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks: [jarvis_internal]
+
   api:
     build:
       context: ./backend
@@ -24,10 +37,13 @@ services:
     env_file: .env
     environment:
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-jarvis}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-jarvis}
+      REDIS_URL: redis://redis:6379/0
       JARVIS_DATA_DIR: /data
       JARVIS_LOG_DIR: /logs
     depends_on:
       postgres:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     volumes:
       - jarvis_data:/data
@@ -36,10 +52,26 @@ services:
       - "${JARVIS_BIND_ADDRESS:-127.0.0.1}:${JARVIS_PORT:-8000}:8000"
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"]
-      interval: 30s
+      interval: 15s
       timeout: 5s
-      retries: 5
+      retries: 8
       start_period: 20s
+    networks: [jarvis_internal]
+
+  frontend:
+    build:
+      context: ./frontend
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "${PHOENIX_UI_BIND_ADDRESS:-127.0.0.1}:${PHOENIX_UI_PORT:-8080}:80"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/healthz"]
+      interval: 15s
+      timeout: 5s
+      retries: 8
     networks: [jarvis_internal]
 
   sandbox-runner:
@@ -64,6 +96,7 @@ services:
 
 volumes:
   postgres_data:
+  redis_data:
   jarvis_data:
   jarvis_logs:
 
