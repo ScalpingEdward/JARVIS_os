@@ -44,6 +44,7 @@ from .roadmap.api import router as roadmap_router
 from .runtime.api import router as runtime_router
 from .sandbox.api import router as sandbox_router
 from .self_reflection.api import router as self_reflection_router
+from .simulation_engine.api import router as simulation_engine_router
 from .tools.api import router as tools_router
 from .trading.api import router as trading_router
 from .tradingview_sync.api import router as tradingview_sync_router
@@ -79,6 +80,7 @@ app.include_router(roadmap_router)
 app.include_router(runtime_router)
 app.include_router(sandbox_router)
 app.include_router(self_reflection_router)
+app.include_router(simulation_engine_router)
 app.include_router(tools_router)
 app.include_router(trading_router)
 app.include_router(tradingview_sync_router)
