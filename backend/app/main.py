@@ -21,6 +21,7 @@ from .knowledge_graph.api import router as knowledge_graph_router
 from .live_analysis.api import router as live_analysis_router
 from .long_term_memory.api import router as long_term_memory_router
 from .market_intelligence.api import router as market_intelligence_router
+from .market_vision.api import router as market_vision_router
 from .memory.models import MemoryCreate, MemoryListResponse, MemoryRecord
 from .memory.service import memory_service
 from .mobile.api import router as mobile_router
@@ -79,6 +80,7 @@ app.include_router(knowledge_graph_router)
 app.include_router(live_analysis_router)
 app.include_router(long_term_memory_router)
 app.include_router(market_intelligence_router)
+app.include_router(market_vision_router)
 app.include_router(mobile_router)
 app.include_router(mt5_bridge_router)
 app.include_router(orderflow_router)
