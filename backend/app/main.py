@@ -8,6 +8,7 @@ from .autofix.api import router as autofix_router
 from .collaboration.api import router as collaboration_router
 from .commands.api import router as commands_router
 from .company.api import router as company_router
+from .company_runtime.api import router as company_runtime_router
 from .config import get_settings
 from .execution.api import router as execution_router
 from .github_remote.api import router as github_remote_router
@@ -52,6 +53,7 @@ app.include_router(autofix_router)
 app.include_router(collaboration_router)
 app.include_router(commands_router)
 app.include_router(company_router)
+app.include_router(company_runtime_router)
 app.include_router(execution_router)
 app.include_router(github_remote_router)
 app.include_router(live_analysis_router)
