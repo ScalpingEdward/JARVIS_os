@@ -3,6 +3,7 @@ from uuid import UUID
 from fastapi import APIRouter, HTTPException, Query, status
 
 from ..autonomous_research.api import router as autonomous_research_router
+from ..personal_ceo.api import router as personal_ceo_router
 from .models import MarketVisionCreate, MarketVisionListResponse, MarketVisionRecord, MarketVisionStatus
 from .service import market_vision_service
 
@@ -43,3 +44,4 @@ def latest_analysis(symbol: str) -> MarketVisionRecord:
 
 
 router.include_router(autonomous_research_router)
+router.include_router(personal_ceo_router)
