@@ -50,6 +50,7 @@ from .self_reflection.api import router as self_reflection_router
 from .simulation_engine.api import router as simulation_engine_router
 from .strategic_planner.api import router as strategic_planner_router
 from .tools.api import router as tools_router
+from .trade_analyst.api import router as trade_analyst_router
 from .trading.api import router as trading_router
 from .tradingview_sync.api import router as tradingview_sync_router
 from .vision.api import router as vision_router
@@ -90,6 +91,7 @@ app.include_router(self_reflection_router)
 app.include_router(simulation_engine_router)
 app.include_router(strategic_planner_router)
 app.include_router(tools_router)
+app.include_router(trade_analyst_router)
 app.include_router(trading_router)
 app.include_router(tradingview_sync_router)
 app.include_router(vision_router)
