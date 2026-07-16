@@ -1,5 +1,29 @@
 # PHOENIX OS
 
+## Live Integrations Hub — v5.4
+
+PHOENIX exposes a read-only integration layer for MT5, TradingView, Telegram and research feeds.
+
+Core endpoints:
+
+```text
+GET  /v1/live-integrations/status
+POST /v1/live-integrations
+GET  /v1/live-integrations
+POST /v1/live-integrations/{id}/heartbeat
+POST /v1/live-integrations/events
+GET  /v1/live-integrations/events/recent
+```
+
+All live connectors are read-only. v5.4 accepts normalized market events, connector heartbeats, latency, data-quality metadata and record counters, but it cannot place or modify orders.
+
+Typical flow:
+
+1. Register an MT5, TradingView, Telegram or research connector.
+2. Send periodic heartbeats from the local bridge.
+3. Normalize incoming alerts, quotes or research events.
+4. Read recent events from the Command Center and downstream analysis modules.
+
 ## Full Local Launch — v5.2
 
 PHOENIX can run locally as one coordinated stack:
