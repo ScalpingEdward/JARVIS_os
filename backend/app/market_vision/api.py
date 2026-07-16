@@ -3,6 +3,7 @@ from uuid import UUID
 from fastapi import APIRouter, HTTPException, Query, status
 
 from ..autonomous_research.api import router as autonomous_research_router
+from ..capital_allocation.api import router as capital_allocation_router
 from ..collaboration_mesh.api import router as collaboration_mesh_router
 from ..config_control.api import router as config_control_router
 from ..decision_memory.api import router as decision_memory_router
@@ -67,3 +68,4 @@ router.include_router(decision_memory_router)
 router.include_router(strategic_planning_router)
 router.include_router(predictive_intelligence_router)
 router.include_router(portfolio_risk_router)
+router.include_router(capital_allocation_router)
