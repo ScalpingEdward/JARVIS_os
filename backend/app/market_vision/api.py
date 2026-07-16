@@ -17,6 +17,7 @@ from ..predictive_intelligence.api import router as predictive_intelligence_rout
 from ..proactive_operations.api import router as proactive_operations_router
 from ..readiness_center.api import router as readiness_center_router
 from ..strategic_planning.api import router as strategic_planning_router
+from ..strategy_builder.api import router as strategy_builder_router
 from .models import MarketVisionCreate, MarketVisionListResponse, MarketVisionRecord, MarketVisionStatus
 from .service import market_vision_service
 
@@ -71,3 +72,4 @@ router.include_router(predictive_intelligence_router)
 router.include_router(portfolio_risk_router)
 router.include_router(capital_allocation_router)
 router.include_router(multi_broker_router)
+router.include_router(strategy_builder_router)
