@@ -35,6 +35,16 @@ def list_integrations() -> LiveIntegrationList:
     return LiveIntegrationList(items=items, count=len(items))
 
 
+@router.post("/events", response_model=NormalizedMarketEvent, status_code=status.HTTP_202_ACCEPTED)
+def ingest_event(payload: NormalizedMarketEvent) -> NormalizedMarketEvent:
+    return live_integration_service.ingest(payload)
+
+
+@router.get("/events/recent", response_model=list[NormalizedMarketEvent])
+def recent_events(symbol: str | None = Query(default=None, max_length=40), limit: int = Query(default=100, ge=1, le=500)) -> list[NormalizedMarketEvent]:
+    return live_integration_service.events(symbol=symbol, limit=limit)
+
+
 @router.get("/{integration_id}", response_model=LiveIntegration)
 def get_integration(integration_id: UUID) -> LiveIntegration:
     record = live_integration_service.get(integration_id)
@@ -49,13 +59,3 @@ def heartbeat(integration_id: UUID, payload: IntegrationHeartbeat) -> LiveIntegr
     if record is None:
         raise HTTPException(status_code=404, detail="Live integration not found")
     return record
-
-
-@router.post("/events", response_model=NormalizedMarketEvent, status_code=status.HTTP_202_ACCEPTED)
-def ingest_event(payload: NormalizedMarketEvent) -> NormalizedMarketEvent:
-    return live_integration_service.ingest(payload)
-
-
-@router.get("/events/recent", response_model=list[NormalizedMarketEvent])
-def recent_events(symbol: str | None = Query(default=None, max_length=40), limit: int = Query(default=100, ge=1, le=500)) -> list[NormalizedMarketEvent]:
-    return live_integration_service.events(symbol=symbol, limit=limit)
