@@ -47,6 +47,7 @@ from .tradingview_sync.api import router as tradingview_sync_router
 from .vision.api import router as vision_router
 from .voice.api import router as voice_router
 from .workers.api import router as workers_router
+from .world_model.api import router as world_model_router
 from .workspace.api import router as workspace_router
 
 settings = get_settings()
@@ -78,6 +79,7 @@ app.include_router(tradingview_sync_router)
 app.include_router(vision_router)
 app.include_router(voice_router)
 app.include_router(workers_router)
+app.include_router(world_model_router)
 app.include_router(workspace_router)
 
 
