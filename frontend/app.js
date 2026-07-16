@@ -70,6 +70,23 @@ function renderResearch(brief, status) {
   $('#researchEntities').innerHTML = (brief.key_entities || []).slice(0, 8).map((entity) => `<span>${entity}</span>`).join('');
 }
 
+function renderCEOProfile(profile) {
+  const salutation = profile.preferred_salutation || 'MASTER Brano';
+  const heading = $('.hero-copy h2');
+  if (heading) heading.innerHTML = `Welcome, ${salutation}.<br />Every mission prioritized.`;
+  setText('#voiceStatus', `Ready for ${salutation}. Wake name: ${profile.assistant_name || 'PHOENIX'}`);
+  log(`Personal AI CEO profile loaded for ${salutation}`, 'CEO');
+}
+
+function renderCEOBriefing(briefing) {
+  if (!briefing) return;
+  const focus = briefing.daily_focus || 'No critical action required';
+  setText('#missionStatus', `CEO · ${briefing.top_priorities?.length || 0} PRIORITIES`);
+  log(`${briefing.salutation}: daily focus — ${focus}`, 'CEO');
+  (briefing.risks || []).slice(0, 3).forEach((risk) => log(`Executive risk: ${risk}`, 'RISK'));
+  (briefing.approvals || []).slice(0, 3).forEach((approval) => log(`Approval required: ${approval}`, 'CONTROL'));
+}
+
 function renderRuntime(report) {
   const queued = report.queued || 0;
   const active = report.active || 0;
@@ -104,6 +121,8 @@ async function refresh() {
   $('#refreshButton').disabled = true;
   const services = [
     ['/health', (data) => setText('#coreStatus', data.status?.toUpperCase() || 'ONLINE')],
+    ['/v1/personal-ceo/profile', renderCEOProfile],
+    ['/v1/personal-ceo/briefings/latest', renderCEOBriefing],
     ['/v1/market-intelligence/watchlist', renderWatchlist],
     ['/v1/trade-analyst/analyses', (data) => renderTradeAnalysis((data.items || [])[0])],
     ['/v1/orderflow/snapshots', (data) => renderOrderflow((data.items || [])[0])],
@@ -114,7 +133,6 @@ async function refresh() {
     ['/v1/approvals', renderApprovals],
     ['/v1/voice/status', (data) => {
       setText('#assistantName', data.assistant_name || 'PHOENIX');
-      setText('#voiceStatus', `Wake name: ${data.wake_name || data.assistant_name || 'PHOENIX'}`);
     }]
   ];
   let connected = 0;
@@ -124,7 +142,7 @@ async function refresh() {
       apply(data);
       connected += 1;
     } catch (error) {
-      log(`Service unavailable: ${path}`, 'WAIT');
+      if (path !== '/v1/personal-ceo/briefings/latest') log(`Service unavailable: ${path}`, 'WAIT');
     }
   }
   setText('#connectedServices', `${connected}/${services.length}`);
@@ -142,13 +160,13 @@ $('#voiceButton').addEventListener('click', () => {
   const active = document.body.classList.toggle('listening');
   setText('#voiceButton', active ? 'VOICE LINK ACTIVE' : 'ACTIVATE VOICE LINK');
   setText('#voiceBadge', active ? 'LISTENING' : 'STANDBY');
-  setText('#voiceStatus', active ? 'Listening for the configured wake name…' : 'Voice link paused.');
-  log(active ? 'Voice link activated' : 'Voice link paused', 'VOICE');
+  setText('#voiceStatus', active ? 'Listening for PHOENIX commands from MASTER Brano…' : 'Voice link paused.');
+  log(active ? 'Voice link activated for MASTER Brano' : 'Voice link paused', 'VOICE');
 });
 $('#focusButton').addEventListener('click', () => {
   const active = document.body.classList.toggle('focus');
   setText('#focusButton', active ? 'EXIT FOCUS MODE' : 'ENTER FOCUS MODE');
-  log(active ? 'Market focus mode enabled' : 'Full command view restored', 'UI');
+  log(active ? 'Executive focus mode enabled' : 'Full command view restored', 'UI');
 });
 
 setInterval(updateClock, 1000);
