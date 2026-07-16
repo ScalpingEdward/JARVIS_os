@@ -10,6 +10,7 @@ from ..digital_twin.api import router as digital_twin_router
 from ..live_integrations.api import router as live_integrations_router
 from ..notification_hub.api import router as notification_hub_router
 from ..personal_ceo.api import router as personal_ceo_router
+from ..portfolio_risk.api import router as portfolio_risk_router
 from ..predictive_intelligence.api import router as predictive_intelligence_router
 from ..proactive_operations.api import router as proactive_operations_router
 from ..readiness_center.api import router as readiness_center_router
@@ -65,3 +66,4 @@ router.include_router(digital_twin_router)
 router.include_router(decision_memory_router)
 router.include_router(strategic_planning_router)
 router.include_router(predictive_intelligence_router)
+router.include_router(portfolio_risk_router)
