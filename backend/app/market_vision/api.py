@@ -12,6 +12,7 @@ from ..notification_hub.api import router as notification_hub_router
 from ..personal_ceo.api import router as personal_ceo_router
 from ..proactive_operations.api import router as proactive_operations_router
 from ..readiness_center.api import router as readiness_center_router
+from ..strategic_planning.api import router as strategic_planning_router
 from .models import MarketVisionCreate, MarketVisionListResponse, MarketVisionRecord, MarketVisionStatus
 from .service import market_vision_service
 
@@ -61,3 +62,4 @@ router.include_router(config_control_router)
 router.include_router(readiness_center_router)
 router.include_router(digital_twin_router)
 router.include_router(decision_memory_router)
+router.include_router(strategic_planning_router)
