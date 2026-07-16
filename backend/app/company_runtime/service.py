@@ -9,6 +9,15 @@ class CompanyRuntimeService:
         self._missions: dict[UUID, RuntimeMission] = {}
         self._audit: list[AuditEntry] = []
 
+    @staticmethod
+    def _normalize_id(mission_id: UUID | str) -> UUID | None:
+        if isinstance(mission_id, UUID):
+            return mission_id
+        try:
+            return UUID(str(mission_id))
+        except (TypeError, ValueError, AttributeError):
+            return None
+
     def create(self, payload: RuntimeMissionCreate) -> RuntimeMission:
         mission = RuntimeMission(**payload.model_dump())
         self._missions[mission.id] = mission
@@ -18,8 +27,11 @@ class CompanyRuntimeService:
     def list_all(self) -> list[RuntimeMission]:
         return sorted(self._missions.values(), key=lambda item: (item.priority, item.created_at))
 
-    def get(self, mission_id: UUID) -> RuntimeMission | None:
-        return self._missions.get(mission_id)
+    def get(self, mission_id: UUID | str) -> RuntimeMission | None:
+        normalized_id = self._normalize_id(mission_id)
+        if normalized_id is None:
+            return None
+        return self._missions.get(normalized_id)
 
     def claim_next(self) -> RuntimeMission | None:
         candidates = [m for m in self.list_all() if m.status == RuntimeStatus.queued]
@@ -31,8 +43,8 @@ class CompanyRuntimeService:
         self._audit.append(AuditEntry(mission_id=mission.id, action="mission_claimed"))
         return mission
 
-    def update(self, mission_id: UUID, payload: RuntimeUpdate) -> RuntimeMission | None:
-        mission = self._missions.get(mission_id)
+    def update(self, mission_id: UUID | str, payload: RuntimeUpdate) -> RuntimeMission | None:
+        mission = self.get(mission_id)
         if mission is None:
             return None
         mission.tokens_used += payload.tokens_used_delta
@@ -53,8 +65,8 @@ class CompanyRuntimeService:
         self._audit.append(AuditEntry(mission_id=mission.id, action=f"status:{mission.status.value}", note=payload.note))
         return mission
 
-    def approve(self, mission_id: UUID) -> RuntimeMission | None:
-        mission = self._missions.get(mission_id)
+    def approve(self, mission_id: UUID | str) -> RuntimeMission | None:
+        mission = self.get(mission_id)
         if mission is None or mission.status != RuntimeStatus.waiting_approval:
             return None
         mission.status = RuntimeStatus.completed
@@ -62,10 +74,13 @@ class CompanyRuntimeService:
         self._audit.append(AuditEntry(mission_id=mission.id, action="human_approved"))
         return mission
 
-    def audit(self, mission_id: UUID | None = None) -> list[AuditEntry]:
+    def audit(self, mission_id: UUID | str | None = None) -> list[AuditEntry]:
         if mission_id is None:
             return list(self._audit)
-        return [entry for entry in self._audit if entry.mission_id == mission_id]
+        normalized_id = self._normalize_id(mission_id)
+        if normalized_id is None:
+            return []
+        return [entry for entry in self._audit if entry.mission_id == normalized_id]
 
     def report(self) -> RuntimeReport:
         values = list(self._missions.values())
