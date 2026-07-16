@@ -2,6 +2,11 @@ const API = localStorage.getItem('phoenix_api') || 'http://localhost:8000';
 const $ = (selector) => document.querySelector(selector);
 const safe = (value, fallback = '—') => value === undefined || value === null || value === '' ? fallback : value;
 const percent = (value) => `${Math.round(Number(value || 0) * 100)}%`;
+const VOICE_SESSION = localStorage.getItem('phoenix_voice_session') || `browser-${crypto.randomUUID?.() || Date.now()}`;
+localStorage.setItem('phoenix_voice_session', VOICE_SESSION);
+let voiceSettings = { wake_name: 'phoenix', language: 'de-DE', wake_reply: 'Yes, MASTER Brano?' };
+let recognition = null;
+let voiceEnabled = false;
 
 function log(message, level = 'INFO') {
   const node = $('#log');
@@ -15,9 +20,114 @@ async function get(path) {
   return response.json();
 }
 
+async function post(path, body) {
+  const response = await fetch(`${API}${path}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify(body),
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(payload.detail || `${path}: ${response.status}`);
+  return payload;
+}
+
 function setText(selector, value) {
   const node = $(selector);
   if (node) node.textContent = safe(value);
+}
+
+function speak(text) {
+  if (!text || !('speechSynthesis' in window)) return;
+  speechSynthesis.cancel();
+  const utterance = new SpeechSynthesisUtterance(text);
+  utterance.lang = voiceSettings.language || 'de-DE';
+  utterance.rate = 0.95;
+  speechSynthesis.speak(utterance);
+}
+
+function applyVoiceAction(reply) {
+  if (reply.ui_action === 'focus_market') {
+    document.body.classList.add('focus');
+    setText('#focusButton', 'EXIT FOCUS MODE');
+    setText('#analystSymbol', reply.ui_target || 'XAUUSD');
+  } else if (reply.ui_action === 'open_briefing') {
+    document.querySelector('.hero')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  } else if (reply.ui_action === 'open_approvals') {
+    $('#approvalList')?.closest('.panel')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+}
+
+async function sendVoiceTranscript(transcript) {
+  setText('#voiceStatus', `Heard: “${transcript}”`);
+  log(`Transcript: ${transcript}`, 'VOICE');
+  try {
+    const reply = await post('/v1/voice/browser', {
+      transcript,
+      session_id: VOICE_SESSION,
+      source: 'browser',
+      telegram_user_id: 0,
+      chat_id: 0,
+    });
+    setText('#voiceStatus', reply.text);
+    setText('#voiceBadge', reply.session_active ? 'ACTIVE' : 'STANDBY');
+    speak(reply.speak_text || reply.text);
+    applyVoiceAction(reply);
+    log(`PHOENIX: ${reply.text}`, 'VOICE');
+  } catch (error) {
+    setText('#voiceStatus', error.message);
+    setText('#voiceBadge', 'WAKE REQUIRED');
+    log(error.message, 'VOICE');
+  }
+}
+
+function configureRecognition() {
+  const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!Recognition) {
+    setText('#voiceStatus', 'Browser speech recognition is unavailable. Use Chrome or Edge, or type commands through the API.');
+    setText('#voiceBadge', 'UNAVAILABLE');
+    return false;
+  }
+  recognition = new Recognition();
+  recognition.lang = voiceSettings.language || 'de-DE';
+  recognition.continuous = true;
+  recognition.interimResults = false;
+  recognition.onresult = (event) => {
+    const result = event.results[event.results.length - 1];
+    const transcript = result[0].transcript.trim();
+    sendVoiceTranscript(transcript);
+  };
+  recognition.onerror = (event) => {
+    log(`Speech recognition error: ${event.error}`, 'VOICE');
+    if (event.error === 'not-allowed') setText('#voiceStatus', 'Microphone permission denied.');
+  };
+  recognition.onend = () => {
+    if (voiceEnabled) {
+      try { recognition.start(); } catch (_) { /* browser restart race */ }
+    }
+  };
+  return true;
+}
+
+function toggleVoice() {
+  voiceEnabled = !voiceEnabled;
+  document.body.classList.toggle('listening', voiceEnabled);
+  setText('#voiceButton', voiceEnabled ? 'VOICE LINK ACTIVE' : 'ACTIVATE VOICE LINK');
+  setText('#voiceBadge', voiceEnabled ? 'LISTENING' : 'STANDBY');
+  if (voiceEnabled) {
+    if (!recognition && !configureRecognition()) {
+      voiceEnabled = false;
+      document.body.classList.remove('listening');
+      return;
+    }
+    try { recognition.start(); } catch (_) { /* already active */ }
+    setText('#voiceStatus', `Say “${voiceSettings.wake_name || 'PHOENIX'}”.`);
+    log('Wake-word listening activated for MASTER Brano', 'VOICE');
+  } else {
+    recognition?.stop();
+    speechSynthesis?.cancel();
+    setText('#voiceStatus', 'Voice link paused.');
+    log('Voice link paused', 'VOICE');
+  }
 }
 
 function renderWatchlist(payload) {
@@ -74,7 +184,6 @@ function renderCEOProfile(profile) {
   const salutation = profile.preferred_salutation || 'MASTER Brano';
   const heading = $('.hero-copy h2');
   if (heading) heading.innerHTML = `Welcome, ${salutation}.<br />Every mission prioritized.`;
-  setText('#voiceStatus', `Ready for ${salutation}. Wake name: ${profile.assistant_name || 'PHOENIX'}`);
   log(`Personal AI CEO profile loaded for ${salutation}`, 'CEO');
 }
 
@@ -83,8 +192,6 @@ function renderCEOBriefing(briefing) {
   const focus = briefing.daily_focus || 'No critical action required';
   setText('#missionStatus', `CEO · ${briefing.top_priorities?.length || 0} PRIORITIES`);
   log(`${briefing.salutation}: daily focus — ${focus}`, 'CEO');
-  (briefing.risks || []).slice(0, 3).forEach((risk) => log(`Executive risk: ${risk}`, 'RISK'));
-  (briefing.approvals || []).slice(0, 3).forEach((approval) => log(`Approval required: ${approval}`, 'CONTROL'));
 }
 
 function renderRuntime(report) {
@@ -94,10 +201,8 @@ function renderRuntime(report) {
   const blocked = (report.failed || 0) + (report.dead_letter || 0);
   const total = queued + active + completed + blocked + (report.waiting_review || 0) + (report.waiting_approval || 0);
   const progress = total ? completed / total : 0;
-  setText('#missionsQueued', queued);
-  setText('#missionsActive', active);
-  setText('#missionsCompleted', completed);
-  setText('#missionsBlocked', blocked);
+  setText('#missionsQueued', queued); setText('#missionsActive', active);
+  setText('#missionsCompleted', completed); setText('#missionsBlocked', blocked);
   setText('#missionProgress', percent(progress));
   $('#missionProgressBar').style.width = percent(progress);
   setText('#missionStatus', blocked ? 'ATTENTION' : active ? 'EXECUTING' : 'MONITORING');
@@ -106,13 +211,9 @@ function renderRuntime(report) {
 function renderApprovals(payload) {
   const items = payload.items || payload.approvals || [];
   const pending = items.filter((item) => !item.status || ['pending', 'requested', 'waiting'].includes(String(item.status).toLowerCase()));
-  setText('#pendingApprovals', pending.length);
-  setText('#approvalBadge', `${pending.length} PENDING`);
+  setText('#pendingApprovals', pending.length); setText('#approvalBadge', `${pending.length} PENDING`);
   const root = $('#approvalList');
-  if (!pending.length) {
-    root.innerHTML = '<div class="empty-state">No pending approvals detected.</div>';
-    return;
-  }
+  if (!pending.length) { root.innerHTML = '<div class="empty-state">No pending approvals detected.</div>'; return; }
   root.innerHTML = pending.slice(0, 4).map((item) => `<div class="approval-item"><div><b>${safe(item.title || item.action, 'Approval request')}</b><small>${safe(item.reason || item.description, 'Human review required')}</small></div><button data-approval="${safe(item.id, '')}">REVIEW</button></div>`).join('');
   root.querySelectorAll('button').forEach((button) => button.addEventListener('click', () => log(`Approval ${button.dataset.approval || ''} opened for human review — no automatic action`, 'CONTROL')));
 }
@@ -132,18 +233,16 @@ async function refresh() {
     ['/v1/orchestrator/status', (data) => setText('#agentCount', `${data.available_agents || data.active_agents || 0} AVAILABLE`)],
     ['/v1/approvals', renderApprovals],
     ['/v1/voice/status', (data) => {
-      setText('#assistantName', data.assistant_name || 'PHOENIX');
-    }]
+      const settings = data.settings || data;
+      voiceSettings = { ...voiceSettings, ...settings };
+      setText('#assistantName', settings.assistant_name || 'PHOENIX');
+      setText('#voiceStatus', `Say “${settings.wake_name || 'PHOENIX'}” or press the voice button.`);
+    }],
   ];
   let connected = 0;
   for (const [path, apply] of services) {
-    try {
-      const data = await get(path);
-      apply(data);
-      connected += 1;
-    } catch (error) {
-      if (path !== '/v1/personal-ceo/briefings/latest') log(`Service unavailable: ${path}`, 'WAIT');
-    }
+    try { apply(await get(path)); connected += 1; }
+    catch (error) { if (path !== '/v1/personal-ceo/briefings/latest') log(`Service unavailable: ${path}`, 'WAIT'); }
   }
   setText('#connectedServices', `${connected}/${services.length}`);
   setText('#systemRisk', connected >= Math.ceil(services.length * 0.7) ? 'CONTROLLED' : 'DEGRADED');
@@ -151,18 +250,10 @@ async function refresh() {
   $('#refreshButton').disabled = false;
 }
 
-function updateClock() {
-  setText('#clock', new Date().toLocaleTimeString([], { hour12: false }));
-}
+function updateClock() { setText('#clock', new Date().toLocaleTimeString([], { hour12: false })); }
 
 $('#refreshButton').addEventListener('click', refresh);
-$('#voiceButton').addEventListener('click', () => {
-  const active = document.body.classList.toggle('listening');
-  setText('#voiceButton', active ? 'VOICE LINK ACTIVE' : 'ACTIVATE VOICE LINK');
-  setText('#voiceBadge', active ? 'LISTENING' : 'STANDBY');
-  setText('#voiceStatus', active ? 'Listening for PHOENIX commands from MASTER Brano…' : 'Voice link paused.');
-  log(active ? 'Voice link activated for MASTER Brano' : 'Voice link paused', 'VOICE');
-});
+$('#voiceButton').addEventListener('click', toggleVoice);
 $('#focusButton').addEventListener('click', () => {
   const active = document.body.classList.toggle('focus');
   setText('#focusButton', active ? 'EXIT FOCUS MODE' : 'ENTER FOCUS MODE');
