@@ -1,4 +1,131 @@
-<!doctype html><html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><title>PHOENIX Command Center</title><link rel="stylesheet" href="./styles.css"/></head><body><div class="grid"></div><main><header><div><small>AI OPERATIONS PLATFORM</small><h1 id="assistantName">PHOENIX</h1></div><div class="live"><span></span> SYSTEM ONLINE</div></header><section class="hero panel"><div class="orb"><div class="core"></div><div class="ring r1"></div><div class="ring r2"></div></div><div><p class="eyebrow">COMMAND CORE</p><h2>Holographic intelligence interface</h2><p>Live trading, agents, voice, approvals and project control in one responsive command center.</p><div class="actions"><button id="voiceButton">ACTIVATE VOICE</button><button class="ghost" id="refreshButton">REFRESH DATA</button></div></div></section><section class="metrics"><article class="panel"><span>Market bias</span><strong id="bias">NEUTRAL</strong><em>XAUUSD · H1/H4</em></article><article class="panel"><span>Setup score</span><strong id="score">82</strong><em>Human approval required</em></article><article class="panel"><span>Risk</span><strong id="risk">0.50%</strong><em>Auto execution disabled</em></article><article class="panel"><span>Drawdown</span><strong id="drawdown">1.24%</strong><em>Within safety limits</em></article></section><section class="dashboard"><article class="panel chart"><div class="title"><h3>LIVE MARKET FEED</h3><span>MT5 / TradingView</span></div><div class="chartline"></div><div class="zones"><i>Liquidity</i><i>FVG</i><i>Order Block</i></div></article><article class="panel"><div class="title"><h3>AGENT NETWORK</h3><span id="agentCount">4 ACTIVE</span></div><ul id="agents"><li><b>CODEX</b><span>Building</span></li><li><b>CLAUDE</b><span>Reviewing</span></li><li><b>GPT</b><span>Planning</span></li><li><b>GEMINI</b><span>Vision</span></li></ul></article><article class="panel"><div class="title"><h3>VOICE LINK</h3><span>READY</span></div><div class="wave"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div><p id="voiceStatus">Say the configured wake name to begin.</p></article><article class="panel"><div class="title"><h3>APPROVAL CENTER</h3><span>2 PENDING</span></div><div class="approval"><b>Trading setup #184</b><p>Score 82 · RR 1:3.4 · XAUUSD</p><button>REVIEW</button></div><div class="approval"><b>Deployment release</b><p>Sandbox green · rollback ready</p><button>REVIEW</button></div></article><article class="panel wide"><div class="title"><h3>PROJECT ROADMAP</h3><span>PHASE 30</span></div><div class="progress"><span style="width:87%"></span></div><p>Command Center integration · 87% complete</p></article><article class="panel wide"><div class="title"><h3>SYSTEM LOG</h3><span>LIVE</span></div><pre id="log">[ONLINE] PHOENIX core connected
-[VISION] MT5 feed ready
-[TRADING] Advisory mode active
-[SAFETY] Automatic order execution disabled</pre></article></section></main><script src="./app.js"></script></body></html>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#030712" />
+  <title>PHOENIX v5.0 · Holographic Command Center</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <div class="ambient ambient-a"></div>
+  <div class="ambient ambient-b"></div>
+  <div class="grid"></div>
+
+  <main class="shell">
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-mark"><span></span><i></i></div>
+        <div>
+          <small>PHOENIX INTELLIGENCE OS</small>
+          <h1 id="assistantName">PHOENIX</h1>
+        </div>
+      </div>
+      <nav class="system-strip" aria-label="System status">
+        <div><span class="status-dot"></span><b>CORE</b><em id="coreStatus">ONLINE</em></div>
+        <div><b>MODE</b><em>ADVISORY</em></div>
+        <div><b>TIME</b><em id="clock">--:--:--</em></div>
+        <button class="icon-button" id="refreshButton" aria-label="Refresh data">↻</button>
+      </nav>
+    </header>
+
+    <section class="hero panel">
+      <div class="orb-wrap" aria-hidden="true">
+        <div class="orbit orbit-outer"><span></span><span></span><span></span></div>
+        <div class="orbit orbit-mid"></div>
+        <div class="orbit orbit-inner"></div>
+        <div class="core-orb"><div class="core-eye"></div></div>
+        <div class="scan-line"></div>
+      </div>
+      <div class="hero-copy">
+        <p class="eyebrow">HOLOGRAPHIC COMMAND CENTER · V5.0</p>
+        <h2>One intelligence layer.<br />Every mission visible.</h2>
+        <p>Institutional market intelligence, autonomous research, agent operations, approvals and system safety in one real-time control surface.</p>
+        <div class="hero-actions">
+          <button id="voiceButton">ACTIVATE VOICE LINK</button>
+          <button class="ghost" id="focusButton">ENTER FOCUS MODE</button>
+        </div>
+        <div class="safety-banner"><span>◆</span> Human approval required · Automatic order execution disabled</div>
+      </div>
+      <div class="hero-telemetry">
+        <div><span>CONNECTED SERVICES</span><strong id="connectedServices">0/0</strong></div>
+        <div><span>ACTIVE MARKETS</span><strong id="activeMarkets">0</strong></div>
+        <div><span>RESEARCH EVENTS</span><strong id="researchEvents">0</strong></div>
+        <div><span>PENDING APPROVALS</span><strong id="pendingApprovals">0</strong></div>
+      </div>
+    </section>
+
+    <section class="metric-grid">
+      <article class="panel metric"><span>MARKET REGIME</span><strong id="marketRegime">SCANNING</strong><em id="marketBias">Multi-timeframe intelligence</em></article>
+      <article class="panel metric"><span>TRADE ANALYST</span><strong id="tradeVerdict">NO SETUP</strong><em id="tradeConfidence">Confidence unavailable</em></article>
+      <article class="panel metric"><span>ORDERFLOW</span><strong id="orderflowSignal">NEUTRAL</strong><em id="orderflowQuality">Awaiting structured feed</em></article>
+      <article class="panel metric"><span>SYSTEM RISK</span><strong id="systemRisk">CONTROLLED</strong><em>Execution remains human-gated</em></article>
+    </section>
+
+    <section class="command-grid">
+      <article class="panel market-board span-8">
+        <div class="panel-title"><div><p>INSTITUTIONAL RADAR</p><h3>Priority Watchlist</h3></div><span class="badge live-badge">LIVE INTELLIGENCE</span></div>
+        <div class="watchlist" id="watchlist">
+          <div class="watch-row header"><span>MARKET</span><span>REGIME</span><span>BIAS</span><span>OPPORTUNITY</span><span>RISK</span></div>
+          <div class="empty-state">Waiting for Market Intelligence snapshots…</div>
+        </div>
+      </article>
+
+      <article class="panel voice-card span-4">
+        <div class="panel-title"><div><p>VOICE INTERFACE</p><h3>Neural Link</h3></div><span class="badge" id="voiceBadge">STANDBY</span></div>
+        <div class="voice-sphere"><span></span><i></i><b></b></div>
+        <div class="wave" id="voiceWave"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+        <p id="voiceStatus">Voice link is ready for the configured wake name.</p>
+      </article>
+
+      <article class="panel span-4">
+        <div class="panel-title"><div><p>AI TRADE ANALYST</p><h3 id="analystSymbol">No active thesis</h3></div><span class="badge" id="analystVerdict">WAITING</span></div>
+        <div class="confidence-ring" id="confidenceRing"><strong id="analystConfidence">0%</strong><span>CONFIDENCE</span></div>
+        <dl class="analysis-list">
+          <div><dt>Direction</dt><dd id="analystDirection">—</dd></div>
+          <div><dt>Entry zone</dt><dd id="analystEntry">—</dd></div>
+          <div><dt>Invalidation</dt><dd id="analystInvalidation">—</dd></div>
+          <div><dt>Risk / Reward</dt><dd id="analystRR">—</dd></div>
+        </dl>
+      </article>
+
+      <article class="panel span-4">
+        <div class="panel-title"><div><p>AUTONOMOUS RESEARCH</p><h3>Intelligence Brief</h3></div><span class="badge" id="researchConfidence">0% CONF.</span></div>
+        <h4 id="researchHeadline">No research brief available</h4>
+        <p class="muted" id="researchSummary">PHOENIX is waiting for verified sources and structured research events.</p>
+        <div class="tag-cloud" id="researchEntities"></div>
+        <div class="risk-opportunity"><div><span>OPPORTUNITIES</span><strong id="opportunityCount">0</strong></div><div><span>RISKS</span><strong id="riskCount">0</strong></div><div><span>CONTRADICTIONS</span><strong id="contradictionCount">0</strong></div></div>
+      </article>
+
+      <article class="panel span-4">
+        <div class="panel-title"><div><p>AGENT OPERATIONS</p><h3>Runtime Network</h3></div><span class="badge" id="agentCount">0 AVAILABLE</span></div>
+        <div id="agents" class="agent-list">
+          <div class="agent"><span>PX</span><div><b>PHOENIX CORE</b><small>Orchestration</small></div><em class="online">ONLINE</em></div>
+          <div class="agent"><span>AI</span><div><b>ANALYST</b><small>Market intelligence</small></div><em>STANDBY</em></div>
+          <div class="agent"><span>RS</span><div><b>RESEARCH</b><small>Source verification</small></div><em>STANDBY</em></div>
+          <div class="agent"><span>QA</span><div><b>GUARDIAN</b><small>Safety and approvals</small></div><em class="online">ACTIVE</em></div>
+        </div>
+      </article>
+
+      <article class="panel span-6">
+        <div class="panel-title"><div><p>MISSION CONTROL</p><h3>Strategic Execution</h3></div><span class="badge" id="missionStatus">MONITORING</span></div>
+        <div class="mission-meter"><div><span id="missionProgressBar"></span></div><strong id="missionProgress">0%</strong></div>
+        <div class="mission-stats"><div><span>Queued</span><strong id="missionsQueued">0</strong></div><div><span>Active</span><strong id="missionsActive">0</strong></div><div><span>Completed</span><strong id="missionsCompleted">0</strong></div><div><span>Blocked</span><strong id="missionsBlocked">0</strong></div></div>
+      </article>
+
+      <article class="panel span-6">
+        <div class="panel-title"><div><p>HUMAN CONTROL GATE</p><h3>Approval Center</h3></div><span class="badge warning" id="approvalBadge">0 PENDING</span></div>
+        <div id="approvalList" class="approval-list"><div class="empty-state">No pending approvals detected.</div></div>
+      </article>
+
+      <article class="panel span-12 log-panel">
+        <div class="panel-title"><div><p>SYSTEM TELEMETRY</p><h3>Live Event Stream</h3></div><span class="badge live-badge">STREAMING</span></div>
+        <pre id="log">[BOOT] PHOENIX v5.0 command center initialized
+[SAFETY] Automatic order execution disabled
+[CONTROL] Human approval gate active</pre>
+      </article>
+    </section>
+  </main>
+  <script src="./app.js"></script>
+</body>
+</html>
