@@ -62,7 +62,7 @@ class OrderflowService:
         data_quality = round(min(1, evidence * 0.7 + (0.3 if payload.source_timestamp else 0)), 4)
 
         snapshot = OrderflowSnapshot(
-            **payload.model_dump(),
+            **payload.model_dump(exclude={"symbol"}),
             symbol=payload.symbol.upper(),
             total_bid_volume=round(total_bid, 4),
             total_ask_volume=round(total_ask, 4),
