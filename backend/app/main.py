@@ -16,6 +16,7 @@ from .connectors.api import router as connectors_router
 from .decision_engine.api import router as decision_engine_router
 from .execution.api import router as execution_router
 from .github_remote.api import router as github_remote_router
+from .goal_execution.api import router as goal_execution_router
 from .knowledge_graph.api import router as knowledge_graph_router
 from .live_analysis.api import router as live_analysis_router
 from .long_term_memory.api import router as long_term_memory_router
@@ -70,6 +71,7 @@ app.include_router(connectors_router)
 app.include_router(decision_engine_router)
 app.include_router(execution_router)
 app.include_router(github_remote_router)
+app.include_router(goal_execution_router)
 app.include_router(knowledge_graph_router)
 app.include_router(live_analysis_router)
 app.include_router(long_term_memory_router)
