@@ -5,6 +5,7 @@ from fastapi import APIRouter, HTTPException, Query, status
 from ..autonomous_research.api import router as autonomous_research_router
 from ..collaboration_mesh.api import router as collaboration_mesh_router
 from ..config_control.api import router as config_control_router
+from ..decision_memory.api import router as decision_memory_router
 from ..digital_twin.api import router as digital_twin_router
 from ..live_integrations.api import router as live_integrations_router
 from ..notification_hub.api import router as notification_hub_router
@@ -59,3 +60,4 @@ router.include_router(notification_hub_router)
 router.include_router(config_control_router)
 router.include_router(readiness_center_router)
 router.include_router(digital_twin_router)
+router.include_router(decision_memory_router)
