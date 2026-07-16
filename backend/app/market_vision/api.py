@@ -2,6 +2,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Query, status
 
+from ..autonomous_research.api import router as autonomous_research_router
 from .models import MarketVisionCreate, MarketVisionListResponse, MarketVisionRecord, MarketVisionStatus
 from .service import market_vision_service
 
@@ -39,3 +40,7 @@ def latest_analysis(symbol: str) -> MarketVisionRecord:
     if record is None:
         raise HTTPException(status_code=404, detail="No market vision analysis found")
     return record
+
+
+# Register the independent research-network API through an already mounted router.
+router.include_router(autonomous_research_router)
