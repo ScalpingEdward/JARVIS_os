@@ -21,6 +21,7 @@ from ..event_bus.api import router as event_bus_router
 from ..execution_simulator.api import router as execution_simulator_router
 from ..forward_validation.api import router as forward_validation_router
 from ..identity_access.api import router as identity_access_router
+from ..incident_management.api import router as incident_management_router
 from ..integration_hub.api import router as integration_hub_router
 from ..job_orchestrator.api import router as job_orchestrator_router
 from ..knowledge_engine.api import router as knowledge_engine_router
@@ -134,3 +135,4 @@ router.include_router(job_orchestrator_router)
 router.include_router(temporal_scheduler_router)
 router.include_router(resilience_engine_router)
 router.include_router(slo_engine_router)
+router.include_router(incident_management_router)
