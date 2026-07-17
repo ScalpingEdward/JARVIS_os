@@ -24,6 +24,7 @@ from ..market_replay.api import router as market_replay_router
 from ..memory_engine.api import router as memory_engine_router
 from ..multi_broker.api import router as multi_broker_router
 from ..notification_hub.api import router as notification_hub_router
+from ..observability_control.api import router as observability_control_router
 from ..personal_ceo.api import router as personal_ceo_router
 from ..plugin_sdk.api import router as plugin_sdk_router
 from ..portfolio_risk.api import router as portfolio_risk_router
@@ -41,7 +42,6 @@ from ..vision_intelligence.api import router as vision_intelligence_router
 from ..workflow_designer.api import router as workflow_designer_router
 from .models import MarketVisionCreate, MarketVisionListResponse, MarketVisionRecord, MarketVisionStatus
 from .service import market_vision_service
-
 
 router = APIRouter(tags=["market-vision"])
 
@@ -115,3 +115,4 @@ router.include_router(vision_intelligence_router)
 router.include_router(desktop_intelligence_router)
 router.include_router(task_engine_router)
 router.include_router(integration_hub_router)
+router.include_router(observability_control_router)
