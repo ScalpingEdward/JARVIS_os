@@ -102,12 +102,9 @@ def test_unknown_command_is_blocked():
 
 def test_circuit_breaker_blocks_unavailable_module():
     service = IntegrationHubService()
-    module = service.create_module(
-        ModuleRegistrationCreate(
-            **module_payload("task-engine").model_dump(),
-            failure_threshold=1,
-        )
-    )
+    payload = module_payload("task-engine").model_dump()
+    payload["failure_threshold"] = 1
+    module = service.create_module(ModuleRegistrationCreate.model_validate(payload))
     updated = service.update_health(module.id, "workspace-1", HealthUpdate(requester_id="owner-1", health=ModuleHealth.UNAVAILABLE, reason="timeout"))
     assert updated is not None
     assert updated.circuit_state == CircuitState.OPEN
