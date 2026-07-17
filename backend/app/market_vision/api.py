@@ -2,6 +2,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Query, status
 
+from ..agent_orchestrator.api import router as agent_orchestrator_router
 from ..autonomous_research.api import router as autonomous_research_router
 from ..backtesting_lab.api import router as backtesting_lab_router
 from ..capital_allocation.api import router as capital_allocation_router
@@ -89,3 +90,4 @@ router.include_router(strategy_coach_router)
 router.include_router(forward_validation_router)
 router.include_router(risk_allocation_router)
 router.include_router(trade_approval_router)
+router.include_router(agent_orchestrator_router)
