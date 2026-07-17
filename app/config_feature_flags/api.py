@@ -3,8 +3,9 @@ from uuid import UUID
 from fastapi import APIRouter, HTTPException, Query, status
 
 from .models import (
-    ApprovalCreate, ApprovalRecord, ConfigEntryCreate, ConfigEntryRecord, ConfigFeatureStatus,
-    ConfigState, Environment, EvaluationRequest, EvaluationResult, FeatureFlagCreate,
+    ApprovalCreate, ApprovalRecord, ConfigApprovalCreate, ConfigApprovalRecord,
+    ConfigEntryCreate, ConfigEntryRecord, ConfigFeatureStatus, ConfigState,
+    Environment, EvaluationRequest, EvaluationResult, FeatureFlagCreate,
     FeatureFlagRecord, FlagState, MetricsRecord, Mutation,
 )
 from .service import config_feature_service as service
@@ -112,6 +113,14 @@ def _set_config(config_id: UUID, workspace_id: str, payload: Mutation, state: Co
 @router.post("/configs/{config_id}/review", response_model=ConfigEntryRecord)
 def review_config(config_id: UUID, payload: Mutation, workspace_id: str = Query(min_length=1, max_length=120)) -> ConfigEntryRecord:
     return _set_config(config_id, workspace_id, payload, ConfigState.REVIEW)
+
+
+@router.post("/configs/approvals", response_model=ConfigApprovalRecord, status_code=status.HTTP_201_CREATED)
+def approve_config_review(payload: ConfigApprovalCreate) -> ConfigApprovalRecord:
+    try:
+        return service.approve_config(payload)
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
 
 
 @router.post("/configs/{config_id}/approved", response_model=ConfigEntryRecord)
