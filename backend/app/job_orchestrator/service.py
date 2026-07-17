@@ -106,7 +106,7 @@ class JobOrchestratorService:
         duplicate = next((j for j in self.jobs.values() if j.workspace_id == payload.workspace_id and j.idempotency_key == payload.idempotency_key and j.state != JobState.CANCELLED), None)
         if duplicate:
             raise ValueError("idempotency key already exists")
-        data = payload.model_dump(exclude={"human_approved", "execute_action"})
+        data = payload.model_dump(exclude={"human_approved", "execute_action", "lease_seconds"})
         item = JobRecord(**data, lease_seconds=payload.lease_seconds or queue.default_lease_seconds)
         self.jobs[item.id] = item
         self._audit(item.workspace_id, "job.queued", "job", item.id, item.owner_id, job_type=item.job_type)
