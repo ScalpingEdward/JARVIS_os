@@ -72,10 +72,15 @@ def test_owner_only_archive_restore():
 
 
 def test_safety_rejects_external_calls_and_uploads():
+    payload = asset_payload().model_dump()
+
     with pytest.raises(ValidationError):
-        asset_payload().model_copy(update={"automatic_cloud_upload": True})
+        VisionAssetCreate.model_validate({**payload, "automatic_cloud_upload": True})
     with pytest.raises(ValidationError):
-        asset_payload().model_copy(update={"external_vision_request": True})
+        VisionAssetCreate.model_validate({**payload, "external_vision_request": True})
+    with pytest.raises(ValidationError):
+        VisionAssetCreate.model_validate({**payload, "external_ocr_request": True})
+
     service = VisionIntelligenceService()
     asset = service.create_asset(asset_payload())
     with pytest.raises(ValidationError):
