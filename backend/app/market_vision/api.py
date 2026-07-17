@@ -28,6 +28,7 @@ from ..strategic_planning.api import router as strategic_planning_router
 from ..strategy_builder.api import router as strategy_builder_router
 from ..strategy_coach.api import router as strategy_coach_router
 from ..trade_approval.api import router as trade_approval_router
+from ..workflow_designer.api import router as workflow_designer_router
 from .models import MarketVisionCreate, MarketVisionListResponse, MarketVisionRecord, MarketVisionStatus
 from .service import market_vision_service
 
@@ -93,3 +94,4 @@ router.include_router(risk_allocation_router)
 router.include_router(trade_approval_router)
 router.include_router(agent_orchestrator_router)
 router.include_router(memory_engine_router)
+router.include_router(workflow_designer_router)
