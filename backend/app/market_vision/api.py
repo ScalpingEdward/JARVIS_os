@@ -22,6 +22,7 @@ from ..readiness_center.api import router as readiness_center_router
 from ..replay_intelligence.api import router as replay_intelligence_router
 from ..strategic_planning.api import router as strategic_planning_router
 from ..strategy_builder.api import router as strategy_builder_router
+from ..strategy_coach.api import router as strategy_coach_router
 from .models import MarketVisionCreate, MarketVisionListResponse, MarketVisionRecord, MarketVisionStatus
 from .service import market_vision_service
 
@@ -81,3 +82,4 @@ router.include_router(backtesting_lab_router)
 router.include_router(execution_simulator_router)
 router.include_router(market_replay_router)
 router.include_router(replay_intelligence_router)
+router.include_router(strategy_coach_router)
