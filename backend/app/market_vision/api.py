@@ -9,6 +9,7 @@ from ..collaboration_mesh.api import router as collaboration_mesh_router
 from ..config_control.api import router as config_control_router
 from ..decision_memory.api import router as decision_memory_router
 from ..digital_twin.api import router as digital_twin_router
+from ..execution_simulator.api import router as execution_simulator_router
 from ..live_integrations.api import router as live_integrations_router
 from ..multi_broker.api import router as multi_broker_router
 from ..notification_hub.api import router as notification_hub_router
@@ -75,3 +76,4 @@ router.include_router(capital_allocation_router)
 router.include_router(multi_broker_router)
 router.include_router(strategy_builder_router)
 router.include_router(backtesting_lab_router)
+router.include_router(execution_simulator_router)
