@@ -35,6 +35,7 @@ from ..proactive_operations.api import router as proactive_operations_router
 from ..readiness_center.api import router as readiness_center_router
 from ..replay_intelligence.api import router as replay_intelligence_router
 from ..risk_allocation.api import router as risk_allocation_router
+from ..secrets_vault.api import router as secrets_vault_router
 from ..strategic_planning.api import router as strategic_planning_router
 from ..strategy_builder.api import router as strategy_builder_router
 from ..strategy_coach.api import router as strategy_coach_router
@@ -120,3 +121,4 @@ router.include_router(integration_hub_router)
 router.include_router(observability_control_router)
 router.include_router(policy_approval_router)
 router.include_router(identity_access_router)
+router.include_router(secrets_vault_router)
