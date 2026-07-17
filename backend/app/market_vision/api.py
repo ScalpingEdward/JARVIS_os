@@ -21,6 +21,7 @@ from ..identity_access.api import router as identity_access_router
 from ..integration_hub.api import router as integration_hub_router
 from ..knowledge_engine.api import router as knowledge_engine_router
 from ..live_integrations.api import router as live_integrations_router
+from ..localization.api import router as localization_router
 from ..market_replay.api import router as market_replay_router
 from ..memory_engine.api import router as memory_engine_router
 from ..multi_broker.api import router as multi_broker_router
@@ -122,3 +123,4 @@ router.include_router(observability_control_router)
 router.include_router(policy_approval_router)
 router.include_router(identity_access_router)
 router.include_router(secrets_vault_router)
+router.include_router(localization_router)
