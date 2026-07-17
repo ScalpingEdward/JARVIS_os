@@ -43,6 +43,7 @@ from ..readiness_center.api import router as readiness_center_router
 from ..replay_intelligence.api import router as replay_intelligence_router
 from ..resilience_engine.api import router as resilience_engine_router
 from ..risk_allocation.api import router as risk_allocation_router
+from ..runbook_engine.api import router as runbook_engine_router
 from ..secrets_vault.api import router as secrets_vault_router
 from ..service_registry.api import router as service_registry_router
 from ..slo_engine.api import router as slo_engine_router
@@ -138,3 +139,4 @@ router.include_router(resilience_engine_router)
 router.include_router(slo_engine_router)
 router.include_router(incident_management_router)
 router.include_router(change_governance_router)
+router.include_router(runbook_engine_router)
