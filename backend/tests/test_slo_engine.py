@@ -62,7 +62,7 @@ def test_budget_risk_and_exhaustion() -> None:
     slo = service.create_slo(_slo())
     service.set_state(slo.id, "alpha", Mutation(requester_id="owner"), SLOState.ACTIVE)
 
-    _, at_risk = service.record_measurement(_measurement(slo.id, 9880, 10000))
+    _, at_risk = service.record_measurement(_measurement(slo.id, 9920, 10000))
     assert at_risk.health == SLOHealth.AT_RISK
     assert at_risk.requires_review is True
 
