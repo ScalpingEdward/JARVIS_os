@@ -13,6 +13,7 @@ from ..collaboration_mesh.api import router as collaboration_mesh_router
 from ..config_control.api import router as config_control_router
 from ..decision_memory.api import router as decision_memory_router
 from ..digital_twin.api import router as digital_twin_router
+from ..document_intelligence.api import router as document_intelligence_router
 from ..execution_simulator.api import router as execution_simulator_router
 from ..forward_validation.api import router as forward_validation_router
 from ..knowledge_engine.api import router as knowledge_engine_router
@@ -105,3 +106,4 @@ router.include_router(automation_runtime_router)
 router.include_router(ai_connector_hub_router)
 router.include_router(knowledge_engine_router)
 router.include_router(browser_intelligence_router)
+router.include_router(document_intelligence_router)
