@@ -11,6 +11,7 @@ from ..browser_intelligence.api import router as browser_intelligence_router
 from ..capital_allocation.api import router as capital_allocation_router
 from ..collaboration_mesh.api import router as collaboration_mesh_router
 from ..config_control.api import router as config_control_router
+from ..data_governance.api import router as data_governance_router
 from ..decision_memory.api import router as decision_memory_router
 from ..desktop_intelligence.api import router as desktop_intelligence_router
 from ..digital_twin.api import router as digital_twin_router
@@ -124,3 +125,4 @@ router.include_router(policy_approval_router)
 router.include_router(identity_access_router)
 router.include_router(secrets_vault_router)
 router.include_router(localization_router)
+router.include_router(data_governance_router)
