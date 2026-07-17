@@ -13,6 +13,7 @@ from ..change_governance.api import router as change_governance_router
 from ..collaboration_mesh.api import router as collaboration_mesh_router
 from ..compliance_evidence.api import router as compliance_evidence_router
 from ..config_control.api import router as config_control_router
+from ..config_feature_flags.api import router as config_feature_flags_router
 from ..data_governance.api import router as data_governance_router
 from ..decision_memory.api import router as decision_memory_router
 from ..desktop_intelligence.api import router as desktop_intelligence_router
@@ -144,3 +145,4 @@ router.include_router(change_governance_router)
 router.include_router(runbook_engine_router)
 router.include_router(on_call_engine_router)
 router.include_router(status_communication_router)
+router.include_router(config_feature_flags_router)
