@@ -176,7 +176,11 @@ class TemporalSchedulerService:
             due = self._utc(schedule.next_run_at)
             if due > now:
                 continue
-            if schedule.misfire_policy == MisfirePolicy.SKIP and due < now:
+            if (
+                schedule.trigger_kind != TriggerKind.ONCE
+                and schedule.misfire_policy == MisfirePolicy.SKIP
+                and due < now
+            ):
                 run = self._plan_run(schedule, due, "misfire", "missed occurrence skipped")
                 run.state = RunState.SKIPPED
                 planned.append(run)
