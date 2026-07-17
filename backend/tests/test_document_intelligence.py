@@ -77,12 +77,7 @@ def test_duplicate_version_and_content_rejected():
 def test_owner_only_archive_and_restore():
     service = DocumentIntelligenceService()
     document = service.create_document(document_payload())
-    assert service.set_active(
-        document.id,
-        "workspace-1",
-        DocumentMutation(requester_id="wrong-owner"),
-        False,
-    ) is None
+    assert service.set_active(document.id, "workspace-1", DocumentMutation(requester_id="wrong-owner"), False) is None
     archived = service.set_active(
         document.id,
         "workspace-1",
@@ -90,12 +85,7 @@ def test_owner_only_archive_and_restore():
         False,
     )
     assert archived is not None and archived.active is False
-    restored = service.set_active(
-        document.id,
-        "workspace-1",
-        DocumentMutation(requester_id="owner-1"),
-        True,
-    )
+    restored = service.set_active(document.id, "workspace-1", DocumentMutation(requester_id="owner-1"), True)
     assert restored is not None and restored.active is True
 
 
@@ -120,7 +110,14 @@ def test_compare_versions():
 
 def test_safety_rejects_external_ai_upload_and_ocr():
     with pytest.raises(ValidationError):
-        document_payload().model_copy(update={"automatic_cloud_upload": True})
+        DocumentCreate(
+            workspace_id="w",
+            owner_id="o",
+            document_key="cloud-file",
+            title="Cloud file",
+            format=DocumentFormat.TXT,
+            automatic_cloud_upload=True,
+        )
     with pytest.raises(ValidationError):
         DocumentCreate(
             workspace_id="w",
