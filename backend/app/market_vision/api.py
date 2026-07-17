@@ -27,6 +27,7 @@ from ..notification_hub.api import router as notification_hub_router
 from ..observability_control.api import router as observability_control_router
 from ..personal_ceo.api import router as personal_ceo_router
 from ..plugin_sdk.api import router as plugin_sdk_router
+from ..policy_approval.api import router as policy_approval_router
 from ..portfolio_risk.api import router as portfolio_risk_router
 from ..predictive_intelligence.api import router as predictive_intelligence_router
 from ..proactive_operations.api import router as proactive_operations_router
@@ -116,3 +117,4 @@ router.include_router(desktop_intelligence_router)
 router.include_router(task_engine_router)
 router.include_router(integration_hub_router)
 router.include_router(observability_control_router)
+router.include_router(policy_approval_router)
