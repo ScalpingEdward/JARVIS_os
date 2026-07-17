@@ -18,6 +18,7 @@ from ..memory_engine.api import router as memory_engine_router
 from ..multi_broker.api import router as multi_broker_router
 from ..notification_hub.api import router as notification_hub_router
 from ..personal_ceo.api import router as personal_ceo_router
+from ..plugin_sdk.api import router as plugin_sdk_router
 from ..portfolio_risk.api import router as portfolio_risk_router
 from ..predictive_intelligence.api import router as predictive_intelligence_router
 from ..proactive_operations.api import router as proactive_operations_router
@@ -95,3 +96,4 @@ router.include_router(trade_approval_router)
 router.include_router(agent_orchestrator_router)
 router.include_router(memory_engine_router)
 router.include_router(workflow_designer_router)
+router.include_router(plugin_sdk_router)
