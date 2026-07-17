@@ -192,7 +192,15 @@ def test_real_execution_and_automatic_paid_requests_rejected():
             execute_provider_request=True,
         )
     with pytest.raises(ValidationError):
-        provider_payload().model_copy(update={"automatic_paid_requests": True})
+        ProviderRegister(
+            workspace_id="workspace-1",
+            owner_id="owner-1",
+            provider_key="paid-provider",
+            provider_type=ProviderType.OPENAI,
+            display_name="Paid provider",
+            models=[ModelProfile(model_key="paid-model", capabilities=["text.generate"])],
+            automatic_paid_requests=True,
+        )
 
 
 def test_status_reports_safety_defaults():
