@@ -12,6 +12,7 @@ from ..capital_allocation.api import router as capital_allocation_router
 from ..collaboration_mesh.api import router as collaboration_mesh_router
 from ..config_control.api import router as config_control_router
 from ..decision_memory.api import router as decision_memory_router
+from ..desktop_intelligence.api import router as desktop_intelligence_router
 from ..digital_twin.api import router as digital_twin_router
 from ..document_intelligence.api import router as document_intelligence_router
 from ..execution_simulator.api import router as execution_simulator_router
@@ -109,3 +110,4 @@ router.include_router(knowledge_engine_router)
 router.include_router(browser_intelligence_router)
 router.include_router(document_intelligence_router)
 router.include_router(vision_intelligence_router)
+router.include_router(desktop_intelligence_router)
