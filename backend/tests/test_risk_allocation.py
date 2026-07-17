@@ -51,13 +51,18 @@ def test_allocates_risk_across_accounts() -> None:
 def test_correlation_limit_reduces_second_account() -> None:
     service = RiskAllocationService()
     plan = service.create(
-        payload(accounts=[
-            account(account_id="a", requested_risk_pct=1),
-            account(account_id="b", requested_risk_pct=1),
-        ], max_correlation_group_risk_pct=1.5)
+        payload(
+            accounts=[
+                account(account_id="a", requested_risk_pct=2),
+                account(account_id="b", requested_risk_pct=2),
+            ],
+            max_account_risk_pct=2,
+            max_correlation_group_risk_pct=1.5,
+        )
     )
     assert plan.correlation_group_allocations["xauusd"] == 3000
-    assert plan.allocations[1].allocated_risk_amount == 2000
+    assert plan.allocations[0].allocated_risk_amount == 2000
+    assert plan.allocations[1].allocated_risk_amount == 1000
     assert plan.allocations[1].state == AccountState.CAUTION
 
 
