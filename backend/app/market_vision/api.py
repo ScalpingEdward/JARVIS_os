@@ -21,6 +21,7 @@ from ..predictive_intelligence.api import router as predictive_intelligence_rout
 from ..proactive_operations.api import router as proactive_operations_router
 from ..readiness_center.api import router as readiness_center_router
 from ..replay_intelligence.api import router as replay_intelligence_router
+from ..risk_allocation.api import router as risk_allocation_router
 from ..strategic_planning.api import router as strategic_planning_router
 from ..strategy_builder.api import router as strategy_builder_router
 from ..strategy_coach.api import router as strategy_coach_router
@@ -85,3 +86,4 @@ router.include_router(market_replay_router)
 router.include_router(replay_intelligence_router)
 router.include_router(strategy_coach_router)
 router.include_router(forward_validation_router)
+router.include_router(risk_allocation_router)
