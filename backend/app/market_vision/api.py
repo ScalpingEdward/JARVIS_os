@@ -34,6 +34,7 @@ from ..risk_allocation.api import router as risk_allocation_router
 from ..strategic_planning.api import router as strategic_planning_router
 from ..strategy_builder.api import router as strategy_builder_router
 from ..strategy_coach.api import router as strategy_coach_router
+from ..task_engine.api import router as task_engine_router
 from ..trade_approval.api import router as trade_approval_router
 from ..vision_intelligence.api import router as vision_intelligence_router
 from ..workflow_designer.api import router as workflow_designer_router
@@ -111,3 +112,4 @@ router.include_router(browser_intelligence_router)
 router.include_router(document_intelligence_router)
 router.include_router(vision_intelligence_router)
 router.include_router(desktop_intelligence_router)
+router.include_router(task_engine_router)
