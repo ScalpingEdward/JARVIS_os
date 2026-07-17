@@ -7,6 +7,7 @@ from ..ai_connector_hub.api import router as ai_connector_hub_router
 from ..automation_runtime.api import router as automation_runtime_router
 from ..autonomous_research.api import router as autonomous_research_router
 from ..backtesting_lab.api import router as backtesting_lab_router
+from ..browser_intelligence.api import router as browser_intelligence_router
 from ..capital_allocation.api import router as capital_allocation_router
 from ..collaboration_mesh.api import router as collaboration_mesh_router
 from ..config_control.api import router as config_control_router
@@ -103,3 +104,4 @@ router.include_router(plugin_sdk_router)
 router.include_router(automation_runtime_router)
 router.include_router(ai_connector_hub_router)
 router.include_router(knowledge_engine_router)
+router.include_router(browser_intelligence_router)
