@@ -22,6 +22,7 @@ from ..execution_simulator.api import router as execution_simulator_router
 from ..forward_validation.api import router as forward_validation_router
 from ..identity_access.api import router as identity_access_router
 from ..integration_hub.api import router as integration_hub_router
+from ..job_orchestrator.api import router as job_orchestrator_router
 from ..knowledge_engine.api import router as knowledge_engine_router
 from ..live_integrations.api import router as live_integrations_router
 from ..localization.api import router as localization_router
@@ -126,3 +127,4 @@ router.include_router(data_governance_router)
 router.include_router(compliance_evidence_router)
 router.include_router(service_registry_router)
 router.include_router(event_bus_router)
+router.include_router(job_orchestrator_router)
