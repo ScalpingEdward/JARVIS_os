@@ -19,6 +19,7 @@ from ..portfolio_risk.api import router as portfolio_risk_router
 from ..predictive_intelligence.api import router as predictive_intelligence_router
 from ..proactive_operations.api import router as proactive_operations_router
 from ..readiness_center.api import router as readiness_center_router
+from ..replay_intelligence.api import router as replay_intelligence_router
 from ..strategic_planning.api import router as strategic_planning_router
 from ..strategy_builder.api import router as strategy_builder_router
 from .models import MarketVisionCreate, MarketVisionListResponse, MarketVisionRecord, MarketVisionStatus
@@ -79,3 +80,4 @@ router.include_router(strategy_builder_router)
 router.include_router(backtesting_lab_router)
 router.include_router(execution_simulator_router)
 router.include_router(market_replay_router)
+router.include_router(replay_intelligence_router)
