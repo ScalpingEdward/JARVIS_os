@@ -46,6 +46,7 @@ from ..strategic_planning.api import router as strategic_planning_router
 from ..strategy_builder.api import router as strategy_builder_router
 from ..strategy_coach.api import router as strategy_coach_router
 from ..task_engine.api import router as task_engine_router
+from ..temporal_scheduler.api import router as temporal_scheduler_router
 from ..trade_approval.api import router as trade_approval_router
 from ..vision_intelligence.api import router as vision_intelligence_router
 from ..workflow_designer.api import router as workflow_designer_router
@@ -128,3 +129,4 @@ router.include_router(compliance_evidence_router)
 router.include_router(service_registry_router)
 router.include_router(event_bus_router)
 router.include_router(job_orchestrator_router)
+router.include_router(temporal_scheduler_router)
