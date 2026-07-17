@@ -14,6 +14,7 @@ from ..execution_simulator.api import router as execution_simulator_router
 from ..forward_validation.api import router as forward_validation_router
 from ..live_integrations.api import router as live_integrations_router
 from ..market_replay.api import router as market_replay_router
+from ..memory_engine.api import router as memory_engine_router
 from ..multi_broker.api import router as multi_broker_router
 from ..notification_hub.api import router as notification_hub_router
 from ..personal_ceo.api import router as personal_ceo_router
@@ -91,3 +92,4 @@ router.include_router(forward_validation_router)
 router.include_router(risk_allocation_router)
 router.include_router(trade_approval_router)
 router.include_router(agent_orchestrator_router)
+router.include_router(memory_engine_router)
