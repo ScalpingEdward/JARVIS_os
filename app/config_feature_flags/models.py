@@ -141,6 +141,28 @@ class ConfigEntryRecord(ConfigEntryCreate):
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
+class ConfigApprovalCreate(BaseModel):
+    workspace_id: str = Field(min_length=1, max_length=120)
+    requester_id: str = Field(min_length=1, max_length=120)
+    config_id: UUID
+    comment: str = Field(default="", max_length=4000)
+    human_approved: bool = True
+    automatic_decision: bool = False
+
+    @model_validator(mode="after")
+    def safety(self) -> "ConfigApprovalCreate":
+        if not self.human_approved:
+            raise ValueError("human approval is required")
+        if self.automatic_decision:
+            raise ValueError("automatic approval decisions are disabled")
+        return self
+
+
+class ConfigApprovalRecord(ConfigApprovalCreate):
+    id: UUID = Field(default_factory=uuid4)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
 class EvaluationRequest(BaseModel):
     workspace_id: str = Field(min_length=1, max_length=120)
     flag_key: str = Field(min_length=1, max_length=180)
