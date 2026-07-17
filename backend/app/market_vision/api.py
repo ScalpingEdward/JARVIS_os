@@ -39,6 +39,7 @@ from ..readiness_center.api import router as readiness_center_router
 from ..replay_intelligence.api import router as replay_intelligence_router
 from ..risk_allocation.api import router as risk_allocation_router
 from ..secrets_vault.api import router as secrets_vault_router
+from ..service_registry.api import router as service_registry_router
 from ..strategic_planning.api import router as strategic_planning_router
 from ..strategy_builder.api import router as strategy_builder_router
 from ..strategy_coach.api import router as strategy_coach_router
@@ -122,3 +123,4 @@ router.include_router(secrets_vault_router)
 router.include_router(localization_router)
 router.include_router(data_governance_router)
 router.include_router(compliance_evidence_router)
+router.include_router(service_registry_router)
