@@ -9,6 +9,7 @@ from ..autonomous_research.api import router as autonomous_research_router
 from ..backtesting_lab.api import router as backtesting_lab_router
 from ..browser_intelligence.api import router as browser_intelligence_router
 from ..capital_allocation.api import router as capital_allocation_router
+from ..change_governance.api import router as change_governance_router
 from ..collaboration_mesh.api import router as collaboration_mesh_router
 from ..compliance_evidence.api import router as compliance_evidence_router
 from ..config_control.api import router as config_control_router
@@ -136,3 +137,4 @@ router.include_router(temporal_scheduler_router)
 router.include_router(resilience_engine_router)
 router.include_router(slo_engine_router)
 router.include_router(incident_management_router)
+router.include_router(change_governance_router)
