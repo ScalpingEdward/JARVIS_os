@@ -17,6 +17,7 @@ from ..digital_twin.api import router as digital_twin_router
 from ..document_intelligence.api import router as document_intelligence_router
 from ..execution_simulator.api import router as execution_simulator_router
 from ..forward_validation.api import router as forward_validation_router
+from ..identity_access.api import router as identity_access_router
 from ..integration_hub.api import router as integration_hub_router
 from ..knowledge_engine.api import router as knowledge_engine_router
 from ..live_integrations.api import router as live_integrations_router
@@ -118,3 +119,4 @@ router.include_router(task_engine_router)
 router.include_router(integration_hub_router)
 router.include_router(observability_control_router)
 router.include_router(policy_approval_router)
+router.include_router(identity_access_router)
