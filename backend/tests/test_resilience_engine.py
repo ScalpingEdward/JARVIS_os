@@ -21,7 +21,7 @@ def _policy(workspace: str = "alpha", owner: str = "owner", **overrides) -> Poli
         failure_threshold=2,
         failure_window_seconds=60,
         open_seconds=30,
-        bulkhead_max_concurrency=2,
+        bulkhead_max_concurrency=10,
         retry_budget=1,
         retry_window_seconds=60,
     )
