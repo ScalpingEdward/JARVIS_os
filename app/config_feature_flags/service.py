@@ -3,8 +3,9 @@ from hashlib import sha256
 from uuid import UUID
 
 from .models import (
-    ApprovalCreate, ApprovalRecord, ConfigEntryCreate, ConfigEntryRecord, ConfigFeatureStatus,
-    ConfigState, Environment, EvaluationRequest, EvaluationResult, FeatureFlagCreate,
+    ApprovalCreate, ApprovalRecord, ConfigApprovalCreate, ConfigApprovalRecord,
+    ConfigEntryCreate, ConfigEntryRecord, ConfigFeatureStatus, ConfigState,
+    Environment, EvaluationRequest, EvaluationResult, FeatureFlagCreate,
     FeatureFlagRecord, FlagState, MetricsRecord, Mutation,
 )
 
@@ -14,6 +15,7 @@ class ConfigFeatureService:
         self.flags: dict[UUID, FeatureFlagRecord] = {}
         self.configs: dict[UUID, ConfigEntryRecord] = {}
         self.approvals: list[ApprovalRecord] = []
+        self.config_approvals: list[ConfigApprovalRecord] = []
         self.audit: list[dict] = []
 
     def status(self) -> ConfigFeatureStatus:
@@ -101,6 +103,20 @@ class ConfigFeatureService:
 
     def list_configs(self, workspace_id: str, environment: Environment | None = None) -> list[ConfigEntryRecord]:
         return [x for x in self.configs.values() if x.workspace_id == workspace_id and (environment is None or x.environment == environment)]
+
+    def approve_config(self, payload: ConfigApprovalCreate) -> ConfigApprovalRecord:
+        item = self.configs.get(payload.config_id)
+        if item is None or item.workspace_id != payload.workspace_id or item.state != ConfigState.REVIEW:
+            raise ValueError("configuration is not available for review")
+        if item.owner_id == payload.requester_id:
+            raise ValueError("owner self-approval is blocked")
+        if any(x.config_id == payload.config_id and x.requester_id == payload.requester_id for x in self.config_approvals):
+            raise ValueError("reviewer already approved this configuration")
+        approval = ConfigApprovalRecord(**payload.model_dump())
+        self.config_approvals.append(approval)
+        item.approval_count += 1
+        self._audit(payload.workspace_id, "config.approved-by-reviewer", payload.requester_id, item.id)
+        return approval
 
     def set_config_state(self, config_id: UUID, workspace_id: str, payload: Mutation, target: ConfigState) -> ConfigEntryRecord | None:
         item = self.configs.get(config_id)
