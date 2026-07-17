@@ -122,7 +122,7 @@ class TickRequest(BaseModel):
         if self.automatic_release:
             raise ValueError("automatic schedule release is disabled")
         if self.execute_targets:
-            raise ValueError("scheduler ticks never execute target actions")
+            raise ValueError("scheduler ticks never executes target actions")
         return self
 
 
