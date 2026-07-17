@@ -17,6 +17,7 @@ from ..decision_memory.api import router as decision_memory_router
 from ..desktop_intelligence.api import router as desktop_intelligence_router
 from ..digital_twin.api import router as digital_twin_router
 from ..document_intelligence.api import router as document_intelligence_router
+from ..event_bus.api import router as event_bus_router
 from ..execution_simulator.api import router as execution_simulator_router
 from ..forward_validation.api import router as forward_validation_router
 from ..identity_access.api import router as identity_access_router
@@ -124,3 +125,4 @@ router.include_router(localization_router)
 router.include_router(data_governance_router)
 router.include_router(compliance_evidence_router)
 router.include_router(service_registry_router)
+router.include_router(event_bus_router)
