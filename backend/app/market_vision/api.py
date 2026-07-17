@@ -10,6 +10,7 @@ from ..backtesting_lab.api import router as backtesting_lab_router
 from ..browser_intelligence.api import router as browser_intelligence_router
 from ..capital_allocation.api import router as capital_allocation_router
 from ..collaboration_mesh.api import router as collaboration_mesh_router
+from ..compliance_evidence.api import router as compliance_evidence_router
 from ..config_control.api import router as config_control_router
 from ..data_governance.api import router as data_governance_router
 from ..decision_memory.api import router as decision_memory_router
@@ -50,22 +51,18 @@ from .service import market_vision_service
 
 router = APIRouter(tags=["market-vision"])
 
-
 @router.get("/v1/market-vision/status", response_model=MarketVisionStatus)
 def vision_status() -> MarketVisionStatus:
     return market_vision_service.status()
-
 
 @router.post("/v1/market-vision/analyses", response_model=MarketVisionRecord, status_code=status.HTTP_201_CREATED)
 def create_analysis(payload: MarketVisionCreate) -> MarketVisionRecord:
     return market_vision_service.create(payload)
 
-
 @router.get("/v1/market-vision/analyses", response_model=MarketVisionListResponse)
 def list_analyses(symbol: str | None = Query(default=None, max_length=40)) -> MarketVisionListResponse:
     items = market_vision_service.list_all(symbol=symbol)
     return MarketVisionListResponse(items=items, count=len(items))
-
 
 @router.get("/v1/market-vision/analyses/{analysis_id}", response_model=MarketVisionRecord)
 def get_analysis(analysis_id: UUID) -> MarketVisionRecord:
@@ -74,14 +71,12 @@ def get_analysis(analysis_id: UUID) -> MarketVisionRecord:
         raise HTTPException(status_code=404, detail="Market vision analysis not found")
     return record
 
-
 @router.get("/v1/market-vision/latest/{symbol}", response_model=MarketVisionRecord)
 def latest_analysis(symbol: str) -> MarketVisionRecord:
     record = market_vision_service.latest(symbol)
     if record is None:
         raise HTTPException(status_code=404, detail="No market vision analysis found")
     return record
-
 
 router.include_router(autonomous_research_router)
 router.include_router(personal_ceo_router)
@@ -126,3 +121,4 @@ router.include_router(identity_access_router)
 router.include_router(secrets_vault_router)
 router.include_router(localization_router)
 router.include_router(data_governance_router)
+router.include_router(compliance_evidence_router)
