@@ -39,6 +39,7 @@ from ..predictive_intelligence.api import router as predictive_intelligence_rout
 from ..proactive_operations.api import router as proactive_operations_router
 from ..readiness_center.api import router as readiness_center_router
 from ..replay_intelligence.api import router as replay_intelligence_router
+from ..resilience_engine.api import router as resilience_engine_router
 from ..risk_allocation.api import router as risk_allocation_router
 from ..secrets_vault.api import router as secrets_vault_router
 from ..service_registry.api import router as service_registry_router
@@ -130,3 +131,4 @@ router.include_router(service_registry_router)
 router.include_router(event_bus_router)
 router.include_router(job_orchestrator_router)
 router.include_router(temporal_scheduler_router)
+router.include_router(resilience_engine_router)
