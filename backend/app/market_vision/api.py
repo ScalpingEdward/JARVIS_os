@@ -10,6 +10,7 @@ from ..config_control.api import router as config_control_router
 from ..decision_memory.api import router as decision_memory_router
 from ..digital_twin.api import router as digital_twin_router
 from ..execution_simulator.api import router as execution_simulator_router
+from ..forward_validation.api import router as forward_validation_router
 from ..live_integrations.api import router as live_integrations_router
 from ..market_replay.api import router as market_replay_router
 from ..multi_broker.api import router as multi_broker_router
@@ -83,3 +84,4 @@ router.include_router(execution_simulator_router)
 router.include_router(market_replay_router)
 router.include_router(replay_intelligence_router)
 router.include_router(strategy_coach_router)
+router.include_router(forward_validation_router)
