@@ -3,23 +3,23 @@ from pydantic import ValidationError
 
 from app.policy_approval.models import (
     ApprovalDecisionCreate, ApprovalRequestCreate, DecisionType,
-    EvaluationRequest, ExceptionCreate, PolicyCreate, PolicyEffect,
-    PolicyMutation, PolicyState, RequestState, RiskClass,
+    EvaluationRequest, ExceptionCreate, ExceptionDecision, PolicyCreate,
+    PolicyEffect, PolicyMutation, PolicyState, RequestState, RiskClass,
 )
 from app.policy_approval.service import PolicyApprovalService
 
 
-def policy_payload(effect: PolicyEffect = PolicyEffect.REQUIRE_APPROVAL) -> PolicyCreate:
+def policy_payload(effect: PolicyEffect = PolicyEffect.REQUIRE_APPROVAL, key: str = "critical-actions") -> PolicyCreate:
     return PolicyCreate(
         workspace_id="workspace-1", owner_id="owner-1",
-        policy_key="critical-actions", name="Critical actions",
+        policy_key=key, name="Critical actions",
         target_modules=["desktop-intelligence"], target_actions=["delete"],
         effect=effect, minimum_risk=RiskClass.HIGH, required_approvals=2,
     )
 
 
-def activate(service: PolicyApprovalService, effect: PolicyEffect = PolicyEffect.REQUIRE_APPROVAL):
-    policy = service.create_policy(policy_payload(effect))
+def activate(service: PolicyApprovalService, effect: PolicyEffect = PolicyEffect.REQUIRE_APPROVAL, key: str = "critical-actions"):
+    policy = service.create_policy(policy_payload(effect, key))
     return service.set_policy_state(policy.id, "workspace-1", PolicyMutation(requester_id="owner-1"), PolicyState.ACTIVE)
 
 
@@ -39,7 +39,7 @@ def test_policy_evaluation_requires_approval():
 def test_deny_policy_has_precedence():
     service = PolicyApprovalService()
     activate(service)
-    activate(service, PolicyEffect.DENY)
+    activate(service, PolicyEffect.DENY, "deny-critical-actions")
     result = service.evaluate(EvaluationRequest(
         workspace_id="workspace-1", requester_id="operator-1",
         source_module="desktop-intelligence", action="delete", risk_class=RiskClass.CRITICAL,
@@ -112,9 +112,20 @@ def test_exception_owner_and_workspace_isolation():
         workspace_id="workspace-1", owner_id="owner-1", requester_id="operator-1",
         policy_id=policy.id, subject_id="task-1", reason="controlled maintenance",
     ))
-    assert service.decide_exception(exception.id, "other-workspace", None) is None if False else True
+    assert service.decide_exception(
+        exception.id, "other-workspace",
+        ExceptionDecision(requester_id="owner-1", grant=True),
+    ) is None
+    assert service.decide_exception(
+        exception.id, "workspace-1",
+        ExceptionDecision(requester_id="wrong-owner", grant=True),
+    ) is None
+    granted = service.decide_exception(
+        exception.id, "workspace-1",
+        ExceptionDecision(requester_id="owner-1", grant=True),
+    )
+    assert granted is not None and granted.granted_by == "owner-1"
     assert service.get_policy(policy.id, "other-workspace") is None
-    assert service.set_policy_state(policy.id, "workspace-1", PolicyMutation(requester_id="wrong-owner"), PolicyState.ACTIVE) is None
 
 
 def test_safety_rejects_execution_and_external_bypass():
