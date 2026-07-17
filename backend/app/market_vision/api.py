@@ -3,6 +3,7 @@ from uuid import UUID
 from fastapi import APIRouter, HTTPException, Query, status
 
 from ..agent_orchestrator.api import router as agent_orchestrator_router
+from ..ai_connector_hub.api import router as ai_connector_hub_router
 from ..automation_runtime.api import router as automation_runtime_router
 from ..autonomous_research.api import router as autonomous_research_router
 from ..backtesting_lab.api import router as backtesting_lab_router
@@ -99,3 +100,4 @@ router.include_router(memory_engine_router)
 router.include_router(workflow_designer_router)
 router.include_router(plugin_sdk_router)
 router.include_router(automation_runtime_router)
+router.include_router(ai_connector_hub_router)
