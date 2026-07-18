@@ -57,6 +57,7 @@ from ..runbook_engine.api import router as runbook_engine_router
 from ..secrets_vault.api import router as secrets_vault_router
 from ..service_registry.api import router as service_registry_router
 from ..slo_engine.api import router as slo_engine_router
+from ..strategic_execution.api import router as strategic_execution_router
 from ..strategic_planning.api import router as strategic_planning_router
 from ..strategy_builder.api import router as strategy_builder_router
 from ..strategy_coach.api import router as strategy_coach_router
@@ -166,3 +167,4 @@ router.include_router(dashboard_governance_router)
 router.include_router(playbook_engine_router)
 router.include_router(mission_control_router)
 router.include_router(planning_intelligence_router)
+router.include_router(strategic_execution_router)
