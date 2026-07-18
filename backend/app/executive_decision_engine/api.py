@@ -2,6 +2,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Query, status
 
+from ..executive_strategy.api import router as executive_strategy_router
 from .models import (
     ApprovalRequest,
     AuditRecord,
@@ -65,3 +66,6 @@ def approve_decision(decision_id: UUID, request: ApprovalRequest, workspace_id: 
 @router.get("/v1/executive-decisions/audit", response_model=list[AuditRecord])
 def decision_audit(workspace_id: str = Query(min_length=1, max_length=100)) -> list[AuditRecord]:
     return executive_decision_service.audit_records(workspace_id)
+
+
+router.include_router(executive_strategy_router)
