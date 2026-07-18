@@ -31,7 +31,7 @@ def create_portfolio(payload: PortfolioCreate) -> PortfolioRecord:
 
 @router.get("", response_model=list[PortfolioRecord])
 def list_portfolios(workspace_id: str = Query(min_length=1, max_length=120)) -> list[PortfolioRecord]:
-    return planning_portfolio_service.list(workspace_id)
+    return planning_portfolio_service.list_portfolios(workspace_id)
 
 
 @router.get("/{portfolio_id}", response_model=PortfolioRecord)
