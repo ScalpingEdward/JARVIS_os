@@ -26,6 +26,7 @@ from ..digital_twin.api import router as digital_twin_router
 from ..document_intelligence.api import router as document_intelligence_router
 from ..event_bus.api import router as event_bus_router
 from ..execution_simulator.api import router as execution_simulator_router
+from ..executive_mission_orchestration.api import router as executive_mission_orchestration_router
 from ..forward_validation.api import router as forward_validation_router
 from ..health_intelligence.api import router as health_intelligence_router
 from ..identity_access.api import router as identity_access_router
@@ -74,22 +75,18 @@ from .service import market_vision_service
 
 router = APIRouter(tags=["market-vision"])
 
-
 @router.get("/v1/market-vision/status", response_model=MarketVisionStatus)
 def vision_status() -> MarketVisionStatus:
     return market_vision_service.status()
-
 
 @router.post("/v1/market-vision/analyses", response_model=MarketVisionRecord, status_code=status.HTTP_201_CREATED)
 def create_analysis(payload: MarketVisionCreate) -> MarketVisionRecord:
     return market_vision_service.create(payload)
 
-
 @router.get("/v1/market-vision/analyses", response_model=MarketVisionListResponse)
 def list_analyses(symbol: str | None = Query(default=None, max_length=40)) -> MarketVisionListResponse:
     items = market_vision_service.list_all(symbol=symbol)
     return MarketVisionListResponse(items=items, count=len(items))
-
 
 @router.get("/v1/market-vision/analyses/{analysis_id}", response_model=MarketVisionRecord)
 def get_analysis(analysis_id: UUID) -> MarketVisionRecord:
@@ -98,14 +95,12 @@ def get_analysis(analysis_id: UUID) -> MarketVisionRecord:
         raise HTTPException(status_code=404, detail="Market vision analysis not found")
     return record
 
-
 @router.get("/v1/market-vision/latest/{symbol}", response_model=MarketVisionRecord)
 def latest_analysis(symbol: str) -> MarketVisionRecord:
     record = market_vision_service.latest(symbol)
     if record is None:
         raise HTTPException(status_code=404, detail="No market vision analysis found")
     return record
-
 
 router.include_router(autonomous_research_router)
 router.include_router(personal_ceo_router)
@@ -174,3 +169,4 @@ router.include_router(strategic_execution_router)
 router.include_router(continuous_learning_router)
 router.include_router(optimization_governance_router)
 router.include_router(jarvis_core_router)
+router.include_router(executive_mission_orchestration_router)
