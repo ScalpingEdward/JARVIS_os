@@ -42,6 +42,7 @@ from ..multi_broker.api import router as multi_broker_router
 from ..notification_hub.api import router as notification_hub_router
 from ..observability_control.api import router as observability_control_router
 from ..on_call_engine.api import router as on_call_engine_router
+from ..optimization_governance.api import router as optimization_governance_router
 from ..personal_ceo.api import router as personal_ceo_router
 from ..planning_intelligence.api import router as planning_intelligence_router
 from ..playbook_engine.api import router as playbook_engine_router
@@ -170,3 +171,4 @@ router.include_router(mission_control_router)
 router.include_router(planning_intelligence_router)
 router.include_router(strategic_execution_router)
 router.include_router(continuous_learning_router)
+router.include_router(optimization_governance_router)
