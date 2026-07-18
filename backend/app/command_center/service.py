@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from uuid import UUID
 
 from .models import (
@@ -58,7 +58,7 @@ class CommandCenterService:
             "action": action,
             "actor_id": actor_id,
             "entity_id": str(entity_id) if entity_id else None,
-            "created_at": datetime.now().astimezone(),
+            "created_at": datetime.now(timezone.utc),
         })
 
     def record_signal(self, payload: SignalCreate) -> SignalRecord:
