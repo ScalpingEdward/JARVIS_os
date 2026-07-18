@@ -2,6 +2,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Query, status
 
+from ..planning_portfolio.api import router as planning_portfolio_router
 from .models import (
     ApprovalRequest,
     AuditRecord,
@@ -108,3 +109,6 @@ def archive_plan(
 @router.get("/audit", response_model=list[AuditRecord])
 def planning_audit(workspace_id: str = Query(min_length=1, max_length=120)) -> list[AuditRecord]:
     return planning_intelligence_service.audit(workspace_id)
+
+
+router.include_router(planning_portfolio_router)
