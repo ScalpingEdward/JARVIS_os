@@ -13,7 +13,7 @@ from .models import (
 )
 from .service import planning_portfolio_service
 
-router = APIRouter(prefix="/v1/planning-portfolios", tags=["planning-portfolio"])
+router = APIRouter(prefix="/portfolios", tags=["planning-portfolio"])
 
 
 @router.get("/status", response_model=PortfolioStatus)
