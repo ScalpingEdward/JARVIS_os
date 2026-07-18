@@ -28,6 +28,7 @@ from ..event_bus.api import router as event_bus_router
 from ..execution_governance.api import router as execution_governance_router
 from ..execution_simulator.api import router as execution_simulator_router
 from ..executive_mission_orchestration.api import router as executive_mission_orchestration_router
+from ..executive_operations.api import router as executive_operations_router
 from ..forward_validation.api import router as forward_validation_router
 from ..health_intelligence.api import router as health_intelligence_router
 from ..identity_access.api import router as identity_access_router
@@ -172,3 +173,4 @@ router.include_router(optimization_governance_router)
 router.include_router(jarvis_core_router)
 router.include_router(executive_mission_orchestration_router)
 router.include_router(execution_governance_router)
+router.include_router(executive_operations_router)
