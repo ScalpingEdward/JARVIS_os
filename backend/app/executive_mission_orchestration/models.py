@@ -93,7 +93,7 @@ class OrchestrationCreate(BaseModel):
 class AgentAssignment(BaseModel):
     mission_key: str
     task_key: str
-    agent_id: str | None
+    assigned_agent_id: str | None
     fit_score: float
     explanation: list[str]
 
