@@ -104,12 +104,12 @@ class ExecutiveMissionOrchestrationService:
             fit = capability_fit * 0.55 + capacity_fit * 0.25 + agent.reliability * 0.2
             eligible.append((fit, remaining, agent.agent_id, capability_fit))
         if not eligible:
-            return AgentAssignment(mission_key="", task_key=task.key, agent_id=None, fit_score=0, explanation=["No candidate agent matched the task constraints"])
+            return AgentAssignment(mission_key="", task_key=task.key, assigned_agent_id=None, fit_score=0, explanation=["No candidate agent matched the task constraints"])
         fit, remaining, agent_id, capability_fit = max(eligible)
         if capability_fit < 1.0 or remaining < task.duration_hours:
-            return AgentAssignment(mission_key="", task_key=task.key, agent_id=None, fit_score=round(fit * 100, 2), explanation=["No agent has both full capability fit and sufficient remaining capacity"])
+            return AgentAssignment(mission_key="", task_key=task.key, assigned_agent_id=None, fit_score=round(fit * 100, 2), explanation=["No agent has both full capability fit and sufficient remaining capacity"])
         remaining_hours[agent_id] -= task.duration_hours
-        return AgentAssignment(mission_key="", task_key=task.key, agent_id=agent_id, fit_score=round(fit * 100, 2), explanation=["Agent has all required capabilities", f"Remaining capacity before assignment: {remaining:.1f}h"])
+        return AgentAssignment(mission_key="", task_key=task.key, assigned_agent_id=agent_id, fit_score=round(fit * 100, 2), explanation=["Agent has all required capabilities", f"Remaining capacity before assignment: {remaining:.1f}h"])
 
     def analyze(self, orchestration_id: UUID, workspace_id: str, actor_id: str) -> OrchestrationRecord:
         with self._lock:
@@ -135,7 +135,7 @@ class ExecutiveMissionOrchestrationService:
                     assignments.append(assignment)
                     ref = f"{mission.key}:{task.key}"
                     blocked = []
-                    if assignment.agent_id is None:
+                    if assignment.assigned_agent_id is None:
                         blocked.append("No eligible agent capacity")
                     dependency_end = max((end_times.get(f"{mission.key}:{dependency}", 0.0) for dependency in task.dependency_keys), default=0.0)
                     start = dependency_end
@@ -149,13 +149,13 @@ class ExecutiveMissionOrchestrationService:
                     else:
                         active_windows.append((start, end))
                         end_times[ref] = end
-                    schedule.append(ScheduledTask(mission_key=mission.key, task_key=task.key, sequence=sequence, start_hour=round(start, 2), end_hour=round(end, 2), dependency_keys=task.dependency_keys, assigned_agent_id=assignment.agent_id, blocked_reasons=blocked, requires_human_approval=task.requires_human_approval))
+                    schedule.append(ScheduledTask(mission_key=mission.key, task_key=task.key, sequence=sequence, start_hour=round(start, 2), end_hour=round(end, 2), dependency_keys=task.dependency_keys, assigned_agent_id=assignment.assigned_agent_id, blocked_reasons=blocked, requires_human_approval=task.requires_human_approval))
                     sequence += 1
             conflicts: list[ResourceConflict] = []
             by_agent: dict[str, list[str]] = defaultdict(list)
             for assignment in assignments:
-                if assignment.agent_id:
-                    by_agent[assignment.agent_id].append(f"{assignment.mission_key}:{assignment.task_key}")
+                if assignment.assigned_agent_id:
+                    by_agent[assignment.assigned_agent_id].append(f"{assignment.mission_key}:{assignment.task_key}")
             for agent_id, refs in by_agent.items():
                 capacity = initial_hours.get(agent_id, 0.0)
                 used = capacity - remaining_hours.get(agent_id, 0.0)
