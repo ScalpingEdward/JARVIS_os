@@ -35,7 +35,7 @@ def telemetry(value: float, workspace: str = "ws") -> TelemetryCreate:
 def test_threshold_evaluation_opens_alert_and_snapshot() -> None:
     service = HealthIntelligenceService()
     service.create_rule(rule())
-    service.record_telemetry(650)
+    service.record_telemetry(telemetry(650))
     alerts = service.list_alerts("ws")
     assert len(alerts) == 1
     assert alerts[0].severity.value == "critical"
@@ -47,7 +47,7 @@ def test_threshold_evaluation_opens_alert_and_snapshot() -> None:
 def test_alert_lifecycle() -> None:
     service = HealthIntelligenceService()
     service.create_rule(rule())
-    service.record_telemetry(250)
+    service.record_telemetry(telemetry(250))
     alert = service.list_alerts("ws")[0]
     mutation = Mutation(requester_id="operator")
     assert service.mutate_alert(alert.id, "ws", mutation, AlertState.ACKNOWLEDGED).state == AlertState.ACKNOWLEDGED
@@ -68,8 +68,8 @@ def test_workspace_isolation_and_duplicate_rule_keys() -> None:
 def test_duplicate_active_alert_is_suppressed() -> None:
     service = HealthIntelligenceService()
     service.create_rule(rule())
-    service.record_telemetry(700)
-    service.record_telemetry(800)
+    service.record_telemetry(telemetry(700))
+    service.record_telemetry(telemetry(800))
     assert len(service.list_alerts("ws")) == 1
 
 
