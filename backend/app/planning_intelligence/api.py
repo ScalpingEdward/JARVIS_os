@@ -7,6 +7,7 @@ from .models import (
     AuditRecord,
     GoalCreate,
     GoalRecord,
+    MissionHandoffPreview,
     PlanCreate,
     PlanRecord,
     PlanningStatus,
@@ -34,6 +35,14 @@ def create_goal(payload: GoalCreate) -> GoalRecord:
 @router.get("/goals", response_model=list[GoalRecord])
 def list_goals(workspace_id: str = Query(min_length=1, max_length=120)) -> list[GoalRecord]:
     return planning_intelligence_service.list_goals(workspace_id)
+
+
+@router.get("/goals/{goal_id}/tree", response_model=list[GoalRecord])
+def goal_tree(goal_id: UUID, workspace_id: str = Query(min_length=1, max_length=120)) -> list[GoalRecord]:
+    try:
+        return planning_intelligence_service.goal_tree(workspace_id, goal_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
 @router.post("/plans", response_model=PlanRecord, status_code=status.HTTP_201_CREATED)
@@ -69,6 +78,17 @@ def simulate_plan(plan_id: UUID, payload: SimulationRequest) -> SimulationRecord
 def approve_plan(plan_id: UUID, payload: ApprovalRequest) -> PlanRecord:
     try:
         return planning_intelligence_service.approve(plan_id, payload)
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@router.get("/plans/{plan_id}/mission-handoff-preview", response_model=MissionHandoffPreview)
+def mission_handoff_preview(
+    plan_id: UUID,
+    workspace_id: str = Query(min_length=1, max_length=120),
+) -> MissionHandoffPreview:
+    try:
+        return planning_intelligence_service.mission_handoff_preview(workspace_id, plan_id)
     except ValueError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
 
