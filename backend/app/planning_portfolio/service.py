@@ -36,7 +36,7 @@ class PlanningPortfolioService:
         self._audit(record.workspace_id, record.owner_id, "portfolio.created", record.id, {"key": record.key})
         return record
 
-    def list(self, workspace_id: str) -> list[PortfolioRecord]:
+    def list_portfolios(self, workspace_id: str) -> list[PortfolioRecord]:
         return sorted(
             [item for item in self.portfolios.values() if item.workspace_id == workspace_id],
             key=lambda item: item.created_at,
