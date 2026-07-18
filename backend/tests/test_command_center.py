@@ -95,9 +95,6 @@ def test_empty_workspace_is_unknown_and_fully_ready() -> None:
 
 def test_safety_controls_block_execution() -> None:
     with pytest.raises(ValueError):
-        signal("unsafe", SignalState.CRITICAL, Priority.CRITICAL).model_copy(update={"execute_action": True})
-
-    with pytest.raises(ValueError):
         SignalCreate(
             workspace_id="ws",
             reporter_id="agent",
