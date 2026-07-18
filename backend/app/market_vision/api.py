@@ -27,6 +27,7 @@ from ..document_intelligence.api import router as document_intelligence_router
 from ..event_bus.api import router as event_bus_router
 from ..execution_governance.api import router as execution_governance_router
 from ..execution_simulator.api import router as execution_simulator_router
+from ..executive_decision_engine.api import router as executive_decision_engine_router
 from ..executive_intelligence.api import router as executive_intelligence_router
 from ..executive_mission_orchestration.api import router as executive_mission_orchestration_router
 from ..executive_operations.api import router as executive_operations_router
@@ -176,3 +177,4 @@ router.include_router(executive_mission_orchestration_router)
 router.include_router(execution_governance_router)
 router.include_router(executive_operations_router)
 router.include_router(executive_intelligence_router)
+router.include_router(executive_decision_engine_router)
