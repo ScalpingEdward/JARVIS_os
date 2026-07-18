@@ -36,6 +36,7 @@ from ..live_integrations.api import router as live_integrations_router
 from ..localization.api import router as localization_router
 from ..market_replay.api import router as market_replay_router
 from ..memory_engine.api import router as memory_engine_router
+from ..mission_control.api import router as mission_control_router
 from ..multi_broker.api import router as multi_broker_router
 from ..notification_hub.api import router as notification_hub_router
 from ..observability_control.api import router as observability_control_router
@@ -162,3 +163,4 @@ router.include_router(audit_compliance_router)
 router.include_router(command_center_router)
 router.include_router(dashboard_governance_router)
 router.include_router(playbook_engine_router)
+router.include_router(mission_control_router)
