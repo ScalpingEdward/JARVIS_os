@@ -31,6 +31,7 @@ from ..health_intelligence.api import router as health_intelligence_router
 from ..identity_access.api import router as identity_access_router
 from ..incident_management.api import router as incident_management_router
 from ..integration_hub.api import router as integration_hub_router
+from ..jarvis_core.api import router as jarvis_core_router
 from ..job_orchestrator.api import router as job_orchestrator_router
 from ..knowledge_engine.api import router as knowledge_engine_router
 from ..live_integrations.api import router as live_integrations_router
@@ -172,3 +173,4 @@ router.include_router(planning_intelligence_router)
 router.include_router(strategic_execution_router)
 router.include_router(continuous_learning_router)
 router.include_router(optimization_governance_router)
+router.include_router(jarvis_core_router)
