@@ -2,6 +2,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Query, status
 
+from ..executive_performance.api import router as executive_performance_router
 from .models import (
     AuditRecord,
     ExecutiveStrategyCreate,
@@ -66,3 +67,6 @@ def generate_roadmap(plan_id: UUID, scenario: WhatIfRequest, workspace_id: str =
 @router.get("/v1/executive-strategy/audit", response_model=list[AuditRecord])
 def strategy_audit(workspace_id: str = Query(min_length=1, max_length=100)) -> list[AuditRecord]:
     return executive_strategy_service.audit_records(workspace_id)
+
+
+router.include_router(executive_performance_router)
