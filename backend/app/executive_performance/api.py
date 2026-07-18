@@ -2,6 +2,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Query, status
 
+from ..executive_governance.api import router as executive_governance_router
 from .models import AuditRecord, MeasurementUpdate, PerformanceStatusResponse, Scorecard, ScorecardCreate, ScorecardList
 from .service import executive_performance_service
 
@@ -56,3 +57,6 @@ def analyze_scorecard(scorecard_id: UUID, workspace_id: str = Query(min_length=1
 @router.get("/v1/executive-performance/audit", response_model=list[AuditRecord])
 def performance_audit(workspace_id: str = Query(min_length=1, max_length=100)) -> list[AuditRecord]:
     return executive_performance_service.audit_records(workspace_id)
+
+
+router.include_router(executive_governance_router)
