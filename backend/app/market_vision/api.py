@@ -4,6 +4,7 @@ from fastapi import APIRouter, HTTPException, Query, status
 
 from ..agent_orchestrator.api import router as agent_orchestrator_router
 from ..ai_connector_hub.api import router as ai_connector_hub_router
+from ..asset_cmdb.api import router as asset_cmdb_router
 from ..automation_runtime.api import router as automation_runtime_router
 from ..autonomous_research.api import router as autonomous_research_router
 from ..backtesting_lab.api import router as backtesting_lab_router
@@ -61,18 +62,22 @@ from .service import market_vision_service
 
 router = APIRouter(tags=["market-vision"])
 
+
 @router.get("/v1/market-vision/status", response_model=MarketVisionStatus)
 def vision_status() -> MarketVisionStatus:
     return market_vision_service.status()
+
 
 @router.post("/v1/market-vision/analyses", response_model=MarketVisionRecord, status_code=status.HTTP_201_CREATED)
 def create_analysis(payload: MarketVisionCreate) -> MarketVisionRecord:
     return market_vision_service.create(payload)
 
+
 @router.get("/v1/market-vision/analyses", response_model=MarketVisionListResponse)
 def list_analyses(symbol: str | None = Query(default=None, max_length=40)) -> MarketVisionListResponse:
     items = market_vision_service.list_all(symbol=symbol)
     return MarketVisionListResponse(items=items, count=len(items))
+
 
 @router.get("/v1/market-vision/analyses/{analysis_id}", response_model=MarketVisionRecord)
 def get_analysis(analysis_id: UUID) -> MarketVisionRecord:
@@ -81,12 +86,14 @@ def get_analysis(analysis_id: UUID) -> MarketVisionRecord:
         raise HTTPException(status_code=404, detail="Market vision analysis not found")
     return record
 
+
 @router.get("/v1/market-vision/latest/{symbol}", response_model=MarketVisionRecord)
 def latest_analysis(symbol: str) -> MarketVisionRecord:
     record = market_vision_service.latest(symbol)
     if record is None:
         raise HTTPException(status_code=404, detail="No market vision analysis found")
     return record
+
 
 router.include_router(autonomous_research_router)
 router.include_router(personal_ceo_router)
@@ -142,3 +149,4 @@ router.include_router(incident_management_router)
 router.include_router(change_governance_router)
 router.include_router(runbook_engine_router)
 router.include_router(on_call_engine_router)
+router.include_router(asset_cmdb_router)
