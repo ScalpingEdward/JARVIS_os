@@ -16,6 +16,7 @@ from ..config_control.api import router as config_control_router
 from ..config_feature_flags.api import router as config_feature_flags_router
 from ..data_governance.api import router as data_governance_router
 from ..decision_memory.api import router as decision_memory_router
+from ..dependency_impact.api import router as dependency_impact_router
 from ..desktop_intelligence.api import router as desktop_intelligence_router
 from ..digital_twin.api import router as digital_twin_router
 from ..document_intelligence.api import router as document_intelligence_router
@@ -146,3 +147,4 @@ router.include_router(runbook_engine_router)
 router.include_router(on_call_engine_router)
 router.include_router(status_communication_router)
 router.include_router(config_feature_flags_router)
+router.include_router(dependency_impact_router)
