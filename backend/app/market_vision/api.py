@@ -41,6 +41,7 @@ from ..notification_hub.api import router as notification_hub_router
 from ..observability_control.api import router as observability_control_router
 from ..on_call_engine.api import router as on_call_engine_router
 from ..personal_ceo.api import router as personal_ceo_router
+from ..playbook_engine.api import router as playbook_engine_router
 from ..plugin_sdk.api import router as plugin_sdk_router
 from ..policy_approval.api import router as policy_approval_router
 from ..portfolio_risk.api import router as portfolio_risk_router
@@ -160,3 +161,4 @@ router.include_router(health_intelligence_router)
 router.include_router(audit_compliance_router)
 router.include_router(command_center_router)
 router.include_router(dashboard_governance_router)
+router.include_router(playbook_engine_router)
