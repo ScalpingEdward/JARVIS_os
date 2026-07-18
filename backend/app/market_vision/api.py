@@ -14,10 +14,8 @@ from ..change_governance.api import router as change_governance_router
 from ..collaboration_mesh.api import router as collaboration_mesh_router
 from ..compliance_evidence.api import router as compliance_evidence_router
 from ..config_control.api import router as config_control_router
-from ..config_feature_flags.api import router as config_feature_flags_router
 from ..data_governance.api import router as data_governance_router
 from ..decision_memory.api import router as decision_memory_router
-from ..dependency_impact.api import router as dependency_impact_router
 from ..desktop_intelligence.api import router as desktop_intelligence_router
 from ..digital_twin.api import router as digital_twin_router
 from ..document_intelligence.api import router as document_intelligence_router
@@ -51,7 +49,6 @@ from ..runbook_engine.api import router as runbook_engine_router
 from ..secrets_vault.api import router as secrets_vault_router
 from ..service_registry.api import router as service_registry_router
 from ..slo_engine.api import router as slo_engine_router
-from ..status_communication.api import router as status_communication_router
 from ..strategic_planning.api import router as strategic_planning_router
 from ..strategy_builder.api import router as strategy_builder_router
 from ..strategy_coach.api import router as strategy_coach_router
@@ -65,18 +62,22 @@ from .service import market_vision_service
 
 router = APIRouter(tags=["market-vision"])
 
+
 @router.get("/v1/market-vision/status", response_model=MarketVisionStatus)
 def vision_status() -> MarketVisionStatus:
     return market_vision_service.status()
+
 
 @router.post("/v1/market-vision/analyses", response_model=MarketVisionRecord, status_code=status.HTTP_201_CREATED)
 def create_analysis(payload: MarketVisionCreate) -> MarketVisionRecord:
     return market_vision_service.create(payload)
 
+
 @router.get("/v1/market-vision/analyses", response_model=MarketVisionListResponse)
 def list_analyses(symbol: str | None = Query(default=None, max_length=40)) -> MarketVisionListResponse:
     items = market_vision_service.list_all(symbol=symbol)
     return MarketVisionListResponse(items=items, count=len(items))
+
 
 @router.get("/v1/market-vision/analyses/{analysis_id}", response_model=MarketVisionRecord)
 def get_analysis(analysis_id: UUID) -> MarketVisionRecord:
@@ -85,12 +86,14 @@ def get_analysis(analysis_id: UUID) -> MarketVisionRecord:
         raise HTTPException(status_code=404, detail="Market vision analysis not found")
     return record
 
+
 @router.get("/v1/market-vision/latest/{symbol}", response_model=MarketVisionRecord)
 def latest_analysis(symbol: str) -> MarketVisionRecord:
     record = market_vision_service.latest(symbol)
     if record is None:
         raise HTTPException(status_code=404, detail="No market vision analysis found")
     return record
+
 
 router.include_router(autonomous_research_router)
 router.include_router(personal_ceo_router)
@@ -146,7 +149,4 @@ router.include_router(incident_management_router)
 router.include_router(change_governance_router)
 router.include_router(runbook_engine_router)
 router.include_router(on_call_engine_router)
-router.include_router(status_communication_router)
-router.include_router(config_feature_flags_router)
-router.include_router(dependency_impact_router)
 router.include_router(asset_cmdb_router)
