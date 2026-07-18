@@ -14,6 +14,7 @@ from ..browser_intelligence.api import router as browser_intelligence_router
 from ..capital_allocation.api import router as capital_allocation_router
 from ..change_governance.api import router as change_governance_router
 from ..collaboration_mesh.api import router as collaboration_mesh_router
+from ..command_center.api import router as command_center_router
 from ..compliance_evidence.api import router as compliance_evidence_router
 from ..config_control.api import router as config_control_router
 from ..data_governance.api import router as data_governance_router
@@ -156,3 +157,4 @@ router.include_router(asset_cmdb_router)
 router.include_router(backup_recovery_router)
 router.include_router(health_intelligence_router)
 router.include_router(audit_compliance_router)
+router.include_router(command_center_router)
