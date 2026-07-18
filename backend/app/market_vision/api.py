@@ -17,6 +17,7 @@ from ..collaboration_mesh.api import router as collaboration_mesh_router
 from ..command_center.api import router as command_center_router
 from ..compliance_evidence.api import router as compliance_evidence_router
 from ..config_control.api import router as config_control_router
+from ..continuous_learning.api import router as continuous_learning_router
 from ..dashboard_governance.api import router as dashboard_governance_router
 from ..data_governance.api import router as data_governance_router
 from ..decision_memory.api import router as decision_memory_router
@@ -168,3 +169,4 @@ router.include_router(playbook_engine_router)
 router.include_router(mission_control_router)
 router.include_router(planning_intelligence_router)
 router.include_router(strategic_execution_router)
+router.include_router(continuous_learning_router)
