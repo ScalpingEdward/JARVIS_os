@@ -2,6 +2,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Query, status
 
+from ..executive_transformation.api import router as executive_transformation_router
 from .models import (
     AuditRecord,
     ControlUpdate,
@@ -63,3 +64,6 @@ def assess_framework(framework_id: UUID, workspace_id: str = Query(min_length=1,
 @router.get("/v1/executive-governance/audit", response_model=list[AuditRecord])
 def governance_audit(workspace_id: str = Query(min_length=1, max_length=100)) -> list[AuditRecord]:
     return executive_governance_service.audit_records(workspace_id)
+
+
+router.include_router(executive_transformation_router)
