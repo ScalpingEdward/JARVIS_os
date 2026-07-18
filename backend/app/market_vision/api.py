@@ -23,6 +23,7 @@ from ..document_intelligence.api import router as document_intelligence_router
 from ..event_bus.api import router as event_bus_router
 from ..execution_simulator.api import router as execution_simulator_router
 from ..forward_validation.api import router as forward_validation_router
+from ..health_intelligence.api import router as health_intelligence_router
 from ..identity_access.api import router as identity_access_router
 from ..incident_management.api import router as incident_management_router
 from ..integration_hub.api import router as integration_hub_router
@@ -152,3 +153,4 @@ router.include_router(runbook_engine_router)
 router.include_router(on_call_engine_router)
 router.include_router(asset_cmdb_router)
 router.include_router(backup_recovery_router)
+router.include_router(health_intelligence_router)
