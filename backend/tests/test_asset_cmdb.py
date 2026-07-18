@@ -63,8 +63,14 @@ def test_workspace_isolation_and_duplicate_keys() -> None:
 
 def test_safety_controls() -> None:
     with pytest.raises(ValueError):
-        asset("ws", "owner", "unsafe").model_copy(update={"automatic_discovery": True}).model_validate(
-            asset("ws", "owner", "unsafe").model_dump() | {"automatic_discovery": True}
+        AssetCreate(
+            workspace_id="ws",
+            owner_id="owner",
+            asset_key="unsafe",
+            name="unsafe",
+            kind=AssetKind.VPS,
+            environment=Environment.PRODUCTION,
+            automatic_discovery=True,
         )
     with pytest.raises(ValueError):
         RelationshipCreate(
