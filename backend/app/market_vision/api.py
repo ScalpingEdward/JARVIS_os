@@ -5,6 +5,7 @@ from fastapi import APIRouter, HTTPException, Query, status
 from ..agent_orchestrator.api import router as agent_orchestrator_router
 from ..ai_connector_hub.api import router as ai_connector_hub_router
 from ..asset_cmdb.api import router as asset_cmdb_router
+from ..audit_compliance.api import router as audit_compliance_router
 from ..automation_runtime.api import router as automation_runtime_router
 from ..autonomous_research.api import router as autonomous_research_router
 from ..backup_recovery.api import router as backup_recovery_router
@@ -154,3 +155,4 @@ router.include_router(on_call_engine_router)
 router.include_router(asset_cmdb_router)
 router.include_router(backup_recovery_router)
 router.include_router(health_intelligence_router)
+router.include_router(audit_compliance_router)
