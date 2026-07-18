@@ -4,6 +4,7 @@ from fastapi import APIRouter, HTTPException, Query, status
 
 from ..agent_orchestrator.api import router as agent_orchestrator_router
 from ..ai_connector_hub.api import router as ai_connector_hub_router
+from ..asset_cmdb.api import router as asset_cmdb_router
 from ..automation_runtime.api import router as automation_runtime_router
 from ..autonomous_research.api import router as autonomous_research_router
 from ..backtesting_lab.api import router as backtesting_lab_router
@@ -13,8 +14,10 @@ from ..change_governance.api import router as change_governance_router
 from ..collaboration_mesh.api import router as collaboration_mesh_router
 from ..compliance_evidence.api import router as compliance_evidence_router
 from ..config_control.api import router as config_control_router
+from ..config_feature_flags.api import router as config_feature_flags_router
 from ..data_governance.api import router as data_governance_router
 from ..decision_memory.api import router as decision_memory_router
+from ..dependency_impact.api import router as dependency_impact_router
 from ..desktop_intelligence.api import router as desktop_intelligence_router
 from ..digital_twin.api import router as digital_twin_router
 from ..document_intelligence.api import router as document_intelligence_router
@@ -48,6 +51,7 @@ from ..runbook_engine.api import router as runbook_engine_router
 from ..secrets_vault.api import router as secrets_vault_router
 from ..service_registry.api import router as service_registry_router
 from ..slo_engine.api import router as slo_engine_router
+from ..status_communication.api import router as status_communication_router
 from ..strategic_planning.api import router as strategic_planning_router
 from ..strategy_builder.api import router as strategy_builder_router
 from ..strategy_coach.api import router as strategy_coach_router
@@ -142,3 +146,7 @@ router.include_router(incident_management_router)
 router.include_router(change_governance_router)
 router.include_router(runbook_engine_router)
 router.include_router(on_call_engine_router)
+router.include_router(status_communication_router)
+router.include_router(config_feature_flags_router)
+router.include_router(dependency_impact_router)
+router.include_router(asset_cmdb_router)
