@@ -2,6 +2,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Query, status
 
+from app.executive_procurement.api import router as executive_procurement_router
 from .models import AuditRecord, CultureIssueUpdate, CultureListResponse, CulturePortfolioCreate, CultureStatusResponse, ExecutiveCulturePortfolio
 from .service import executive_culture_service
 
@@ -54,3 +55,6 @@ def assess_portfolio(portfolio_id: UUID, workspace_id: str = Query(min_length=1,
 @router.get("/v1/executive-culture/audit", response_model=list[AuditRecord])
 def culture_audit(workspace_id: str = Query(min_length=1, max_length=100)) -> list[AuditRecord]:
     return executive_culture_service.audit_records(workspace_id)
+
+
+router.include_router(executive_procurement_router)
