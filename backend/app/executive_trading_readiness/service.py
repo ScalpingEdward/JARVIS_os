@@ -135,7 +135,7 @@ class ExecutiveTradingReadinessService:
             self._audit.append(AuditRecord(workspace_id=payload.workspace_id, action="trading-readiness-assessed", actor_id=payload.actor_id, assessment_id=record.id, details={"state": state.value, "issues": len(issues), "overall": overall}, created_at=self._now()))
             return record
 
-    def list(self, workspace_id: str) -> list[ReadinessAssessment]:
+    def list_assessments(self, workspace_id: str) -> list[ReadinessAssessment]:
         with self._lock:
             return [item for item in self._items.values() if item.workspace_id == workspace_id]
 
@@ -145,7 +145,7 @@ class ExecutiveTradingReadinessService:
             return item if item and item.workspace_id == workspace_id else None
 
     def status(self, workspace_id: str) -> ReadinessStatusResponse:
-        records = self.list(workspace_id)
+        records = self.list_assessments(workspace_id)
         return ReadinessStatusResponse(
             assessments=len(records),
             ready=sum(item.state == ReadinessState.ready for item in records),
