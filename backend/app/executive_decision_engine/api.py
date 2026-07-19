@@ -10,6 +10,7 @@ from ..executive_trading_post_release_drift.api import router as executive_tradi
 from ..executive_trading_promotion_scaling.api import router as executive_trading_promotion_scaling_router
 from ..executive_trading_readiness.api import router as executive_trading_readiness_router
 from ..executive_trading_release_reentry.api import router as executive_trading_release_reentry_router
+from ..executive_treasury_wealth_governance.api import router as executive_treasury_wealth_governance_router
 from .models import (
     ApprovalRequest,
     AuditRecord,
@@ -84,4 +85,5 @@ router.include_router(executive_trading_post_release_drift_router)
 router.include_router(executive_trading_promotion_scaling_router)
 router.include_router(executive_capital_allocation_deployment_router)
 router.include_router(executive_prop_payout_capital_formation_router)
+router.include_router(executive_treasury_wealth_governance_router)
 router.include_router(executive_strategy_router)
