@@ -1,0 +1,1 @@
+"""Executive market-regime intelligence."""
