@@ -1,5 +1,5 @@
-from backend.app.executive_market.models import MarketPortfolioCreate, SignalUpdate
-from backend.app.executive_market.service import ExecutiveMarketService
+from app.executive_market.models import MarketPortfolioCreate, SignalUpdate
+from app.executive_market.service import ExecutiveMarketService
 
 
 def payload(workspace_id: str = "ws-1") -> MarketPortfolioCreate:
@@ -34,7 +34,11 @@ def test_workspace_isolation_and_signal_update():
     service = ExecutiveMarketService()
     item = service.create(payload())
     assert service.get(item.portfolio_id, "other") is None
-    updated = service.update_signal(item.portfolio_id, "ws-1", SignalUpdate(actor_id="analyst", signal_id="sig1", confidence=90))
+    updated = service.update_signal(
+        item.portfolio_id,
+        "ws-1",
+        SignalUpdate(actor_id="analyst", signal_id="sig1", confidence=90),
+    )
     assert updated.signals[0].confidence == 90
 
 
