@@ -2,6 +2,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Query, status
 
+from app.executive_workforce.api import router as executive_workforce_router
 from .models import AuditRecord, ComplianceIssueUpdate, ExecutiveRegulatoryPortfolio, RegulatoryListResponse, RegulatoryPortfolioCreate, RegulatoryStatusResponse
 from .service import executive_regulatory_service
 
@@ -47,3 +48,6 @@ def assess_portfolio(portfolio_id: UUID, workspace_id: str = Query(min_length=1,
 @router.get("/v1/executive-regulatory/audit", response_model=list[AuditRecord])
 def regulatory_audit(workspace_id: str = Query(min_length=1, max_length=100)) -> list[AuditRecord]:
     return executive_regulatory_service.audit_records(workspace_id)
+
+
+router.include_router(executive_workforce_router)
