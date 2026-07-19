@@ -11,6 +11,7 @@ from .models import (
     ExecutiveCustomerPortfolio,
 )
 from .service import executive_customer_service
+from app.executive_product.api import router as executive_product_router
 
 router = APIRouter(tags=["executive-customer"])
 
@@ -73,3 +74,6 @@ def assess_portfolio(
 @router.get("/v1/executive-customer/audit", response_model=list[AuditRecord])
 def customer_audit(workspace_id: str = Query(min_length=1, max_length=100)) -> list[AuditRecord]:
     return executive_customer_service.audit_records(workspace_id)
+
+
+router.include_router(executive_product_router)
