@@ -3,6 +3,7 @@ from uuid import UUID
 from fastapi import APIRouter, HTTPException, Query, status
 
 from ..executive_strategy.api import router as executive_strategy_router
+from ..executive_trading_incident_recovery.api import router as executive_trading_incident_recovery_router
 from ..executive_trading_readiness.api import router as executive_trading_readiness_router
 from .models import (
     ApprovalRequest,
@@ -72,4 +73,5 @@ def decision_audit(workspace_id: str = Query(min_length=1, max_length=100)) -> l
 
 router.include_router(trading_decision_router)
 router.include_router(executive_trading_readiness_router)
+router.include_router(executive_trading_incident_recovery_router)
 router.include_router(executive_strategy_router)
