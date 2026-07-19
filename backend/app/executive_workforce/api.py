@@ -2,6 +2,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Query, status
 
+from app.executive_culture.api import router as executive_culture_router
 from .models import (
     AuditRecord,
     ExecutiveWorkforcePortfolio,
@@ -61,3 +62,6 @@ def assess_portfolio(portfolio_id: UUID, workspace_id: str = Query(min_length=1,
 @router.get("/v1/executive-workforce/audit", response_model=list[AuditRecord])
 def workforce_audit(workspace_id: str = Query(min_length=1, max_length=100)) -> list[AuditRecord]:
     return executive_workforce_service.audit_records(workspace_id)
+
+
+router.include_router(executive_culture_router)
