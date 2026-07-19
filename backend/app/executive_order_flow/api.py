@@ -2,6 +2,8 @@ from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Query, status
 
+from app.executive_shadow_trading.api import router as executive_shadow_trading_router
+
 from .models import (
     AuditRecord,
     ExecutiveOrderFlowPortfolio,
@@ -61,3 +63,6 @@ def assess_portfolio(portfolio_id: UUID, workspace_id: str = Query(min_length=1,
 @router.get("/v1/executive-order-flow/audit", response_model=list[AuditRecord])
 def order_flow_audit(workspace_id: str = Query(min_length=1, max_length=100)) -> list[AuditRecord]:
     return executive_order_flow_service.audit_records(workspace_id)
+
+
+router.include_router(executive_shadow_trading_router)
