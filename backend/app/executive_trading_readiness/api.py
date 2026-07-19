@@ -23,7 +23,7 @@ def create_assessment(payload: ReadinessInput) -> ReadinessAssessment:
 
 @router.get("/v1/executive-trading-readiness/assessments", response_model=ReadinessListResponse)
 def list_assessments(workspace_id: str = Query(min_length=1, max_length=100)) -> ReadinessListResponse:
-    items = executive_trading_readiness_service.list(workspace_id)
+    items = executive_trading_readiness_service.list_assessments(workspace_id)
     return ReadinessListResponse(items=items, count=len(items))
 
 
