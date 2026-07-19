@@ -12,6 +12,7 @@ from .models import (
     ExecutiveDecisionCreate,
 )
 from .service import executive_decision_service
+from .trading_api import router as trading_decision_router
 
 router = APIRouter(tags=["executive-decisions"])
 
@@ -68,4 +69,5 @@ def decision_audit(workspace_id: str = Query(min_length=1, max_length=100)) -> l
     return executive_decision_service.audit_records(workspace_id)
 
 
+router.include_router(trading_decision_router)
 router.include_router(executive_strategy_router)
