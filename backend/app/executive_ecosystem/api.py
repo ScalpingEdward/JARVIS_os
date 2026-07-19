@@ -4,6 +4,7 @@ from fastapi import APIRouter, HTTPException, Query, status
 
 from .models import AuditRecord, EcosystemListResponse, EcosystemPortfolioCreate, EcosystemStatusResponse, ExecutiveEcosystemPortfolio, PartnershipUpdate
 from .service import executive_ecosystem_service
+from app.executive_data_ai.api import router as executive_data_ai_router
 
 router = APIRouter(tags=["executive-ecosystem"])
 
@@ -54,3 +55,6 @@ def assess_portfolio(portfolio_id: UUID, workspace_id: str = Query(min_length=1,
 @router.get("/v1/executive-ecosystem/audit", response_model=list[AuditRecord])
 def ecosystem_audit(workspace_id: str = Query(min_length=1, max_length=100)) -> list[AuditRecord]:
     return executive_ecosystem_service.audit_records(workspace_id)
+
+
+router.include_router(executive_data_ai_router)
