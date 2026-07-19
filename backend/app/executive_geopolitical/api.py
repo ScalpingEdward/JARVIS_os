@@ -82,3 +82,8 @@ def assess_portfolio(
 @router.get("/v1/executive-geopolitical/audit", response_model=list[AuditRecord])
 def geopolitical_audit(workspace_id: str = Query(min_length=1, max_length=100)) -> list[AuditRecord]:
     return executive_geopolitical_service.audit_records(workspace_id)
+
+
+from app.executive_ma.api import router as executive_ma_router
+
+router.include_router(executive_ma_router)
