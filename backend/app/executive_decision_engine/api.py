@@ -4,6 +4,7 @@ from fastapi import APIRouter, HTTPException, Query, status
 
 from ..executive_strategy.api import router as executive_strategy_router
 from ..executive_trading_incident_recovery.api import router as executive_trading_incident_recovery_router
+from ..executive_trading_post_release_drift.api import router as executive_trading_post_release_drift_router
 from ..executive_trading_readiness.api import router as executive_trading_readiness_router
 from ..executive_trading_release_reentry.api import router as executive_trading_release_reentry_router
 from .models import (
@@ -76,4 +77,5 @@ router.include_router(trading_decision_router)
 router.include_router(executive_trading_readiness_router)
 router.include_router(executive_trading_incident_recovery_router)
 router.include_router(executive_trading_release_reentry_router)
+router.include_router(executive_trading_post_release_drift_router)
 router.include_router(executive_strategy_router)
