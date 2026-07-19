@@ -2,10 +2,13 @@ from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Query, status
 
+from app.executive_treasury.api import router as executive_treasury_router
+
 from .models import AuditRecord, BoardListResponse, BoardPortfolioCreate, BoardStatusResponse, ExecutiveBoardPortfolio, GovernanceIssueUpdate
 from .service import executive_board_service
 
 router = APIRouter(tags=["executive-board"])
+router.include_router(executive_treasury_router)
 
 
 @router.get("/v1/executive-board/status", response_model=BoardStatusResponse)
