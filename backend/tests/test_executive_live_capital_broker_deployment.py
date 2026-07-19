@@ -35,7 +35,11 @@ def payload(**overrides):
         human_approved=True,
         risk_brain_clear=True,
         candidates=[candidate(), candidate(broker_id="broker-b", account_id="live-2", requested_funding=6000)],
-        policy=BrokerDeploymentPolicy(max_broker_share=0.6, max_account_share=0.6),
+        policy=BrokerDeploymentPolicy(
+            max_broker_share=0.6,
+            max_account_share=0.6,
+            max_new_accounts_per_cycle=2,
+        ),
     )
     data.update(overrides)
     return LiveCapitalDeploymentCreate(**data)
