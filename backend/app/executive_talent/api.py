@@ -4,7 +4,7 @@ from fastapi import APIRouter, HTTPException, Query, status
 
 from .models import AuditRecord, ExecutiveTalentPortfolio, TalentListResponse, TalentPortfolioCreate, TalentStatusResponse, TalentUpdate
 from .service import executive_talent_service
-from backend.app.executive_market.api import router as executive_market_router
+from app.executive_market.api import router as executive_market_router
 
 router = APIRouter(tags=["executive-talent"])
 
