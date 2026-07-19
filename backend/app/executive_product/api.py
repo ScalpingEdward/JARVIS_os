@@ -4,6 +4,7 @@ from fastapi import APIRouter, HTTPException, Query, status
 
 from .models import AuditRecord, ExecutiveProductPortfolio, InitiativeUpdate, ProductListResponse, ProductPortfolioCreate, ProductStatusResponse
 from .service import executive_product_service
+from app.executive_ecosystem.api import router as executive_ecosystem_router
 
 router = APIRouter(tags=["executive-product"])
 
@@ -54,3 +55,6 @@ def assess_portfolio(portfolio_id: UUID, workspace_id: str = Query(min_length=1,
 @router.get("/v1/executive-product/audit", response_model=list[AuditRecord])
 def product_audit(workspace_id: str = Query(min_length=1, max_length=100)) -> list[AuditRecord]:
     return executive_product_service.audit_records(workspace_id)
+
+
+router.include_router(executive_ecosystem_router)
