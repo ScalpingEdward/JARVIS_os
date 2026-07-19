@@ -54,3 +54,8 @@ def assess_portfolio(portfolio_id: UUID, workspace_id: str = Query(min_length=1,
 @router.get("/v1/executive-treasury/audit", response_model=list[AuditRecord])
 def treasury_audit(workspace_id: str = Query(min_length=1, max_length=100)) -> list[AuditRecord]:
     return executive_treasury_service.audit_records(workspace_id)
+
+
+from app.executive_investor.api import router as executive_investor_router
+
+router.include_router(executive_investor_router)
