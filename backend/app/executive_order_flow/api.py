@@ -6,6 +6,7 @@ from app.executive_adaptive_strategy_scoring.api import router as executive_adap
 from app.executive_champion_challenger.api import router as executive_champion_challenger_router
 from app.executive_evidence_intelligence.api import router as executive_evidence_intelligence_router
 from app.executive_market_regime.api import router as executive_market_regime_router
+from app.executive_portfolio_intelligence.api import router as executive_portfolio_intelligence_router
 from app.executive_shadow_trading.api import router as executive_shadow_trading_router
 
 from .models import (
@@ -74,3 +75,4 @@ router.include_router(executive_champion_challenger_router)
 router.include_router(executive_market_regime_router)
 router.include_router(executive_evidence_intelligence_router)
 router.include_router(executive_adaptive_strategy_scoring_router)
+router.include_router(executive_portfolio_intelligence_router)
