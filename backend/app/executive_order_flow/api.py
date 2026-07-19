@@ -2,6 +2,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Query, status
 
+from app.executive_adaptive_strategy_scoring.api import router as executive_adaptive_strategy_scoring_router
 from app.executive_champion_challenger.api import router as executive_champion_challenger_router
 from app.executive_evidence_intelligence.api import router as executive_evidence_intelligence_router
 from app.executive_market_regime.api import router as executive_market_regime_router
@@ -72,3 +73,4 @@ router.include_router(executive_shadow_trading_router)
 router.include_router(executive_champion_challenger_router)
 router.include_router(executive_market_regime_router)
 router.include_router(executive_evidence_intelligence_router)
+router.include_router(executive_adaptive_strategy_scoring_router)
