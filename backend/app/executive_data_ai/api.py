@@ -4,6 +4,7 @@ from fastapi import APIRouter, HTTPException, Query, status
 
 from .models import AuditRecord, DataAIListResponse, DataAIPortfolioCreate, DataAIStatusResponse, ExecutiveDataAIPortfolio, GovernanceUpdate
 from .service import executive_data_ai_service
+from app.executive_esg.api import router as executive_esg_router
 
 router = APIRouter(tags=["executive-data-ai"])
 
@@ -54,3 +55,6 @@ def assess_portfolio(portfolio_id: UUID, workspace_id: str = Query(min_length=1,
 @router.get("/v1/executive-data-ai/audit", response_model=list[AuditRecord])
 def data_ai_audit(workspace_id: str = Query(min_length=1, max_length=100)) -> list[AuditRecord]:
     return executive_data_ai_service.audit_records(workspace_id)
+
+
+router.include_router(executive_esg_router)
