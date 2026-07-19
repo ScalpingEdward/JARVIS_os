@@ -2,6 +2,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Query, status
 
+from app.executive_champion_challenger.api import router as executive_champion_challenger_router
 from app.executive_shadow_trading.api import router as executive_shadow_trading_router
 
 from .models import (
@@ -66,3 +67,4 @@ def order_flow_audit(workspace_id: str = Query(min_length=1, max_length=100)) ->
 
 
 router.include_router(executive_shadow_trading_router)
+router.include_router(executive_champion_challenger_router)
