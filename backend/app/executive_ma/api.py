@@ -4,6 +4,7 @@ from fastapi import APIRouter, HTTPException, Query, status
 
 from .models import AuditRecord, ExecutiveMAPortfolio, IntegrationRiskUpdate, MAListResponse, MAPortfolioCreate, MAStatusResponse
 from .service import executive_ma_service
+from app.executive_board.api import router as executive_board_router
 
 router = APIRouter(tags=["executive-ma"])
 
@@ -54,3 +55,6 @@ def assess_portfolio(portfolio_id: UUID, workspace_id: str = Query(min_length=1,
 @router.get("/v1/executive-ma/audit", response_model=list[AuditRecord])
 def ma_audit(workspace_id: str = Query(min_length=1, max_length=100)) -> list[AuditRecord]:
     return executive_ma_service.audit_records(workspace_id)
+
+
+router.include_router(executive_board_router)
