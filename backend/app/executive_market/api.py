@@ -4,6 +4,7 @@ from fastapi import APIRouter, HTTPException, Query, status
 
 from .models import AuditRecord, ExecutiveMarketPortfolio, MarketListResponse, MarketPortfolioCreate, MarketStatusResponse, SignalUpdate
 from .service import executive_market_service
+from app.executive_customer.api import router as executive_customer_router
 
 router = APIRouter(tags=["executive-market"])
 
@@ -54,3 +55,6 @@ def assess_portfolio(portfolio_id: UUID, workspace_id: str = Query(min_length=1,
 @router.get("/v1/executive-market/audit", response_model=list[AuditRecord])
 def market_audit(workspace_id: str = Query(min_length=1, max_length=100)) -> list[AuditRecord]:
     return executive_market_service.audit_records(workspace_id)
+
+
+router.include_router(executive_customer_router)
