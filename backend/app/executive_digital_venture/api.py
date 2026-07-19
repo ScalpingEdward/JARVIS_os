@@ -61,3 +61,8 @@ def assess_portfolio(portfolio_id: UUID, workspace_id: str = Query(min_length=1,
 @router.get("/v1/executive-digital-venture/audit", response_model=list[AuditRecord])
 def digital_venture_audit(workspace_id: str = Query(min_length=1, max_length=100)) -> list[AuditRecord]:
     return executive_digital_venture_service.audit_records(workspace_id)
+
+
+from app.executive_remote_work.api import router as executive_remote_work_router
+
+router.include_router(executive_remote_work_router)
