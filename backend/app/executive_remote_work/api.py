@@ -2,10 +2,12 @@ from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Query, status
 
+from ..executive_order_flow.api import router as executive_order_flow_router
 from .models import AuditRecord, ExecutiveRemoteWorkPortfolio, RemoteWorkListResponse, RemoteWorkPortfolioCreate, RemoteWorkRiskUpdate, RemoteWorkStatusResponse
 from .service import executive_remote_work_service
 
 router = APIRouter(tags=["executive-remote-work"])
+router.include_router(executive_order_flow_router)
 
 
 @router.get("/v1/executive-remote-work/status", response_model=RemoteWorkStatusResponse)
