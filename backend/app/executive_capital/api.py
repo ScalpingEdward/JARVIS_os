@@ -11,8 +11,10 @@ from .models import (
     ExecutiveCapitalPortfolio,
 )
 from .service import executive_capital_service
+from app.executive_talent.api import router as executive_talent_router
 
 router = APIRouter(tags=["executive-capital"])
+router.include_router(executive_talent_router)
 
 
 @router.get("/v1/executive-capital/status", response_model=CapitalStatusResponse)
