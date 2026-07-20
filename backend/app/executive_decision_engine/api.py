@@ -23,6 +23,7 @@ from ..executive_trading_release_reentry.api import router as executive_trading_
 from ..executive_treasury_wealth_governance.api import router as executive_treasury_wealth_governance_router
 from ..executive_vision_adapter_consensus.api import router as executive_vision_adapter_consensus_router
 from ..executive_vision_adapter_execution.api import router as executive_vision_adapter_execution_router
+from ..executive_vision_adapter_registry.api import router as executive_vision_adapter_registry_router
 from ..executive_vision_provider_routing.api import router as executive_vision_provider_routing_router
 from .models import (
     ApprovalRequest,
@@ -111,5 +112,6 @@ router.include_router(executive_telegram_chart_vision_signal_intelligence_router
 router.include_router(executive_telegram_media_ingestion_router)
 router.include_router(executive_vision_adapter_execution_router)
 router.include_router(executive_vision_adapter_consensus_router)
+router.include_router(executive_vision_adapter_registry_router)
 router.include_router(executive_vision_provider_routing_router)
 router.include_router(executive_strategy_router)
