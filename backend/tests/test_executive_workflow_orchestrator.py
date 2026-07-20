@@ -129,8 +129,11 @@ def test_duplicate_instance_rejected() -> None:
     service = ExecutiveWorkflowOrchestratorService()
     first = valid_payload()
     service.create(first)
+
     second = valid_payload()
     second.source_key = "workflow-2"
+    second.workflow_instance_id = first.workflow_instance_id
+
     try:
         service.create(second)
     except ValueError as exc:
