@@ -65,7 +65,7 @@ class ExecutiveVisionAdapterConsensusService:
             agreeing = [item for item in eligible if (item.symbol, item.timeframe, item.direction) == winning_key]
             directional_agreement = round(100 * winning_count / len(eligible))
 
-            minimum = policy.minimum_agreeing_adapters if len(eligible) > 1 and policy.require_consensus_for_multiple_results else 1
+            minimum = policy.minimum_agreeing_adapters if policy.require_consensus_for_multiple_results else 1
             single_override = (
                 len(eligible) == 1
                 and policy.allow_single_adapter_with_human_approval
@@ -79,7 +79,10 @@ class ExecutiveVisionAdapterConsensusService:
 
             if winning_count < minimum and not single_override:
                 state, action = ConsensusState.disagreement, "review-cross-provider-disagreement"
-                reasons.append("Vision providers disagree on symbol, timeframe or trade direction")
+                if len(eligible) == 1:
+                    reasons.append("A single adapter requires explicit human approval before normalization")
+                else:
+                    reasons.append("Vision providers disagree on symbol, timeframe or trade direction")
             elif context_missing:
                 state, action = ConsensusState.disagreement, "review-incomplete-normalized-context"
                 reasons.append("Consensus lacks required symbol, timeframe or direction")
