@@ -4,6 +4,7 @@ from fastapi import APIRouter, HTTPException, Query, status
 
 from ..executive_capital_allocation_deployment.api import router as executive_capital_allocation_deployment_router
 from ..executive_live_capital_broker_deployment.api import router as executive_live_capital_broker_deployment_router
+from ..executive_live_portfolio_exposure.api import router as executive_live_portfolio_exposure_router
 from ..executive_prop_payout_capital_formation.api import router as executive_prop_payout_capital_formation_router
 from ..executive_strategy.api import router as executive_strategy_router
 from ..executive_trading_incident_recovery.api import router as executive_trading_incident_recovery_router
@@ -88,4 +89,5 @@ router.include_router(executive_capital_allocation_deployment_router)
 router.include_router(executive_prop_payout_capital_formation_router)
 router.include_router(executive_treasury_wealth_governance_router)
 router.include_router(executive_live_capital_broker_deployment_router)
+router.include_router(executive_live_portfolio_exposure_router)
 router.include_router(executive_strategy_router)
