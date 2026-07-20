@@ -26,6 +26,7 @@ from ..executive_trading_post_release_drift.api import router as executive_tradi
 from ..executive_trading_promotion_scaling.api import router as executive_trading_promotion_scaling_router
 from ..executive_trading_readiness.api import router as executive_trading_readiness_router
 from ..executive_trading_release_reentry.api import router as executive_trading_release_reentry_router
+from ..executive_transactional_outbox.api import router as executive_transactional_outbox_router
 from ..executive_treasury_wealth_governance.api import router as executive_treasury_wealth_governance_router
 from ..executive_vision_adapter_consensus.api import router as executive_vision_adapter_consensus_router
 from ..executive_vision_adapter_execution.api import router as executive_vision_adapter_execution_router
@@ -100,6 +101,7 @@ def decision_audit(workspace_id: str = Query(min_length=1, max_length=100)) -> l
 router.include_router(trading_decision_router)
 router.include_router(executive_event_bus_router)
 router.include_router(executive_persistent_event_store_router)
+router.include_router(executive_transactional_outbox_router)
 router.include_router(executive_trading_readiness_router)
 router.include_router(executive_trading_incident_recovery_router)
 router.include_router(executive_trading_release_reentry_router)
