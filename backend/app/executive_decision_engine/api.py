@@ -33,15 +33,9 @@ from ..executive_vision_adapter_consensus.api import router as executive_vision_
 from ..executive_vision_adapter_execution.api import router as executive_vision_adapter_execution_router
 from ..executive_vision_adapter_registry.api import router as executive_vision_adapter_registry_router
 from ..executive_vision_provider_routing.api import router as executive_vision_provider_routing_router
+from ..executive_workflow_executor_runtime.api import router as executive_workflow_executor_runtime_router
 from ..executive_workflow_orchestrator.api import router as executive_workflow_orchestrator_router
-from .models import (
-    ApprovalRequest,
-    AuditRecord,
-    DecisionListResponse,
-    DecisionStatusResponse,
-    ExecutiveDecision,
-    ExecutiveDecisionCreate,
-)
+from .models import ApprovalRequest, AuditRecord, DecisionListResponse, DecisionStatusResponse, ExecutiveDecision, ExecutiveDecisionCreate
 from .service import executive_decision_service
 from .trading_api import router as trading_decision_router
 
@@ -106,6 +100,7 @@ router.include_router(executive_persistent_event_store_router)
 router.include_router(executive_transactional_outbox_router)
 router.include_router(executive_sql_outbox_runtime_router)
 router.include_router(executive_workflow_orchestrator_router)
+router.include_router(executive_workflow_executor_runtime_router)
 router.include_router(executive_trading_readiness_router)
 router.include_router(executive_trading_incident_recovery_router)
 router.include_router(executive_trading_release_reentry_router)
