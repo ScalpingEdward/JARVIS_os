@@ -3,6 +3,7 @@ from uuid import UUID
 from fastapi import APIRouter, HTTPException, Query, status
 
 from ..executive_capital_allocation_deployment.api import router as executive_capital_allocation_deployment_router
+from ..executive_event_bus.api import router as executive_event_bus_router
 from ..executive_live_capital_broker_deployment.api import router as executive_live_capital_broker_deployment_router
 from ..executive_live_portfolio_exposure.api import router as executive_live_portfolio_exposure_router
 from ..executive_live_rebalancing_strategy_rotation.api import router as executive_live_rebalancing_strategy_rotation_router
@@ -96,6 +97,7 @@ def decision_audit(workspace_id: str = Query(min_length=1, max_length=100)) -> l
 
 
 router.include_router(trading_decision_router)
+router.include_router(executive_event_bus_router)
 router.include_router(executive_trading_readiness_router)
 router.include_router(executive_trading_incident_recovery_router)
 router.include_router(executive_trading_release_reentry_router)
