@@ -18,6 +18,7 @@ from ..executive_telegram_collector.api import router as executive_telegram_coll
 from ..executive_telegram_media_ingestion.api import router as executive_telegram_media_ingestion_router
 from ..executive_telegram_sdk_client.api import router as executive_telegram_sdk_client_router
 from ..executive_telegram_transport.api import router as executive_telegram_transport_router
+from ..executive_telethon_client_bootstrap.api import router as executive_telethon_client_bootstrap_router
 from ..executive_trading_incident_recovery.api import router as executive_trading_incident_recovery_router
 from ..executive_trading_post_release_drift.api import router as executive_trading_post_release_drift_router
 from ..executive_trading_promotion_scaling.api import router as executive_trading_promotion_scaling_router
@@ -113,6 +114,7 @@ router.include_router(executive_live_strategy_probation_canary_expansion_router)
 router.include_router(executive_live_strategy_production_scale_capacity_router)
 router.include_router(executive_telegram_chart_vision_signal_intelligence_router)
 router.include_router(executive_telegram_sdk_client_router)
+router.include_router(executive_telethon_client_bootstrap_router)
 router.include_router(executive_telegram_transport_router)
 router.include_router(executive_telegram_collector_router)
 router.include_router(executive_telegram_media_ingestion_router)
