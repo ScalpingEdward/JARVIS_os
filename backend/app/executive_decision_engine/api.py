@@ -21,6 +21,7 @@ from ..executive_trading_promotion_scaling.api import router as executive_tradin
 from ..executive_trading_readiness.api import router as executive_trading_readiness_router
 from ..executive_trading_release_reentry.api import router as executive_trading_release_reentry_router
 from ..executive_treasury_wealth_governance.api import router as executive_treasury_wealth_governance_router
+from ..executive_vision_adapter_consensus.api import router as executive_vision_adapter_consensus_router
 from ..executive_vision_provider_routing.api import router as executive_vision_provider_routing_router
 from .models import (
     ApprovalRequest,
@@ -107,5 +108,6 @@ router.include_router(executive_live_strategy_probation_canary_expansion_router)
 router.include_router(executive_live_strategy_production_scale_capacity_router)
 router.include_router(executive_telegram_chart_vision_signal_intelligence_router)
 router.include_router(executive_telegram_media_ingestion_router)
+router.include_router(executive_vision_adapter_consensus_router)
 router.include_router(executive_vision_provider_routing_router)
 router.include_router(executive_strategy_router)
