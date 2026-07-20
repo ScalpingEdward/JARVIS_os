@@ -15,6 +15,7 @@ from ..executive_live_strategy_probation_canary_expansion.api import router as e
 from ..executive_live_strategy_production_scale_capacity.api import router as executive_live_strategy_production_scale_capacity_router
 from ..executive_live_strategy_review_retirement_knowledge.api import router as executive_live_strategy_review_retirement_knowledge_router
 from ..executive_live_strategy_succession_replacement.api import router as executive_live_strategy_succession_replacement_router
+from ..executive_market_data.api import router as executive_market_data_router
 from ..executive_module_executor_adapter.api import router as executive_module_executor_adapter_router
 from ..executive_observability.api import router as executive_observability_router
 from ..executive_persistent_event_store.api import router as executive_persistent_event_store_router
@@ -113,6 +114,7 @@ router.include_router(executive_observability_router)
 router.include_router(executive_policy_engine_router)
 router.include_router(executive_configuration_registry_router)
 router.include_router(executive_broker_connectivity_router)
+router.include_router(executive_market_data_router)
 router.include_router(executive_trading_readiness_router)
 router.include_router(executive_trading_incident_recovery_router)
 router.include_router(executive_trading_release_reentry_router)
