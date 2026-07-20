@@ -2,6 +2,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Query, status
 
+from ..executive_broker_connectivity.api import router as executive_broker_connectivity_router
 from ..executive_capital_allocation_deployment.api import router as executive_capital_allocation_deployment_router
 from ..executive_configuration_registry.api import router as executive_configuration_registry_router
 from ..executive_event_bus.api import router as executive_event_bus_router
@@ -111,6 +112,7 @@ router.include_router(executive_executor_transport_runtime_router)
 router.include_router(executive_observability_router)
 router.include_router(executive_policy_engine_router)
 router.include_router(executive_configuration_registry_router)
+router.include_router(executive_broker_connectivity_router)
 router.include_router(executive_trading_readiness_router)
 router.include_router(executive_trading_incident_recovery_router)
 router.include_router(executive_trading_release_reentry_router)
