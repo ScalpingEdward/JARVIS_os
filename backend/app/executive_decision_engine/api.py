@@ -14,6 +14,7 @@ from ..executive_live_strategy_review_retirement_knowledge.api import router as 
 from ..executive_live_strategy_succession_replacement.api import router as executive_live_strategy_succession_replacement_router
 from ..executive_persistent_event_store.api import router as executive_persistent_event_store_router
 from ..executive_prop_payout_capital_formation.api import router as executive_prop_payout_capital_formation_router
+from ..executive_sql_outbox_runtime.api import router as executive_sql_outbox_runtime_router
 from ..executive_strategy.api import router as executive_strategy_router
 from ..executive_telegram_chart_vision_signal_intelligence.api import router as executive_telegram_chart_vision_signal_intelligence_router
 from ..executive_telegram_collector.api import router as executive_telegram_collector_router
@@ -102,6 +103,7 @@ router.include_router(trading_decision_router)
 router.include_router(executive_event_bus_router)
 router.include_router(executive_persistent_event_store_router)
 router.include_router(executive_transactional_outbox_router)
+router.include_router(executive_sql_outbox_runtime_router)
 router.include_router(executive_trading_readiness_router)
 router.include_router(executive_trading_incident_recovery_router)
 router.include_router(executive_trading_release_reentry_router)
