@@ -1,4 +1,4 @@
-from app.modules.executive_sql_outbox_runtime.models import (
+from app.executive_sql_outbox_runtime.models import (
     DatabaseType,
     RelayMode,
     RelayWorkerObservation,
@@ -6,7 +6,7 @@ from app.modules.executive_sql_outbox_runtime.models import (
     SqlOutboxRuntimeState,
     SqlSchemaObservation,
 )
-from app.modules.executive_sql_outbox_runtime.service import ExecutiveSqlOutboxRuntimeService
+from app.executive_sql_outbox_runtime.service import ExecutiveSqlOutboxRuntimeService
 
 
 def valid_payload(workspace_id: str = "ws-1") -> SqlOutboxRuntimeAssessmentCreate:
