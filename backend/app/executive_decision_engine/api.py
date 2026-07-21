@@ -23,6 +23,7 @@ from ..executive_market_data.api import router as executive_market_data_router
 from ..executive_module_executor_adapter.api import router as executive_module_executor_adapter_router
 from ..executive_multi_account_copy_governance.api import router as executive_multi_account_copy_governance_router
 from ..executive_observability.api import router as executive_observability_router
+from ..executive_operational_continuity.api import router as executive_operational_continuity_router
 from ..executive_order_execution.api import router as executive_order_execution_router
 from ..executive_order_routing.api import router as executive_order_routing_router
 from ..executive_persistent_event_store.api import router as executive_persistent_event_store_router
@@ -131,6 +132,7 @@ router.include_router(executive_emergency_risk_containment_router)
 router.include_router(executive_controlled_reentry_router)
 router.include_router(executive_multi_account_copy_governance_router)
 router.include_router(executive_copy_execution_drift_repair_router)
+router.include_router(executive_operational_continuity_router)
 router.include_router(executive_trading_readiness_router)
 router.include_router(executive_trading_incident_recovery_router)
 router.include_router(executive_trading_release_reentry_router)
