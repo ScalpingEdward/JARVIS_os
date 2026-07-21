@@ -15,6 +15,7 @@ from .connector_setup.api import router as connector_setup_router
 from .connectors.api import router as connectors_router
 from .decision_engine.api import router as decision_engine_router
 from .execution.api import router as execution_router
+from .executive_mt5_portfolio_correlation_exposure.api import router as executive_mt5_portfolio_correlation_exposure_router
 from .github_remote.api import router as github_remote_router
 from .goal_execution.api import router as goal_execution_router
 from .knowledge_graph.api import router as knowledge_graph_router
@@ -74,6 +75,7 @@ app.include_router(connector_setup_router)
 app.include_router(connectors_router)
 app.include_router(decision_engine_router)
 app.include_router(execution_router)
+app.include_router(executive_mt5_portfolio_correlation_exposure_router)
 app.include_router(github_remote_router)
 app.include_router(goal_execution_router)
 app.include_router(knowledge_graph_router)
