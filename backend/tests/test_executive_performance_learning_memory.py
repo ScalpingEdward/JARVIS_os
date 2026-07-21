@@ -1,10 +1,10 @@
-from backend.app.executive_performance_learning_memory.models import (
+from app.executive_performance_learning_memory.models import (
     PerformanceLearningCreate,
     PerformanceLearningExecuteRequest,
     PerformanceLearningState,
     TradeOutcome,
 )
-from backend.app.executive_performance_learning_memory.service import PerformanceLearningMemoryService
+from app.executive_performance_learning_memory.service import PerformanceLearningMemoryService
 
 
 def trade(index: int, pnl: float, realized_rr: float, confidence: float = 70) -> TradeOutcome:
