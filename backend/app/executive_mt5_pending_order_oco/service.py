@@ -1,4 +1,3 @@
-from dataclasses import replace
 from datetime import datetime, timezone
 from uuid import UUID
 
@@ -31,7 +30,8 @@ class PendingOrderOCOService:
             return PendingOrderState.PRICE_INVALID, ["Buy stop entry must be above current ask"]
         if payload.order_type.startswith("sell") and payload.entry_price > payload.current_bid and "limit" not in payload.order_type:
             return PendingOrderState.PRICE_INVALID, ["Sell stop entry must be below current bid"]
-        if abs(payload.entry_price - (payload.current_ask if payload.order_type.startswith("buy") else payload.current_bid)) < minimum_distance:
+        reference_price = payload.current_ask if payload.order_type.startswith("buy") else payload.current_bid
+        if abs(payload.entry_price - reference_price) < minimum_distance:
             return PendingOrderState.PRICE_INVALID, ["Pending entry violates stop or freeze distance"]
         if payload.expiration_at is not None and payload.expiration_at <= datetime.now(timezone.utc):
             return PendingOrderState.EXPIRATION_INVALID, ["Pending-order expiration must be in the future"]
@@ -82,14 +82,14 @@ class PendingOrderOCOService:
         return record if record and record.payload.workspace_id == workspace_id else None
 
     def list_records(self, workspace_id: str) -> list[PendingOrderAssessment]:
-        return [r for r in self._records.values() if r.payload.workspace_id == workspace_id]
+        return [record for record in self._records.values() if record.payload.workspace_id == workspace_id]
 
     def status(self, workspace_id: str) -> PendingOrderStatus:
         records = self.list_records(workspace_id)
         return PendingOrderStatus(workspace_id=workspace_id, latest_state=records[-1].state if records else None, count=len(records))
 
     def audit_records(self, workspace_id: str) -> list[AuditRecord]:
-        return [a for a in self._audit if a.workspace_id == workspace_id]
+        return [record for record in self._audit if record.workspace_id == workspace_id]
 
 
 pending_order_oco_service = PendingOrderOCOService()
