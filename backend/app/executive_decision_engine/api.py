@@ -11,6 +11,7 @@ from ..executive_copy_execution_drift_repair.api import router as executive_copy
 from ..executive_emergency_risk_containment.api import router as executive_emergency_risk_containment_router
 from ..executive_event_bus.api import router as executive_event_bus_router
 from ..executive_executor_transport_runtime.api import router as executive_executor_transport_runtime_router
+from ..executive_live_adapter_activation.api import router as executive_live_adapter_activation_router
 from ..executive_live_capital_broker_deployment.api import router as executive_live_capital_broker_deployment_router
 from ..executive_live_portfolio_exposure.api import router as executive_live_portfolio_exposure_router
 from ..executive_live_rebalancing_strategy_rotation.api import router as executive_live_rebalancing_strategy_rotation_router
@@ -133,6 +134,7 @@ router.include_router(executive_controlled_reentry_router)
 router.include_router(executive_multi_account_copy_governance_router)
 router.include_router(executive_copy_execution_drift_repair_router)
 router.include_router(executive_operational_continuity_router)
+router.include_router(executive_live_adapter_activation_router)
 router.include_router(executive_trading_readiness_router)
 router.include_router(executive_trading_incident_recovery_router)
 router.include_router(executive_trading_release_reentry_router)
