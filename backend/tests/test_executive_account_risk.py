@@ -12,22 +12,23 @@ def reset_service() -> None:
 
 
 def payload(**observation_overrides):
-    observation = AccountRiskObservation(
-        balance=100_000,
-        equity=99_000,
-        start_of_day_balance=100_000,
-        initial_account_balance=100_000,
-        used_margin=10_000,
-        free_margin=89_000,
-        gross_exposure=30_000,
-        net_exposure=20_000,
-        largest_symbol_exposure_pct=20,
-        largest_strategy_exposure_pct=30,
-        correlated_exposure_pct=40,
-        open_risk_pct=1.5,
-        pending_order_risk_pct=0.5,
-        **observation_overrides,
-    )
+    observation_values = {
+        "balance": 100_000,
+        "equity": 99_000,
+        "start_of_day_balance": 100_000,
+        "initial_account_balance": 100_000,
+        "used_margin": 10_000,
+        "free_margin": 89_000,
+        "gross_exposure": 30_000,
+        "net_exposure": 20_000,
+        "largest_symbol_exposure_pct": 20,
+        "largest_strategy_exposure_pct": 30,
+        "correlated_exposure_pct": 40,
+        "open_risk_pct": 1.5,
+        "pending_order_risk_pct": 0.5,
+    }
+    observation_values.update(observation_overrides)
+    observation = AccountRiskObservation(**observation_values)
     return AccountRiskAssessmentCreate(
         workspace_id="master-brano",
         source_key=str(uuid4()),
