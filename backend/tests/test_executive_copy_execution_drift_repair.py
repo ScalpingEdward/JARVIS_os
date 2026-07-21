@@ -137,7 +137,6 @@ def test_repair_requires_human_approval() -> None:
                 fanout_id=record.fanout_id,
                 actor_id="master-brano",
                 human_approval_verified=False,
-                updated_open_risk_pct=0 if False else 0,
             )
         )
 
