@@ -94,8 +94,17 @@ class AutonomousCodeReviewService:
 
         quality = round(max(0, min(100, quality)), 2)
         risk = round(max(0, min(100, risk)), 2)
-        critical = any(item.severity == "critical" for item in findings)
-        if critical or quality < 70 or risk >= 50:
+
+        blocking_critical = any(
+            item.severity == "critical" and item.category != "trading-safety"
+            for item in findings
+        )
+        blocking_quality_or_risk = quality < 70 or (
+            risk >= 50
+            and not (evidence.protected_paths_changed or evidence.risk_or_execution_changed)
+        )
+
+        if blocking_critical or blocking_quality_or_risk:
             return CodeReviewState.CHANGES_REQUIRED, "review found blocking defects", quality, risk, findings, "reject"
         if evidence.protected_paths_changed or evidence.risk_or_execution_changed:
             return CodeReviewState.HUMAN_REVIEW_REQUIRED, "sensitive changes require explicit human review", quality, risk, findings, "human-review"
