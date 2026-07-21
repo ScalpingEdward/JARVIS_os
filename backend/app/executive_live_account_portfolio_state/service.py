@@ -23,7 +23,14 @@ class LiveAccountPortfolioStateService:
             raise ValueError("duplicate source_key in workspace")
         state, detail = self._evaluate(payload)
         metrics = self._metrics(payload)
-        record = AccountPortfolioSnapshot(state=state, detail=detail, request=payload, **metrics)
+        record = AccountPortfolioSnapshot(
+            workspace_id=payload.workspace_id,
+            source_key=payload.source_key,
+            state=state,
+            detail=detail,
+            request=payload,
+            **metrics,
+        )
         self._records[record.id] = record
         self._source_keys.add(key)
         self._log(record, payload.actor_id, "create")
