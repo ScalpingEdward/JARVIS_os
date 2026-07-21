@@ -43,6 +43,7 @@ from ..executive_order_execution.api import router as executive_order_execution_
 from ..executive_order_routing.api import router as executive_order_routing_router
 from ..executive_persistent_event_store.api import router as executive_persistent_event_store_router
 from ..executive_policy_engine.api import router as executive_policy_engine_router
+from ..executive_portfolio_risk_brain.api import router as executive_portfolio_risk_brain_router
 from ..executive_position_lifecycle.api import router as executive_position_lifecycle_router
 from ..executive_prop_payout_capital_formation.api import router as executive_prop_payout_capital_formation_router
 from ..executive_sql_outbox_runtime.api import router as executive_sql_outbox_runtime_router
@@ -163,6 +164,7 @@ router.include_router(executive_mt5_native_adapter_runtime_router)
 router.include_router(executive_mt5_live_order_executor_router)
 router.include_router(executive_mt5_live_state_sync_router)
 router.include_router(executive_live_account_portfolio_state_router)
+router.include_router(executive_portfolio_risk_brain_router)
 router.include_router(executive_trading_readiness_router)
 router.include_router(executive_trading_incident_recovery_router)
 router.include_router(executive_trading_release_reentry_router)
