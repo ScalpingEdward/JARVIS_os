@@ -90,11 +90,11 @@ class ExecutiveLiveAdapterActivationService:
         record = self._records.get(record_id)
         return record if record and record.workspace_id == workspace_id else None
 
-    def list(self, workspace_id: str) -> list[LiveAdapterActivationRecord]:
+    def list_records(self, workspace_id: str) -> list[LiveAdapterActivationRecord]:
         return [item for item in self._records.values() if item.workspace_id == workspace_id]
 
     def status(self, workspace_id: str) -> ActivationStatusResponse:
-        records = self.list(workspace_id)
+        records = self.list_records(workspace_id)
         return ActivationStatusResponse(workspace_id=workspace_id, records=len(records), production_ready=sum(r.state == LiveAdapterActivationState.production_ready for r in records), blocked=sum(r.state == LiveAdapterActivationState.blocked for r in records))
 
     def audit(self, workspace_id: str) -> list[AuditRecord]:
