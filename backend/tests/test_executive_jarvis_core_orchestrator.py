@@ -1,5 +1,5 @@
-from backend.app.executive_jarvis_core_orchestrator.models import JarvisCoreCreate, JarvisCoreExecuteRequest, JarvisCoreState, ModuleCommand
-from backend.app.executive_jarvis_core_orchestrator.service import JarvisCoreOrchestratorService
+from app.executive_jarvis_core_orchestrator.models import JarvisCoreCreate, JarvisCoreExecuteRequest, JarvisCoreState, ModuleCommand
+from app.executive_jarvis_core_orchestrator.service import JarvisCoreOrchestratorService
 
 
 def payload(**overrides):
