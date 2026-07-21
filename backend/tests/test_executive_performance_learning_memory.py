@@ -20,7 +20,12 @@ def payload(**overrides) -> PerformanceLearningCreate:
     data = dict(
         workspace_id="w-1", source_key="batch-1", actor_id="tester",
         min_sample_size=4, baseline_win_rate_pct=50, baseline_expectancy_r=0.5,
-        outcomes=[trade(1, 200, 2), trade(2, -100, -1), trade(3, 200, 2), trade(4, -100, -1)],
+        outcomes=[
+            trade(1, 200, 2, 80),
+            trade(2, -100, -1, 20),
+            trade(3, 200, 2, 80),
+            trade(4, -100, -1, 20),
+        ],
     )
     data.update(overrides)
     return PerformanceLearningCreate(**data)
