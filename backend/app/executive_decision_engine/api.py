@@ -22,6 +22,7 @@ from ..executive_live_strategy_review_retirement_knowledge.api import router as 
 from ..executive_live_strategy_succession_replacement.api import router as executive_live_strategy_succession_replacement_router
 from ..executive_market_data.api import router as executive_market_data_router
 from ..executive_module_executor_adapter.api import router as executive_module_executor_adapter_router
+from ..executive_mt5_order_command_deal_ingestion.api import router as executive_mt5_order_command_deal_ingestion_router
 from ..executive_mt5_runtime_bridge.api import router as executive_mt5_runtime_bridge_router
 from ..executive_multi_account_copy_governance.api import router as executive_multi_account_copy_governance_router
 from ..executive_observability.api import router as executive_observability_router
@@ -137,6 +138,7 @@ router.include_router(executive_copy_execution_drift_repair_router)
 router.include_router(executive_operational_continuity_router)
 router.include_router(executive_live_adapter_activation_router)
 router.include_router(executive_mt5_runtime_bridge_router)
+router.include_router(executive_mt5_order_command_deal_ingestion_router)
 router.include_router(executive_trading_readiness_router)
 router.include_router(executive_trading_incident_recovery_router)
 router.include_router(executive_trading_release_reentry_router)
