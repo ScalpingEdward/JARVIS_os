@@ -23,7 +23,7 @@ def create_assessment(payload: LiveAdapterActivationCreate) -> LiveAdapterActiva
 
 @router.get("/v1/executive-live-adapter-activation/assessments", response_model=list[LiveAdapterActivationRecord])
 def list_assessments(workspace_id: str = Query(min_length=1, max_length=100)) -> list[LiveAdapterActivationRecord]:
-    return executive_live_adapter_activation_service.list(workspace_id)
+    return executive_live_adapter_activation_service.list_records(workspace_id)
 
 
 @router.get("/v1/executive-live-adapter-activation/assessments/{record_id}", response_model=LiveAdapterActivationRecord)
