@@ -58,7 +58,7 @@ def test_remediation_lifecycle() -> None:
     record = service.act(record.record_id, "workspace-a", action("approve", approval_token="approval-2"))
     record = service.act(record.record_id, "workspace-a", action("queue-remediation", receipt_id="queue-1"))
     record = service.act(record.record_id, "workspace-a", action("complete-remediation", receipt_id="apply-1", applied_remediation_ids=["r1"]))
-    record = service.act(record.record_id, "workspace-a", action("verify", receipt_id="verify-1", verification_evidence_refs=["verification"] ))
+    record = service.act(record.record_id, "workspace-a", action("verify", receipt_id="verify-1", verification_evidence_refs=["verification"]))
     assert record.state == AssuranceState.VERIFIED
 
 
@@ -85,8 +85,10 @@ def test_replay_and_workspace_isolation() -> None:
 
 
 def test_integrity_validation() -> None:
+    base = payload().model_dump()
+    base["controls"] = [PolicyControl(control_id="x", policy_id="p", description="x", weight=0.5, expected_value="1", observed_value="1", evidence_ref="e", compliant=True)]
     with pytest.raises(ValidationError, match="exactly 1.0"):
-        payload().model_copy(update={"controls": [PolicyControl(control_id="x", policy_id="p", description="x", weight=0.5, expected_value="1", observed_value="1", evidence_ref="e", compliant=True)]}).model_dump()
+        AssuranceAssessmentCreate(**base)
 
     with pytest.raises(ValidationError, match="known control"):
         AssuranceAssessmentCreate(
