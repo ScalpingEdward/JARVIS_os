@@ -145,6 +145,8 @@ class TradeSetupQualificationService:
         if risk == 0:
             raise TradeSetupError("entry and stop cannot be equal")
         rr = [round(abs(target - payload.entry_price) / risk, 3) for target in payload.target_prices]
+        minimum_rr = min(rr)
+        maximum_rr = max(rr)
         blocking: list[str] = []
         warnings: list[str] = []
         if payload.direction == "neutral":
@@ -155,11 +157,16 @@ class TradeSetupQualificationService:
             blocking.append("Spread exceeds the configured execution threshold.")
         if any(not item.evidence_ref for item in payload.confirmations if item.present):
             warnings.append("One or more present confirmations lack evidence references.")
-        if score >= 90 and min(rr) >= 3 and payload.confidence_score >= 85:
+        if (
+            score >= 90
+            and minimum_rr >= payload.minimum_rr
+            and maximum_rr >= 3
+            and payload.confidence_score >= 85
+        ):
             grade = "A+"
-        elif score >= 80 and min(rr) >= 2 and payload.confidence_score >= 75:
+        elif score >= 80 and minimum_rr >= 2 and payload.confidence_score >= 75:
             grade = "A"
-        elif score >= 70 and min(rr) >= 1.5:
+        elif score >= 70 and minimum_rr >= 1.5:
             grade = "B"
         elif score >= 55:
             grade = "C"
