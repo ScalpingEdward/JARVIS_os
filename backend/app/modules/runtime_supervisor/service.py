@@ -107,7 +107,12 @@ class RuntimeSupervisorService:
                 record.state = self._health_state(record)
 
             elif action.action == "degrade":
-                self._require_state(record, RuntimeState.HEALTHY, RuntimeState.STARTING)
+                self._require_state(
+                    record,
+                    RuntimeState.HEALTHY,
+                    RuntimeState.DEGRADED,
+                    RuntimeState.STARTING,
+                )
                 record.consecutive_failures += 1
                 record.state = RuntimeState.DEGRADED
                 if record.consecutive_failures >= record.max_consecutive_failures:
