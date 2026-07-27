@@ -4,7 +4,7 @@ from app.schemas.controlled_tool_invocation_gateway import ToolInvocationCreate,
 from app.services.controlled_tool_invocation_gateway import ControlledToolInvocationGatewayService
 
 
-def payload(**overrides):
+def payload(*, allowed_operations=None, **overrides):
     invocation = {
         "agent_id": "phoenix-agent",
         "task_id": "task-001",
@@ -29,7 +29,7 @@ def payload(**overrides):
         requested_by="planner",
         invocation=invocation,
         allowed_tools=["github"],
-        allowed_operations=["read-repository", "create-draft-pr"],
+        allowed_operations=allowed_operations or ["read-repository", "create-draft-pr"],
         allowed_hosts=["api.github.com"],
         denied_operations=["delete-repository"],
     )
@@ -73,7 +73,13 @@ def test_result_requires_dispatched_state_and_matching_adapter():
 
 def test_protected_operation_is_hard_blocked():
     service = ControlledToolInvocationGatewayService()
-    record = service.create(payload(operation="trade-execute", side_effect_level="critical"))
+    record = service.create(
+        payload(
+            operation="trade-execute",
+            side_effect_level="critical",
+            allowed_operations=["read-repository", "create-draft-pr", "trade-execute"],
+        )
+    )
     assert "risk-brain-hard-block" in record.risk_flags
     assert record.state.value == "blocked"
 
