@@ -8,7 +8,7 @@ from app.schemas.read_only_external_adapter_executor import (
 from app.services.read_only_external_adapter_executor import ReadOnlyExternalAdapterExecutorService
 
 
-def payload(**overrides):
+def payload(*, allowed_operations=None, **overrides):
     request = {
         "worker_record_id": "worker-001",
         "gateway_record_id": "gateway-001",
@@ -33,7 +33,7 @@ def payload(**overrides):
         request=request,
         egress_allow_hosts=["api.github.com"],
         pinned_hosts=["api.github.com"],
-        allowed_operations=["read-repository", "read-file", "list-pull-requests"],
+        allowed_operations=allowed_operations or ["read-repository", "read-file", "list-pull-requests"],
     )
 
 
@@ -85,8 +85,7 @@ def test_response_size_limit_is_enforced():
 
 def test_protected_operation_is_risk_brain_blocked():
     service = ReadOnlyExternalAdapterExecutorService()
-    p = payload(operation="trade-execute")
-    p.allowed_operations.append("trade-execute")
+    p = payload(operation="trade-execute", allowed_operations=["read-repository", "trade-execute"])
     record = service.create(p)
     assert "risk-brain-hard-block" in record.risk_flags
     assert record.state.value == "blocked"
