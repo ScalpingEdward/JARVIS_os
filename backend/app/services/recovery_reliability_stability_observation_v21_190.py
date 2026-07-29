@@ -95,6 +95,7 @@ class RecoveryReliabilityStabilityObservationGovernance:
             or set(consumers) != set(record.expected_consumers)
         )
         scores: list[float] = []
+        consumer_degraded = False
         if not invalid:
             for o in record.observations:
                 normalized = [o.latency_quality, o.error_quality, o.confidence, o.freshness]
@@ -107,6 +108,8 @@ class RecoveryReliabilityStabilityObservationGovernance:
                 if not exact or any(v < 0.0 or v > 1.0 for v in normalized):
                     invalid = True
                     break
+                if not o.healthy or not o.dependency_satisfied:
+                    consumer_degraded = True
                 health = 1.0 if o.healthy else 0.0
                 deps = 1.0 if o.dependency_satisfied else 0.0
                 scores.append((health + deps + sum(normalized)) / 6.0)
@@ -116,7 +119,11 @@ class RecoveryReliabilityStabilityObservationGovernance:
         else:
             record.stability_score = sum(scores) / len(scores)
             record.residual_risk = 1.0 - record.stability_score
-            if record.stability_score < self.min_stability_score or record.residual_risk > record.max_residual_risk:
+            if (
+                consumer_degraded
+                or record.stability_score < self.min_stability_score
+                or record.residual_risk > record.max_residual_risk
+            ):
                 record.state = "degraded"
 
         self.records[record.record_id] = record
