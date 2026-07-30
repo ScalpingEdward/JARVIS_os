@@ -72,13 +72,9 @@ def dialogue(req: DialogueRequest) -> dict:
     if confirmation is not None:
         return confirmation
 
-    # Detect durable statements independently from the lower-level intent mode.
-    # Phrases such as "Mein Ziel ist ..." may legitimately be routed by an
-    # existing goal capability, but they are still valid memory candidates.
     candidate = _candidate_from_text(req.command)
     result = v21_246_dialogue(req)
 
-    # Never turn blocked or approval-gated/high-risk requests into memory prompts.
     if result.get('state') in {'blocked', 'approval-required'}:
         candidate = None
 
@@ -106,3 +102,7 @@ def command_center() -> str:
     html = html.replace('SMART MEMORY COMMAND CENTER', 'MEMORY LEARNING COMMAND CENTER')
     html = html.replace("E('approval').textContent='APPROVAL · '+(d.approval_required?'YES':'NO');", "E('approval').textContent=d.memory_candidate_pending?'MEMORY · CONFIRM?':'APPROVAL · '+(d.approval_required?'YES':'NO');")
     return html
+
+
+from app.api.routes.auron_demo1_conversation_state_v21_248 import router as _auron_v21_248_router
+router.routes.extend(_auron_v21_248_router.routes)
