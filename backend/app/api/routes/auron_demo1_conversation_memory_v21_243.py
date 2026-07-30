@@ -126,3 +126,8 @@ def command_center() -> str:
     html = html.replace(marker, replacement)
     html = html.replace("E('steps').textContent='STEPS · '+steps.length;", "E('steps').textContent='MEMORY · '+(d.context_turns||0)+' TURNS';")
     return html
+
+
+# v21.244 is attached to the already-registered AURON router so main.py stays stable.
+from app.api.routes.auron_demo1_long_term_memory_v21_244 import router as _auron_v21_244_router
+router.routes.extend(_auron_v21_244_router.routes)
