@@ -5,6 +5,7 @@ from fastapi import FastAPI, HTTPException, Query, Response, status
 from .agent_adapters.api import router as agent_adapters_router
 from .api.routes.phoenix_demo1_runtime_readiness_v21_226 import router as phoenix_demo1_runtime_readiness_router
 from .api.routes.phoenix_demo1_v21_225 import router as phoenix_demo1_router
+from .api.routes.phoenix_demo1_voice_adapter_v21_227 import router as phoenix_demo1_voice_adapter_router
 from .approvals.api import router as approvals_router
 from .autofix.api import router as autofix_router
 from .collaboration.api import router as collaboration_router
@@ -68,6 +69,7 @@ app = FastAPI(title=settings.app_name, version=settings.version)
 app.include_router(agent_adapters_router)
 app.include_router(phoenix_demo1_router)
 app.include_router(phoenix_demo1_runtime_readiness_router)
+app.include_router(phoenix_demo1_voice_adapter_router)
 app.include_router(approvals_router)
 app.include_router(autofix_router)
 app.include_router(collaboration_router)
