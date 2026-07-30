@@ -2,10 +2,6 @@ from fastapi import APIRouter
 from fastapi.responses import HTMLResponse
 
 from app.api.routes.auron_demo1_conversational_core_v21_242 import DialogueRequest
-from app.api.routes.auron_demo1_conversation_memory_v21_243 import (
-    command_center as v21_243_command_center,
-    dialogue as v21_243_dialogue,
-)
 from app.memory.models import MemoryCreate, MemoryPriority
 from app.memory.service import memory_service
 
@@ -95,6 +91,9 @@ def dialogue(req: DialogueRequest) -> dict:
     memory_result = _memory_command(req)
     if memory_result is not None:
         return memory_result
+    # Lazy import deliberately breaks the v21.243 <-> v21.244 module cycle.
+    from app.api.routes.auron_demo1_conversation_memory_v21_243 import dialogue as v21_243_dialogue
+
     result = v21_243_dialogue(req)
     result['long_term_memory_count'] = len(_facts(req))
     return result
@@ -109,6 +108,9 @@ def long_term_memory(workspace_id: str = 'demo', operator_id: str = 'brano') -> 
 
 @router.get('/command-center', response_class=HTMLResponse)
 def command_center() -> str:
+    # Lazy import deliberately breaks the v21.243 <-> v21.244 module cycle.
+    from app.api.routes.auron_demo1_conversation_memory_v21_243 import command_center as v21_243_command_center
+
     html = v21_243_command_center()
     html = html.replace('v21.243', 'v21.244')
     html = html.replace('CONTEXT MEMORY COMMAND CENTER', 'LONG-TERM MEMORY COMMAND CENTER')
