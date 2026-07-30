@@ -177,3 +177,7 @@ def command_center() -> str:
         "E('intent').textContent=d.queue_count?'QUEUE · '+(d.queue_completed_count||0)+'/'+d.queue_count:(d.plan_active?'PLAN · '+(d.plan_done_count||0)+'/'+(d.plan_step_count||0):(d.goal?'GOAL · ACTIVE':'INTENTS · '+intents.length));"
     )
     return html
+
+
+from app.api.routes.auron_demo1_safe_queue_runner_v21_252 import router as _auron_v21_252_router
+router.routes.extend(_auron_v21_252_router.routes)
