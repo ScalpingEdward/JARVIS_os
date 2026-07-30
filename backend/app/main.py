@@ -8,6 +8,7 @@ from .api.routes.phoenix_demo1_integration_validation_v21_232 import router as p
 from .api.routes.phoenix_demo1_memory_binding_v21_229 import router as phoenix_demo1_memory_binding_router
 from .api.routes.phoenix_demo1_operator_acceptance_v21_233 import router as phoenix_demo1_operator_acceptance_router
 from .api.routes.phoenix_demo1_operator_dashboard_v21_230 import router as phoenix_demo1_operator_dashboard_router
+from .api.routes.phoenix_demo1_packaging_readiness_v21_234 import router as phoenix_demo1_packaging_readiness_router
 from .api.routes.phoenix_demo1_runtime_readiness_v21_226 import router as phoenix_demo1_runtime_readiness_router
 from .api.routes.phoenix_demo1_tool_adapters_v21_231 import router as phoenix_demo1_tool_adapters_router
 from .api.routes.phoenix_demo1_v21_225 import router as phoenix_demo1_router
@@ -82,6 +83,7 @@ app.include_router(phoenix_demo1_operator_dashboard_router)
 app.include_router(phoenix_demo1_tool_adapters_router)
 app.include_router(phoenix_demo1_integration_validation_router)
 app.include_router(phoenix_demo1_operator_acceptance_router)
+app.include_router(phoenix_demo1_packaging_readiness_router)
 app.include_router(approvals_router)
 app.include_router(autofix_router)
 app.include_router(collaboration_router)
