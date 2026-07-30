@@ -16,21 +16,23 @@ def test_demo1_routes_are_registered_on_application():
     assert '/phoenix/demo1/v21.228/approvals/recover-deferred' in paths
     assert '/phoenix/demo1/v21.229/memory/status' in paths
     assert '/phoenix/demo1/v21.229/memory/context' in paths
+    assert '/phoenix/demo1/v21.230/dashboard' in paths
 
 
-def test_readiness_reports_known_remaining_integrations_after_memory_binding():
+def test_readiness_reports_only_tool_adapter_debt_after_dashboard_binding():
     status = runtime_readiness()
     assert status.demo_router_registered is True
     assert status.readiness_router_registered is True
     assert status.voice_adapter_bound is True
     assert status.approval_store_persistent is True
     assert status.memory_provider_bound is True
+    assert status.operator_ui_bound is True
+    assert status.concrete_tool_adapters_bound is False
     assert status.state == 'degraded'
     assert status.autonomous_high_risk_execution_enabled is False
-    assert 'persistent-approval-inbox' not in status.missing_integrations
-    assert 'memory-provider-binding' not in status.missing_integrations
-    assert 'operator-ui-dashboard' in status.missing_integrations
-    assert status.next_priority == 'operator-ui-dashboard'
+    assert 'operator-ui-dashboard' not in status.missing_integrations
+    assert status.missing_integrations == ['concrete-tool-adapters']
+    assert status.next_priority == 'concrete-tool-adapters'
 
 
 def test_readiness_endpoint_is_live():
@@ -38,9 +40,11 @@ def test_readiness_endpoint_is_live():
     response = client.get('/phoenix/demo1/v21.226/readiness')
     assert response.status_code == 200
     body = response.json()
-    assert body['version'] == 'v21.229'
+    assert body['version'] == 'v21.230'
     assert body['demo_router_registered'] is True
     assert body['voice_adapter_bound'] is True
     assert body['approval_store_persistent'] is True
     assert body['memory_provider_bound'] is True
+    assert body['operator_ui_bound'] is True
+    assert body['concrete_tool_adapters_bound'] is False
     assert body['autonomous_high_risk_execution_enabled'] is False
