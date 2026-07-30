@@ -224,7 +224,7 @@ def create_task(payload: TaskCreate) -> TaskRecord:
 
 @app.get("/v1/tasks", response_model=TaskListResponse, tags=["orchestrator"])
 def list_tasks(task_status: TaskStatus | None = None) -> TaskListResponse:
-    items = orchestrator_service.list_all(status=task_status)
+    items = orchestrator_service.list_tasks(status=task_status)
     return TaskListResponse(items=items, count=len(items))
 
 
