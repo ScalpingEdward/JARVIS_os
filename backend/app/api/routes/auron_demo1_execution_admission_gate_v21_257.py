@@ -136,9 +136,7 @@ def command_center() -> str:
     html = v21_256_command_center()
     html = html.replace('v21.256', 'v21.257')
     html = html.replace('AURON HEALTH SUPERVISOR COMMAND CENTER', 'AURON EXECUTION ADMISSION COMMAND CENTER')
-    html = html.replace(
-        "E('channel').textContent=d.health?'HEALTH · '+String(d.health.score||0)+'/100':(d.brain_provider?'BRAIN · '+d.brain_provider.toUpperCase():'VOICE · '+(window.speechSynthesis?'READY':'OFF'));
-",
-        "E('channel').textContent=d.admission?(d.admission.allowed?'GATE · ADMITTED':'GATE · DENIED'):(d.health?'HEALTH · '+String(d.health.score||0)+'/100':(d.brain_provider?'BRAIN · '+d.brain_provider.toUpperCase():'VOICE · '+(window.speechSynthesis?'READY':'OFF')));\n",
-    )
+    old_channel = "E('channel').textContent=d.health?'HEALTH · '+String(d.health.score||0)+'/100':(d.brain_provider?'BRAIN · '+d.brain_provider.toUpperCase():'VOICE · '+(window.speechSynthesis?'READY':'OFF'));"
+    new_channel = "E('channel').textContent=d.admission?(d.admission.allowed?'GATE · ADMITTED':'GATE · DENIED'):(d.health?'HEALTH · '+String(d.health.score||0)+'/100':(d.brain_provider?'BRAIN · '+d.brain_provider.toUpperCase():'VOICE · '+(window.speechSynthesis?'READY':'OFF')));"
+    html = html.replace(old_channel, new_channel)
     return html
