@@ -128,6 +128,8 @@ def command_center() -> str:
     return html
 
 
-# v21.244 is attached to the already-registered AURON router so main.py stays stable.
+# Later AURON versions attach through this already-registered router to keep main.py stable.
 from app.api.routes.auron_demo1_long_term_memory_v21_244 import router as _auron_v21_244_router
 router.routes.extend(_auron_v21_244_router.routes)
+from app.api.routes.auron_demo1_contextual_long_term_memory_v21_245 import router as _auron_v21_245_router
+router.routes.extend(_auron_v21_245_router.routes)
