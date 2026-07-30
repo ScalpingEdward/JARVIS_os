@@ -4,6 +4,7 @@ from fastapi import FastAPI, HTTPException, Query, Response, status
 
 from .agent_adapters.api import router as agent_adapters_router
 from .api.routes.phoenix_demo1_approval_inbox_v21_228 import router as phoenix_demo1_approval_inbox_router
+from .api.routes.phoenix_demo1_execution_orchestrator_v21_237 import router as phoenix_demo1_execution_orchestrator_router
 from .api.routes.phoenix_demo1_integration_validation_v21_232 import router as phoenix_demo1_integration_validation_router
 from .api.routes.phoenix_demo1_launch_console_v21_236 import router as phoenix_demo1_launch_console_router
 from .api.routes.phoenix_demo1_memory_binding_v21_229 import router as phoenix_demo1_memory_binding_router
@@ -88,6 +89,7 @@ app.include_router(phoenix_demo1_operator_acceptance_router)
 app.include_router(phoenix_demo1_packaging_readiness_router)
 app.include_router(phoenix_demo1_release_candidate_router)
 app.include_router(phoenix_demo1_launch_console_router)
+app.include_router(phoenix_demo1_execution_orchestrator_router)
 app.include_router(approvals_router)
 app.include_router(autofix_router)
 app.include_router(collaboration_router)
