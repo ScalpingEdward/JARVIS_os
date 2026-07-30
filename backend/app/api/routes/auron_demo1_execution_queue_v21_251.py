@@ -2,12 +2,6 @@ from fastapi import APIRouter
 from fastapi.responses import HTMLResponse
 
 from app.api.routes.auron_demo1_conversational_core_v21_242 import DialogueRequest
-from app.api.routes.auron_demo1_goal_aware_planning_v21_249 import _plan
-from app.api.routes.auron_demo1_plan_execution_coordinator_v21_250 import (
-    _preview,
-    command_center as v21_250_command_center,
-    dialogue as v21_250_dialogue,
-)
 from app.memory.models import MemoryCreate, MemoryPriority
 from app.memory.service import memory_service
 
@@ -54,6 +48,10 @@ def _set_status(req: DialogueRequest, item: dict, status: str) -> None:
 
 
 def _build_queue(req: DialogueRequest) -> list[dict]:
+    # Lazy imports break the v21.250 <-> v21.251 initialization cycle.
+    from app.api.routes.auron_demo1_goal_aware_planning_v21_249 import _plan
+    from app.api.routes.auron_demo1_plan_execution_coordinator_v21_250 import _preview
+
     _clear(req)
     scope = list(_scope(req))
     pending = [step for step in _plan(req) if step['status'] == 'pending']
@@ -147,6 +145,8 @@ def dialogue(req: DialogueRequest) -> dict:
     direct = _queue_command(req)
     if direct is not None:
         return direct
+    from app.api.routes.auron_demo1_plan_execution_coordinator_v21_250 import dialogue as v21_250_dialogue
+
     result = v21_250_dialogue(req)
     queue = _queue(req)
     result['execution_queue'] = queue
@@ -169,6 +169,8 @@ def execution_queue(session_id: str, workspace_id: str = 'demo', operator_id: st
 
 @router.get('/command-center', response_class=HTMLResponse)
 def command_center() -> str:
+    from app.api.routes.auron_demo1_plan_execution_coordinator_v21_250 import command_center as v21_250_command_center
+
     html = v21_250_command_center()
     html = html.replace('v21.250', 'v21.251')
     html = html.replace('PLAN EXECUTION COMMAND CENTER', 'EXECUTION QUEUE COMMAND CENTER')
