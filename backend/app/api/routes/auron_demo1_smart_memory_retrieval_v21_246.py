@@ -5,8 +5,6 @@ from fastapi import APIRouter
 from fastapi.responses import HTMLResponse
 
 from app.api.routes.auron_demo1_conversational_core_v21_242 import DialogueRequest, _human_summary
-from app.api.routes.auron_demo1_conversation_memory_v21_243 import _history, _remember
-from app.api.routes.auron_demo1_long_term_memory_v21_244 import _facts, _memory_command
 from app.models.contracts import ModelRequest
 from app.models.router import model_router
 from app.schemas.phoenix_demo1_intent_router_v21_238 import IntentRouteRequest
@@ -28,7 +26,6 @@ def _tokens(text: str) -> set[str]:
 
 
 def _utc_datetime(value: datetime) -> datetime:
-    """Normalize DB datetimes so SQLite-naive and timezone-aware values can be compared safely."""
     if value.tzinfo is None or value.utcoffset() is None:
         return value.replace(tzinfo=timezone.utc)
     return value.astimezone(timezone.utc)
@@ -53,6 +50,8 @@ def _score_fact(query: str, item) -> float:
 
 
 def _retrieve_facts(req: DialogueRequest, limit: int = MAX_RETRIEVED_FACTS) -> list[dict]:
+    from app.api.routes.auron_demo1_long_term_memory_v21_244 import _facts
+
     ranked = [(item, _score_fact(req.command, item)) for item in _facts(req)]
     ranked.sort(key=lambda pair: (pair[1], _utc_datetime(pair[0].created_at).timestamp()), reverse=True)
     selected = [pair for pair in ranked if pair[1] > 0.2][:limit]
@@ -99,6 +98,9 @@ def _reply(req: DialogueRequest, history: list[dict[str, str]], retrieved: list[
 
 @router.post('/dialogue')
 def dialogue(req: DialogueRequest) -> dict:
+    from app.api.routes.auron_demo1_conversation_memory_v21_243 import _history, _remember
+    from app.api.routes.auron_demo1_long_term_memory_v21_244 import _facts, _memory_command
+
     memory_result = _memory_command(req)
     if memory_result is not None:
         memory_result['smart_memory_retrieval'] = True
@@ -153,7 +155,6 @@ def memory_retrieval(q: str, workspace_id: str = 'demo', operator_id: str = 'bra
 
 @router.get('/command-center', response_class=HTMLResponse)
 def command_center() -> str:
-    # Lazy import avoids the v21.245 -> v21.246 -> v21.245 module-initialization cycle.
     from app.api.routes.auron_demo1_contextual_long_term_memory_v21_245 import command_center as v21_245_command_center
 
     html = v21_245_command_center()
