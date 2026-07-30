@@ -142,7 +142,6 @@ def _execution_command(req: DialogueRequest) -> dict | None:
                 execution_steps=[step.model_dump(mode='json') for step in execution.steps],
             )
 
-        # Advance the goal-aware plan only after a confirmed completed low-risk execution.
         completed = _planning_command(DialogueRequest(
             session_id=req.session_id,
             workspace_id=req.workspace_id,
@@ -197,3 +196,7 @@ def command_center() -> str:
         "E('approval').textContent=d.execution_preview&&d.execution_preview.approval_required?'EXEC · APPROVAL':(d.memory_candidate_pending?'MEMORY · CONFIRM?':'APPROVAL · '+(d.approval_required?'YES':'NO'));"
     )
     return html
+
+
+from app.api.routes.auron_demo1_execution_queue_v21_251 import router as _auron_v21_251_router
+router.routes.extend(_auron_v21_251_router.routes)
