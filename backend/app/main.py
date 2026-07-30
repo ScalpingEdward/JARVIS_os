@@ -5,6 +5,7 @@ from fastapi import FastAPI, HTTPException, Query, Response, status
 from .agent_adapters.api import router as agent_adapters_router
 from .api.routes.auron_demo1_conversational_core_v21_242 import router as auron_demo1_conversational_core_v21_242_router
 from .api.routes.auron_demo1_conversation_memory_v21_243 import router as auron_demo1_conversation_memory_v21_243_router
+from .api.routes.auron_demo1_execution_admission_gate_v21_257 import router as auron_demo1_execution_admission_gate_v21_257_router
 from .api.routes.auron_demo1_retry_recovery_v21_255 import router as auron_demo1_retry_recovery_v21_255_router
 from .api.routes.phoenix_demo1_approval_inbox_v21_228 import router as phoenix_demo1_approval_inbox_router
 from .api.routes.phoenix_demo1_execution_orchestrator_v21_237 import router as phoenix_demo1_execution_orchestrator_router
@@ -104,6 +105,7 @@ app.include_router(phoenix_demo1_visual_core_v21_241_router)
 app.include_router(auron_demo1_conversational_core_v21_242_router)
 app.include_router(auron_demo1_conversation_memory_v21_243_router)
 app.include_router(auron_demo1_retry_recovery_v21_255_router)
+app.include_router(auron_demo1_execution_admission_gate_v21_257_router)
 app.include_router(approvals_router)
 app.include_router(autofix_router)
 app.include_router(collaboration_router)
