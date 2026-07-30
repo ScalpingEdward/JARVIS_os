@@ -7,6 +7,7 @@ from .api.routes.phoenix_demo1_approval_inbox_v21_228 import router as phoenix_d
 from .api.routes.phoenix_demo1_memory_binding_v21_229 import router as phoenix_demo1_memory_binding_router
 from .api.routes.phoenix_demo1_operator_dashboard_v21_230 import router as phoenix_demo1_operator_dashboard_router
 from .api.routes.phoenix_demo1_runtime_readiness_v21_226 import router as phoenix_demo1_runtime_readiness_router
+from .api.routes.phoenix_demo1_tool_adapters_v21_231 import router as phoenix_demo1_tool_adapters_router
 from .api.routes.phoenix_demo1_v21_225 import router as phoenix_demo1_router
 from .api.routes.phoenix_demo1_voice_adapter_v21_227 import router as phoenix_demo1_voice_adapter_router
 from .approvals.api import router as approvals_router
@@ -76,6 +77,7 @@ app.include_router(phoenix_demo1_voice_adapter_router)
 app.include_router(phoenix_demo1_approval_inbox_router)
 app.include_router(phoenix_demo1_memory_binding_router)
 app.include_router(phoenix_demo1_operator_dashboard_router)
+app.include_router(phoenix_demo1_tool_adapters_router)
 app.include_router(approvals_router)
 app.include_router(autofix_router)
 app.include_router(collaboration_router)
