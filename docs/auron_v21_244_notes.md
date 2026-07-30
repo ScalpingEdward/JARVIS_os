@@ -1,0 +1,1 @@
+Implementation note: v21.244 routes are attached through the already-registered v21.243 AURON router to avoid unnecessary main.py churn while preserving the existing application startup surface.

@@ -1,0 +1,1 @@
+CI expectation: validate v21.244 route registration, explicit remember/recall/forget behavior, input clearing, and unchanged financial approval gating.
