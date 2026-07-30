@@ -76,7 +76,6 @@ def _run_safe_batch(req: DialogueRequest) -> dict:
             stop_reason = execution.get('mode', 'execution-failed') if execution else 'execution-failed'
             break
 
-        # Queue progress follows only a confirmed completed governed plan execution.
         current_queue = _queue(req)
         current_ready = _ready_item(current_queue)
         if current_ready and current_ready['index'] == ready['index']:
@@ -162,3 +161,7 @@ def command_center() -> str:
         "E('approval').textContent=d.runner_classification==='approval-required'?'RUNNER · APPROVAL':(d.runner_classification==='blocked'?'RUNNER · BLOCKED':(d.execution_preview&&d.execution_preview.approval_required?'EXEC · APPROVAL':(d.memory_candidate_pending?'MEMORY · CONFIRM?':'APPROVAL · '+(d.approval_required?'YES':'NO'))));"
     )
     return html
+
+
+from app.api.routes.auron_demo1_runner_checkpoints_v21_253 import router as _auron_v21_253_router
+router.routes.extend(_auron_v21_253_router.routes)
