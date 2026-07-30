@@ -38,8 +38,10 @@ def _candidate_from_text(text: str) -> str | None:
 
 
 def _confirmation_action(text: str) -> str | None:
-    normalized = text.casefold().strip(' .!?')
-    if normalized in {'ja merk dir das','ja, merk dir das','merk dir das','ja speichern','ja speicher das','ja, speicher das','remember it','yes remember it'}:
+    # Normalize punctuation before matching so spoken/written variants such as
+    # "Ja, merk dir das" and "Ja merk dir das" behave identically.
+    normalized = ' '.join(text.casefold().replace(',', ' ').strip(' .!?').split())
+    if normalized in {'ja merk dir das','merk dir das','ja speichern','ja speicher das','remember it','yes remember it'}:
         return 'confirm'
     if normalized in {'nein','nein nicht merken','nicht merken','vergiss es','no','do not remember it',"don't remember it"}:
         return 'reject'
