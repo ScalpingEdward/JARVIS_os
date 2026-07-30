@@ -115,8 +115,3 @@ def command_center() -> str:
     capture = "const c=E('command').value.trim();if(!c)return;"
     html = html.replace(capture, capture + "E('command').value='';E('command').focus();")
     return html
-
-
-# v21.245 is attached through the already-registered AURON v21.244 router.
-from app.api.routes.auron_demo1_contextual_long_term_memory_v21_245 import router as _auron_v21_245_router
-router.routes.extend(_auron_v21_245_router.routes)
