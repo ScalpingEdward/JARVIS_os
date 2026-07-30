@@ -2,11 +2,6 @@ from fastapi import APIRouter
 from fastapi.responses import HTMLResponse
 
 from app.api.routes.auron_demo1_conversational_core_v21_242 import DialogueRequest
-from app.api.routes.auron_demo1_execution_policy_controller_v21_258 import _policy
-from app.api.routes.auron_demo1_policy_decision_ledger_v21_259 import (
-    command_center as v21_259_command_center,
-    dialogue as v21_259_dialogue,
-)
 from app.approvals.models import ActorRole, ApprovalRequestCreate, ApprovalStatus, RiskLevel
 from app.approvals.service import approval_service
 
@@ -90,6 +85,12 @@ def dialogue(req: DialogueRequest) -> dict:
     if direct is not None:
         return direct
 
+    # Import downstream AURON layers only when this endpoint is actually used.
+    # This keeps application startup independent from the historical router-chain
+    # import order and prevents v21.260 from exposing latent circular imports.
+    from app.api.routes.auron_demo1_execution_policy_controller_v21_258 import _policy
+    from app.api.routes.auron_demo1_policy_decision_ledger_v21_259 import dialogue as v21_259_dialogue
+
     policy = _policy(req)
     if policy.get('mode') == 'approval-required':
         approval = _request_approval(req, policy)
@@ -128,6 +129,8 @@ def pending(
 
 @router.get('/command-center', response_class=HTMLResponse)
 def command_center() -> str:
+    from app.api.routes.auron_demo1_policy_decision_ledger_v21_259 import command_center as v21_259_command_center
+
     html = v21_259_command_center()
     html = html.replace('v21.259', 'v21.260')
     html = html.replace(
