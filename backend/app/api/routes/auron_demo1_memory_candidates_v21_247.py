@@ -3,7 +3,6 @@ from fastapi.responses import HTMLResponse
 
 from app.api.routes.auron_demo1_conversational_core_v21_242 import DialogueRequest
 from app.api.routes.auron_demo1_long_term_memory_v21_244 import CATEGORY as LONG_TERM_CATEGORY, _facts, _scope
-from app.api.routes.auron_demo1_smart_memory_retrieval_v21_246 import command_center as v21_246_command_center, dialogue as v21_246_dialogue
 from app.memory.models import MemoryCreate, MemoryPriority
 from app.memory.service import memory_service
 
@@ -68,6 +67,8 @@ def _store_candidate(req: DialogueRequest, content: str) -> None:
 
 @router.post('/dialogue')
 def dialogue(req: DialogueRequest) -> dict:
+    from app.api.routes.auron_demo1_smart_memory_retrieval_v21_246 import dialogue as v21_246_dialogue
+
     confirmation = _handle_confirmation(req)
     if confirmation is not None:
         return confirmation
@@ -97,6 +98,8 @@ def memory_candidate(session_id: str, workspace_id: str = 'demo', operator_id: s
 
 @router.get('/command-center', response_class=HTMLResponse)
 def command_center() -> str:
+    from app.api.routes.auron_demo1_smart_memory_retrieval_v21_246 import command_center as v21_246_command_center
+
     html = v21_246_command_center()
     html = html.replace('v21.246', 'v21.247')
     html = html.replace('SMART MEMORY COMMAND CENTER', 'MEMORY LEARNING COMMAND CENTER')
