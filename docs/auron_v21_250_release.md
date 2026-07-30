@@ -1,0 +1,1 @@
+AURON v21.250 introduces a governed bridge between goal-aware plans and executable capabilities. Low-risk supported steps can be executed on explicit operator command and only advance after successful completion. Financial/high-risk steps remain approval-gated and blocked steps remain untouched.
