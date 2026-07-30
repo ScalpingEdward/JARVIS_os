@@ -11,18 +11,23 @@ def test_demo1_routes_are_registered_on_application():
     assert '/phoenix/demo1/v21.226/readiness' in paths
     assert '/phoenix/demo1/v21.227/voice/status' in paths
     assert '/phoenix/demo1/v21.227/voice/resolve' in paths
+    assert '/phoenix/demo1/v21.228/approvals/status' in paths
+    assert '/phoenix/demo1/v21.228/approvals' in paths
+    assert '/phoenix/demo1/v21.228/approvals/recover-deferred' in paths
 
 
-def test_readiness_reports_known_remaining_integrations_after_voice_binding():
+def test_readiness_reports_known_remaining_integrations_after_approval_persistence():
     status = runtime_readiness()
     assert status.demo_router_registered is True
     assert status.readiness_router_registered is True
     assert status.voice_adapter_bound is True
+    assert status.approval_store_persistent is True
     assert status.state == 'degraded'
     assert status.autonomous_high_risk_execution_enabled is False
     assert 'real-stt-tts-adapter' not in status.missing_integrations
-    assert 'persistent-approval-inbox' in status.missing_integrations
-    assert status.next_priority == 'persistent-approval-inbox'
+    assert 'persistent-approval-inbox' not in status.missing_integrations
+    assert 'memory-provider-binding' in status.missing_integrations
+    assert status.next_priority == 'memory-provider-binding'
 
 
 def test_readiness_endpoint_is_live():
@@ -30,7 +35,8 @@ def test_readiness_endpoint_is_live():
     response = client.get('/phoenix/demo1/v21.226/readiness')
     assert response.status_code == 200
     body = response.json()
-    assert body['version'] == 'v21.227'
+    assert body['version'] == 'v21.228'
     assert body['demo_router_registered'] is True
     assert body['voice_adapter_bound'] is True
+    assert body['approval_store_persistent'] is True
     assert body['autonomous_high_risk_execution_enabled'] is False
