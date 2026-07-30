@@ -223,3 +223,7 @@ def command_center() -> str:
         "E('intent').textContent=d.plan_active?'PLAN · '+(d.plan_done_count||0)+'/'+(d.plan_step_count||0):(d.goal?'GOAL · ACTIVE':'INTENTS · '+intents.length);"
     )
     return html
+
+
+from app.api.routes.auron_demo1_plan_execution_coordinator_v21_250 import router as _auron_v21_250_router
+router.routes.extend(_auron_v21_250_router.routes)
