@@ -18,6 +18,7 @@ from .api.routes.phoenix_demo1_tool_adapters_v21_231 import router as phoenix_de
 from .api.routes.phoenix_demo1_v21_225 import router as phoenix_demo1_router
 from .api.routes.phoenix_demo1_voice_adapter_v21_227 import router as phoenix_demo1_voice_adapter_router
 from .api.routes.phoenix_demo1_web_console_v21_239 import router as phoenix_demo1_web_console_router
+from .api.routes.phoenix_demo1_web_console_v21_240 import router as phoenix_demo1_web_console_v21_240_router
 from .approvals.api import router as approvals_router
 from .autofix.api import router as autofix_router
 from .collaboration.api import router as collaboration_router
@@ -94,6 +95,7 @@ app.include_router(phoenix_demo1_launch_console_router)
 app.include_router(phoenix_demo1_execution_orchestrator_router)
 app.include_router(phoenix_demo1_intent_router_v21_238)
 app.include_router(phoenix_demo1_web_console_router)
+app.include_router(phoenix_demo1_web_console_v21_240_router)
 app.include_router(approvals_router)
 app.include_router(autofix_router)
 app.include_router(collaboration_router)
