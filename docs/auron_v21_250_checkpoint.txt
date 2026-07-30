@@ -1,0 +1,2 @@
+Checkpoint URL: http://127.0.0.1:8000/auron/demo1/v21.250/command-center
+No local restart required until the next selected checkpoint.
