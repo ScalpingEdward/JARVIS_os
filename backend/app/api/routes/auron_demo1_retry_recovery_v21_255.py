@@ -156,3 +156,8 @@ def command_center() -> str:
     html = html.replace('v21.254', 'v21.255')
     html = html.replace('PROVIDER-NATIVE AURON COMMAND CENTER', 'RESILIENT AURON COMMAND CENTER')
     return html
+
+
+# v21.256 extends the already registered v21.255 router after all v21.255 symbols exist.
+from app.api.routes.auron_demo1_health_supervisor_v21_256 import router as _auron_v21_256_router
+router.routes.extend(_auron_v21_256_router.routes)
