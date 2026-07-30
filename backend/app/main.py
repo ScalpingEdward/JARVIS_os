@@ -199,7 +199,7 @@ def register_agent(payload: AgentCreate) -> AgentRecord:
 
 @app.get("/v1/agents", response_model=AgentListResponse, tags=["orchestrator"])
 def list_agents() -> AgentListResponse:
-    items = orchestrator_service.list_all()
+    items = orchestrator_service.list_agents()
     return AgentListResponse(items=items, count=len(items))
 
 
