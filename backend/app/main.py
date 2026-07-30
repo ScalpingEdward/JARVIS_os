@@ -3,6 +3,7 @@ from uuid import UUID
 from fastapi import FastAPI, HTTPException, Query, Response, status
 
 from .agent_adapters.api import router as agent_adapters_router
+from .api.routes.auron_demo1_approval_handoff_v21_260 import router as auron_demo1_approval_handoff_v21_260_router
 from .api.routes.auron_demo1_conversational_core_v21_242 import router as auron_demo1_conversational_core_v21_242_router
 from .api.routes.auron_demo1_conversation_memory_v21_243 import router as auron_demo1_conversation_memory_v21_243_router
 from .api.routes.auron_demo1_execution_admission_gate_v21_257 import router as auron_demo1_execution_admission_gate_v21_257_router
@@ -110,6 +111,7 @@ app.include_router(auron_demo1_retry_recovery_v21_255_router)
 app.include_router(auron_demo1_execution_admission_gate_v21_257_router)
 app.include_router(auron_demo1_execution_policy_controller_v21_258_router)
 app.include_router(auron_demo1_policy_decision_ledger_v21_259_router)
+app.include_router(auron_demo1_approval_handoff_v21_260_router)
 app.include_router(approvals_router)
 app.include_router(autofix_router)
 app.include_router(collaboration_router)
