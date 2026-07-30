@@ -2,17 +2,21 @@ from fastapi import APIRouter
 from fastapi.responses import HTMLResponse
 
 from app.api.routes.auron_demo1_conversational_core_v21_242 import DialogueRequest
-from app.api.routes.auron_demo1_conversation_state_v21_248 import (
-    _set as _set_state,
-    _state,
-    command_center as v21_248_command_center,
-    dialogue as v21_248_dialogue,
-)
 from app.memory.models import MemoryCreate, MemoryPriority
 from app.memory.service import memory_service
 
 router = APIRouter(prefix='/auron/demo1/v21.249', tags=['auron-demo1-goal-aware-planning'])
 PLAN_CATEGORY = 'auron-goal-plan'
+
+
+def _state(req: DialogueRequest) -> dict:
+    from app.api.routes.auron_demo1_conversation_state_v21_248 import _state as state_fn
+    return state_fn(req)
+
+
+def _set_state(req: DialogueRequest, kind: str, content: str) -> None:
+    from app.api.routes.auron_demo1_conversation_state_v21_248 import _set as set_fn
+    set_fn(req, kind, content)
 
 
 def _scope(req: DialogueRequest) -> set[str]:
@@ -181,6 +185,8 @@ def _planning_command(req: DialogueRequest) -> dict | None:
 
 @router.post('/dialogue')
 def dialogue(req: DialogueRequest) -> dict:
+    from app.api.routes.auron_demo1_conversation_state_v21_248 import dialogue as v21_248_dialogue
+
     direct = _planning_command(req)
     if direct is not None:
         return direct
@@ -211,6 +217,8 @@ def plan(session_id: str, workspace_id: str = 'demo', operator_id: str = 'brano'
 
 @router.get('/command-center', response_class=HTMLResponse)
 def command_center() -> str:
+    from app.api.routes.auron_demo1_conversation_state_v21_248 import command_center as v21_248_command_center
+
     html = v21_248_command_center()
     html = html.replace('v21.248', 'v21.249')
     html = html.replace('MISSION STATE COMMAND CENTER', 'GOAL-AWARE PLANNING COMMAND CENTER')
