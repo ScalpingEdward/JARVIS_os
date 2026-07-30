@@ -22,10 +22,12 @@ def test_dashboard_unifies_core_demo1_surfaces():
     assert snapshot.autonomous_high_risk_execution_enabled is False
 
 
-def test_tool_panel_remains_attention_item_until_concrete_adapters_bound():
+def test_tool_panel_reflects_concrete_adapter_binding_after_v21_231():
     snapshot = build_operator_dashboard(req())
-    assert snapshot.concrete_tool_adapters_bound is False
-    assert 'tools' in snapshot.attention_panels
+    assert snapshot.concrete_tool_adapters_bound is True
+    assert 'tools' not in snapshot.attention_panels
+    tool_panel = next(panel for panel in snapshot.panels if panel.panel_id == 'tools')
+    assert tool_panel.state == 'ready'
 
 
 def test_risk_brain_hard_block_blocks_entire_surface():
@@ -40,6 +42,7 @@ def test_dashboard_navigation_is_explicit_and_stable():
     assert snapshot.navigation['approvals'] == '/phoenix/demo1/v21.228/approvals'
     assert snapshot.navigation['memory'] == '/phoenix/demo1/v21.229/memory/status'
     assert snapshot.navigation['dashboard'] == '/phoenix/demo1/v21.230/dashboard'
+    assert snapshot.navigation['tools'] == '/phoenix/demo1/v21.231/tools/status'
 
 
 def test_dashboard_route_is_registered_and_live():
@@ -51,4 +54,5 @@ def test_dashboard_route_is_registered_and_live():
     body = response.json()
     assert body['version'] == 'v21.230'
     assert body['operator_ui_bound'] is True
+    assert body['concrete_tool_adapters_bound'] is True
     assert body['autonomous_high_risk_execution_enabled'] is False
