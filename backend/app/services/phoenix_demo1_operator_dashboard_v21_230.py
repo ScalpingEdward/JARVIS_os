@@ -2,6 +2,7 @@ from app.schemas.phoenix_demo1_operator_dashboard_v21_230 import DashboardPanel,
 from app.services.phoenix_demo1_approval_inbox_v21_228 import approval_inbox_service
 from app.services.phoenix_demo1_memory_binding_v21_229 import memory_binding_status
 from app.services.phoenix_demo1_runtime_readiness_v21_226 import runtime_readiness
+from app.services.phoenix_demo1_tool_adapters_v21_231 import adapter_status
 from app.voice.service import voice_control_service
 
 
@@ -10,6 +11,7 @@ def build_operator_dashboard(req: OperatorDashboardRequest) -> OperatorDashboard
     approval_status = approval_inbox_service.status()
     memory_status = memory_binding_status()
     voice_status = voice_control_service.status()
+    tools_status = adapter_status()
 
     if req.risk_brain_hard_block:
         state = 'blocked'
@@ -52,8 +54,8 @@ def build_operator_dashboard(req: OperatorDashboardRequest) -> OperatorDashboard
         DashboardPanel(
             panel_id='tools', title='Tool Adapters',
             state='ready' if readiness.concrete_tool_adapters_bound else 'degraded',
-            summary='Concrete tool adapters bound' if readiness.concrete_tool_adapters_bound else 'Concrete tool adapters remain pending',
-            endpoint='/v1/tools',
+            summary=f'{tools_status.healthy_count} healthy concrete capabilities; {tools_status.unavailable_count} unavailable or intentionally gated',
+            endpoint='/phoenix/demo1/v21.231/tools/status',
             attention_required=not readiness.concrete_tool_adapters_bound,
         ),
     ]
@@ -71,7 +73,7 @@ def build_operator_dashboard(req: OperatorDashboardRequest) -> OperatorDashboard
         'approvals': '/phoenix/demo1/v21.228/approvals',
         'memory': '/phoenix/demo1/v21.229/memory/status',
         'dashboard': '/phoenix/demo1/v21.230/dashboard',
-        'tools': '/v1/tools',
+        'tools': '/phoenix/demo1/v21.231/tools/status',
     }
     return OperatorDashboardSnapshot(
         state=state,
