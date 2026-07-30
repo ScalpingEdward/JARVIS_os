@@ -38,8 +38,6 @@ def _candidate_from_text(text: str) -> str | None:
 
 
 def _confirmation_action(text: str) -> str | None:
-    # Normalize punctuation before matching so spoken/written variants such as
-    # "Ja, merk dir das" and "Ja merk dir das" behave identically.
     normalized = ' '.join(text.casefold().replace(',', ' ').strip(' .!?').split())
     if normalized in {'ja merk dir das','merk dir das','ja speichern','ja speicher das','remember it','yes remember it'}:
         return 'confirm'
@@ -73,8 +71,17 @@ def dialogue(req: DialogueRequest) -> dict:
     confirmation = _handle_confirmation(req)
     if confirmation is not None:
         return confirmation
+
+    # Detect durable statements independently from the lower-level intent mode.
+    # Phrases such as "Mein Ziel ist ..." may legitimately be routed by an
+    # existing goal capability, but they are still valid memory candidates.
+    candidate = _candidate_from_text(req.command)
     result = v21_246_dialogue(req)
-    candidate = _candidate_from_text(req.command) if result.get('mode') == 'conversation' else None
+
+    # Never turn blocked or approval-gated/high-risk requests into memory prompts.
+    if result.get('state') in {'blocked', 'approval-required'}:
+        candidate = None
+
     if candidate:
         _store_candidate(req, candidate)
         result['memory_candidate_pending'] = True
