@@ -1,5 +1,8 @@
+from fastapi.testclient import TestClient
+
 from app.api.routes.auron_demo1_conversational_core_v21_242 import DialogueRequest
 from app.api.routes.auron_demo1_retry_recovery_v21_255 import MAX_RETRIES, _recovery, _reset_recovery, dialogue, recovery_status
+from app.main import app
 
 
 def _req(command: str) -> DialogueRequest:
@@ -28,7 +31,8 @@ def test_retry_without_retryable_failure_does_not_execute():
     assert result['approval_required'] is False
 
 
-def test_command_center_route_is_registered(client):
+def test_command_center_route_is_registered():
+    client = TestClient(app)
     response = client.get('/auron/demo1/v21.255/command-center')
     assert response.status_code == 200
     assert 'v21.255' in response.text
