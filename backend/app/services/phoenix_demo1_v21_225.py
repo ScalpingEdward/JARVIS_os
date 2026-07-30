@@ -1,7 +1,8 @@
 import hashlib
 import json
-from datetime import datetime
 from app.schemas.phoenix_demo1_v21_225 import DemoRequest, DemoResponse, DemoApprovalRequest, DemoStatus
+from app.schemas.phoenix_demo1_approval_inbox_v21_228 import ApprovalInboxCreate
+from app.services.phoenix_demo1_approval_inbox_v21_228 import approval_inbox_service
 
 _HIGH_RISK = {'high'}
 
@@ -43,6 +44,19 @@ def run_demo_vertical_slice(req: DemoRequest) -> DemoResponse:
                 state = 'deferred'
             else:
                 state = 'queued-for-approval'
+            approval_inbox_service.upsert(ApprovalInboxCreate(
+                approval_id=approval.approval_id,
+                session_id=req.session_id,
+                workspace_id=req.workspace_id,
+                operator_id=req.operator_id,
+                command=req.command,
+                reason=approval.reason,
+                priority=approval.priority,
+                action_risk=approval.action_risk,
+                state='deferred' if state == 'deferred' else 'pending',
+                created_at=req.now,
+                deferred_until=req.suppress_interaction_until,
+            ))
         else:
             executable.append(req.command)
             state = 'working'
@@ -65,6 +79,7 @@ def run_demo_vertical_slice(req: DemoRequest) -> DemoResponse:
             parts.append(f'unhealthy/unavailable tools: {", ".join(sorted(unhealthy_tools))}')
         if approvals:
             parts.append('approval required before gated execution')
+            parts.append('approval persisted in durable inbox')
         if deferred:
             parts.append('interaction deferred by operator quiet mode')
         summary = '; '.join(parts) if parts else 'Demo request accepted.'
@@ -114,6 +129,7 @@ def demo_status() -> DemoStatus:
         autonomous_high_risk_execution_enabled=False,
         notes=[
             'Demo 1 integrates operator command intake, context availability, quiet modes, approval queueing and safe work continuation.',
+            'Approval-gated requests are durably persisted by the v21.228 approval inbox.',
             'High-risk execution remains approval-gated.',
             'This slice is intentionally bounded and does not claim every PHOENIX subsystem is production-integrated yet.',
         ],
