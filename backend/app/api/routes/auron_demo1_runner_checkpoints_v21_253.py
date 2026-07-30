@@ -202,3 +202,7 @@ def command_center() -> str:
         "E('approval').textContent=d.runner_paused?'RUNNER · PAUSED':(d.runner_classification==='approval-required'?'RUNNER · APPROVAL':(d.runner_classification==='blocked'?'RUNNER · BLOCKED':(d.execution_preview&&d.execution_preview.approval_required?'EXEC · APPROVAL':(d.memory_candidate_pending?'MEMORY · CONFIRM?':'APPROVAL · '+(d.approval_required?'YES':'NO')))));",
     )
     return html
+
+
+from app.api.routes.auron_demo1_provider_brain_v21_254 import router as _auron_v21_254_router
+router.routes.extend(_auron_v21_254_router.routes)
