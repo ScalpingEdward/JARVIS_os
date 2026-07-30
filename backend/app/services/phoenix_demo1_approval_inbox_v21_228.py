@@ -44,7 +44,9 @@ class PersistentApprovalInbox:
                 return existing
             now = datetime.now(timezone.utc)
             state = 'blocked' if payload.risk_brain_hard_block else payload.state
-            record = ApprovalInboxRecord(**payload.model_dump(), state=state, updated_at=now)
+            data = payload.model_dump()
+            data['state'] = state
+            record = ApprovalInboxRecord(**data, updated_at=now)
             self._items[record.approval_id] = record
             self._persist()
             return record
