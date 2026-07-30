@@ -162,3 +162,7 @@ def command_center() -> str:
         "E('steps').textContent='MEMORY · '+(d.context_turns||0)+' CTX · '+(d.retrieved_fact_count||0)+' REL';",
     )
     return html
+
+
+from app.api.routes.auron_demo1_memory_candidates_v21_247 import router as _auron_v21_247_router
+router.routes.extend(_auron_v21_247_router.routes)
