@@ -28,6 +28,13 @@ def _tokens(text: str) -> set[str]:
     }
 
 
+def _utc_datetime(value: datetime) -> datetime:
+    """Normalize DB datetimes so SQLite-naive and timezone-aware values can be compared safely."""
+    if value.tzinfo is None or value.utcoffset() is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)
+
+
 def _score_fact(query: str, item) -> float:
     q = _tokens(query)
     f = _tokens(item.content)
@@ -39,7 +46,8 @@ def _score_fact(query: str, item) -> float:
         if query.casefold() in item.content.casefold() or item.content.casefold() in query.casefold():
             lexical += 1.0
 
-    age_days = max(0.0, (datetime.now(timezone.utc) - item.created_at).total_seconds() / 86400.0)
+    created_at = _utc_datetime(item.created_at)
+    age_days = max(0.0, (datetime.now(timezone.utc) - created_at).total_seconds() / 86400.0)
     recency = 1.0 / (1.0 + age_days / 30.0)
     priority = float(getattr(item.priority, 'value', item.priority)) / 4.0
     return lexical * 5.0 + priority * 0.75 + recency * 0.25
@@ -47,7 +55,7 @@ def _score_fact(query: str, item) -> float:
 
 def _retrieve_facts(req: DialogueRequest, limit: int = MAX_RETRIEVED_FACTS) -> list[dict]:
     ranked = [(item, _score_fact(req.command, item)) for item in _facts(req)]
-    ranked.sort(key=lambda pair: (pair[1], pair[0].created_at), reverse=True)
+    ranked.sort(key=lambda pair: (pair[1], _utc_datetime(pair[0].created_at).timestamp()), reverse=True)
     selected = [pair for pair in ranked if pair[1] > 0.2][:limit]
     if not selected and ranked:
         selected = ranked[:min(2, limit)]
