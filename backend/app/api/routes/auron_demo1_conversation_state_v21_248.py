@@ -2,10 +2,6 @@ from fastapi import APIRouter
 from fastapi.responses import HTMLResponse
 
 from app.api.routes.auron_demo1_conversational_core_v21_242 import DialogueRequest
-from app.api.routes.auron_demo1_memory_candidates_v21_247 import (
-    command_center as v21_247_command_center,
-    dialogue as v21_247_dialogue,
-)
 from app.memory.models import MemoryCreate, MemoryPriority
 from app.memory.service import memory_service
 
@@ -140,6 +136,9 @@ def _response(mode: str, reply: str, state: dict) -> dict:
 
 @router.post('/dialogue')
 def dialogue(req: DialogueRequest) -> dict:
+    # Lazy import prevents the v21.247 -> v21.248 -> v21.247 initialization cycle.
+    from app.api.routes.auron_demo1_memory_candidates_v21_247 import dialogue as v21_247_dialogue
+
     direct = _state_command(req)
     if direct is not None:
         return direct
@@ -161,6 +160,9 @@ def conversation_state(session_id: str, workspace_id: str = 'demo', operator_id:
 
 @router.get('/command-center', response_class=HTMLResponse)
 def command_center() -> str:
+    # Lazy import prevents the v21.247 -> v21.248 -> v21.247 initialization cycle.
+    from app.api.routes.auron_demo1_memory_candidates_v21_247 import command_center as v21_247_command_center
+
     html = v21_247_command_center()
     html = html.replace('v21.247', 'v21.248')
     html = html.replace('MEMORY LEARNING COMMAND CENTER', 'MISSION STATE COMMAND CENTER')
