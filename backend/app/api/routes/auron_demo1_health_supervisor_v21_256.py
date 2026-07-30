@@ -136,7 +136,3 @@ def command_center() -> str:
         "E('channel').textContent=d.health?'HEALTH · '+String(d.health.score||0)+'/100':(d.brain_provider?'BRAIN · '+d.brain_provider.toUpperCase():'VOICE · '+(window.speechSynthesis?'READY':'OFF'));",
     )
     return html
-
-
-from app.api.routes.auron_demo1_execution_admission_gate_v21_257 import router as _auron_v21_257_router
-router.routes.extend(_auron_v21_257_router.routes)
