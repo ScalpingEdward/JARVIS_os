@@ -173,3 +173,7 @@ def command_center() -> str:
         "E('intent').textContent=d.goal?'GOAL · ACTIVE':'INTENTS · '+intents.length;"
     )
     return html
+
+
+from app.api.routes.auron_demo1_goal_aware_planning_v21_249 import router as _auron_v21_249_router
+router.routes.extend(_auron_v21_249_router.routes)
