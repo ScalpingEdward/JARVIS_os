@@ -1,0 +1,1 @@
+Safety boundary: long-term memory changes do not alter execution permissions. Financial and high-risk commands continue through the existing governed execution/approval path.
