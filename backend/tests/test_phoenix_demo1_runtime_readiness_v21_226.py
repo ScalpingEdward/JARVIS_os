@@ -20,9 +20,10 @@ def test_demo1_routes_are_registered_on_application():
     assert '/phoenix/demo1/v21.231/tools/status' in paths
     assert '/phoenix/demo1/v21.231/tools/invoke' in paths
     assert '/phoenix/demo1/v21.232/validate' in paths
+    assert '/phoenix/demo1/v21.233/acceptance' in paths
 
 
-def test_readiness_reports_validation_stage_complete_after_v21_232():
+def test_readiness_reports_operator_acceptance_stage_complete_after_v21_233():
     status = runtime_readiness()
     assert status.demo_router_registered is True
     assert status.readiness_router_registered is True
@@ -34,7 +35,7 @@ def test_readiness_reports_validation_stage_complete_after_v21_232():
     assert status.state == 'ready'
     assert status.autonomous_high_risk_execution_enabled is False
     assert status.missing_integrations == []
-    assert status.next_priority == 'operator-acceptance-demo-script'
+    assert status.next_priority == 'demo-packaging-startup-health'
 
 
 def test_readiness_endpoint_is_live():
@@ -42,7 +43,7 @@ def test_readiness_endpoint_is_live():
     response = client.get('/phoenix/demo1/v21.226/readiness')
     assert response.status_code == 200
     body = response.json()
-    assert body['version'] == 'v21.232'
+    assert body['version'] == 'v21.233'
     assert body['demo_router_registered'] is True
     assert body['voice_adapter_bound'] is True
     assert body['approval_store_persistent'] is True
