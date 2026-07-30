@@ -34,3 +34,30 @@ class IntentRouteResult(BaseModel):
     approval_required: bool = False
     autonomous_high_risk_execution_enabled: bool = False
     reasons: list[str] = Field(default_factory=list)
+
+
+class DynamicExecutionStep(BaseModel):
+    step_id: str
+    intent: str
+    adapter_id: str
+    capability: str
+    state: str
+    output: dict | None = None
+    reasons: list[str] = Field(default_factory=list)
+
+
+class DynamicIntentExecutionResult(BaseModel):
+    version: str = 'v21.238'
+    state: Literal['completed','partial','approval-required','blocked','unsupported','failed']
+    session_id: str
+    workspace_id: str
+    operator_id: str
+    command: str
+    detected_intents: list[str]
+    selected_capabilities: list[str]
+    steps: list[DynamicExecutionStep]
+    completed_steps: int = 0
+    approval_required: bool = False
+    operator_summary: str
+    autonomous_high_risk_execution_enabled: bool = False
+    reasons: list[str] = Field(default_factory=list)
