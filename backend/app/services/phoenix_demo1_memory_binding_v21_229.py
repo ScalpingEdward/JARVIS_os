@@ -6,11 +6,17 @@ from app.schemas.phoenix_demo1_memory_binding_v21_229 import (
 )
 
 
+def _token_hits(query: str, content: str, category: str, tags: list[str]) -> int:
+    tokens = [token for token in query.casefold().strip().split() if token]
+    hay = f"{content} {category} {' '.join(tags)}".casefold()
+    return sum(1 for token in tokens if token in hay)
+
+
 def _score(query: str, content: str, category: str, tags: list[str], priority: int) -> float:
     needle = query.casefold().strip()
     hay = f"{content} {category} {' '.join(tags)}".casefold()
-    token_hits = sum(1 for token in needle.split() if token and token in hay)
-    exact = 1.0 if needle in hay else 0.0
+    token_hits = _token_hits(query, content, category, tags)
+    exact = 1.0 if needle and needle in hay else 0.0
     return round(min(1.0, 0.15 * priority + 0.15 * token_hits + 0.4 * exact), 4)
 
 
@@ -22,10 +28,16 @@ def retrieve_memory_context(req: MemoryContextQuery) -> MemoryContextResponse:
             reasons=['risk-brain-hard-block'],
         )
 
-    records = memory_service.search(req.query, category=req.category)
+    # The canonical MemoryService.search() intentionally performs a strict substring
+    # match. Demo 1 context retrieval needs multi-token recall (for example
+    # "gold xauusd" should match a memory containing both terms separately), so we
+    # read through the canonical provider and apply governed token matching here.
+    records = memory_service.list_all(category=req.category)
     items: list[MemoryContextItem] = []
     for record in records:
         if int(record.priority) < req.min_priority:
+            continue
+        if _token_hits(req.query, record.content, record.category, record.tags) == 0:
             continue
         score = _score(req.query, record.content, record.category, record.tags, int(record.priority))
         items.append(MemoryContextItem(
