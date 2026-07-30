@@ -15,6 +15,13 @@ def _contains(text: str, *terms: str) -> bool:
     return any(term in text for term in terms)
 
 
+def _system_status_requested(text: str) -> bool:
+    explicit_system_terms = ('system', 'readiness', 'health', 'runtime', 'overall status', 'system status')
+    if _contains(text, *explicit_system_terms):
+        return True
+    return text.strip() in {'status', 'ready', 'health'}
+
+
 def plan_operator_command(req: IntentRouteRequest) -> IntentRouteResult:
     if req.risk_brain_hard_block:
         return IntentRouteResult(
@@ -36,7 +43,7 @@ def plan_operator_command(req: IntentRouteRequest) -> IntentRouteResult:
                 arguments=arguments or {}, reason=reason,
             ))
 
-    if _contains(text, 'system', 'readiness', 'status', 'health', 'ready'):
+    if _system_status_requested(text):
         add('system-status', 'system-readiness', 'phoenix-demo1', 'operator-dashboard.snapshot', 'Command asks for system/runtime readiness.')
     if _contains(text, 'memory', 'remember', 'erinner', 'context', 'search memory'):
         add('memory-search', 'memory-search', 'memory', 'search', 'Command asks for memory/context retrieval.', {'query': req.command})
