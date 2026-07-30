@@ -78,6 +78,8 @@ def _provider_reply(req: DialogueRequest, result: dict) -> tuple[str | None, str
 def dialogue(req: DialogueRequest) -> dict:
     result = v21_253_dialogue(req)
 
+    # Operational/capability modes stay deterministic and governed. Only ordinary
+    # conversation is handed to the configured frontier-model provider.
     if result.get('mode') == 'conversation' and result.get('state') not in {'blocked', 'approval-required'}:
         reply, provider = _provider_reply(req, result)
         if reply:
@@ -118,7 +120,3 @@ def command_center() -> str:
         "E('channel').textContent=d.brain_provider?'BRAIN · '+d.brain_provider.toUpperCase():'VOICE · '+(window.speechSynthesis?'READY':'OFF');"
     )
     return html
-
-
-from app.api.routes.auron_demo1_retry_recovery_v21_255 import router as _auron_v21_255_router
-router.routes.extend(_auron_v21_255_router.routes)
