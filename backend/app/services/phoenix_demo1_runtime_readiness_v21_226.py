@@ -4,7 +4,7 @@ from app.schemas.phoenix_demo1_runtime_readiness_v21_226 import DemoRuntimeReadi
 def runtime_readiness() -> DemoRuntimeReadiness:
     missing = []
     return DemoRuntimeReadiness(
-        version='v21.232',
+        version='v21.233',
         state='degraded' if missing else 'ready',
         demo_router_registered=True,
         readiness_router_registered=True,
@@ -15,5 +15,5 @@ def runtime_readiness() -> DemoRuntimeReadiness:
         concrete_tool_adapters_bound=True,
         autonomous_high_risk_execution_enabled=False,
         missing_integrations=missing,
-        next_priority='operator-acceptance-demo-script',
+        next_priority='demo-packaging-startup-health',
     )
