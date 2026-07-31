@@ -19,6 +19,7 @@ def _policy() -> dict:
         'critical_health_percent_below': _DEFAULT_CRITICAL_HEALTH_PERCENT,
         'warning_failure_count_at_least': _DEFAULT_WARNING_FAILURE_COUNT,
         'critical_failure_count_at_least': _DEFAULT_CRITICAL_FAILURE_COUNT,
+        'failure_count_precedence': True,
         'policy_mode': 'read-only-evaluation',
     }
 
@@ -28,30 +29,32 @@ def _reasons(health: dict) -> list[str]:
     health_percent = float(health.get('health_percent', 100.0))
     failure_count = int(health.get('integrity_failed', 0))
 
-    if health_percent < _DEFAULT_CRITICAL_HEALTH_PERCENT:
-        reasons.append('health_percent_below_critical_threshold')
-    elif health_percent < _DEFAULT_WARNING_HEALTH_PERCENT:
-        reasons.append('health_percent_below_warning_threshold')
-
+    # Failure-count thresholds are authoritative whenever integrity failures exist.
+    # This prevents small sample sizes (for example 1 failure out of 2 = 50% health)
+    # from escalating a single failure straight to critical severity.
     if failure_count >= _DEFAULT_CRITICAL_FAILURE_COUNT:
         reasons.append('failure_count_at_or_above_critical_threshold')
     elif failure_count >= _DEFAULT_WARNING_FAILURE_COUNT:
         reasons.append('failure_count_at_or_above_warning_threshold')
+    elif health_percent < _DEFAULT_CRITICAL_HEALTH_PERCENT:
+        reasons.append('health_percent_below_critical_threshold')
+    elif health_percent < _DEFAULT_WARNING_HEALTH_PERCENT:
+        reasons.append('health_percent_below_warning_threshold')
     return reasons
 
 
 def _severity(health: dict) -> str:
     health_percent = float(health.get('health_percent', 100.0))
     failure_count = int(health.get('integrity_failed', 0))
-    if (
-        health_percent < _DEFAULT_CRITICAL_HEALTH_PERCENT
-        or failure_count >= _DEFAULT_CRITICAL_FAILURE_COUNT
-    ):
+
+    # Count thresholds take precedence for observed integrity failures.
+    if failure_count >= _DEFAULT_CRITICAL_FAILURE_COUNT:
         return 'critical'
-    if (
-        health_percent < _DEFAULT_WARNING_HEALTH_PERCENT
-        or failure_count >= _DEFAULT_WARNING_FAILURE_COUNT
-    ):
+    if failure_count >= _DEFAULT_WARNING_FAILURE_COUNT:
+        return 'warning'
+    if health_percent < _DEFAULT_CRITICAL_HEALTH_PERCENT:
+        return 'critical'
+    if health_percent < _DEFAULT_WARNING_HEALTH_PERCENT:
         return 'warning'
     return 'ok'
 
