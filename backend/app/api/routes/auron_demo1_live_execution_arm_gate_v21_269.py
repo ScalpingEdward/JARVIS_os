@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field
 from app.approvals.models import ApprovalStatus
 from app.approvals.service import approval_service
 
-router = APIRouter(prefix='/auron/demo1/v21.269', tags=['auron-demo1-live-execution-arm-gate'])
+v21_269_router = APIRouter(prefix='/auron/demo1/v21.269', tags=['auron-demo1-live-execution-arm-gate'])
 
 
 class LiveExecutionArmRequest(BaseModel):
@@ -65,7 +65,7 @@ def _arm_readiness(payload: LiveExecutionArmRequest) -> dict:
     return {'checks': checks, 'blockers': blockers, 'ready': not blockers}
 
 
-@router.get('/arm-status/{approval_id}')
+@v21_269_router.get('/arm-status/{approval_id}')
 def arm_status(approval_id: UUID) -> dict:
     item = approval_service.get(approval_id)
     if item is None:
@@ -80,7 +80,7 @@ def arm_status(approval_id: UUID) -> dict:
     }
 
 
-@router.post('/arm')
+@v21_269_router.post('/arm')
 def arm(payload: LiveExecutionArmRequest) -> dict:
     item = approval_service.get(payload.approval_id)
     if item is None:
@@ -150,7 +150,7 @@ def arm(payload: LiveExecutionArmRequest) -> dict:
     }
 
 
-@router.get('/command-center', response_class=HTMLResponse)
+@v21_269_router.get('/command-center', response_class=HTMLResponse)
 def command_center() -> str:
     from app.api.routes.auron_demo1_execution_preview_review_v21_268 import command_center as v21_268_command_center
 
@@ -161,3 +161,11 @@ def command_center() -> str:
         'AURON LIVE EXECUTION ARM GATE COMMAND CENTER',
     )
     return html
+
+
+# Composite registration keeps app.main stable while exposing the next isolated gate.
+from app.api.routes.auron_demo1_single_use_execution_token_v21_270 import router as v21_270_router
+
+router = APIRouter()
+router.include_router(v21_269_router)
+router.include_router(v21_270_router)
