@@ -150,6 +150,7 @@ from app.api.routes.auron_demo1_adapter_call_dispatch_v21_273 import router as v
 from app.api.routes.auron_demo1_adapter_result_verification_v21_274 import router as v21_274_router
 from app.api.routes.auron_demo1_downstream_state_commit_v21_275 import router as v21_275_router
 from app.api.routes.auron_demo1_post_commit_audit_v21_276 import router as v21_276_router
+from app.api.routes.auron_demo1_execution_chain_closure_v21_277 import router as v21_277_router
 
 router = APIRouter()
 router.include_router(v21_270_router)
@@ -159,3 +160,4 @@ router.include_router(v21_273_router)
 router.include_router(v21_274_router)
 router.include_router(v21_275_router)
 router.include_router(v21_276_router)
+router.include_router(v21_277_router)
