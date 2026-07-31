@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field
 from app.approvals.models import ApprovalStatus
 from app.approvals.service import approval_service
 
-router = APIRouter(prefix='/auron/demo1/v21.268', tags=['auron-demo1-execution-preview-review'])
+v21_268_router = APIRouter(prefix='/auron/demo1/v21.268', tags=['auron-demo1-execution-preview-review'])
 
 
 class ExecutionPreviewReviewRequest(BaseModel):
@@ -49,7 +49,7 @@ def _validate_receipt(item, payload: ExecutionPreviewReviewRequest) -> list[str]
     return blockers
 
 
-@router.get('/review-status/{approval_id}')
+@v21_268_router.get('/review-status/{approval_id}')
 def review_status(approval_id: UUID) -> dict:
     item = approval_service.get(approval_id)
     if item is None:
@@ -63,7 +63,7 @@ def review_status(approval_id: UUID) -> dict:
     }
 
 
-@router.post('/review')
+@v21_268_router.post('/review')
 def review(payload: ExecutionPreviewReviewRequest) -> dict:
     item = approval_service.get(payload.approval_id)
     if item is None:
@@ -118,7 +118,7 @@ def review(payload: ExecutionPreviewReviewRequest) -> dict:
     }
 
 
-@router.get('/command-center', response_class=HTMLResponse)
+@v21_268_router.get('/command-center', response_class=HTMLResponse)
 def command_center() -> str:
     from app.api.routes.auron_demo1_adapter_dry_run_simulation_v21_267 import command_center as v21_267_command_center
 
@@ -129,3 +129,11 @@ def command_center() -> str:
         'AURON EXECUTION PREVIEW REVIEW COMMAND CENTER',
     )
     return html
+
+
+# Composite registration keeps app.main unchanged while exposing the next isolated gate.
+from app.api.routes.auron_demo1_live_execution_arm_gate_v21_269 import router as v21_269_router
+
+router = APIRouter()
+router.include_router(v21_268_router)
+router.include_router(v21_269_router)
