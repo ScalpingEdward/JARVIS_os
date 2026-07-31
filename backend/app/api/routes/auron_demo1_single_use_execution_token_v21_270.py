@@ -143,9 +143,11 @@ def command_center() -> str:
     return html
 
 
-# Composite registration keeps app.main stable while exposing the next isolated gate.
+# Composite registration keeps app.main stable while exposing the next isolated gates.
 from app.api.routes.auron_demo1_controlled_adapter_boundary_v21_271 import router as v21_271_router
+from app.api.routes.auron_demo1_adapter_call_commit_v21_272 import router as v21_272_router
 
 router = APIRouter()
 router.include_router(v21_270_router)
 router.include_router(v21_271_router)
+router.include_router(v21_272_router)
