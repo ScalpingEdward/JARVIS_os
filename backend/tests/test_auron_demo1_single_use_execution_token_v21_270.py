@@ -93,7 +93,7 @@ def test_issue_token_is_non_executing_and_single_use() -> None:
     assert consumed['authorization_receipt']['single_use_enforced'] is True
     assert consumed['execution_performed'] is False
     assert consumed['adapter_invoked'] is False
-    assert consumed['next_gate'] == 'live-adapter-invocation'
+    assert consumed['next_gate'] == 'controlled-adapter-boundary'
 
 
 def test_second_consume_is_rejected() -> None:
