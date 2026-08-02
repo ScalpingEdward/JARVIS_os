@@ -18,7 +18,7 @@ from app.api.routes.auron_demo1_telegram_controlled_live_transport_adapter_v21_3
     TelegramLiveReceiptRequest,
 )
 
-router = APIRouter(prefix='/auron/demo1/v21.311', tags=['auron-demo1-telegram-operational-runtime-worker'])
+v21_311_router = APIRouter(prefix='/auron/demo1/v21.311', tags=['auron-demo1-telegram-operational-runtime-worker'])
 
 _worker_run_store: dict[str, dict] = {}
 _EXECUTION_PHRASE = 'RUN ONE AURON TELEGRAM PROVIDER CALL'
@@ -129,7 +129,7 @@ def execute_runtime_worker(
     }
 
 
-@router.get('/status')
+@v21_311_router.get('/status')
 def runtime_worker_status() -> dict:
     return {
         'runtime_worker_enabled': _runtime_enabled(),
@@ -141,17 +141,17 @@ def runtime_worker_status() -> dict:
     }
 
 
-@router.post('/execute')
+@v21_311_router.post('/execute')
 def execute_runtime_worker_route(payload: TelegramRuntimeWorkerRequest) -> dict:
     return execute_runtime_worker(payload)
 
 
-@router.get('/runs')
+@v21_311_router.get('/runs')
 def list_runtime_worker_runs() -> dict:
     return {'count': len(_worker_run_store), 'items': list(_worker_run_store.values())}
 
 
-@router.get('/command-center', response_class=HTMLResponse)
+@v21_311_router.get('/command-center', response_class=HTMLResponse)
 def command_center() -> str:
     from app.api.routes.auron_demo1_telegram_live_lifecycle_closure_v21_310 import command_center as v21_310_command_center
     html = v21_310_command_center()
@@ -160,3 +160,10 @@ def command_center() -> str:
         'AURON TELEGRAM LIVE LIFECYCLE CLOSURE COMMAND CENTER',
         'AURON TELEGRAM OPERATIONAL RUNTIME WORKER COMMAND CENTER',
     )
+
+
+from app.api.routes.auron_demo1_telegram_secure_bot_provisioning_v21_312 import router as v21_312_router
+
+router = APIRouter()
+router.include_router(v21_311_router)
+router.include_router(v21_312_router)
