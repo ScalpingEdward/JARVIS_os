@@ -158,6 +158,7 @@ from app.api.routes.auron_demo1_completion_alert_delivery_boundary_v21_281 impor
 from app.api.routes.auron_demo1_controlled_alert_dispatch_adapter_v21_282 import router as v21_282_router
 from app.api.routes.auron_demo1_alert_dispatch_result_verification_v21_283 import router as v21_283_router
 from app.api.routes.auron_demo1_alert_dispatch_retry_controller_v21_284 import router as v21_284_router
+from app.api.routes.auron_demo1_controlled_alert_retry_dispatch_v21_285 import router as v21_285_router
 
 router = APIRouter()
 router.include_router(v21_270_router)
@@ -175,3 +176,4 @@ router.include_router(v21_281_router)
 router.include_router(v21_282_router)
 router.include_router(v21_283_router)
 router.include_router(v21_284_router)
+router.include_router(v21_285_router)
