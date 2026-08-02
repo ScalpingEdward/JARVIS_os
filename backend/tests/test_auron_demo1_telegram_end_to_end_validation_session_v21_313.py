@@ -8,7 +8,7 @@ from app.main import app
 
 def setup_function() -> None:
     e2e.reset_telegram_end_to_end_validation_session_store()
-    bridge.reset_telegram_mobile_conversation_bridge_store()
+    bridge.reset_telegram_bridge_store()
     provisioning.reset_telegram_secure_bot_provisioning_store()
 
 
@@ -18,11 +18,13 @@ def _ready_state() -> None:
         'bot_id': '123456789',
         'runtime_ready': True,
     }
-    bridge._pairing_store['pairing-313'] = {
-        'pairing_id': 'pairing-313',
+    bridge._binding_store['1001'] = {
+        'binding_id': 'binding-313',
         'operator_id': 'brano',
         'telegram_chat_id': '1001',
-        'paired': True,
+        'telegram_user_id': 'user-313',
+        'workspace_id': 'jarvis-os',
+        'active': True,
     }
 
 
@@ -43,6 +45,7 @@ def test_ready_session_starts_without_external_call() -> None:
     assert result['state'] == 'telegram-end-to-end-validation-started'
     assert result['session']['state'] == 'awaiting-evidence'
     assert result['session']['bot_id'] == '123456789'
+    assert result['session']['pairing_id'] == 'binding-313'
     assert result['external_calls_made'] == 0
 
 
