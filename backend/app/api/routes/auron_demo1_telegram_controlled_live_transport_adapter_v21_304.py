@@ -7,7 +7,7 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
 
-from app.api.routes.auron_demo1_telegram_controlled_send_adapter_v21_294 import _send_dispatch_store
+from app.api.routes.auron_demo1_telegram_controlled_send_adapter_v21_294 import _dispatch_store
 from app.api.routes.auron_demo1_telegram_production_activation_gate_v21_303 import _activation_store
 from app.api.routes.auron_demo1_telegram_provider_registration_v21_292 import _active_provider, _outbound_store
 
@@ -45,7 +45,7 @@ def _active_authorization() -> dict | None:
 
 
 def _dispatch_for_correlation(correlation_id: str) -> dict | None:
-    return next((item for item in _send_dispatch_store.values() if item.get('correlation_id') == correlation_id), None)
+    return _dispatch_store.get(correlation_id)
 
 
 @router.get('/status')
@@ -98,7 +98,7 @@ def prepare_live_execution(payload: TelegramLiveExecutionRequest) -> dict:
         'provider_id': provider['provider_id'],
         'runtime_id': provider['runtime_id'],
         'outbound_id': outbound['outbound_id'],
-        'dispatch_id': dispatch['send_dispatch_id'],
+        'dispatch_id': dispatch['dispatch_id'],
         'method': 'sendMessage',
         'request_body': {
             'chat_id': outbound['telegram_chat_id'],
