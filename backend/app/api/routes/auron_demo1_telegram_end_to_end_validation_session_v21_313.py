@@ -8,7 +8,7 @@ from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
 
 from app.api.routes.auron_demo1_telegram_secure_bot_provisioning_v21_312 import _validation_store
-from app.api.routes.auron_demo1_telegram_mobile_conversation_bridge_v21_290 import _pairing_store
+from app.api.routes.auron_demo1_telegram_mobile_conversation_bridge_v21_290 import _binding_store
 
 router = APIRouter(prefix='/auron/demo1/v21.313', tags=['auron-demo1-telegram-end-to-end-validation-session'])
 
@@ -46,7 +46,16 @@ def _runtime_validation() -> dict | None:
 
 
 def _paired_chat(operator_id: str, chat_id: str) -> dict | None:
-    return next((item for item in _pairing_store.values() if item.get('operator_id') == operator_id and str(item.get('telegram_chat_id')) == str(chat_id) and item.get('paired')), None)
+    return next(
+        (
+            item
+            for item in _binding_store.values()
+            if item.get('operator_id') == operator_id
+            and str(item.get('telegram_chat_id')) == str(chat_id)
+            and item.get('active') is True
+        ),
+        None,
+    )
 
 
 @router.get('/status')
@@ -96,7 +105,7 @@ def start_validation_session(payload: TelegramEndToEndValidationStartRequest) ->
         'test_message': payload.test_message,
         'bot_id': validation['bot_id'],
         'token_fingerprint': validation['token_fingerprint'],
-        'pairing_id': pairing.get('pairing_id'),
+        'pairing_id': pairing.get('binding_id'),
         'state': 'awaiting-evidence',
         'checks': checks,
         'started_by': payload.actor,
