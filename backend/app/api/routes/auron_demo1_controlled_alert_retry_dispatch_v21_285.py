@@ -52,6 +52,20 @@ def dispatch_retry(retry_id: str, payload: ControlledRetryDispatchRequest) -> di
     retry = _retry_store.get(retry_id)
     if retry is None:
         raise HTTPException(status_code=404, detail='Scheduled alert retry not found')
+
+    existing = next((item for item in _retry_dispatch_store.values() if item['retry_id'] == retry_id), None)
+    if existing is not None:
+        return {
+            'state': 'alert-retry-dispatch-already-prepared',
+            'retry_dispatch': existing,
+            'idempotent_replay': True,
+            'provider_call_performed': False,
+            'notification_dispatched': False,
+            'external_calls_made': 0,
+            'terminal_execution_state_modified': False,
+            'next_layer': 'alert-retry-result-verification',
+        }
+
     if retry['retry_state'] != 'scheduled':
         raise HTTPException(status_code=409, detail='Alert retry is not in scheduled state')
     if payload.dry_run is not True:
@@ -81,19 +95,6 @@ def dispatch_retry(retry_id: str, payload: ControlledRetryDispatchRequest) -> di
             'external_calls_made': 0,
             'terminal_execution_state_modified': False,
             'next_layer': 'alert-retry-dispatch-remediation',
-        }
-
-    existing = next((item for item in _retry_dispatch_store.values() if item['retry_id'] == retry_id), None)
-    if existing is not None:
-        return {
-            'state': 'alert-retry-dispatch-already-prepared',
-            'retry_dispatch': existing,
-            'idempotent_replay': True,
-            'provider_call_performed': False,
-            'notification_dispatched': False,
-            'external_calls_made': 0,
-            'terminal_execution_state_modified': False,
-            'next_layer': 'alert-retry-result-verification',
         }
 
     retry_dispatch_id = str(uuid4())
