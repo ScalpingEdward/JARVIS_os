@@ -41,24 +41,14 @@ def _chain_checks(commit: dict, audit: dict, delivery: dict) -> dict[str, bool]:
         'audit_immutable': audit.get('immutable') is True,
         'audit_commit_matches': audit.get('commit_id') == commit.get('commit_id'),
         'audit_delivery_matches': audit.get('delivery_id') == commit.get('delivery_id'),
-        'chain_identifiers_complete': all(
-            commit.get(key)
-            for key in ('commit_id', 'delivery_id', 'dispatch_id', 'retry_dispatch_id', 'retry_result_id')
-        ),
+        'chain_identifiers_complete': all(commit.get(key) for key in ('commit_id', 'delivery_id', 'dispatch_id', 'retry_dispatch_id', 'retry_result_id')),
     }
 
 
 @v21_289_router.get('/status')
 def lifecycle_closure_status() -> dict:
     archived = sum(1 for item in _closure_store.values() if item['archived'])
-    return {
-        'closed_alert_lifecycles': len(_closure_store),
-        'archived_alert_lifecycles': archived,
-        'closure_version': _CLOSURE_VERSION,
-        'external_calls_made': 0,
-        'terminal_execution_state_modified': False,
-        'boundary_mode': 'internal-lifecycle-closure-only',
-    }
+    return {'closed_alert_lifecycles': len(_closure_store), 'archived_alert_lifecycles': archived, 'closure_version': _CLOSURE_VERSION, 'external_calls_made': 0, 'terminal_execution_state_modified': False, 'boundary_mode': 'internal-lifecycle-closure-only'}
 
 
 @v21_289_router.post('/close/{commit_id}')
@@ -66,39 +56,27 @@ def close_alert_lifecycle(commit_id: str, payload: AlertLifecycleClosureRequest)
     commit = _commit_store.get(commit_id)
     if commit is None:
         raise HTTPException(status_code=404, detail='Alert delivery commit not found')
-
     existing = next((item for item in _closure_store.values() if item['commit_id'] == commit_id), None)
     if existing is not None:
         return {'state': 'alert-lifecycle-already-closed', 'closure': existing, 'idempotent_replay': True, 'external_calls_made': 0, 'terminal_execution_state_modified': False}
-
     audit = _audit_for_commit(commit_id)
     if audit is None:
         raise HTTPException(status_code=409, detail='Immutable audit receipt required before lifecycle closure')
     delivery = _delivery_store.get(commit['delivery_id'])
     if delivery is None:
         raise HTTPException(status_code=409, detail='Alert delivery record not found for lifecycle closure')
-
     checks = _chain_checks(commit, audit, delivery)
     blockers = [name for name, passed in checks.items() if not passed]
     if blockers:
         return {'state': 'alert-lifecycle-closure-blocked', 'commit_id': commit_id, 'checks': checks, 'blockers': blockers, 'external_calls_made': 0, 'terminal_execution_state_modified': False, 'next_layer': 'alert-lifecycle-integrity-remediation'}
-
     closed_at = datetime.now(timezone.utc).isoformat()
     closure_id = str(uuid4())
-    record = {
-        'closure_id': closure_id, 'commit_id': commit_id, 'audit_id': audit['audit_id'],
-        'delivery_id': commit['delivery_id'], 'dispatch_id': commit['dispatch_id'],
-        'retry_dispatch_id': commit['retry_dispatch_id'], 'retry_result_id': commit['retry_result_id'],
-        'final_delivery_state': commit['committed_delivery_state'], 'integrity_hash': audit['integrity_hash'],
-        'chain_complete': True, 'lifecycle_closed': True, 'archived': payload.archive,
-        'closed_by': payload.actor, 'closed_at': closed_at, 'closure_version': _CLOSURE_VERSION, 'note': payload.note,
-    }
+    record = {'closure_id': closure_id, 'commit_id': commit_id, 'audit_id': audit['audit_id'], 'delivery_id': commit['delivery_id'], 'dispatch_id': commit['dispatch_id'], 'retry_dispatch_id': commit['retry_dispatch_id'], 'retry_result_id': commit['retry_result_id'], 'final_delivery_state': commit['committed_delivery_state'], 'integrity_hash': audit['integrity_hash'], 'chain_complete': True, 'lifecycle_closed': True, 'archived': payload.archive, 'closed_by': payload.actor, 'closed_at': closed_at, 'closure_version': _CLOSURE_VERSION, 'note': payload.note}
     _closure_store[closure_id] = record
     delivery['lifecycle_closed'] = True
     delivery['lifecycle_closure_id'] = closure_id
     delivery['lifecycle_closed_at'] = closed_at
     delivery['archived'] = payload.archive
-
     return {'state': 'alert-lifecycle-closed', 'closure': record, 'checks': checks, 'closure_store_mutations_made': 1, 'delivery_store_mutations_made': 1, 'external_calls_made': 0, 'business_mutations_made': 0, 'terminal_execution_state_modified': False, 'next_layer': 'next-auron-execution-framework-stage', 'reply': 'Der Alert-Lebenszyklus ist vollstaendig geprueft, geschlossen und intern archiviert.'}
 
 
@@ -131,6 +109,7 @@ from app.api.routes.auron_demo1_telegram_retry_delivery_state_commit_v21_300 imp
 from app.api.routes.auron_demo1_telegram_terminal_delivery_audit_v21_301 import router as v21_301_router
 from app.api.routes.auron_demo1_telegram_lifecycle_closure_v21_302 import router as v21_302_router
 from app.api.routes.auron_demo1_telegram_production_activation_gate_v21_303 import router as v21_303_router
+from app.api.routes.auron_demo1_telegram_controlled_live_transport_adapter_v21_304 import router as v21_304_router
 
 router = APIRouter()
 router.include_router(v21_289_router)
@@ -148,3 +127,4 @@ router.include_router(v21_300_router)
 router.include_router(v21_301_router)
 router.include_router(v21_302_router)
 router.include_router(v21_303_router)
+router.include_router(v21_304_router)
