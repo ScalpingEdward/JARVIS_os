@@ -114,6 +114,7 @@ from app.api.routes.auron_demo1_telegram_live_delivery_state_commit_v21_305 impo
 from app.api.routes.auron_demo1_telegram_live_retry_controller_v21_306 import router as v21_306_router
 from app.api.routes.auron_demo1_telegram_live_controlled_retry_dispatch_v21_307 import router as v21_307_router
 from app.api.routes.auron_demo1_telegram_live_retry_receipt_commit_v21_308 import router as v21_308_router
+from app.api.routes.auron_demo1_telegram_live_terminal_delivery_audit_v21_309 import router as v21_309_router
 
 router = APIRouter()
 router.include_router(v21_289_router)
@@ -136,3 +137,4 @@ router.include_router(v21_305_router)
 router.include_router(v21_306_router)
 router.include_router(v21_307_router)
 router.include_router(v21_308_router)
+router.include_router(v21_309_router)
