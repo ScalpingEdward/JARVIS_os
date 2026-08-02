@@ -122,6 +122,7 @@ from app.api.routes.auron_demo1_telegram_end_to_end_validation_session_v21_313 i
 from app.api.routes.auron_demo1_telegram_inbound_webhook_receiver_v21_314 import router as v21_314_router
 from app.api.routes.auron_demo1_telegram_inbound_conversation_dispatch_v21_315 import router as v21_315_router
 from app.api.routes.auron_demo1_telegram_correlated_response_delivery_admission_v21_316 import router as v21_316_router
+from app.api.routes.auron_demo1_telegram_correlated_response_controlled_execution_v21_317 import router as v21_317_router
 
 router = APIRouter()
 router.include_router(v21_311_router)
@@ -130,3 +131,4 @@ router.include_router(v21_313_router)
 router.include_router(v21_314_router)
 router.include_router(v21_315_router)
 router.include_router(v21_316_router)
+router.include_router(v21_317_router)
