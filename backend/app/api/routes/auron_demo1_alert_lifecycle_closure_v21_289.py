@@ -11,7 +11,7 @@ from app.api.routes.auron_demo1_alert_delivery_commit_audit_v21_288 import _audi
 from app.api.routes.auron_demo1_alert_delivery_state_commit_v21_287 import _commit_store
 from app.api.routes.auron_demo1_completion_alert_delivery_boundary_v21_281 import _delivery_store
 
-router = APIRouter(prefix='/auron/demo1/v21.289', tags=['auron-demo1-alert-lifecycle-closure'])
+v21_289_router = APIRouter(prefix='/auron/demo1/v21.289', tags=['auron-demo1-alert-lifecycle-closure'])
 
 _closure_store: dict[str, dict] = {}
 _CLOSURE_VERSION = 'v21.289'
@@ -48,7 +48,7 @@ def _chain_checks(commit: dict, audit: dict, delivery: dict) -> dict[str, bool]:
     }
 
 
-@router.get('/status')
+@v21_289_router.get('/status')
 def lifecycle_closure_status() -> dict:
     archived = sum(1 for item in _closure_store.values() if item['archived'])
     return {
@@ -61,7 +61,7 @@ def lifecycle_closure_status() -> dict:
     }
 
 
-@router.post('/close/{commit_id}')
+@v21_289_router.post('/close/{commit_id}')
 def close_alert_lifecycle(commit_id: str, payload: AlertLifecycleClosureRequest) -> dict:
     commit = _commit_store.get(commit_id)
     if commit is None:
@@ -69,13 +69,7 @@ def close_alert_lifecycle(commit_id: str, payload: AlertLifecycleClosureRequest)
 
     existing = next((item for item in _closure_store.values() if item['commit_id'] == commit_id), None)
     if existing is not None:
-        return {
-            'state': 'alert-lifecycle-already-closed',
-            'closure': existing,
-            'idempotent_replay': True,
-            'external_calls_made': 0,
-            'terminal_execution_state_modified': False,
-        }
+        return {'state': 'alert-lifecycle-already-closed', 'closure': existing, 'idempotent_replay': True, 'external_calls_made': 0, 'terminal_execution_state_modified': False}
 
     audit = _audit_for_commit(commit_id)
     if audit is None:
@@ -87,35 +81,17 @@ def close_alert_lifecycle(commit_id: str, payload: AlertLifecycleClosureRequest)
     checks = _chain_checks(commit, audit, delivery)
     blockers = [name for name, passed in checks.items() if not passed]
     if blockers:
-        return {
-            'state': 'alert-lifecycle-closure-blocked',
-            'commit_id': commit_id,
-            'checks': checks,
-            'blockers': blockers,
-            'external_calls_made': 0,
-            'terminal_execution_state_modified': False,
-            'next_layer': 'alert-lifecycle-integrity-remediation',
-        }
+        return {'state': 'alert-lifecycle-closure-blocked', 'commit_id': commit_id, 'checks': checks, 'blockers': blockers, 'external_calls_made': 0, 'terminal_execution_state_modified': False, 'next_layer': 'alert-lifecycle-integrity-remediation'}
 
     closed_at = datetime.now(timezone.utc).isoformat()
     closure_id = str(uuid4())
     record = {
-        'closure_id': closure_id,
-        'commit_id': commit_id,
-        'audit_id': audit['audit_id'],
-        'delivery_id': commit['delivery_id'],
-        'dispatch_id': commit['dispatch_id'],
-        'retry_dispatch_id': commit['retry_dispatch_id'],
-        'retry_result_id': commit['retry_result_id'],
-        'final_delivery_state': commit['committed_delivery_state'],
-        'integrity_hash': audit['integrity_hash'],
-        'chain_complete': True,
-        'lifecycle_closed': True,
-        'archived': payload.archive,
-        'closed_by': payload.actor,
-        'closed_at': closed_at,
-        'closure_version': _CLOSURE_VERSION,
-        'note': payload.note,
+        'closure_id': closure_id, 'commit_id': commit_id, 'audit_id': audit['audit_id'],
+        'delivery_id': commit['delivery_id'], 'dispatch_id': commit['dispatch_id'],
+        'retry_dispatch_id': commit['retry_dispatch_id'], 'retry_result_id': commit['retry_result_id'],
+        'final_delivery_state': commit['committed_delivery_state'], 'integrity_hash': audit['integrity_hash'],
+        'chain_complete': True, 'lifecycle_closed': True, 'archived': payload.archive,
+        'closed_by': payload.actor, 'closed_at': closed_at, 'closure_version': _CLOSURE_VERSION, 'note': payload.note,
     }
     _closure_store[closure_id] = record
     delivery['lifecycle_closed'] = True
@@ -123,39 +99,26 @@ def close_alert_lifecycle(commit_id: str, payload: AlertLifecycleClosureRequest)
     delivery['lifecycle_closed_at'] = closed_at
     delivery['archived'] = payload.archive
 
-    return {
-        'state': 'alert-lifecycle-closed',
-        'closure': record,
-        'checks': checks,
-        'closure_store_mutations_made': 1,
-        'delivery_store_mutations_made': 1,
-        'external_calls_made': 0,
-        'business_mutations_made': 0,
-        'terminal_execution_state_modified': False,
-        'next_layer': 'next-auron-execution-framework-stage',
-        'reply': 'Der Alert-Lebenszyklus ist vollstaendig geprueft, geschlossen und intern archiviert.',
-    }
+    return {'state': 'alert-lifecycle-closed', 'closure': record, 'checks': checks, 'closure_store_mutations_made': 1, 'delivery_store_mutations_made': 1, 'external_calls_made': 0, 'business_mutations_made': 0, 'terminal_execution_state_modified': False, 'next_layer': 'next-auron-execution-framework-stage', 'reply': 'Der Alert-Lebenszyklus ist vollstaendig geprueft, geschlossen und intern archiviert.'}
 
 
-@router.get('/closures')
+@v21_289_router.get('/closures')
 def list_lifecycle_closures() -> dict:
     items = sorted(_closure_store.values(), key=lambda item: item['closed_at'])
-    return {
-        'count': len(items),
-        'items': items,
-        'external_calls_made': 0,
-        'terminal_execution_state_modified': False,
-    }
+    return {'count': len(items), 'items': items, 'external_calls_made': 0, 'terminal_execution_state_modified': False}
 
 
-@router.get('/command-center', response_class=HTMLResponse)
+@v21_289_router.get('/command-center', response_class=HTMLResponse)
 def command_center() -> str:
     from app.api.routes.auron_demo1_alert_delivery_commit_audit_v21_288 import command_center as v21_288_command_center
-
     html = v21_288_command_center()
     html = html.replace('v21.288', 'v21.289')
-    html = html.replace(
-        'AURON ALERT DELIVERY COMMIT AUDIT COMMAND CENTER',
-        'AURON ALERT LIFECYCLE CLOSURE COMMAND CENTER',
-    )
+    html = html.replace('AURON ALERT DELIVERY COMMIT AUDIT COMMAND CENTER', 'AURON ALERT LIFECYCLE CLOSURE COMMAND CENTER')
     return html
+
+
+from app.api.routes.auron_demo1_telegram_mobile_conversation_bridge_v21_290 import router as v21_290_router
+
+router = APIRouter()
+router.include_router(v21_289_router)
+router.include_router(v21_290_router)
