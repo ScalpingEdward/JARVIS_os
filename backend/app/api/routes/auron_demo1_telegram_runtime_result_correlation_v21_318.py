@@ -11,11 +11,9 @@ from app.api.routes.auron_demo1_telegram_correlated_response_controlled_executio
 from app.api.routes.auron_demo1_telegram_correlated_response_delivery_admission_v21_316 import _admission_store
 from app.api.routes.auron_demo1_telegram_inbound_conversation_dispatch_v21_315 import _dispatch_store
 from app.api.routes.auron_demo1_telegram_mobile_conversation_bridge_v21_290 import _message_store
-from app.api.routes.auron_demo1_telegram_operational_runtime_worker_v21_311 import _worker_run_store
 from app.api.routes.auron_demo1_telegram_provider_registration_v21_292 import _outbound_store
 
 router = APIRouter(prefix='/auron/demo1/v21.318', tags=['auron-demo1-telegram-runtime-result-correlation'])
-
 _result_commit_store: dict[str, dict] = {}
 
 
@@ -47,6 +45,10 @@ def commit_runtime_result(payload: TelegramRuntimeResultCorrelationRequest) -> d
             raise HTTPException(status_code=409, detail='Telegram update already committed with a different execution')
         return {'state': 'telegram-runtime-result-already-correlated', 'commit': existing, 'idempotent_replay': True, 'external_calls_made': 0}
 
+    # Function-local import prevents the composite v21.311 router from forming a
+    # circular import when it includes this module during app startup.
+    from app.api.routes.auron_demo1_telegram_operational_runtime_worker_v21_311 import _worker_run_store
+
     handoff = _execution_handoff_store.get(payload.update_id)
     admission = _admission_store.get(payload.update_id)
     dispatch = _dispatch_store.get(payload.update_id)
@@ -74,64 +76,29 @@ def commit_runtime_result(payload: TelegramRuntimeResultCorrelationRequest) -> d
 
     delivery_state = _delivery_state(run)
     delivered = delivery_state == 'delivered'
-    committed_at = datetime.now(timezone.utc).isoformat()
     record = {
-        'result_commit_id': str(uuid4()),
-        'update_id': payload.update_id,
-        'execution_id': payload.execution_id,
-        'worker_run_id': run['worker_run_id'],
-        'receipt_id': run['receipt_id'],
-        'handoff_id': handoff['handoff_id'],
-        'admission_id': admission['admission_id'],
-        'dispatch_id': dispatch['dispatch_id'],
-        'correlation_id': dispatch['correlation_id'],
-        'outbound_id': dispatch['outbound_id'],
-        'delivery_state': delivery_state,
-        'provider_message_id': run.get('provider_message_id'),
-        'provider_error': run.get('provider_error'),
-        'http_status': run.get('http_status'),
-        'checks': checks,
-        'committed_by': payload.actor,
-        'committed_at': committed_at,
-        'external_calls_made': 0,
+        'result_commit_id': str(uuid4()), 'update_id': payload.update_id,
+        'execution_id': payload.execution_id, 'worker_run_id': run['worker_run_id'],
+        'receipt_id': run['receipt_id'], 'handoff_id': handoff['handoff_id'],
+        'admission_id': admission['admission_id'], 'dispatch_id': dispatch['dispatch_id'],
+        'correlation_id': dispatch['correlation_id'], 'outbound_id': dispatch['outbound_id'],
+        'delivery_state': delivery_state, 'provider_message_id': run.get('provider_message_id'),
+        'provider_error': run.get('provider_error'), 'http_status': run.get('http_status'),
+        'checks': checks, 'committed_by': payload.actor,
+        'committed_at': datetime.now(timezone.utc).isoformat(), 'external_calls_made': 0,
     }
     _result_commit_store[payload.update_id] = record
-
-    handoff['handoff_state'] = 'runtime-result-correlated'
-    handoff['result_commit_id'] = record['result_commit_id']
-    admission['admission_state'] = 'delivered' if delivered else delivery_state
-    admission['result_commit_id'] = record['result_commit_id']
-    dispatch['dispatch_state'] = 'delivered' if delivered else delivery_state
-    dispatch['reply_sent'] = delivered
-    dispatch['provider_message_id'] = run.get('provider_message_id')
-    dispatch['result_commit_id'] = record['result_commit_id']
-    outbound['delivery_state'] = delivery_state
-    outbound['message_sent'] = delivered
-    outbound['provider_message_id'] = run.get('provider_message_id')
-    outbound['result_commit_id'] = record['result_commit_id']
-    message['reply_sent'] = delivered
-    message['delivery_state'] = delivery_state
-    message['provider_message_id'] = run.get('provider_message_id')
-
-    return {
-        'state': 'telegram-runtime-result-correlated-and-committed',
-        'commit': record,
-        'outbound_messages_sent': 1 if delivered else 0,
-        'external_calls_made': 0,
-        'next_layer': 'telegram-inbound-conversation-lifecycle-closure' if delivered else 'telegram-correlated-response-retry-or-failure-handling',
-    }
+    handoff.update(handoff_state='runtime-result-correlated', result_commit_id=record['result_commit_id'])
+    admission.update(admission_state='delivered' if delivered else delivery_state, result_commit_id=record['result_commit_id'])
+    dispatch.update(dispatch_state='delivered' if delivered else delivery_state, reply_sent=delivered, provider_message_id=run.get('provider_message_id'), result_commit_id=record['result_commit_id'])
+    outbound.update(delivery_state=delivery_state, message_sent=delivered, provider_message_id=run.get('provider_message_id'), result_commit_id=record['result_commit_id'])
+    message.update(reply_sent=delivered, delivery_state=delivery_state, provider_message_id=run.get('provider_message_id'))
+    return {'state': 'telegram-runtime-result-correlated-and-committed', 'commit': record, 'outbound_messages_sent': 1 if delivered else 0, 'external_calls_made': 0, 'next_layer': 'telegram-inbound-conversation-lifecycle-closure' if delivered else 'telegram-correlated-response-retry-or-failure-handling'}
 
 
 @router.get('/status')
 def runtime_result_correlation_status() -> dict:
-    return {
-        'result_commits': len(_result_commit_store),
-        'delivered': sum(1 for item in _result_commit_store.values() if item['delivery_state'] == 'delivered'),
-        'retry_required': sum(1 for item in _result_commit_store.values() if item['delivery_state'] == 'retry-required'),
-        'permanent_failures': sum(1 for item in _result_commit_store.values() if item['delivery_state'] == 'permanent-failure'),
-        'external_calls_made': 0,
-        'correlation_mode': 'runtime-result-to-inbound-lifecycle-commit',
-    }
+    return {'result_commits': len(_result_commit_store), 'delivered': sum(1 for item in _result_commit_store.values() if item['delivery_state'] == 'delivered'), 'retry_required': sum(1 for item in _result_commit_store.values() if item['delivery_state'] == 'retry-required'), 'permanent_failures': sum(1 for item in _result_commit_store.values() if item['delivery_state'] == 'permanent-failure'), 'external_calls_made': 0, 'correlation_mode': 'runtime-result-to-inbound-lifecycle-commit'}
 
 
 @router.get('/commits')
