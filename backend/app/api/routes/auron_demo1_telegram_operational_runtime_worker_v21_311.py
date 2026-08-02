@@ -163,7 +163,9 @@ def command_center() -> str:
 
 
 from app.api.routes.auron_demo1_telegram_secure_bot_provisioning_v21_312 import router as v21_312_router
+from app.api.routes.auron_demo1_telegram_end_to_end_validation_session_v21_313 import router as v21_313_router
 
 router = APIRouter()
 router.include_router(v21_311_router)
 router.include_router(v21_312_router)
+router.include_router(v21_313_router)
