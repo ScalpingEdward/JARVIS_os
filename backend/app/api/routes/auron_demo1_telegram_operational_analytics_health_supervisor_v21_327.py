@@ -19,7 +19,6 @@ from app.api.routes.auron_demo1_telegram_lifecycle_progression_worker_v21_325 im
     _progression_store,
 )
 from app.api.routes.auron_demo1_telegram_operational_go_live_acceptance_v21_322 import _go_live_store
-from app.api.routes.auron_demo1_telegram_operational_runtime_worker_v21_311 import _worker_run_store
 
 router = APIRouter(prefix='/auron/demo1/v21.327', tags=['auron-demo1-telegram-operational-analytics-health-supervisor'])
 
@@ -47,6 +46,8 @@ def _chat_items(store: dict[str, dict], chat_id: str) -> list[dict]:
 
 
 def _metrics(chat_id: str) -> dict:
+    from app.api.routes.auron_demo1_telegram_operational_runtime_worker_v21_311 import _worker_run_store
+
     worker_runs = [item for item in _worker_run_store.values() if str(item.get('telegram_chat_id') or item.get('chat_id') or '') == str(chat_id)]
     queue_items = _chat_items(_queue_item_store, chat_id)
     progressions = _chat_items(_progression_store, chat_id)
