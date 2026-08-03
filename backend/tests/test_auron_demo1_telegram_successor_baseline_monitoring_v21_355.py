@@ -1,10 +1,13 @@
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from app.main import app
 from app.api.routes.auron_demo1_telegram_successor_baseline_monitoring_v21_355 import (
     reset_telegram_successor_baseline_monitoring_store,
+    router,
 )
 
+app = FastAPI()
+app.include_router(router)
 client = TestClient(app)
 
 
