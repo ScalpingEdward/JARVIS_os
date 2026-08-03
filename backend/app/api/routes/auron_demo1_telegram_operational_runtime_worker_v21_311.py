@@ -132,6 +132,7 @@ from app.api.routes.auron_demo1_telegram_continuous_queue_orchestration_v21_324 
 from app.api.routes.auron_demo1_telegram_lifecycle_progression_worker_v21_325 import router as v21_325_router
 from app.api.routes.auron_demo1_telegram_dead_letter_replay_governance_v21_326 import router as v21_326_router
 from app.api.routes.auron_demo1_telegram_operational_analytics_health_supervisor_v21_327 import router as v21_327_router
+from app.api.routes.auron_demo1_telegram_runtime_health_remediation_v21_328 import router as v21_328_router
 
 router = APIRouter()
 router.include_router(v21_311_router)
@@ -151,3 +152,4 @@ router.include_router(v21_324_router)
 router.include_router(v21_325_router)
 router.include_router(v21_326_router)
 router.include_router(v21_327_router)
+router.include_router(v21_328_router)
