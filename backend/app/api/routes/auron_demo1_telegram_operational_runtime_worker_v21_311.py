@@ -19,7 +19,6 @@ from app.api.routes.auron_demo1_telegram_controlled_live_transport_adapter_v21_3
 )
 
 v21_311_router = APIRouter(prefix='/auron/demo1/v21.311', tags=['auron-demo1-telegram-operational-runtime-worker'])
-
 _worker_run_store: dict[str, dict] = {}
 _EXECUTION_PHRASE = 'RUN ONE AURON TELEGRAM PROVIDER CALL'
 
@@ -129,6 +128,7 @@ from app.api.routes.auron_demo1_telegram_operational_readiness_observability_v21
 from app.api.routes.auron_demo1_telegram_phone_validation_reconciliation_v21_321 import router as v21_321_router
 from app.api.routes.auron_demo1_telegram_operational_go_live_acceptance_v21_322 import router as v21_322_router
 from app.api.routes.auron_demo1_telegram_continuous_conversation_supervisor_v21_323 import router as v21_323_router
+from app.api.routes.auron_demo1_telegram_continuous_queue_orchestration_v21_324 import router as v21_324_router
 
 router = APIRouter()
 router.include_router(v21_311_router)
@@ -144,3 +144,4 @@ router.include_router(v21_320_router)
 router.include_router(v21_321_router)
 router.include_router(v21_322_router)
 router.include_router(v21_323_router)
+router.include_router(v21_324_router)
