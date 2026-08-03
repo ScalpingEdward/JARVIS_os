@@ -125,6 +125,7 @@ from app.api.routes.auron_demo1_telegram_correlated_response_delivery_admission_
 from app.api.routes.auron_demo1_telegram_correlated_response_controlled_execution_v21_317 import router as v21_317_router
 from app.api.routes.auron_demo1_telegram_runtime_result_correlation_v21_318 import router as v21_318_router
 from app.api.routes.auron_demo1_telegram_inbound_lifecycle_closure_audit_v21_319 import router as v21_319_router
+from app.api.routes.auron_demo1_telegram_operational_readiness_observability_v21_320 import router as v21_320_router
 
 router = APIRouter()
 router.include_router(v21_311_router)
@@ -136,3 +137,4 @@ router.include_router(v21_316_router)
 router.include_router(v21_317_router)
 router.include_router(v21_318_router)
 router.include_router(v21_319_router)
+router.include_router(v21_320_router)
