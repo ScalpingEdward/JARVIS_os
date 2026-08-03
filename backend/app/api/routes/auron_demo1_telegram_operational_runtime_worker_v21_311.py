@@ -151,6 +151,7 @@ from app.api.routes.auron_demo1_telegram_post_delivery_compliance_supervision_v2
 from app.api.routes.auron_demo1_telegram_disclosure_retention_assurance_v21_344 import router as v21_344_router
 from app.api.routes.auron_demo1_telegram_return_deletion_offboarding_v21_345 import router as v21_345_router
 from app.api.routes.auron_demo1_telegram_post_offboarding_closure_v21_346 import router as v21_346_router
+from app.api.routes.auron_demo1_telegram_closed_record_integrity_v21_347 import router as v21_347_router
 
 router = APIRouter()
 router.include_router(v21_311_router)
@@ -189,3 +190,4 @@ router.include_router(v21_343_router)
 router.include_router(v21_344_router)
 router.include_router(v21_345_router)
 router.include_router(v21_346_router)
+router.include_router(v21_347_router)
