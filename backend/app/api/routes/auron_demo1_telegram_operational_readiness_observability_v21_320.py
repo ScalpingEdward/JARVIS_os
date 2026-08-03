@@ -12,8 +12,8 @@ from app.api.routes.auron_demo1_telegram_gateway_runtime_v21_291 import _active_
 from app.api.routes.auron_demo1_telegram_mobile_conversation_bridge_v21_290 import _binding_store
 from app.api.routes.auron_demo1_telegram_provider_registration_v21_292 import _active_provider
 from app.api.routes.auron_demo1_telegram_production_activation_gate_v21_303 import _activation_store
-from app.api.routes.auron_demo1_telegram_secure_bot_provisioning_v21_312 import _provisioning_store
-from app.api.routes.auron_demo1_telegram_inbound_lifecycle_closure_audit_v21_319 import _closure_store
+from app.api.routes.auron_demo1_telegram_secure_bot_provisioning_v21_312 import _validation_store
+from app.api.routes.auron_demo1_telegram_inbound_lifecycle_closure_audit_v21_319 import _closure_audit_store
 
 router = APIRouter(prefix='/auron/demo1/v21.320', tags=['auron-demo1-telegram-operational-readiness-observability'])
 
@@ -47,7 +47,7 @@ def _active_activation() -> dict | None:
 
 
 def _active_provisioning() -> dict | None:
-    return next((item for item in _provisioning_store.values() if item.get('validation_state') == 'validated'), None)
+    return next((item for item in _validation_store.values() if item.get('runtime_ready')), None)
 
 
 def evaluate_operational_readiness(payload: TelegramOperationalReadinessRequest) -> dict:
@@ -99,7 +99,7 @@ def evaluate_operational_readiness(payload: TelegramOperationalReadinessRequest)
         'readiness_state': 'ready-for-controlled-phone-validation' if not blockers else 'blocked',
         'evaluated_by': payload.actor,
         'evaluated_at': datetime.now(timezone.utc).isoformat(),
-        'closed_lifecycles_observed': len(_closure_store),
+        'closed_lifecycles_observed': len(_closure_audit_store),
         'external_calls_made': 0,
     }
     _readiness_store[fingerprint] = record
@@ -167,7 +167,7 @@ def operational_status() -> dict:
         'active_blockers': latest.get('blockers', []) if latest else ['readiness-not-evaluated'],
         'phone_validation_runs': len(_validation_run_store),
         'prepared_phone_runs': sum(1 for item in _validation_run_store.values() if item.get('run_state') == 'prepared-awaiting-phone-message'),
-        'closed_lifecycles_observed': len(_closure_store),
+        'closed_lifecycles_observed': len(_closure_audit_store),
         'external_calls_made': 0,
         'observability_mode': 'readiness-and-controlled-phone-validation-preflight',
     }
