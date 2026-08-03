@@ -1,15 +1,19 @@
 from app.main import app
+from app.api.routes import auron_demo1_telegram_continuous_conversation_supervisor_v21_323 as supervisor
+from app.api.routes import auron_demo1_telegram_continuous_queue_orchestration_v21_324 as queue
+from app.api.routes import auron_demo1_telegram_lifecycle_progression_worker_v21_325 as progression
 from app.api.routes import auron_demo1_telegram_operational_analytics_health_supervisor_v21_327 as health
 from app.api.routes import auron_demo1_telegram_operational_go_live_acceptance_v21_322 as go_live
-from app.api.routes import auron_demo1_telegram_continuous_conversation_supervisor_v21_323 as supervisor
-from app.api.routes import auron_demo1_telegram_lifecycle_progression_worker_v21_325 as progression
+from app.api.routes import auron_demo1_telegram_operational_runtime_worker_v21_311 as runtime_worker
 
 
 def setup_function() -> None:
     health.reset_telegram_operational_analytics_health_supervisor_store()
     go_live.reset_telegram_operational_go_live_acceptance_store()
     supervisor.reset_telegram_continuous_conversation_supervisor_store()
+    queue.reset_telegram_continuous_queue_orchestration_store()
     progression.reset_telegram_lifecycle_progression_worker_store()
+    runtime_worker.reset_telegram_operational_runtime_worker_store()
     go_live._go_live_store['123'] = {
         'go_live_acceptance_id': 'go-live-1',
         'telegram_chat_id': '123',
@@ -54,14 +58,14 @@ def test_critical_dead_letter_anomaly_auto_pauses_chat() -> None:
 
 
 def test_degraded_queue_backlog_does_not_auto_pause() -> None:
-    from app.api.routes import auron_demo1_telegram_continuous_queue_orchestration_v21_324 as queue
-    queue._queue_item_store['update-1'] = {
-        'queue_item_id': 'queue-1',
-        'update_id': 'update-1',
-        'telegram_chat_id': '123',
-        'queue_state': 'queued-awaiting-supervised-dispatch',
-    }
-    result = _evaluate(max_queue_backlog=0)
+    for index in range(2):
+        queue._queue_item_store[f'update-{index}'] = {
+            'queue_item_id': f'queue-{index}',
+            'update_id': f'update-{index}',
+            'telegram_chat_id': '123',
+            'queue_state': 'queued-awaiting-supervised-dispatch',
+        }
+    result = _evaluate(max_queue_backlog=1)
     assert result['state'] == 'telegram-runtime-health-degraded'
     assert result['anomaly']['severity'] == 'degraded'
     assert go_live._go_live_store['123']['continuous_mode_active'] is True
