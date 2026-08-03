@@ -209,3 +209,7 @@ def command_center() -> str:
         'AURON TELEGRAM CONTINUOUS SLO MONITORING DRIFT COMMAND CENTER',
         'AURON TELEGRAM CERTIFICATION DRIFT REMEDIATION COMMAND CENTER',
     )
+
+
+from app.api.routes.auron_demo1_telegram_post_recertification_governance_v21_333 import router as v21_333_router
+router.include_router(v21_333_router)
