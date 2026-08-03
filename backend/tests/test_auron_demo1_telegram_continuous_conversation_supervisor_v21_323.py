@@ -57,6 +57,11 @@ def test_completion_releases_chat_sequence() -> None:
 
 
 def test_three_failures_open_safety_circuit_and_pause_go_live() -> None:
+    # Isolate the consecutive-failure circuit-breaker behavior from the separate
+    # per-minute rate-limit behavior. Three sequential admissions are required
+    # to reach the intended third-failure transition.
+    go_live._go_live_store['123']['max_messages_per_minute'] = 10
+
     for index in range(3):
         update_id = f'failed-{index}'
         _admit(update_id, f'seq-{index}')
