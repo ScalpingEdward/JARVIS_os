@@ -135,15 +135,11 @@ def start_continuity(payload: ContinuityStartRequest) -> dict:
         'checks': checks,
     }
     record = {
-        'continuity_monitor_id': str(uuid4()),
-        **data,
+        'continuity_monitor_id': str(uuid4()), **data,
         'continuity_state': 'renewed-successor-next-generation-continuity-active',
         'health_check_count': 0,
-        'integrity_hash': _hash(data),
-        'immutable': True,
-        'started_by': payload.actor,
-        'started_at': now.isoformat(),
-        'external_calls_made': 0,
+        'integrity_hash': _hash(data), 'immutable': True,
+        'started_by': payload.actor, 'started_at': now.isoformat(), 'external_calls_made': 0,
     }
     _continuity_monitor_store[payload.monitoring_id] = record
     return {'state': 'telegram-renewed-successor-next-generation-continuity-started', 'continuity_monitor': record, 'external_calls_made': 0}
@@ -165,30 +161,20 @@ def check_health(payload: HealthCheckRequest) -> dict:
     healthy = hash_matches and not_expired and payload.control_state == 'healthy'
     checks = _health_check_store.setdefault(record['continuity_monitor_id'], [])
     data = {
-        'continuity_monitor_id': record['continuity_monitor_id'],
-        'sequence': len(checks) + 1,
-        'expected_baseline_hash': expected_hash,
-        'observed_baseline_hash': payload.observed_baseline_hash,
-        'hash_matches': hash_matches,
-        'not_expired': not_expired,
-        'control_state': payload.control_state,
-        'healthy': healthy,
-        'statement': payload.statement,
+        'continuity_monitor_id': record['continuity_monitor_id'], 'sequence': len(checks) + 1,
+        'expected_baseline_hash': expected_hash, 'observed_baseline_hash': payload.observed_baseline_hash,
+        'hash_matches': hash_matches, 'not_expired': not_expired,
+        'control_state': payload.control_state, 'healthy': healthy, 'statement': payload.statement,
     }
     evidence = {
-        'health_check_id': str(uuid4()),
-        **data,
+        'health_check_id': str(uuid4()), **data,
         'health_state': 'recertification-health-verified' if healthy else 'recertification-health-failed',
-        'integrity_hash': _hash(data),
-        'immutable': True,
-        'checked_by': payload.actor,
-        'checked_at': checked_at.isoformat(),
-        'external_calls_made': 0,
+        'integrity_hash': _hash(data), 'immutable': True,
+        'checked_by': payload.actor, 'checked_at': checked_at.isoformat(), 'external_calls_made': 0,
     }
     checks.append(evidence)
     record.update(
-        health_check_count=len(checks),
-        last_health_check_id=evidence['health_check_id'],
+        health_check_count=len(checks), last_health_check_id=evidence['health_check_id'],
         next_health_check_due_at=(checked_at + timedelta(days=record['health_check_interval_days'])).isoformat(),
     )
     if not healthy:
@@ -216,23 +202,16 @@ def expire_baseline(payload: BaselineExpiryRequest) -> dict:
     if blockers:
         raise HTTPException(status_code=409, detail={'message': 'Baseline expiry blocked', 'blockers': blockers})
     data = {
-        'continuity_monitor_id': record['continuity_monitor_id'],
-        'monitoring_id': record['monitoring_id'],
-        'baseline_id': record['baseline_id'],
-        'expired_baseline_hash': record['active_baseline_hash'],
-        'expiry_reference': payload.expiry_reference,
-        'expiry_statement': payload.expiry_statement,
+        'continuity_monitor_id': record['continuity_monitor_id'], 'monitoring_id': record['monitoring_id'],
+        'baseline_id': record['baseline_id'], 'expired_baseline_hash': record['active_baseline_hash'],
+        'expiry_reference': payload.expiry_reference, 'expiry_statement': payload.expiry_statement,
         'checks': checks,
     }
     expiry = {
-        'expiry_id': str(uuid4()),
-        **data,
+        'expiry_id': str(uuid4()), **data,
         'expiry_state': 'renewed-successor-next-generation-baseline-expired',
-        'integrity_hash': _hash(data),
-        'immutable': True,
-        'expired_by': payload.actor,
-        'expired_at': expired_at.isoformat(),
-        'external_calls_made': 0,
+        'integrity_hash': _hash(data), 'immutable': True,
+        'expired_by': payload.actor, 'expired_at': expired_at.isoformat(), 'external_calls_made': 0,
     }
     _expiry_store[record['continuity_monitor_id']] = expiry
     record['continuity_state'] = 'renewed-successor-next-generation-baseline-expired-recertification-required'
@@ -248,32 +227,29 @@ def renew_validity(payload: ValidityRenewalRequest) -> dict:
         raise HTTPException(status_code=404, detail='Renewed successor-next-generation continuity record not found')
     if record.get('continuity_state') != 'renewed-successor-next-generation-continuity-active':
         raise HTTPException(status_code=409, detail='Only an active non-expired baseline can have validity renewed')
-    hash_matches = payload.observed_baseline_hash == record['active_baseline_hash']
-    checks = {'hash_matches': hash_matches, 'controls_healthy': payload.control_state == 'healthy', 'not_expired': datetime.now(timezone.utc) < datetime.fromisoformat(record['valid_until'])}
+    now = datetime.now(timezone.utc)
+    checks = {
+        'hash_matches': payload.observed_baseline_hash == record['active_baseline_hash'],
+        'controls_healthy': payload.control_state == 'healthy',
+        'not_expired': now < datetime.fromisoformat(record['valid_until']),
+    }
     blockers = [name for name, passed in checks.items() if not passed]
     if blockers:
         raise HTTPException(status_code=409, detail={'message': 'Baseline validity renewal blocked', 'blockers': blockers})
     renewals = _validity_renewal_store.setdefault(record['continuity_monitor_id'], [])
     old_valid_until = record['valid_until']
-    new_valid_until = (datetime.now(timezone.utc) + timedelta(days=payload.extension_days)).isoformat()
+    new_valid_until = (now + timedelta(days=payload.extension_days)).isoformat()
     data = {
-        'continuity_monitor_id': record['continuity_monitor_id'],
-        'sequence': len(renewals) + 1,
-        'baseline_hash': record['active_baseline_hash'],
-        'old_valid_until': old_valid_until,
-        'new_valid_until': new_valid_until,
-        'renewal_reference': payload.renewal_reference,
+        'continuity_monitor_id': record['continuity_monitor_id'], 'sequence': len(renewals) + 1,
+        'baseline_hash': record['active_baseline_hash'], 'old_valid_until': old_valid_until,
+        'new_valid_until': new_valid_until, 'renewal_reference': payload.renewal_reference,
         'checks': checks,
     }
     renewal = {
-        'validity_renewal_id': str(uuid4()),
-        **data,
+        'validity_renewal_id': str(uuid4()), **data,
         'renewal_state': 'successor-next-generation-baseline-validity-renewed',
-        'integrity_hash': _hash(data),
-        'immutable': True,
-        'renewed_by': payload.actor,
-        'renewed_at': datetime.now(timezone.utc).isoformat(),
-        'external_calls_made': 0,
+        'integrity_hash': _hash(data), 'immutable': True,
+        'renewed_by': payload.actor, 'renewed_at': now.isoformat(), 'external_calls_made': 0,
     }
     renewals.append(renewal)
     record['valid_until'] = new_valid_until
@@ -296,7 +272,9 @@ def status() -> dict:
 @router.get('/command-center', response_class=HTMLResponse)
 def command_center() -> str:
     from app.api.routes.auron_demo1_telegram_successor_next_generation_recertification_v21_371 import command_center as previous
-    return previous().replace('v21.371', 'v21.372').replace(
-        'AURON TELEGRAM SUCCESSOR NEXT GENERATION RECERTIFICATION COMMAND CENTER',
-        'AURON TELEGRAM RENEWED SUCCESSOR NEXT GENERATION CONTINUITY COMMAND CENTER',
-    )
+
+    html = previous().replace('v21.371', 'v21.372')
+    title = 'AURON TELEGRAM RENEWED SUCCESSOR NEXT GENERATION CONTINUITY COMMAND CENTER'
+    if '<body>' in html:
+        return html.replace('<body>', f'<body><h1>{title}</h1>', 1)
+    return f'<h1>{title}</h1>{html}'
