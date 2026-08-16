@@ -157,7 +157,7 @@ Do not generate endless successor generations after v21.523 unless a concrete ar
 - Phase C Instagram Content Manager: completed through C8 — registry/calendar, lifecycle/version history, provider read-health, preview/approval, scheduler dry-run, controlled publish boundary, reconciliation/retries and Content Command Centre with explicit recurring-automation policy.
 - Content provider writes remain disabled by default; recurring automation records policy/cadence only and never bypasses C4-C7 approval/reconciliation gates.
 - Current phase: Phase D — Communications vertical.
-- Completed: D1 — Communications selected as the first additional vertical; provider/adapter onboarding contract defined with identity/health/read/draft capabilities, simulation-first/read-only certification, operator-approval requirement and outbound execution disabled.
-- Next after D1 merge: D2 — persistent communications account/channel registry plus normalized conversation/message state model. No provider writes.
+- Completed: D1 — provider/adapter onboarding contract with simulation-first/read-only certification and outbound execution disabled; D2 — persistent provider-independent account/channel registry plus normalized conversation/message state, unread tracking, message integrity hashes and idempotent message insertion.
+- Next after D2 merge: D3 — read/health provider integration that synchronizes provider conversations/messages into D2 state while remaining strictly read-only.
 
 This section must be updated when phase boundaries or major activation milestones change so a new chat can recover the correct trajectory from the repository itself.
