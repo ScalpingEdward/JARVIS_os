@@ -95,6 +95,9 @@ Required capabilities:
 Activation order:
 `local drafts -> provider read/health -> scheduled dry-run -> controlled publish -> reconciliation -> recurring automation`.
 
+Initial Content build order:
+`C1 brand/account registry + content calendar -> C2 content lifecycle + version history -> C3 Meta/Instagram read/health adapter -> C4 draft/preview/approval policy -> C5 scheduler + dry-run -> C6 controlled publish boundary -> C7 publish reconciliation/retries -> C8 Command Centre content operations`.
+
 ### Phase D — Additional verticals
 
 Future modules (communications, research, automation, other channels/providers) reuse the same capability contract, policy gate, ledger, Command Centre and adapter architecture. They do not create parallel uncontrolled execution systems.
@@ -140,9 +143,9 @@ Do not generate endless successor generations after v21.523 unless a concrete ar
 
 - Foundation successor loop: completed through AURON v21.523 / Generation Forty-Six continuity-expiry-renewal governance.
 - Phase A core cutover: completed through A6 — end-to-end integration harness and core cutover certification.
-- Core status: reusable simulation/integration path certified; live provider execution remains deliberately disabled until vertical-specific gates are completed.
-- Current phase: Phase B — Trading vertical.
-- Completed: B1 — persistent multi-account registry plus provider/prop-firm rule-profile schema and conservative editable seed profiles; B2 — normalized persistent account state for balance, equity, P&L, exposure, positions, orders and trading-day state; B3 — persistent strategy/signal intake with validation, idempotency and strict separation from execution; B4 — account-specific pre-trade risk engine with DD headroom, policy caps and fail-closed approval before allocation; B5 — account-specific multi-account allocation with risk-derived child intents and no blind lot copying; B6 — account/session/day/news guards, exposure/position/loss protections and fail-closed global/per-account trading kill switches; B7 — broker/MT5-style read-only account synchronization plus guard-approved persistent paper execution with idempotent replay and no live-order path; B8 — persistent paper/state reconciliation plus fail-closed controlled-canary certification while live execution remains disabled; B9 — explicit per-account live scopes, operator approval, canary proof, kill-switch enforcement and a disabled-by-default provider write boundary.
-- Next after B9 merge: B10 — Command Centre trading operations: expose accounts, headroom, state, paper/live decisions, certifications, alerts and kill controls through the operational interface before Phase C begins.
+- Phase B Trading architecture: completed through B10 — multi-account registry/state/signals/risk/allocation/guards, read-only + paper adapter, reconciliation/canary proof, controlled live-enablement boundary and Trading Command Centre operations.
+- Trading live-provider execution remains deliberately disabled by default until a real provider transport is configured and all live gates are explicitly satisfied.
+- Current phase: Phase C — Instagram Content Manager vertical.
+- Next after B10 merge: C1 — persistent brand/account registry plus content calendar.
 
 This section must be updated when phase boundaries or major activation milestones change so a new chat can recover the correct trajectory from the repository itself.
