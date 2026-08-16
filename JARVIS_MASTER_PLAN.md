@@ -100,10 +100,14 @@ Initial Content build order:
 
 ### Phase D — Additional verticals
 
-Future modules (communications, research, automation, other channels/providers) reuse the same capability contract, policy gate, ledger, Command Centre and adapter architecture. They do not create parallel uncontrolled execution systems.
+The first Phase D vertical is **Communications**: governed email/messaging operations that can later support inbox triage, drafts, replies, outbound messages and follow-up workflows without creating a parallel uncontrolled execution path.
 
-Initial Phase D sequence:
-`D1 select next vertical + define adapter/onboarding contract -> D2 registry/state model -> D3 read/health integration -> D4 policy/approval boundary -> D5 simulation/dry-run -> D6 controlled execution -> D7 reconciliation/retries -> D8 Command Centre operations`.
+Communications must reuse the shared capability contract, policy gate, ledger, Command Centre and adapter architecture. Provider onboarding begins simulation/read-only first. Outbound send/reply remains disabled until the later controlled-execution gate.
+
+Communications sequence:
+`D1 provider/adapter onboarding contract -> D2 registry/state model -> D3 read/health integration -> D4 policy/approval boundary -> D5 simulation/dry-run -> D6 controlled execution -> D7 reconciliation/retries -> D8 Command Centre operations`.
+
+Future research, automation and other channel/provider verticals follow the same pattern after Communications.
 
 No new vertical may bypass the shared AURON core simply because its provider API is easy to call.
 
@@ -152,7 +156,8 @@ Do not generate endless successor generations after v21.523 unless a concrete ar
 - Trading live-provider execution remains deliberately disabled by default until a real provider transport is configured and all live gates are explicitly satisfied.
 - Phase C Instagram Content Manager: completed through C8 — registry/calendar, lifecycle/version history, provider read-health, preview/approval, scheduler dry-run, controlled publish boundary, reconciliation/retries and Content Command Centre with explicit recurring-automation policy.
 - Content provider writes remain disabled by default; recurring automation records policy/cadence only and never bypasses C4-C7 approval/reconciliation gates.
-- Current phase: Phase D — Additional verticals.
-- Next after C8 merge: D1 — select the next vertical and define its provider/adapter onboarding contract before implementing vertical-specific state or execution.
+- Current phase: Phase D — Communications vertical.
+- Completed: D1 — Communications selected as the first additional vertical; provider/adapter onboarding contract defined with identity/health/read/draft capabilities, simulation-first/read-only certification, operator-approval requirement and outbound execution disabled.
+- Next after D1 merge: D2 — persistent communications account/channel registry plus normalized conversation/message state model. No provider writes.
 
 This section must be updated when phase boundaries or major activation milestones change so a new chat can recover the correct trajectory from the repository itself.
