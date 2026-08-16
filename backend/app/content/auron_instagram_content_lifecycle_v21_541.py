@@ -175,6 +175,20 @@ class InstagramContentLifecycle:
                          (version, created_at, content_id))
         return self.get_revision(content_id, version)
 
+    def _sync_calendar_state(self, content_id: str, calendar_state: str, schedule: str | None, now: str) -> None:
+        """Synchronize C2 state back to the C1 calendar store.
+
+        C1 and C2 may intentionally use different SQLite files. The lifecycle store
+        must therefore never assume that `content_calendar` exists in its own DB.
+        """
+        with sqlite3.connect(self.registry.db_path) as conn:
+            cursor = conn.execute(
+                'UPDATE content_calendar SET state=?, scheduled_for=?, updated_at=? WHERE content_id=?',
+                (calendar_state, schedule, now, content_id),
+            )
+            if cursor.rowcount != 1:
+                raise ContentLifecycleError('C1 calendar entry disappeared during lifecycle transition')
+
     def transition(self, content_id: str, target: LifecycleState, *, scheduled_for: str | None = None,
                    publish_result: str | None = None) -> ContentLifecycleRecord:
         current = self.get(content_id)
@@ -192,12 +206,13 @@ class InstagramContentLifecycle:
         with self._connect() as conn:
             conn.execute('UPDATE content_lifecycle SET state=?, scheduled_for=?, publish_result=?, updated_at=? WHERE content_id=?',
                          (target, schedule, result, now, content_id))
-            calendar_state = target if target in {'idea','draft','review','approved','scheduled','cancelled'} else None
-            if target == 'result' and publish_result == 'published':
-                calendar_state = 'published'
-            if calendar_state is not None:
-                conn.execute('UPDATE content_calendar SET state=?, scheduled_for=?, updated_at=? WHERE content_id=?',
-                             (calendar_state, schedule, now, content_id))
+
+        calendar_state = target if target in {'idea','draft','review','approved','scheduled','cancelled'} else None
+        if target == 'result' and publish_result == 'published':
+            calendar_state = 'published'
+        if calendar_state is not None:
+            self._sync_calendar_state(content_id, calendar_state, schedule, now)
+
         result_record = self.get(content_id)
         if result_record is None:
             raise ContentLifecycleError('transition persistence failed')
