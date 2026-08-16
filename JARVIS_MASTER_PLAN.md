@@ -72,6 +72,9 @@ Required capabilities:
 Trading activation order:
 `read-only account sync -> paper intents -> risk-gated simulated execution -> single-account controlled live -> reconciliation proof -> multi-account controlled live`.
 
+Initial Trading build order:
+`B1 multi-account registry + provider/rule profiles -> B2 normalized account state -> B3 strategy/signal intake -> B4 pre-trade risk engine -> B5 allocation/copy engine -> B6 account/session/news guards + kill switches -> B7 MT5/broker adapter read-only/paper -> B8 reconciliation/canary certification -> B9 controlled multi-account live`.
+
 No strategy is allowed to bypass account rules merely because it is profitable in backtests.
 
 ### Phase C — Instagram Content Manager vertical
@@ -136,8 +139,9 @@ Do not generate endless successor generations after v21.523 unless a concrete ar
 ## 9. Current checkpoint
 
 - Foundation successor loop: completed through AURON v21.523 / Generation Forty-Six continuity-expiry-renewal governance.
-- Current phase: Phase A — Integration readiness and core cutover.
-- Completed: A1 — canonical roadmap + integration-readiness registry; A2 — unified capability/adapter contract; A3 — persistent execution/audit ledger + idempotency/reconciliation primitives; A4 — central policy gate with operator approval, environment mode, kill switches and capability scopes; A5 — Command Centre integration with persistent operational command field, real backend state, approvals and audit timeline.
-- Next after A5 merge: A6 — end-to-end integration harness and core cutover certification.
+- Phase A core cutover: completed through A6 — end-to-end integration harness and core cutover certification.
+- Core status: reusable simulation/integration path certified; live provider execution remains deliberately disabled until vertical-specific gates are completed.
+- Current phase: Phase B — Trading vertical.
+- Next after A6 merge: B1 — Trading multi-account registry plus provider/prop-firm rule profiles.
 
 This section must be updated when phase boundaries or major activation milestones change so a new chat can recover the correct trajectory from the repository itself.
