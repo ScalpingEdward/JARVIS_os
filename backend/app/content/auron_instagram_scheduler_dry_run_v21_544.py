@@ -86,7 +86,7 @@ class InstagramSchedulerDryRun:
             raise ContentSchedulerError('content registry/lifecycle state unavailable')
         if record.state != 'scheduled' or not record.scheduled_for:
             raise ContentSchedulerError('content must be in scheduled lifecycle state')
-        authorization = self.approvals.evaluate_authorization(content_id)
+        authorization = self.approvals.evaluate_publish_authorization(content_id)
         if authorization.state != 'approved-for-scheduler' or authorization.blockers:
             raise ContentSchedulerError('current C4 publish authorization is required')
         revision = self.lifecycle.get_revision(content_id, record.current_version)
@@ -131,7 +131,7 @@ class InstagramSchedulerDryRun:
         now = (at or datetime.now(timezone.utc)).astimezone(timezone.utc)
         if datetime.fromisoformat(plan.scheduled_for).astimezone(timezone.utc) > now:
             raise ContentSchedulerError('plan is not due yet')
-        authorization = self.approvals.evaluate_authorization(plan.content_id)
+        authorization = self.approvals.evaluate_publish_authorization(plan.content_id)
         record = self.lifecycle.get(plan.content_id)
         if authorization.state != 'approved-for-scheduler' or authorization.approval_id != plan.approval_id:
             return self._set_state(plan_id, 'blocked-authorization-changed')
