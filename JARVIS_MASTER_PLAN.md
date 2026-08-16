@@ -137,7 +137,7 @@ Do not generate endless successor generations after v21.523 unless a concrete ar
 
 - Foundation successor loop: completed through AURON v21.523 / Generation Forty-Six continuity-expiry-renewal governance.
 - Current phase: Phase A — Integration readiness and core cutover.
-- Current item: A1 — canonical roadmap + integration-readiness registry.
-- Next after A1 merge: A2 — unified capability/adapter contract.
+- Completed: A1 — canonical roadmap + integration-readiness registry; A2 — unified capability/adapter contract.
+- Next after A2 merge: A3 — persistent execution/audit ledger and idempotency/reconciliation primitives.
 
 This section must be updated when phase boundaries or major activation milestones change so a new chat can recover the correct trajectory from the repository itself.
