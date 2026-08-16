@@ -142,6 +142,7 @@ Do not generate endless successor generations after v21.523 unless a concrete ar
 - Phase A core cutover: completed through A6 — end-to-end integration harness and core cutover certification.
 - Core status: reusable simulation/integration path certified; live provider execution remains deliberately disabled until vertical-specific gates are completed.
 - Current phase: Phase B — Trading vertical.
-- Next after A6 merge: B1 — Trading multi-account registry plus provider/prop-firm rule profiles.
+- Completed: B1 — persistent multi-account registry plus provider/prop-firm rule-profile schema and conservative editable seed profiles.
+- Next after B1 merge: B2 — normalized trading account state for balances, equity, floating/realized P&L, exposure, positions/orders and trading-day state.
 
 This section must be updated when phase boundaries or major activation milestones change so a new chat can recover the correct trajectory from the repository itself.
