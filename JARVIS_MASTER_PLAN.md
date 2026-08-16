@@ -96,7 +96,7 @@ Activation order:
 `local drafts -> provider read/health -> scheduled dry-run -> controlled publish -> reconciliation -> recurring automation`.
 
 Initial Content build order:
-`C1 brand/account registry + content calendar -> C2 content lifecycle + version history -> C3 Meta/Instagram read/health adapter -> C4 draft/preview/approval policy -> C5 scheduler + dry-run -> C6 controlled publish boundary -> C7 publish reconciliation/retries -> C8 Command Centre content operations`.
+`C1 brand/account registry + content calendar -> C2 lifecycle + version history -> C3 Meta/Instagram read & health adapter -> C4 draft/preview/approval policy -> C5 scheduler + dry-run -> C6 controlled Meta publish boundary -> C7 publish reconciliation/retries -> C8 Content Command Centre + recurring automation`.
 
 ### Phase D — Additional verticals
 
@@ -146,7 +146,7 @@ Do not generate endless successor generations after v21.523 unless a concrete ar
 - Phase B Trading architecture: completed through B10 — multi-account registry/state/signals/risk/allocation/guards, read-only + paper adapter, reconciliation/canary proof, controlled live-enablement boundary and Trading Command Centre operations.
 - Trading live-provider execution remains deliberately disabled by default until a real provider transport is configured and all live gates are explicitly satisfied.
 - Current phase: Phase C — Instagram Content Manager vertical.
-- Completed: C1 — persistent brand registry, Instagram account registry and content calendar with brand/account integrity and publishing disabled by default; C2 — controlled idea/draft/assets/review/approval/scheduled/publishing/result lifecycle with append-only caption/hashtag/asset/creative revisions and integrity hashes; C3 — read-only Meta/Instagram provider boundary with account identity verification plus token, permission and reachability health evidence, while publish/write capability remains absent; C4 — immutable preview artifacts bound to exact content revisions plus explicit actor-attributed publish approval, revocation, provider-read verification and stale-approval fail-closed behavior.
-- Next after C4 merge: C5 — scheduler + dry-run, consuming only valid C4 authorization and producing deterministic scheduled execution plans without any provider write.
+- Completed: C1 — persistent brand registry, Instagram account registry and content calendar with brand/account integrity and publishing disabled by default; C2 — controlled idea/draft/assets/review/approval/scheduled/publishing/result lifecycle with append-only caption/hashtag/asset/creative revisions and integrity hashes; C3 — read-only Meta/Instagram provider boundary with account identity verification plus token, permission and reachability health evidence, while publish/write capability remains absent; C4 — immutable preview artifacts bound to exact content revisions plus explicit actor-attributed publish approval, revocation, provider-read verification and stale-approval fail-closed behavior; C5 — deterministic scheduler/dry-run queue bound to current C4 authorization, exact content revision and scheduled time, with due-time revalidation and zero provider writes.
+- Next after C5 merge: C6 — controlled Meta/Instagram publish boundary with explicit provider-write capability, idempotent publish IDs and fail-closed authorization; no recurring automation yet.
 
 This section must be updated when phase boundaries or major activation milestones change so a new chat can recover the correct trajectory from the repository itself.
