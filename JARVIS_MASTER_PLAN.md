@@ -146,6 +146,7 @@ Do not generate endless successor generations after v21.523 unless a concrete ar
 - Phase B Trading architecture: completed through B10 — multi-account registry/state/signals/risk/allocation/guards, read-only + paper adapter, reconciliation/canary proof, controlled live-enablement boundary and Trading Command Centre operations.
 - Trading live-provider execution remains deliberately disabled by default until a real provider transport is configured and all live gates are explicitly satisfied.
 - Current phase: Phase C — Instagram Content Manager vertical.
-- Next after B10 merge: C1 — persistent brand/account registry plus content calendar.
+- Completed: C1 — persistent brand registry, Instagram account registry and content calendar with brand/account integrity and publishing disabled by default.
+- Next after C1 merge: C2 — content lifecycle + version history for idea/draft/assets/review/approval/scheduled/publishing/result progression.
 
 This section must be updated when phase boundaries or major activation milestones change so a new chat can recover the correct trajectory from the repository itself.
