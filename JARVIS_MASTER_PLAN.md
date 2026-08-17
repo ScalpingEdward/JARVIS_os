@@ -100,14 +100,19 @@ Initial Content build order:
 
 ### Phase D — Additional verticals
 
-The first Phase D vertical is **Communications**: governed email/messaging operations that can later support inbox triage, drafts, replies, outbound messages and follow-up workflows without creating a parallel uncontrolled execution path.
-
-Communications must reuse the shared capability contract, policy gate, ledger, Command Centre and adapter architecture. Provider onboarding begins simulation/read-only first. Outbound send/reply remains disabled until the later controlled-execution gate.
+The first Phase D vertical is **Communications**: governed email/messaging operations supporting inbox state, drafts, replies, outbound messages and follow-up workflows without a parallel uncontrolled execution path.
 
 Communications sequence:
 `D1 provider/adapter onboarding contract -> D2 registry/state model -> D3 read/health integration -> D4 policy/approval boundary -> D5 simulation/dry-run -> D6 controlled execution -> D7 reconciliation/retries -> D8 Command Centre operations`.
 
-Future research, automation and other channel/provider verticals follow the same pattern after Communications.
+The second Phase D vertical is **Research**: governed search, retrieval, source normalization, evidence/citation tracking, research snapshots and later monitored research workflows that can feed other JARVIS verticals without bypassing their execution controls.
+
+Research must preserve source provenance. A result is not trusted merely because a provider returned text. Stable source identity, source metadata, attribution/citation capability, timestamps and deterministic persisted research state are required before downstream automation can rely on it.
+
+Research sequence:
+`D9 provider/adapter onboarding contract -> D10 source/query/result registry + normalized state -> D11 read/search/fetch integration -> D12 evidence/provenance/confidence policy -> D13 research simulation/report assembly -> D14 controlled recurring/watch execution -> D15 reconciliation/freshness/retry -> D16 Research Command Centre operations`.
+
+Future automation and other provider/channel verticals follow the same pattern after Research.
 
 No new vertical may bypass the shared AURON core simply because its provider API is easy to call.
 
@@ -122,6 +127,8 @@ The operational interface must ultimately provide:
 - execution timeline and failures;
 - Trading workspace with multi-account risk state;
 - Content workspace with draft/schedule/publish state;
+- Communications workspace with inbox/approval/execution state;
+- Research workspace with queries, sources, evidence, freshness and watch state;
 - global and capability-specific kill switches;
 - audit/evidence access.
 
@@ -158,7 +165,8 @@ Do not generate endless successor generations after v21.523 unless a concrete ar
 - Content provider writes remain disabled by default; recurring automation records policy/cadence only and never bypasses C4-C7 approval/reconciliation gates.
 - Phase D Communications vertical: completed through D8 — provider onboarding, normalized account/channel/conversation state, read-only sync, approval policy, deterministic simulation, controlled execution boundary, reconciliation/retries and Communications Command Centre operations with persistent command field and kill-switch control.
 - Communications outbound provider writes remain disabled by default; D8 exposes operational state and controls but does not silently execute recorded text commands.
-- Current phase: Phase D — next vertical selection.
-- Next after D8 merge: D9 — select the next additional vertical and define its provider/adapter onboarding contract before any execution path is built.
+- Current phase: Phase D — Research vertical.
+- Completed: D9 — Research selected as the second additional vertical; provider/adapter onboarding contract requires search/fetch/source-metadata/citation capabilities, simulation-first operation, stable source IDs, source attribution and provider health while unattended actions remain disabled.
+- Next after D9 merge: D10 — persistent research source/query/result registry plus normalized evidence/freshness state. No recurring watches or downstream actions yet.
 
 This section must be updated when phase boundaries or major activation milestones change so a new chat can recover the correct trajectory from the repository itself.
