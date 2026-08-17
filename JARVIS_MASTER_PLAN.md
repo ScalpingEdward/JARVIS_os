@@ -166,7 +166,7 @@ Do not generate endless successor generations after v21.523 unless a concrete ar
 - Phase D Communications vertical: completed through D8 — provider onboarding, normalized account/channel/conversation state, read-only sync, approval policy, deterministic simulation, controlled execution boundary, reconciliation/retries and Communications Command Centre operations with persistent command field and kill-switch control.
 - Communications outbound provider writes remain disabled by default; D8 exposes operational state and controls but does not silently execute recorded text commands.
 - Current phase: Phase D — Research vertical.
-- Completed: D9 — Research selected as the second additional vertical; provider/adapter onboarding contract requires search/fetch/source-metadata/citation capabilities, simulation-first operation, stable source IDs, source attribution and provider health while unattended actions remain disabled.
-- Next after D9 merge: D10 — persistent research source/query/result registry plus normalized evidence/freshness state. No recurring watches or downstream actions yet.
+- Completed: D9 — Research provider/adapter onboarding contract with search/fetch/source-metadata/citation requirements and simulation-first safety; D10 — persistent normalized query/source/result registry with stable source identities, canonical URLs, content-integrity hashes, evidence hashes bound to source content, attribution, explicit freshness state and append-only evidence history.
+- Next after D10 merge: D11 — certified provider read/search/fetch integration that populates D10 state while preserving provider identity, provenance and zero downstream execution.
 
 This section must be updated when phase boundaries or major activation milestones change so a new chat can recover the correct trajectory from the repository itself.
