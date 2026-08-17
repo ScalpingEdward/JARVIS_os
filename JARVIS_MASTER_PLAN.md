@@ -112,7 +112,14 @@ Research must preserve source provenance. A result is not trusted merely because
 Research sequence:
 `D9 provider/adapter onboarding contract -> D10 source/query/result registry + normalized state -> D11 read/search/fetch integration -> D12 evidence/provenance/confidence policy -> D13 research simulation/report assembly -> D14 controlled recurring/watch execution -> D15 reconciliation/freshness/retry -> D16 Research Command Centre operations`.
 
-Future automation and other provider/channel verticals follow the same pattern after Research.
+The third Phase D vertical is **Automation**: governed workflow orchestration across providers and existing JARVIS capabilities. Automation is treated as a high-risk cross-vertical capability because it can chain actions; therefore every workflow must remain inspectable, simulation-first, idempotent, permission-scoped and subject to the same policy/approval/kill-switch boundaries as the underlying verticals.
+
+Automation sequence:
+`D17 provider/adapter onboarding contract -> D18 workflow/trigger/action registry + normalized state -> D19 catalog/read/health integration -> D20 workflow policy/approval boundary -> D21 deterministic simulation/dry-run -> D22 controlled execution -> D23 reconciliation/retries/cancellation -> D24 Automation Command Centre operations`.
+
+An Automation workflow may coordinate Trading, Content, Communications or Research only through those verticals' governed public boundaries. It may never call provider transports behind their policy/risk layers.
+
+Future provider/channel verticals follow the same pattern after Automation.
 
 No new vertical may bypass the shared AURON core simply because its provider API is easy to call.
 
@@ -129,6 +136,7 @@ The operational interface must ultimately provide:
 - Content workspace with draft/schedule/publish state;
 - Communications workspace with inbox/approval/execution state;
 - Research workspace with queries, sources, evidence, freshness and watch state;
+- Automation workspace with workflows, triggers, action plans, simulations, executions and reconciliation state;
 - global and capability-specific kill switches;
 - audit/evidence access.
 
@@ -167,7 +175,8 @@ Do not generate endless successor generations after v21.523 unless a concrete ar
 - Communications outbound provider writes remain disabled by default; D8 exposes operational state and controls but does not silently execute recorded text commands.
 - Phase D Research vertical: completed through D16 — provider onboarding, persistent query/source/result evidence registry, certified read/search/fetch integration, provenance/confidence admission policy, deterministic citation-bound report simulation, controlled watches, freshness/retry reconciliation and Research Command Centre operations with persistent command field and governed watch kill-switch control.
 - Research unattended actions and all downstream Trading/Content/Communications execution remain disabled by default; D16 exposes operational visibility and controls but recorded commands are not executed directly.
-- Current phase: Phase D — next vertical selection.
-- Next after D16 merge: D17 — select the next additional vertical and define its provider/adapter onboarding contract before any execution path is built.
+- Current phase: Phase D — Automation vertical.
+- Completed: D17 — Automation selected as the next vertical; provider/adapter onboarding contract requires simulation, inspectability, scoped permissions, idempotency, reconciliation support, identity/health/catalog verification and explicit operator approval, while automation execution and cross-vertical execution remain disabled.
+- Next after D17 merge: D18 — persistent workflow/trigger/action registry plus normalized workflow state. No action execution.
 
 This section must be updated when phase boundaries or major activation milestones change so a new chat can recover the correct trajectory from the repository itself.
