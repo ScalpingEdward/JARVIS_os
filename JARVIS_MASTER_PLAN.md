@@ -44,13 +44,15 @@ Files & Documents D25-D32: completed architecture.
 E1-E4 completed: common governance certification, deterministic cross-vertical simulation, reconciliation/observability certification and production-readiness/canary eligibility. E4 never enables provider transport.
 
 ### Phase F — Controlled provider canary program
-F1 defines bounded authorization. F2 provides the adapter-separated hard-budget execution boundary. F3 requires immediate result reconciliation and forced stop on mismatch/failure/safety drift. F4 certifies the completed canary and emits only a promotion, rollback or hold authorization decision. Promotion remains separate from unrestricted production transport and cannot enable it directly.
-
-Phase F sequence complete:
-`F1 controlled provider canary authorization contract -> F2 controlled canary execution boundary -> F3 immediate result reconciliation/stop enforcement -> F4 canary certification and promotion/rollback decision`.
+F1-F4 completed: bounded authorization, adapter-separated hard-budget execution, immediate result reconciliation/forced stop, and promotion/rollback/hold certification. Promotion never directly enables unrestricted production transport.
 
 ### Phase G — Provider-specific controlled canary integration
-G1 begins only after F4 merge. A real provider/vertical may be selected only through a dedicated adapter integration preserving the F1-F4 controls. No generic or cross-provider transport activation is allowed.
+G1 selects **Research** as the first provider-specific canary vertical because it can be constrained to read-only, side-effect-free actions. The selected adapter is `research-readonly-canary-v1` / provider `research-local-readonly`. It implements the F2 execution transport, F3 result-reader and F3 stop boundary against persistent local adapter state while keeping network and production transports disabled.
+
+G1 allowed actions are only `search-preview` and `inspect-source-metadata`; arbitrary provider writes are not exposed.
+
+Phase G initial sequence:
+`G1 research read-only canary adapter integration -> G2 research canary end-to-end certification harness -> G3 research provider-health/drift certification -> G4 provider-specific canary Command Centre controls -> G5 next provider/vertical selection`.
 
 ## 6. Cross-vertical Command Centre requirements
 Persistent command/text interaction, capability health, simulation/execution visibility, approvals, execution timeline/failures, dedicated vertical workspaces, kill switches and audit/evidence access remain mandatory.
@@ -71,8 +73,9 @@ One coherent layer per PR, with tests, dependencies and next layer documented. V
 - Automation D17-D24: complete; external execution disabled by default.
 - Files & Documents D25-D32: complete architecture; provider mutation disabled by default and delete denied.
 - Phase E E1-E4: complete.
-- Phase F F1-F4: complete architecture after F4 merge.
-- F4 complete: canary evidence is revalidated against actual submitted executions and F3 reconciliation state; every submitted action must reconcile; any stop or failed stop forces rollback; health/policy/safety controls are rechecked; explicit operator approval is required for promotion; and the promotion artifact always keeps `unrestricted_production_enabled_by_decision=False`.
-- Next after F4 merge: G1 — provider-specific canary adapter selection and integration, preserving all existing budgets, stop/reconciliation gates and disabled-by-default production transport.
+- Phase F F1-F4: complete.
+- Current phase: Phase G — provider-specific controlled canary integration.
+- G1 complete: Research selected as the first low-risk provider-specific canary; `research-readonly-canary-v1` is bound to the `research-local-readonly` provider and exposes only read-only preview/metadata actions. The adapter is compatible with the F2 execution boundary, F3 result reader and F3 stop boundary, persists deterministic local canary state and keeps network/provider production transport disabled.
+- Next after G1 merge: G2 — end-to-end certification harness wiring F1 authorization -> F2 execution -> G1 Research adapter -> F3 reconciliation/stop -> F4 certification, proving the full provider-specific canary chain without enabling production transport.
 
 This checkpoint must be updated at each phase boundary or major activation milestone.
