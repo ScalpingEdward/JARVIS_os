@@ -44,10 +44,13 @@ Files & Documents D25-D32: completed architecture.
 E1-E4 completed: common governance certification, deterministic cross-vertical simulation, reconciliation/observability certification and production-readiness/canary eligibility. E4 never enables provider transport.
 
 ### Phase F — Controlled provider canary program
-F1 defines bounded authorization. F2 provides the adapter-separated, hard-budget execution boundary. F3 requires every provider-submitted canary action to reconcile immediately before progression. Provider reference, vertical, provider identity, action key and payload hash are verified. Result failure, missing result, mismatch or safety-control drift forces stop; stop failure remains fail-closed.
+F1 defines bounded authorization. F2 provides the adapter-separated hard-budget execution boundary. F3 requires immediate result reconciliation and forced stop on mismatch/failure/safety drift. F4 certifies the completed canary and emits only a promotion, rollback or hold authorization decision. Promotion remains separate from unrestricted production transport and cannot enable it directly.
 
-Phase F sequence:
+Phase F sequence complete:
 `F1 controlled provider canary authorization contract -> F2 controlled canary execution boundary -> F3 immediate result reconciliation/stop enforcement -> F4 canary certification and promotion/rollback decision`.
+
+### Phase G — Provider-specific controlled canary integration
+G1 begins only after F4 merge. A real provider/vertical may be selected only through a dedicated adapter integration preserving the F1-F4 controls. No generic or cross-provider transport activation is allowed.
 
 ## 6. Cross-vertical Command Centre requirements
 Persistent command/text interaction, capability health, simulation/execution visibility, approvals, execution timeline/failures, dedicated vertical workspaces, kill switches and audit/evidence access remain mandatory.
@@ -68,10 +71,8 @@ One coherent layer per PR, with tests, dependencies and next layer documented. V
 - Automation D17-D24: complete; external execution disabled by default.
 - Files & Documents D25-D32: complete architecture; provider mutation disabled by default and delete denied.
 - Phase E E1-E4: complete.
-- Current phase: Phase F — controlled provider canary program.
-- F1 complete: bounded deterministic provider/vertical/operator/scope authorization artifact.
-- F2 complete: persistent idempotent canary execution boundary with per-action safety rechecks and hard budget; transport disabled by default.
-- F3 complete: immediate persistent reconciliation of every submitted action; exact provider/result/action/payload verification; successful reconciliation is mandatory for progression; mismatch, failed/missing result or safety drift triggers stop; failed stop remains fail-closed.
-- Next after F3 merge: F4 — canary certification and promotion/rollback decision. Promotion must remain a separate authorization decision and must not itself enable unrestricted production transport.
+- Phase F F1-F4: complete architecture after F4 merge.
+- F4 complete: canary evidence is revalidated against actual submitted executions and F3 reconciliation state; every submitted action must reconcile; any stop or failed stop forces rollback; health/policy/safety controls are rechecked; explicit operator approval is required for promotion; and the promotion artifact always keeps `unrestricted_production_enabled_by_decision=False`.
+- Next after F4 merge: G1 — provider-specific canary adapter selection and integration, preserving all existing budgets, stop/reconciliation gates and disabled-by-default production transport.
 
 This checkpoint must be updated at each phase boundary or major activation milestone.
