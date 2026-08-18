@@ -42,7 +42,7 @@ Automation D17-D24: completed.
 Files & Documents sequence:
 `D25 provider/adapter onboarding contract -> D26 file/folder/version registry + normalized state -> D27 read/list/search/fetch integration -> D28 provenance/version/access policy -> D29 deterministic mutation simulation/dry-run -> D30 controlled create/update/move boundary -> D31 reconciliation/conflict/retry/delete safeguards -> D32 Files & Documents Command Centre operations`.
 
-D25-D28 do not mutate provider storage. D28 establishes the fail-closed authorization boundary for future mutation simulation: registered provenance, explicit actor/provider/item access grants and exact current file-version identity are required. Mutation execution remains unauthorized.
+D29 produces persistent deterministic create/update/move plans only. It reuses D28 access/version authorization, binds updates/moves to exact registered current versions and validates same-provider folder boundaries. No provider storage mutation occurs.
 
 Automation may coordinate verticals only through governed public boundaries and never behind policy/risk/version layers.
 
@@ -66,8 +66,9 @@ One coherent layer per PR, with tests, dependencies and next layer documented. V
 - Current phase: Phase D — Files & Documents.
 - D25 complete: provider onboarding contract with read-only certification and stable version identity.
 - D26 complete: persistent provider-neutral file/folder/version registry, stable identities, parent relationships and immutable version binding.
-- D27 complete: onboarding-certified provider list/search/fetch integration populates D26 and verifies exact provider item/version/content identity while preserving zero storage mutations.
-- D28 complete: explicit provider/item access grants with revocation, registered-provenance checks and exact current-version authorization for future mutation simulation. Provider-wide grants are supported only when explicitly created. Mutation execution remains fail-closed and cannot be granted in D28.
-- Next after D28 merge: D29 — deterministic mutation simulation/dry-run for create/update/move intents, bound to D28 authorization and exact version/provenance state, with zero provider writes.
+- D27 complete: certified read/list/search/fetch integration with exact provider item/version/content verification.
+- D28 complete: explicit access grants/revocation, registered provenance and exact current-version authorization for mutation simulation; execution remains blocked.
+- D29 complete: deterministic persistent create/update/move dry-run plans with stable plan IDs/hashes, D28 authorization, exact current-version binding for existing files, same-provider parent validation, idempotent replay and explicit `simulated-not-executed` state. Provider writes remain zero.
+- Next after D29 merge: D30 — controlled create/update/move execution boundary with explicit enablement, kill switch, plan-integrity/version revalidation and idempotency, disabled by default.
 
 This checkpoint must be updated at each phase boundary or major activation milestone.
