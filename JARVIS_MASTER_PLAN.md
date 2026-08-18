@@ -41,121 +41,45 @@ v21.523 is therefore a phase boundary, not permission to discard the established
 ## 5. Mandatory build sequence from v21.523
 
 ### Phase A — Integration readiness and core cutover
-
 A1. Canonical roadmap + integration-readiness registry.
-A2. Unified capability/adapter contract: simulation vs live, health, permissions, readiness, external-call accounting.
+A2. Unified capability/adapter contract.
 A3. Persistent execution/audit ledger and idempotency/reconciliation primitives.
-A4. Central policy gate: operator approval, environment mode, kill switch, capability scopes.
-A5. Command Centre integration: real backend state, actions, errors, approvals and audit timeline; preserve text/command interaction field.
+A4. Central policy gate.
+A5. Command Centre integration.
 A6. End-to-end integration harness and cutover certification.
 
-Do not activate a real external provider before A1–A6 gates applicable to that provider are green.
-
 ### Phase B — Trading vertical
-
-Goal: professional multi-account trading operations, including prop-firm accounts and broker accounts, controlled centrally through JARVIS/AURON.
-
-Required capabilities:
-
-- Account registry for multiple prop firms/brokers/accounts with account type, phase/funded state and provider-specific constraints.
-- Per-account rule profiles: daily drawdown, max drawdown, profit target, minimum trading days, news restrictions, holding-time restrictions, EA/grid/hedging/copy constraints, consistency or payout-cycle constraints when applicable.
-- Normalize balances, equity, floating P/L, realized P/L, exposure, open orders/positions and trading-day state.
-- Strategy/signal intake separated from execution.
-- Pre-trade risk engine calculates account-specific permitted risk and rejects non-compliant orders before provider execution.
-- Multi-account allocation/copy engine must transform a master intent into account-safe child intents; no blind lot copying.
-- Explicit protection against prohibited cross-account hedging or other prop-rule violations.
-- Daily-DD/max-DD guard, exposure caps, loss limits, symbol/session/news gates and emergency global/per-account kill switches.
-- MT5/broker adapter layer with deterministic order IDs, retries, reconciliation and partial-fill/error handling.
-- Paper/simulation mode first; then controlled live canary; then multi-account live activation.
-- Command Centre: accounts, rule headroom, positions, risk, execution status, alerts, kill switches and audit history.
-
-Trading activation order:
-`read-only account sync -> paper intents -> risk-gated simulated execution -> single-account controlled live -> reconciliation proof -> multi-account controlled live`.
-
-Initial Trading build order:
-`B1 multi-account registry + provider/rule profiles -> B2 normalized account state -> B3 strategy/signal intake -> B4 pre-trade risk engine -> B5 allocation/copy engine -> B6 account/session/news guards + kill switches -> B7 MT5/broker adapter read-only/paper -> B8 reconciliation/canary certification -> B9 controlled multi-account live -> B10 Command Centre trading operations`.
-
-No strategy is allowed to bypass account rules merely because it is profitable in backtests.
+Trading architecture completed through B10. Live-provider execution remains deliberate and gated.
 
 ### Phase C — Instagram Content Manager vertical
-
-Goal: manage content production and publishing through the same governed JARVIS/AURON core.
-
-Required capabilities:
-
-- Brand/account registry and content calendar.
-- Idea -> draft -> assets -> review -> approval -> scheduled -> publishing -> result lifecycle.
-- Caption/hashtag/creative metadata and version history.
-- Meta/Instagram provider adapter with token/permission health.
-- Draft and preview remain separate from publish permission.
-- Explicit approval gate before outbound publishing unless a future automation policy has been deliberately authorized.
-- Scheduler, retries, idempotent publish IDs, reconciliation and failure reporting.
-- Command Centre queue/calendar/status/analytics/audit views.
-
-Activation order:
-`local drafts -> provider read/health -> scheduled dry-run -> controlled publish -> reconciliation -> recurring automation`.
-
-Initial Content build order:
-`C1 brand/account registry + content calendar -> C2 lifecycle + version history -> C3 Meta/Instagram read & health adapter -> C4 draft/preview/approval policy -> C5 scheduler + dry-run -> C6 controlled Meta publish boundary -> C7 publish reconciliation/retries -> C8 Content Command Centre + recurring automation`.
+Content architecture completed through C8. Provider writes remain deliberate and gated.
 
 ### Phase D — Additional verticals
 
-The first Phase D vertical is **Communications**: governed email/messaging operations supporting inbox state, drafts, replies, outbound messages and follow-up workflows without a parallel uncontrolled execution path.
+Communications D1-D8: completed.
+Research D9-D16: completed.
+Automation D17-D24: completed.
 
-Communications sequence:
-`D1 provider/adapter onboarding contract -> D2 registry/state model -> D3 read/health integration -> D4 policy/approval boundary -> D5 simulation/dry-run -> D6 controlled execution -> D7 reconciliation/retries -> D8 Command Centre operations`.
+The fourth Phase D vertical is **Files & Documents**: governed file/folder discovery, metadata, version identity, content inspection and later controlled document/file mutations. This vertical gives JARVIS a durable knowledge/document workspace without allowing storage-provider writes to bypass approval, version checks or reconciliation.
 
-The second Phase D vertical is **Research**: governed search, retrieval, source normalization, evidence/citation tracking, research snapshots and later monitored research workflows that can feed other JARVIS verticals without bypassing their execution controls.
+Files & Documents sequence:
+`D25 provider/adapter onboarding contract -> D26 file/folder/version registry + normalized state -> D27 read/list/search/fetch integration -> D28 provenance/version/access policy -> D29 deterministic mutation simulation/dry-run -> D30 controlled create/update/move boundary -> D31 reconciliation/conflict/retry/delete safeguards -> D32 Files & Documents Command Centre operations`.
 
-Research must preserve source provenance. A result is not trusted merely because a provider returned text. Stable source identity, source metadata, attribution/citation capability, timestamps and deterministic persisted research state are required before downstream automation can rely on it.
+D25 is strictly read-only certification. A provider may advertise write/delete support, but those capabilities remain disabled until their dedicated later gates.
 
-Research sequence:
-`D9 provider/adapter onboarding contract -> D10 source/query/result registry + normalized state -> D11 read/search/fetch integration -> D12 evidence/provenance/confidence policy -> D13 research simulation/report assembly -> D14 controlled recurring/watch execution -> D15 reconciliation/freshness/retry -> D16 Research Command Centre operations`.
-
-The third Phase D vertical is **Automation**: governed workflow orchestration across providers and existing JARVIS capabilities. Automation is treated as a high-risk cross-vertical capability because it can chain actions; therefore every workflow must remain inspectable, simulation-first, idempotent, permission-scoped and subject to the same policy/approval/kill-switch boundaries as the underlying verticals.
-
-Automation sequence:
-`D17 provider/adapter onboarding contract -> D18 workflow/trigger/action registry + normalized state -> D19 catalog/read/health integration -> D20 workflow policy/approval boundary -> D21 deterministic simulation/dry-run -> D22 controlled execution -> D23 reconciliation/retries/cancellation -> D24 Automation Command Centre operations`.
-
-An Automation workflow may coordinate Trading, Content, Communications or Research only through those verticals' governed public boundaries. It may never call provider transports behind their policy/risk layers.
-
-After D24, Phase D continues by selecting the next vertical and defining its provider/adapter onboarding contract before state or execution layers are built.
+Automation workflows may coordinate Trading, Content, Communications, Research or Files & Documents only through each vertical's governed public boundaries. They may never call provider transports behind policy/risk/version layers.
 
 No new vertical may bypass the shared AURON core simply because its provider API is easy to call.
 
 ## 6. Cross-vertical Command Centre requirements
 
-The operational interface must ultimately provide:
-
-- persistent command/text interaction field;
-- system/capability health;
-- simulation/live mode visibility;
-- pending approvals;
-- execution timeline and failures;
-- Trading workspace with multi-account risk state;
-- Content workspace with draft/schedule/publish state;
-- Communications workspace with inbox/approval/execution state;
-- Research workspace with queries, sources, evidence, freshness and watch state;
-- Automation workspace with workflows, triggers, action plans, simulations, executions and reconciliation state;
-- global and capability-specific kill switches;
-- audit/evidence access.
+The operational interface must ultimately provide persistent command/text interaction, system/capability health, simulation/live visibility, pending approvals, execution timeline/failures, dedicated Trading/Content/Communications/Research/Automation/Files workspaces, global and capability kill switches, and audit/evidence access.
 
 A landing page or decorative footer must never replace the operational command field.
 
 ## 7. Definition of usable
 
-A vertical is not considered usable merely because routes exist.
-
-Minimum usable state requires:
-
-1. provider/account connection health is observable;
-2. persistent state survives process restart;
-3. policy/risk gate executes before outbound action;
-4. external action has idempotency and reconciliation;
-5. operator can see success/failure in Command Centre;
-6. kill/disable control exists;
-7. integration tests cover failure and replay behavior;
-8. live mode is deliberately enabled rather than being the default.
+A vertical is not considered usable merely because routes exist. Minimum usable state requires provider health, persistent state, policy before outbound action, idempotency/reconciliation, operator-visible results, kill/disable controls, failure/replay tests, and deliberate live enablement.
 
 ## 8. PR discipline
 
@@ -165,20 +89,15 @@ Do not generate endless successor generations after v21.523 unless a concrete ar
 
 ## 9. Current checkpoint
 
-- Foundation successor loop: completed through AURON v21.523 / Generation Forty-Six continuity-expiry-renewal governance.
-- Phase A core cutover: completed through A6 — end-to-end integration harness and core cutover certification.
-- Phase B Trading architecture: completed through B10 — multi-account registry/state/signals/risk/allocation/guards, read-only + paper adapter, reconciliation/canary proof, controlled live-enablement boundary and Trading Command Centre operations.
-- Trading live-provider execution remains deliberately disabled by default until a real provider transport is configured and all live gates are explicitly satisfied.
-- Phase C Instagram Content Manager: completed through C8 — registry/calendar, lifecycle/version history, provider read-health, preview/approval, scheduler dry-run, controlled publish boundary, reconciliation/retries and Content Command Centre with explicit recurring-automation policy.
-- Content provider writes remain disabled by default; recurring automation records policy/cadence only and never bypasses C4-C7 approval/reconciliation gates.
-- Phase D Communications vertical: completed through D8 — provider onboarding, normalized account/channel/conversation state, read-only sync, approval policy, deterministic simulation, controlled execution boundary, reconciliation/retries and Communications Command Centre operations with persistent command field and kill-switch control.
-- Communications outbound provider writes remain disabled by default; D8 exposes operational state and controls but does not silently execute recorded text commands.
-- Phase D Research vertical: completed through D16 — provider onboarding, persistent query/source/result evidence registry, certified read/search/fetch integration, provenance/confidence admission policy, deterministic citation-bound report simulation, controlled watches, freshness/retry reconciliation and Research Command Centre operations with persistent command field and governed watch kill-switch control.
-- Research unattended actions and all downstream Trading/Content/Communications execution remain disabled by default; D16 exposes operational visibility and controls but recorded commands are not executed directly.
-- Phase D Automation vertical: completed through D24 — provider onboarding, provider-neutral workflow/trigger/action registry, certified catalog/read/health integration, operator approval/provider/vertical scopes, fail-closed kill controls, deterministic simulation, controlled execution boundary, result reconciliation, bounded retry authorization, best-effort cancellation and Automation Command Centre operations.
-- D24 exposes workflows, triggers/actions, provider/catalog health, approvals, simulations, execution/reconciliation state, retry/cancellation state, alerts and both policy/execution kill controls while preserving the persistent command/text interaction field.
-- Automation execution transports and cross-vertical execution remain disabled by default; recorded commands are stored as `recorded-not-executed` and cannot bypass D20-D23 or any target vertical governance boundary.
-- Current phase: Phase D — next vertical selection.
-- Next after D24 merge: D25 — select the next vertical and define its provider/adapter onboarding contract before building registry/state, read integration, policy, simulation or execution.
+- Foundation successor loop completed through v21.523.
+- Phase A core cutover completed through A6.
+- Phase B Trading architecture completed through B10; live-provider execution remains disabled by default until real transport and live gates are satisfied.
+- Phase C Instagram Content Manager completed through C8; provider writes remain disabled by default.
+- Phase D Communications completed through D8.
+- Phase D Research completed through D16.
+- Phase D Automation completed through D24; execution transports and cross-vertical execution remain disabled by default, and recorded commands cannot bypass governance.
+- Current phase: Phase D — Files & Documents vertical.
+- Completed: D25 — Files & Documents selected as the fourth Phase D vertical; onboarding contract requires stable provider identity, authenticated/reachable read access, explicit read-only scope, metadata/content inspection and stable version identity. Write/delete remain explicitly disabled even when advertised by a provider.
+- Next after D25 merge: D26 — persistent provider-neutral file/folder/version registry and normalized state, still without storage mutations.
 
 This section must be updated when phase boundaries or major activation milestones change so a new chat can recover the correct trajectory from the repository itself.
