@@ -42,7 +42,7 @@ Automation D17-D24: completed.
 Files & Documents sequence:
 `D25 provider/adapter onboarding contract -> D26 file/folder/version registry + normalized state -> D27 read/list/search/fetch integration -> D28 provenance/version/access policy -> D29 deterministic mutation simulation/dry-run -> D30 controlled create/update/move boundary -> D31 reconciliation/conflict/retry/delete safeguards -> D32 Files & Documents Command Centre operations`.
 
-D29 produces persistent deterministic create/update/move plans only. It reuses D28 access/version authorization, binds updates/moves to exact registered current versions and validates same-provider folder boundaries. No provider storage mutation occurs.
+D30 introduces a controlled create/update/move execution boundary only. Execution requires a successful D29 plan, current D28 authorization, unchanged plan integrity/current version, explicit provider and operator enablement, and a released provider kill switch. Provider mutation transport remains disabled by default; delete is still outside the execution boundary.
 
 Automation may coordinate verticals only through governed public boundaries and never behind policy/risk/version layers.
 
@@ -67,8 +67,9 @@ One coherent layer per PR, with tests, dependencies and next layer documented. V
 - D25 complete: provider onboarding contract with read-only certification and stable version identity.
 - D26 complete: persistent provider-neutral file/folder/version registry, stable identities, parent relationships and immutable version binding.
 - D27 complete: certified read/list/search/fetch integration with exact provider item/version/content verification.
-- D28 complete: explicit access grants/revocation, registered provenance and exact current-version authorization for mutation simulation; execution remains blocked.
-- D29 complete: deterministic persistent create/update/move dry-run plans with stable plan IDs/hashes, D28 authorization, exact current-version binding for existing files, same-provider parent validation, idempotent replay and explicit `simulated-not-executed` state. Provider writes remain zero.
-- Next after D29 merge: D30 — controlled create/update/move execution boundary with explicit enablement, kill switch, plan-integrity/version revalidation and idempotency, disabled by default.
+- D28 complete: explicit access grants/revocation, registered provenance and exact current-version authorization for mutation simulation.
+- D29 complete: deterministic persistent create/update/move dry-run plans with stable IDs/hashes, D28 authorization and zero provider writes.
+- D30 complete: controlled create/update/move execution boundary with per-provider execution scope, explicit operator enablement, default-on kill switch semantics, current plan/version/access revalidation, deterministic execution IDs/idempotency keys and a disabled-by-default mutation writer. Delete remains disabled and provider execution is not globally enabled by readiness.
+- Next after D30 merge: D31 — mutation-result reconciliation, version/conflict verification, bounded retry authorization and delete safeguards before any delete capability can exist.
 
 This checkpoint must be updated at each phase boundary or major activation milestone.
