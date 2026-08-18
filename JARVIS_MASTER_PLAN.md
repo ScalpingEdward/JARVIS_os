@@ -45,6 +45,8 @@ E1 certifies the common governance contract across Trading, Instagram Content, C
 
 E2 adds a deterministic end-to-end cross-vertical simulation harness. Handoffs may move only between recognized verticals through named governed public boundaries. Direct `provider:*` bypass boundaries are rejected. Identical scenarios replay idempotently with stable run hashes and every step remains `simulated-not-executed`; provider writes and live actions remain zero.
 
+E3 adds persistent reconciliation/observability certification over E2 runs. Every step receives deterministic correlation identity, source/target/boundary/payload lineage remains traceable, failure state must remain visible and replay correlation must be complete. Provider writes, live actions or step-state drift fail certification.
+
 Phase E sequence:
 `E1 cross-vertical integration certification -> E2 end-to-end cross-vertical simulation harness -> E3 cross-vertical reconciliation/observability certification -> E4 production-readiness/canary gate`.
 
@@ -71,6 +73,7 @@ One coherent layer per PR, with tests, dependencies and next layer documented. V
 - Current phase: Phase E — cross-vertical integration certification.
 - E1 complete: evidence-driven fail-closed certification requires all six verticals, validates common governance primitives, forbids direct command execution, forbids default-live transports and forbids cross-vertical provider bypass. E1 itself enables no live transport.
 - E2 complete: deterministic persistent cross-vertical simulation validates ordered governed boundary handoffs, rejects unknown/same-vertical/provider-bypass transitions, provides stable scenario/run hashes and idempotent replay, and guarantees zero provider writes/live actions.
-- Next after E2 merge: E3 — cross-vertical reconciliation/observability certification proving handoff traceability, failure visibility and replay-safe correlation across simulated vertical boundaries.
+- E3 complete: persistent reconciliation assigns deterministic per-step correlation IDs, certifies run/step lineage and trace hashes, requires visible step state and replay-safe correlation, and fails closed on side effects or simulation-state drift. E3 executes no provider action.
+- Next after E3 merge: E4 — production-readiness/canary gate defining explicit preconditions for controlled provider canaries while keeping every live transport disabled by default until individually authorized.
 
 This checkpoint must be updated at each phase boundary or major activation milestone.
