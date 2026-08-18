@@ -47,11 +47,11 @@ E1-E4 completed: common governance certification, deterministic cross-vertical s
 F1-F4 completed: bounded authorization, adapter-separated hard-budget execution, immediate result reconciliation/forced stop, and promotion/rollback/hold certification. Promotion never directly enables unrestricted production transport.
 
 ### Phase G — Provider-specific controlled canary integration
-G1 selects **Research** as the first provider-specific canary vertical because it can be constrained to read-only, side-effect-free actions. The selected adapter is `research-readonly-canary-v1` / provider `research-local-readonly`. It implements the F2 execution transport, F3 result-reader and F3 stop boundary against persistent local adapter state while keeping network and production transports disabled.
+G1 selects Research as the first provider-specific canary vertical. `research-readonly-canary-v1` / `research-local-readonly` exposes only `search-preview` and `inspect-source-metadata` and keeps network/production transport disabled.
 
-G1 allowed actions are only `search-preview` and `inspect-source-metadata`; arbitrary provider writes are not exposed.
+G2 wires the full provider-specific chain: F1 authorization -> F2 bounded execution -> G1 Research adapter -> F3 immediate reconciliation/stop -> F4 certification. The harness proves identity binding, idempotent execution/reconciliation and promotion-artifact compatibility while remaining read-only and zero-network.
 
-Phase G initial sequence:
+Phase G sequence:
 `G1 research read-only canary adapter integration -> G2 research canary end-to-end certification harness -> G3 research provider-health/drift certification -> G4 provider-specific canary Command Centre controls -> G5 next provider/vertical selection`.
 
 ## 6. Cross-vertical Command Centre requirements
@@ -75,7 +75,8 @@ One coherent layer per PR, with tests, dependencies and next layer documented. V
 - Phase E E1-E4: complete.
 - Phase F F1-F4: complete.
 - Current phase: Phase G — provider-specific controlled canary integration.
-- G1 complete: Research selected as the first low-risk provider-specific canary; `research-readonly-canary-v1` is bound to the `research-local-readonly` provider and exposes only read-only preview/metadata actions. The adapter is compatible with the F2 execution boundary, F3 result reader and F3 stop boundary, persists deterministic local canary state and keeps network/provider production transport disabled.
-- Next after G1 merge: G2 — end-to-end certification harness wiring F1 authorization -> F2 execution -> G1 Research adapter -> F3 reconciliation/stop -> F4 certification, proving the full provider-specific canary chain without enabling production transport.
+- G1 complete: Research read-only local canary adapter integrated with F2/F3 boundaries.
+- G2 complete: full F1->F2->G1->F3->F4 Research canary chain is wired and certifiable end-to-end; wrong provider/action fails before execution; repeated requests preserve deterministic IDs; health drift yields hold; network and production transport remain disabled.
+- Next after G2 merge: G3 — Research provider-health/drift certification, adding persistent health evidence, freshness/staleness checks, adapter configuration fingerprinting and fail-closed drift detection before any later provider expansion.
 
 This checkpoint must be updated at each phase boundary or major activation milestone.
