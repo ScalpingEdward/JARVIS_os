@@ -42,7 +42,7 @@ Automation D17-D24: completed.
 Files & Documents sequence:
 `D25 provider/adapter onboarding contract -> D26 file/folder/version registry + normalized state -> D27 read/list/search/fetch integration -> D28 provenance/version/access policy -> D29 deterministic mutation simulation/dry-run -> D30 controlled create/update/move boundary -> D31 reconciliation/conflict/retry/delete safeguards -> D32 Files & Documents Command Centre operations`.
 
-D25-D28 do not mutate provider storage. D27 permits certified read/list/search/fetch only and must bind fetched bytes to the exact registered provider item/version identity before returning verified content.
+D25-D28 do not mutate provider storage. D28 establishes the fail-closed authorization boundary for future mutation simulation: registered provenance, explicit actor/provider/item access grants and exact current file-version identity are required. Mutation execution remains unauthorized.
 
 Automation may coordinate verticals only through governed public boundaries and never behind policy/risk/version layers.
 
@@ -66,7 +66,8 @@ One coherent layer per PR, with tests, dependencies and next layer documented. V
 - Current phase: Phase D — Files & Documents.
 - D25 complete: provider onboarding contract with read-only certification and stable version identity.
 - D26 complete: persistent provider-neutral file/folder/version registry, stable identities, parent relationships and immutable version binding.
-- D27 complete: onboarding-certified provider list/search/fetch integration populates D26, verifies observation provider identity, requires exact registered item/version before content fetch, verifies returned provider item/version identity plus SHA-256/size when registered, and preserves zero storage mutations.
-- Next after D27 merge: D28 — provenance/version/access policy defining trusted provenance, freshness/version requirements and explicit access authorization before any future mutation simulation.
+- D27 complete: onboarding-certified provider list/search/fetch integration populates D26 and verifies exact provider item/version/content identity while preserving zero storage mutations.
+- D28 complete: explicit provider/item access grants with revocation, registered-provenance checks and exact current-version authorization for future mutation simulation. Provider-wide grants are supported only when explicitly created. Mutation execution remains fail-closed and cannot be granted in D28.
+- Next after D28 merge: D29 — deterministic mutation simulation/dry-run for create/update/move intents, bound to D28 authorization and exact version/provenance state, with zero provider writes.
 
 This checkpoint must be updated at each phase boundary or major activation milestone.
