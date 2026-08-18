@@ -41,19 +41,13 @@ Automation D17-D24: completed.
 Files & Documents D25-D32: completed architecture.
 
 ### Phase E — Cross-vertical integration certification
-E1 certifies the common governance contract across Trading, Instagram Content, Communications, Research, Automation and Files & Documents.
-
-E2 adds deterministic end-to-end cross-vertical simulation through named governed boundaries, with stable replay identity and zero provider writes.
-
-E3 adds persistent reconciliation and observability certification, including correlation identity, lineage, failure visibility and side-effect/drift detection.
-
-E4 adds the production-readiness/canary gate. A candidate provider/vertical must carry E1-E3 proof, green health and policy state, idempotency/reconciliation, explicit operator approval, a tightly bounded canary scope, rollback/stop control and an available kill switch that remains active during certification. Provider transport must be configured but disabled while E4 evaluates readiness. E4 does not switch any provider transport on.
-
-Phase E sequence complete:
-`E1 governance certification -> E2 cross-vertical simulation -> E3 reconciliation/observability certification -> E4 production-readiness/canary gate`.
+E1-E4 completed: common governance certification, deterministic cross-vertical simulation, reconciliation/observability certification and production-readiness/canary eligibility. E4 never enables provider transport.
 
 ### Phase F — Controlled provider canary program
-Phase F begins only after E4 merge. F1 defines a separate canary-control contract for one explicitly selected provider/vertical. Passing E4 indicates readiness for that later controlled decision; it does not change provider execution state.
+F1 defines the separate authorization artifact for one explicitly selected provider/vertical. It binds an E4 decision to one operator, explicit scope and action allowance, requires active kill-switch plus reconciliation/stop readiness, and rejects already-enabled transport. F1 exposes no provider transport and cannot activate a provider itself.
+
+Phase F sequence begins:
+`F1 controlled provider canary authorization contract -> F2 controlled canary execution boundary -> F3 immediate result reconciliation/stop enforcement -> F4 canary certification and promotion/rollback decision`.
 
 ## 6. Cross-vertical Command Centre requirements
 Persistent command/text interaction, capability health, simulation/execution visibility, approvals, execution timeline/failures, dedicated vertical workspaces, kill switches and audit/evidence access remain mandatory.
@@ -73,8 +67,9 @@ One coherent layer per PR, with tests, dependencies and next layer documented. V
 - Research D9-D16: complete.
 - Automation D17-D24: complete; external execution disabled by default.
 - Files & Documents D25-D32: complete architecture; provider mutation disabled by default and delete denied.
-- Phase E E1-E4: complete architecture after E4 merge.
-- E4 complete: evidence-driven readiness gate requires prior certification, provider health/policy, idempotency, reconciliation, operator approval, bounded scope, active safety controls and rollback/stop capability; E4 itself changes no provider execution state.
-- Next after E4 merge: F1 — controlled provider canary contract, remaining disabled by default.
+- Phase E E1-E4: complete.
+- Current phase: Phase F — controlled provider canary program.
+- F1 complete: deterministic authorization artifact binds a passing E4 decision to exactly one vertical/provider, operator, explicit scope and bounded action allowance; requires kill-switch, reconciliation and stop controls; refuses pre-enabled transport; and always reports `live_transport_enabled_by_contract=False`.
+- Next after F1 merge: F2 — controlled canary execution boundary consuming only a valid F1 authorization artifact, with explicit transport adapter separation, hard action budget, kill-switch recheck and idempotent execution state.
 
 This checkpoint must be updated at each phase boundary or major activation milestone.
