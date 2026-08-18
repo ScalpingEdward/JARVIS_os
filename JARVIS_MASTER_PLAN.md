@@ -43,8 +43,10 @@ Files & Documents D25-D32: completed architecture.
 ### Phase E — Cross-vertical integration certification
 E1 certifies the common governance contract across Trading, Instagram Content, Communications, Research, Automation and Files & Documents. Every vertical must prove persistent state, policy, simulation, execution boundary, reconciliation, kill/disable controls and Command Centre/command-field presence. Recorded commands cannot directly execute and live transports cannot default on.
 
-Phase E sequence begins:
-`E1 cross-vertical integration certification -> E2 end-to-end cross-vertical simulation harness -> E3 shared audit/replay certification -> E4 production-readiness/canary gate`.
+E2 adds a deterministic end-to-end cross-vertical simulation harness. Handoffs may move only between recognized verticals through named governed public boundaries. Direct `provider:*` bypass boundaries are rejected. Identical scenarios replay idempotently with stable run hashes and every step remains `simulated-not-executed`; provider writes and live actions remain zero.
+
+Phase E sequence:
+`E1 cross-vertical integration certification -> E2 end-to-end cross-vertical simulation harness -> E3 cross-vertical reconciliation/observability certification -> E4 production-readiness/canary gate`.
 
 No Phase E step silently enables provider transports.
 
@@ -68,6 +70,7 @@ One coherent layer per PR, with tests, dependencies and next layer documented. V
 - Files & Documents D25-D32: complete architecture; provider mutation disabled by default and delete denied.
 - Current phase: Phase E — cross-vertical integration certification.
 - E1 complete: evidence-driven fail-closed certification requires all six verticals, validates common governance primitives, forbids direct command execution, forbids default-live transports and forbids cross-vertical provider bypass. E1 itself enables no live transport.
-- Next after E1 merge: E2 — deterministic end-to-end cross-vertical simulation harness proving governed handoffs between vertical boundaries without provider writes/live execution.
+- E2 complete: deterministic persistent cross-vertical simulation validates ordered governed boundary handoffs, rejects unknown/same-vertical/provider-bypass transitions, provides stable scenario/run hashes and idempotent replay, and guarantees zero provider writes/live actions.
+- Next after E2 merge: E3 — cross-vertical reconciliation/observability certification proving handoff traceability, failure visibility and replay-safe correlation across simulated vertical boundaries.
 
 This checkpoint must be updated at each phase boundary or major activation milestone.
