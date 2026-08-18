@@ -44,9 +44,9 @@ Files & Documents D25-D32: completed architecture.
 E1-E4 completed: common governance certification, deterministic cross-vertical simulation, reconciliation/observability certification and production-readiness/canary eligibility. E4 never enables provider transport.
 
 ### Phase F — Controlled provider canary program
-F1 defines the separate authorization artifact for one explicitly selected provider/vertical. It binds an E4 decision to one operator, explicit scope and action allowance, requires active kill-switch plus reconciliation/stop readiness, and rejects already-enabled transport. F1 exposes no provider transport and cannot activate a provider itself.
+F1 defines the bounded authorization artifact for one provider/vertical. F2 consumes only that artifact at an adapter-separated execution boundary, rechecks kill-switch/reconciliation/stop readiness for every action, enforces a hard action allowance, persists execution state and uses deterministic idempotency keys. The default execution transport remains disabled.
 
-Phase F sequence begins:
+Phase F sequence:
 `F1 controlled provider canary authorization contract -> F2 controlled canary execution boundary -> F3 immediate result reconciliation/stop enforcement -> F4 canary certification and promotion/rollback decision`.
 
 ## 6. Cross-vertical Command Centre requirements
@@ -69,7 +69,8 @@ One coherent layer per PR, with tests, dependencies and next layer documented. V
 - Files & Documents D25-D32: complete architecture; provider mutation disabled by default and delete denied.
 - Phase E E1-E4: complete.
 - Current phase: Phase F — controlled provider canary program.
-- F1 complete: deterministic authorization artifact binds a passing E4 decision to exactly one vertical/provider, operator, explicit scope and bounded action allowance; requires kill-switch, reconciliation and stop controls; refuses pre-enabled transport; and always reports `live_transport_enabled_by_contract=False`.
-- Next after F1 merge: F2 — controlled canary execution boundary consuming only a valid F1 authorization artifact, with explicit transport adapter separation, hard action budget, kill-switch recheck and idempotent execution state.
+- F1 complete: deterministic authorization artifact binds a passing E4 decision to exactly one vertical/provider, operator, explicit scope and bounded action allowance.
+- F2 complete: persistent canary execution boundary requires a valid F1 artifact, creates deterministic idempotency/execution identities, rechecks kill-switch/reconciliation/stop controls before every action, enforces the hard authorization budget, separates provider transport behind an adapter and keeps that transport disabled by default.
+- Next after F2 merge: F3 — immediate provider-result reconciliation and stop enforcement, requiring each submitted canary action to be reconciled before progression and forcing stop on mismatch, failure, missing result or safety-control drift.
 
 This checkpoint must be updated at each phase boundary or major activation milestone.
