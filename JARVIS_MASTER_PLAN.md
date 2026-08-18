@@ -40,10 +40,13 @@ Research D9-D16: completed.
 Automation D17-D24: completed.
 Files & Documents D25-D32: completed architecture.
 
-Files & Documents now has provider onboarding, persistent file/folder/version state, verified read integration, provenance/access/version policy, deterministic mutation simulation, controlled create/update/move execution boundary, result reconciliation/conflict/retry safeguards and Command Centre operations. Provider mutations remain disabled by default and delete remains denied.
-
 ### Phase E — Cross-vertical integration certification
-E1 begins after D32 merge. It must certify that Trading, Content, Communications, Research, Automation and Files & Documents expose coherent governed boundaries through the shared AURON core before any production-live activation program advances.
+E1 certifies the common governance contract across Trading, Instagram Content, Communications, Research, Automation and Files & Documents. Every vertical must prove persistent state, policy, simulation, execution boundary, reconciliation, kill/disable controls and Command Centre/command-field presence. Recorded commands cannot directly execute and live transports cannot default on.
+
+Phase E sequence begins:
+`E1 cross-vertical integration certification -> E2 end-to-end cross-vertical simulation harness -> E3 shared audit/replay certification -> E4 production-readiness/canary gate`.
+
+No Phase E step silently enables provider transports.
 
 ## 6. Cross-vertical Command Centre requirements
 Persistent command/text interaction, capability health, simulation/live visibility, approvals, execution timeline/failures, dedicated vertical workspaces, kill switches and audit/evidence access remain mandatory.
@@ -62,8 +65,9 @@ One coherent layer per PR, with tests, dependencies and next layer documented. V
 - Communications D1-D8: complete.
 - Research D9-D16: complete.
 - Automation D17-D24: complete; execution/cross-vertical transports disabled by default.
-- Files & Documents D25-D32: complete architecture.
-- D32 complete: Files & Documents Command Centre aggregates registry/version state, access grants, mutation plans, execution scopes/results and reconciliation state; surfaces kill-switch/execution/conflict/retry alerts; supports governed execution kill-switch and retry-status controls; preserves a persistent command field whose commands are recorded-not-executed; delete remains denied and provider mutation is disabled by default.
-- Next after D32 merge: E1 — cross-vertical integration certification across Trading, Instagram Content, Communications, Research, Automation and Files & Documents, validating shared governance and boundary compatibility without enabling live transports.
+- Files & Documents D25-D32: complete architecture; provider mutation disabled by default and delete denied.
+- Current phase: Phase E — cross-vertical integration certification.
+- E1 complete: evidence-driven fail-closed certification requires all six verticals, validates common governance primitives, forbids direct command execution, forbids default-live transports and forbids cross-vertical provider bypass. E1 itself enables no live transport.
+- Next after E1 merge: E2 — deterministic end-to-end cross-vertical simulation harness proving governed handoffs between vertical boundaries without provider writes/live execution.
 
 This checkpoint must be updated at each phase boundary or major activation milestone.
