@@ -65,7 +65,7 @@ The fourth Phase D vertical is **Files & Documents**: governed file/folder disco
 Files & Documents sequence:
 `D25 provider/adapter onboarding contract -> D26 file/folder/version registry + normalized state -> D27 read/list/search/fetch integration -> D28 provenance/version/access policy -> D29 deterministic mutation simulation/dry-run -> D30 controlled create/update/move boundary -> D31 reconciliation/conflict/retry/delete safeguards -> D32 Files & Documents Command Centre operations`.
 
-D25 is strictly read-only certification. A provider may advertise write/delete support, but those capabilities remain disabled until their dedicated later gates.
+D25-D27 remain read-only. A provider may advertise write/delete support, but those capabilities remain disabled until their dedicated later gates.
 
 Automation workflows may coordinate Trading, Content, Communications, Research or Files & Documents only through each vertical's governed public boundaries. They may never call provider transports behind policy/risk/version layers.
 
@@ -97,7 +97,7 @@ Do not generate endless successor generations after v21.523 unless a concrete ar
 - Phase D Research completed through D16.
 - Phase D Automation completed through D24; execution transports and cross-vertical execution remain disabled by default, and recorded commands cannot bypass governance.
 - Current phase: Phase D — Files & Documents vertical.
-- Completed: D25 — Files & Documents selected as the fourth Phase D vertical; onboarding contract requires stable provider identity, authenticated/reachable read access, explicit read-only scope, metadata/content inspection and stable version identity. Write/delete remain explicitly disabled even when advertised by a provider.
-- Next after D25 merge: D26 — persistent provider-neutral file/folder/version registry and normalized state, still without storage mutations.
+- Completed: D25 — Files & Documents selected as the fourth Phase D vertical; onboarding contract requires stable provider identity, authenticated/reachable read access, explicit read-only scope, metadata/content inspection and stable version identity. Write/delete remain explicitly disabled even when advertised by a provider; D26 — persistent provider-neutral file/folder/version registry with stable internal item/version identities, normalized parent relationships, current-version state, immutable version-integrity binding and read-only snapshots with zero storage mutations.
+- Next after D26 merge: D27 — onboarding-certified provider read/list/search/fetch integration that populates D26 state while verifying provider item/version identity and preserving zero storage mutations.
 
 This section must be updated when phase boundaries or major activation milestones change so a new chat can recover the correct trajectory from the repository itself.
