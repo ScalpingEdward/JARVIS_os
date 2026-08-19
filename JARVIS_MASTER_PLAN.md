@@ -47,7 +47,7 @@ E1-E4 completed: common governance certification, deterministic cross-vertical s
 F1-F4 completed: bounded authorization, adapter-separated hard-budget execution, immediate result reconciliation/forced stop, and promotion/rollback/hold certification. Promotion never directly enables unrestricted production transport.
 
 ### Phase G — Provider-specific controlled canary integration
-G1 selects Research as the first provider-specific canary vertical. G2 wires the full F1->F4 chain through the local read-only adapter. G3 adds persistent provider-health evidence, bounded freshness, exact adapter configuration fingerprinting and fail-closed provider/config drift detection.
+G1 selects Research as the first provider-specific canary vertical. G2 wires the full F1->F4 chain through the local read-only adapter. G3 adds persistent provider-health evidence, bounded freshness, exact adapter configuration fingerprinting and fail-closed provider/config drift detection. G4 exposes the provider-specific Research canary operationally through one Command Centre read model and governed control surface.
 
 Phase G sequence:
 `G1 research read-only canary adapter integration -> G2 research canary end-to-end certification harness -> G3 research provider-health/drift certification -> G4 provider-specific canary Command Centre controls -> G5 next provider/vertical selection`.
@@ -75,7 +75,8 @@ One coherent layer per PR, with tests, dependencies and next layer documented. V
 - Current phase: Phase G — provider-specific controlled canary integration.
 - G1 complete: Research read-only local canary adapter integrated with F2/F3 boundaries.
 - G2 complete: full F1->F2->G1->F3->F4 Research canary chain certifiable end-to-end with network/production transport disabled.
-- G3 complete: provider health evidence is persisted; evidence expires after a bounded freshness window; provider health must be green; adapter/provider identity and complete descriptor fingerprint must match current configuration; stale, unhealthy, missing or drifted evidence fails closed.
-- Next after G3 merge: G4 — provider-specific canary Command Centre controls exposing Research adapter descriptor, health/freshness/drift certification, E2E canary state, stop controls and audit evidence without enabling network or production transport.
+- G3 complete: provider health evidence is persisted; freshness, provider health, identity and complete adapter configuration fingerprint are certified fail-closed.
+- G4 complete: Research provider-specific Canary Command Centre exposes adapter descriptor, health evidence/certification, action/execution/reconciliation state, persistent stop evidence, alerts and operator stop control. Text commands are persisted as `recorded-not-executed`; network and production transports remain disabled.
+- Next after G4 merge: G5 — select the next provider/vertical based on risk and utility, preserving the same F1-F4 and G1-G4 governance pattern before enabling any external production transport.
 
 This checkpoint must be updated at each phase boundary or major activation milestone.
