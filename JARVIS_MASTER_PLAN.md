@@ -49,7 +49,7 @@ F1-F4 completed.
 ### Phase G — Provider-specific controlled canary integration
 G1-G4 Research complete. G5-G8 Instagram complete. G9-G12 Files & Documents complete.
 
-G13 selects Communications as the fourth provider-specific canary. G14 implements `communications-draft-canary-v1` / `communications-local-draft` with persistent local message-preview and recipient-plan state, F2 execution compatibility and F3 result/stop compatibility. The adapter explicitly rejects outbound/provider transport fields; outbound sending, provider writes, network transport and production transport remain disabled.
+G13-G15 advance Communications as the fourth provider-specific canary. G14 implements the local draft/recipient-plan adapter; G15 wires the complete F1->F2->G14->F3->F4 chain and certifies provider/action identity, idempotent execution/reconciliation and promotion/hold semantics while proving no outbound send, provider write, network transport or production transport occurs and network calls remain zero.
 
 Phase G continuation:
 `G13 Communications selection -> G14 Communications draft canary adapter -> G15 Communications E2E certification -> G16 Communications health/drift + Command Centre certification -> G17 next provider/vertical selection`.
@@ -78,7 +78,8 @@ One coherent layer per PR, with tests, dependencies and next layer documented. V
 - Phase G G5-G8: Instagram provider-specific canary complete.
 - Phase G G9-G12: Files & Documents provider-specific canary complete.
 - G13 complete: Communications selected as the next safe local provider-specific canary.
-- G14 complete: Communications local draft adapter persists message-preview/recipient-plan actions, is F2/F3 compatible, guarantees zero external calls, refuses outbound/provider transport fields, and keeps send/write/network/production disabled.
-- Next after G14 merge: G15 — full Communications F1->F2->G14->F3->F4 end-to-end certification with provider/action binding, idempotency, reconciliation and explicit proof that no outbound message or external transport occurs.
+- G14 complete: Communications local draft adapter is F2/F3 compatible, persistent and zero-external-call with outbound/provider transport disabled.
+- G15 complete: full Communications F1->F2->G14->F3->F4 chain is certifiable end-to-end; wrong provider/send action fails before execution; repeated requests preserve deterministic IDs; health/approval drift yields hold; recipient-plan inspection remains zero-send; outbound send/provider write/network/production stay disabled with zero network calls.
+- Next after G15 merge: G16 — Communications provider health/freshness/config-drift certification plus provider-specific Command Centre visibility, operator stop controls and audit evidence.
 
 This checkpoint must be updated at each phase boundary or major activation milestone.
