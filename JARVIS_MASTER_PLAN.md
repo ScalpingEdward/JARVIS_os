@@ -41,18 +41,18 @@ Automation D17-D24: completed.
 Files & Documents D25-D32: completed architecture.
 
 ### Phase E — Cross-vertical integration certification
-E1-E4 completed: common governance certification, deterministic cross-vertical simulation, reconciliation/observability certification and production-readiness/canary eligibility. E4 never enables provider transport.
+E1-E4 completed.
 
 ### Phase F — Controlled provider canary program
-F1-F4 completed: bounded authorization, adapter-separated hard-budget execution, immediate result reconciliation/forced stop, and promotion/rollback/hold certification. Promotion never directly enables unrestricted production transport.
+F1-F4 completed.
 
 ### Phase G — Provider-specific controlled canary integration
-G1-G4 complete the Research read-only canary path. G5-G8 complete the Instagram local draft-preview canary path. G9-G12 complete the Files & Documents local read-only canary path.
+G1-G4 Research complete. G5-G8 Instagram complete. G9-G12 Files & Documents complete.
 
-G12 adds persistent provider-health evidence, bounded freshness, exact adapter descriptor fingerprinting, fail-closed provider/adapter/config drift detection and a provider-specific Documents Command Centre exposing actions, executions, reconciliation, stops and alerts. Operator stop remains persistent and command text is recorded-not-executed. Content read, mutation, delete, move, network transport and production transport remain disabled.
+G13 selects **Communications** as the fourth provider-specific canary under the same conservative sequencing policy. The selected provider/adapter is `communications-local-draft` / `communications-draft-canary-v1`, restricted to `render-message-preview` and `inspect-recipient-plan`. Outbound message sending, provider writes, network transport and production transport remain disabled. Trading shadow remains deferred until Communications completes; live order placement remains ineligible.
 
 Phase G continuation:
-`G9 Files/Documents selection -> G10 Documents readonly canary adapter -> G11 Documents E2E certification -> G12 Documents health/drift + Command Centre certification -> G13 next provider/vertical selection`.
+`G13 Communications selection -> G14 Communications draft canary adapter -> G15 Communications E2E certification -> G16 Communications health/drift + Command Centre certification -> G17 next provider/vertical selection`.
 
 ## 6. Cross-vertical Command Centre requirements
 Persistent command/text interaction, capability health, simulation/execution visibility, approvals, execution timeline/failures, dedicated vertical workspaces, kill switches and audit/evidence access remain mandatory.
@@ -74,10 +74,10 @@ One coherent layer per PR, with tests, dependencies and next layer documented. V
 - Files & Documents D25-D32: complete architecture; provider mutation disabled by default and delete denied.
 - Phase E E1-E4: complete.
 - Phase F F1-F4: complete.
-- Phase G G1-G4: Research provider-specific canary path complete.
-- Phase G G5-G8: Instagram provider-specific canary path complete with publish/write/network/production disabled.
-- Phase G G9-G12: Files & Documents provider-specific canary path complete with metadata/version-preview-only behavior, zero external calls, health/freshness/config-drift certification, Command Centre visibility and persistent stop controls.
-- G12 complete: health evidence is freshness bounded; identity/config drift fails closed; Command Centre exposes descriptor, health, actions, executions, reconciliation, stops and alerts; commands are recorded-not-executed; content read, mutation/delete/move/network/production remain disabled.
-- Next after G12 merge: G13 — deterministic next provider/vertical selection. Communications is the next preferred side-effect-free local candidate; live Trading remains ineligible until shadow-only controls are explicitly selected and certified.
+- Phase G G1-G4: Research provider-specific canary complete.
+- Phase G G5-G8: Instagram provider-specific canary complete.
+- Phase G G9-G12: Files & Documents provider-specific canary complete.
+- G13 complete: deterministic selection excludes the three completed provider canaries, selects Communications as the lowest-risk remaining side-effect-free local candidate, restricts it to message-preview/recipient-plan inspection, keeps outbound sends disabled, defers trading shadow, and keeps live Trading ineligible.
+- Next after G13 merge: G14 — implement `communications-draft-canary-v1` with persistent local preview/recipient-plan state, F2 execution compatibility, F3 result/stop compatibility and zero outbound/network transport.
 
 This checkpoint must be updated at each phase boundary or major activation milestone.
