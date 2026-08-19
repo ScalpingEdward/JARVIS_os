@@ -49,7 +49,7 @@ F1-F4 completed.
 ### Phase G — Provider-specific controlled canary integration
 G1-G4 Research complete. G5-G8 Instagram complete. G9-G12 Files & Documents complete. G13-G16 Communications complete.
 
-G17 selects Trading only through the side-effect-free `trading-analysis-shadow` / `trading-shadow-canary-v1` path. G18 implements that adapter as persistent local-only infrastructure compatible with F2 execution and F3 result/stop boundaries. It supports only `evaluate-trade-plan` and `simulate-order-intent`, rejects broker credentials and live-execution fields, performs zero network calls, and cannot place/cancel/modify orders or mutate positions.
+G17-G19 advance Trading only through the side-effect-free `trading-analysis-shadow` / `trading-shadow-canary-v1` path. G18 implements the persistent local F2/F3-compatible adapter. G19 wires F1->F2->G18->F3->F4 and certifies exact provider/action binding, deterministic idempotency, immediate reconciliation and promotion/hold semantics while proving broker connectivity, live orders, position mutation, network calls and production transport remain disabled.
 
 Phase G continuation:
 `G17 Trading shadow-only selection -> G18 Trading shadow canary adapter -> G19 Trading shadow E2E certification -> G20 Trading shadow health/drift + Command Centre certification -> G21 provider-expansion/promotion decision`.
@@ -79,7 +79,8 @@ One coherent layer per PR, with tests, dependencies and next layer documented. V
 - Phase G G9-G12: Files & Documents provider-specific canary complete.
 - Phase G G13-G16: Communications provider-specific canary complete.
 - G17 complete: Trading selected only as shadow-analysis; live provider excluded.
-- G18 complete: `trading-shadow-canary-v1` persists local trade-plan evaluation and simulated order-intent state, is F2/F3 compatible, is idempotent, forbids broker credentials/live-execution fields, and keeps broker network, order placement/cancel/modify, position mutation and production transport disabled with zero external calls.
-- Next after G18 merge: G19 — full Trading shadow F1->F2->G18->F3->F4 end-to-end certification with exact provider/action binding, idempotency, immediate reconciliation and explicit proof that no broker connection, live order or position mutation occurs.
+- G18 complete: persistent local Trading shadow adapter, F2/F3 compatible, zero external calls.
+- G19 complete: full Trading shadow F1->F2->G18->F3->F4 chain is certifiable end-to-end; wrong provider/live actions fail before execution; repeated requests remain idempotent; health/approval drift yields hold; broker network/live order/position mutation/production transport remain disabled and network calls remain zero.
+- Next after G19 merge: G20 — Trading shadow provider health/freshness/config-drift certification plus provider-specific Command Centre visibility, persistent operator stop and audit evidence. Live Trading remains out of scope.
 
 This checkpoint must be updated at each phase boundary or major activation milestone.
