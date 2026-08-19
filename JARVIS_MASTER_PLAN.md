@@ -39,12 +39,15 @@ E1-E4 completed.
 ### Phase F — Controlled provider canary program
 F1-F4 completed.
 ### Phase G — Provider-specific controlled canary integration
-G1-G4 Research, G5-G8 Instagram, G9-G12 Files & Documents and G13-G16 Communications complete.
+Research G1-G4, Instagram G5-G8, Files & Documents G9-G12, Communications G13-G16 and Trading-shadow G17-G20 are complete.
 
-G17-G20 complete the Trading shadow-only path. G18 implements the local adapter, G19 certifies F1->F2->G18->F3->F4, and G20 adds persistent health evidence, bounded freshness, descriptor fingerprint/config-drift fail-closed certification, Command Centre visibility, persistent operator stop and a `recorded-not-executed` command journal. Broker network, live orders, order modification/cancellation, position mutation and production transport remain disabled.
+G21 aggregates evidence across all five provider-specific paths and issues a fail-closed promotion artifact. The only promoted scope is **external read-only sandbox contract design**, with Research selected as the lowest-risk first target. This promotion does not enable provider writes, network transport, production transport or live Trading.
 
-Phase G continuation:
-`G17 Trading shadow selection -> G18 adapter -> G19 E2E -> G20 health/drift + Command Centre -> G21 provider-expansion/promotion decision`.
+### Phase H — Controlled external-provider sandbox integration
+H1 begins with an external-provider contract registry and secretless sandbox boundary. The first target is Research read-only. Credentials, network transport and any provider activation remain separate later gates.
+
+Planned Phase H sequence:
+`H1 provider contract registry + secretless sandbox boundary -> H2 research external-readonly sandbox adapter -> H3 external sandbox E2E/reconciliation -> H4 health/drift/observability -> H5 explicit network-transport authorization decision`.
 
 ## 6. Cross-vertical Command Centre requirements
 Persistent command/text interaction, capability health, simulation/execution visibility, approvals, execution timeline/failures, dedicated vertical workspaces, kill switches and audit/evidence access remain mandatory.
@@ -61,9 +64,8 @@ One coherent layer per PR, with tests, dependencies and next layer documented. V
 - Instagram C1-C8: architecture complete; writes gated.
 - Communications D1-D8, Research D9-D16, Automation D17-D24, Files & Documents D25-D32: complete.
 - Phase E E1-E4 and Phase F F1-F4: complete.
-- Phase G G1-G4 Research, G5-G8 Instagram, G9-G12 Files/Documents, G13-G16 Communications: complete.
-- G17-G19: Trading shadow selection, adapter and E2E certification complete.
-- G20 complete: Trading shadow health evidence is persistent/freshness-bounded; provider/adapter/config drift and unhealthy/missing evidence fail closed; Command Centre exposes descriptor, health, actions, executions, reconciliation, stops and alerts; operator stop persists; commands are recorded-not-executed; broker network/live order/cancel-modify/position mutation/production transport remain disabled.
-- Next after G20 merge: G21 — provider-expansion/promotion decision. This must be evidence-driven and must not silently convert shadow certification into live Trading permission.
+- Phase G provider-specific canary paths: Research, Instagram, Files/Documents, Communications and Trading-shadow complete through G20.
+- G21 complete: cross-provider evidence is aggregated; incomplete, unhealthy or unexpectedly live/write-capable evidence holds fail-closed; Research is selected for the next low-risk external read-only sandbox design scope; promotion cannot enable network/production transport, unrestricted provider writes or live Trading.
+- Next after G21 merge: H1 — external-provider contract registry + secretless sandbox boundary. This layer defines provider contracts, capability declarations and credential references without storing secrets or making network calls.
 
 This checkpoint must be updated at each phase boundary or major activation milestone.
