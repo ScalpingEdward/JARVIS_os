@@ -49,7 +49,7 @@ F1-F4 completed: bounded authorization, adapter-separated hard-budget execution,
 ### Phase G — Provider-specific controlled canary integration
 G1-G4 complete the Research read-only canary path through adapter integration, end-to-end certification, health/drift certification and Command Centre controls.
 
-G5 selects **Instagram Content** as the second provider-specific canary vertical using a deterministic risk/utility policy. The selected provider/adapter is `instagram-local-draft-preview` / `instagram-draft-preview-canary-v1`, restricted to `render-draft-preview` and `inspect-draft-metadata`. Public publish, provider writes and external network transport remain disabled. Trading live execution is explicitly deferred because it is consequential and high-risk.
+G5 selects Instagram Content as the second provider-specific canary vertical using a deterministic risk/utility policy. G6 implements `instagram-draft-preview-canary-v1` / `instagram-local-draft-preview` as a local side-effect-free adapter compatible with the F2 execution and F3 result/stop boundaries. It exposes only `render-draft-preview` and `inspect-draft-metadata`, persists local preview/inspection state, and keeps public publish, provider writes, network transport and production transport disabled.
 
 Phase G continuation:
 `G5 next provider/vertical selection -> G6 Instagram draft-preview canary adapter -> G7 Instagram canary E2E certification -> G8 Instagram health/drift + Command Centre certification -> G9 next provider/vertical selection`.
@@ -76,6 +76,7 @@ One coherent layer per PR, with tests, dependencies and next layer documented. V
 - Phase F F1-F4: complete.
 - Phase G G1-G4: Research provider-specific canary path complete with network/production transport disabled.
 - G5 complete: risk/utility selection chooses Instagram Content as the second provider-specific canary using local draft-preview-only actions; publishing, external provider writes and trading execution remain disabled.
-- Next after G5 merge: G6 — implement `instagram-draft-preview-canary-v1` with persistent local preview state, F2 execution compatibility, F3 result/stop compatibility and zero public publish/network transport.
+- G6 complete: local Instagram draft-preview adapter is persistent, idempotent and F2/F3 compatible; preview and metadata actions are strictly validated; public publish, provider writes, network transport and production transport remain disabled.
+- Next after G6 merge: G7 — full F1->F2->G6->F3->F4 Instagram draft-preview end-to-end certification with promotion/hold semantics and zero public publish/network transport.
 
 This checkpoint must be updated at each phase boundary or major activation milestone.
