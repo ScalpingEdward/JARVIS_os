@@ -49,7 +49,7 @@ F1-F4 completed.
 ### Phase G — Provider-specific controlled canary integration
 G1-G4 Research complete. G5-G8 Instagram complete. G9-G12 Files & Documents complete. G13-G16 Communications complete.
 
-G17 selects Trading only through the explicitly side-effect-free provider/adapter pair `trading-analysis-shadow` / `trading-shadow-canary-v1`. The scope is restricted to `evaluate-trade-plan` and `simulate-order-intent`. Broker connectivity, order placement/cancellation, position mutation, production transport and all live execution remain disabled. The live Trading provider remains ineligible.
+G17 selects Trading only through the side-effect-free `trading-analysis-shadow` / `trading-shadow-canary-v1` path. G18 implements that adapter as persistent local-only infrastructure compatible with F2 execution and F3 result/stop boundaries. It supports only `evaluate-trade-plan` and `simulate-order-intent`, rejects broker credentials and live-execution fields, performs zero network calls, and cannot place/cancel/modify orders or mutate positions.
 
 Phase G continuation:
 `G17 Trading shadow-only selection -> G18 Trading shadow canary adapter -> G19 Trading shadow E2E certification -> G20 Trading shadow health/drift + Command Centre certification -> G21 provider-expansion/promotion decision`.
@@ -78,7 +78,8 @@ One coherent layer per PR, with tests, dependencies and next layer documented. V
 - Phase G G5-G8: Instagram provider-specific canary complete.
 - Phase G G9-G12: Files & Documents provider-specific canary complete.
 - Phase G G13-G16: Communications provider-specific canary complete.
-- G17 complete: Trading is selected only as a shadow-analysis canary; allowed actions are trade-plan evaluation and simulated order intent. Broker network, live order placement, position mutation and production transport remain disabled; the live provider is explicitly excluded.
-- Next after G17 merge: G18 — implement `trading-shadow-canary-v1` as a persistent local F2/F3-compatible adapter that evaluates plans and simulates order intent without broker credentials, network calls, order placement or position mutation.
+- G17 complete: Trading selected only as shadow-analysis; live provider excluded.
+- G18 complete: `trading-shadow-canary-v1` persists local trade-plan evaluation and simulated order-intent state, is F2/F3 compatible, is idempotent, forbids broker credentials/live-execution fields, and keeps broker network, order placement/cancel/modify, position mutation and production transport disabled with zero external calls.
+- Next after G18 merge: G19 — full Trading shadow F1->F2->G18->F3->F4 end-to-end certification with exact provider/action binding, idempotency, immediate reconciliation and explicit proof that no broker connection, live order or position mutation occurs.
 
 This checkpoint must be updated at each phase boundary or major activation milestone.
