@@ -47,9 +47,7 @@ E1-E4 completed: common governance certification, deterministic cross-vertical s
 F1-F4 completed: bounded authorization, adapter-separated hard-budget execution, immediate result reconciliation/forced stop, and promotion/rollback/hold certification. Promotion never directly enables unrestricted production transport.
 
 ### Phase G — Provider-specific controlled canary integration
-G1 selects Research as the first provider-specific canary vertical. `research-readonly-canary-v1` / `research-local-readonly` exposes only `search-preview` and `inspect-source-metadata` and keeps network/production transport disabled.
-
-G2 wires the full provider-specific chain: F1 authorization -> F2 bounded execution -> G1 Research adapter -> F3 immediate reconciliation/stop -> F4 certification. The harness proves identity binding, idempotent execution/reconciliation and promotion-artifact compatibility while remaining read-only and zero-network.
+G1 selects Research as the first provider-specific canary vertical. G2 wires the full F1->F4 chain through the local read-only adapter. G3 adds persistent provider-health evidence, bounded freshness, exact adapter configuration fingerprinting and fail-closed provider/config drift detection.
 
 Phase G sequence:
 `G1 research read-only canary adapter integration -> G2 research canary end-to-end certification harness -> G3 research provider-health/drift certification -> G4 provider-specific canary Command Centre controls -> G5 next provider/vertical selection`.
@@ -76,7 +74,8 @@ One coherent layer per PR, with tests, dependencies and next layer documented. V
 - Phase F F1-F4: complete.
 - Current phase: Phase G — provider-specific controlled canary integration.
 - G1 complete: Research read-only local canary adapter integrated with F2/F3 boundaries.
-- G2 complete: full F1->F2->G1->F3->F4 Research canary chain is wired and certifiable end-to-end; wrong provider/action fails before execution; repeated requests preserve deterministic IDs; health drift yields hold; network and production transport remain disabled.
-- Next after G2 merge: G3 — Research provider-health/drift certification, adding persistent health evidence, freshness/staleness checks, adapter configuration fingerprinting and fail-closed drift detection before any later provider expansion.
+- G2 complete: full F1->F2->G1->F3->F4 Research canary chain certifiable end-to-end with network/production transport disabled.
+- G3 complete: provider health evidence is persisted; evidence expires after a bounded freshness window; provider health must be green; adapter/provider identity and complete descriptor fingerprint must match current configuration; stale, unhealthy, missing or drifted evidence fails closed.
+- Next after G3 merge: G4 — provider-specific canary Command Centre controls exposing Research adapter descriptor, health/freshness/drift certification, E2E canary state, stop controls and audit evidence without enabling network or production transport.
 
 This checkpoint must be updated at each phase boundary or major activation milestone.
