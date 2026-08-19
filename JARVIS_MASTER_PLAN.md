@@ -49,10 +49,10 @@ F1-F4 completed.
 ### Phase G — Provider-specific controlled canary integration
 G1-G4 Research complete. G5-G8 Instagram complete. G9-G12 Files & Documents complete. G13-G16 Communications complete.
 
-G16 adds persistent Communications provider-health evidence, bounded freshness, exact adapter descriptor fingerprinting and fail-closed provider/adapter/config drift detection. The provider-specific Command Centre exposes local actions, F2 executions, F3 reconciliation, stops and alerts, provides a persistent operator stop, and records command text as `recorded-not-executed`. Outbound send, provider write, network transport and production transport remain disabled.
+G17 selects Trading only through the explicitly side-effect-free provider/adapter pair `trading-analysis-shadow` / `trading-shadow-canary-v1`. The scope is restricted to `evaluate-trade-plan` and `simulate-order-intent`. Broker connectivity, order placement/cancellation, position mutation, production transport and all live execution remain disabled. The live Trading provider remains ineligible.
 
 Phase G continuation:
-`G13 Communications selection -> G14 Communications draft canary adapter -> G15 Communications E2E certification -> G16 Communications health/drift + Command Centre certification -> G17 next provider/vertical selection`.
+`G17 Trading shadow-only selection -> G18 Trading shadow canary adapter -> G19 Trading shadow E2E certification -> G20 Trading shadow health/drift + Command Centre certification -> G21 provider-expansion/promotion decision`.
 
 ## 6. Cross-vertical Command Centre requirements
 Persistent command/text interaction, capability health, simulation/execution visibility, approvals, execution timeline/failures, dedicated vertical workspaces, kill switches and audit/evidence access remain mandatory.
@@ -78,7 +78,7 @@ One coherent layer per PR, with tests, dependencies and next layer documented. V
 - Phase G G5-G8: Instagram provider-specific canary complete.
 - Phase G G9-G12: Files & Documents provider-specific canary complete.
 - Phase G G13-G16: Communications provider-specific canary complete.
-- G16 complete: health evidence is persistent and freshness-bounded; provider/adapter/config drift and unhealthy/missing evidence fail closed; Command Centre exposes descriptor, health, actions, executions, reconciliation, stops and alerts; operator stop persists; commands are recorded-not-executed; outbound send/provider write/network/production remain disabled.
-- Next after G16 merge: G17 — deterministic next provider/vertical selection. With Research, Instagram, Documents and Communications complete, evaluate the remaining side-effect-free candidates; Trading may advance only as an explicitly shadow-only, no-order-placement canary while live Trading remains ineligible.
+- G17 complete: Trading is selected only as a shadow-analysis canary; allowed actions are trade-plan evaluation and simulated order intent. Broker network, live order placement, position mutation and production transport remain disabled; the live provider is explicitly excluded.
+- Next after G17 merge: G18 — implement `trading-shadow-canary-v1` as a persistent local F2/F3-compatible adapter that evaluates plans and simulates order intent without broker credentials, network calls, order placement or position mutation.
 
 This checkpoint must be updated at each phase boundary or major activation milestone.
