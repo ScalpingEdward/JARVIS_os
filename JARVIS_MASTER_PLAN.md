@@ -47,12 +47,12 @@ E1-E4 completed: common governance certification, deterministic cross-vertical s
 F1-F4 completed: bounded authorization, adapter-separated hard-budget execution, immediate result reconciliation/forced stop, and promotion/rollback/hold certification. Promotion never directly enables unrestricted production transport.
 
 ### Phase G — Provider-specific controlled canary integration
-G1-G4 complete the Research read-only canary path through adapter integration, end-to-end certification, health/drift certification and Command Centre controls.
+G1-G4 complete the Research read-only canary path. G5-G8 complete the Instagram local draft-preview canary path.
 
-G5-G8 complete the Instagram local draft-preview canary path: provider selection, side-effect-free adapter, full F1-F4 E2E certification, then persistent health/freshness/config-drift certification plus governed Command Centre visibility and operator stop controls. Public publish, provider writes, network transport and production transport remain disabled.
+G9 selects **Files & Documents** as the third provider-specific canary using the lowest-risk remaining side-effect-free local candidate policy. The selected provider/adapter is `documents-local-readonly` / `documents-readonly-canary-v1`, restricted to `inspect-file-metadata` and `preview-file-version`. Provider writes, deletes, moves, network transport and production transport remain disabled. Trading live order placement remains explicitly ineligible; trading shadow analysis remains deferred until lower-risk local verticals are completed.
 
 Phase G continuation:
-`G5 Instagram selection -> G6 draft-preview adapter -> G7 Instagram E2E certification -> G8 Instagram health/drift + Command Centre certification -> G9 next provider/vertical selection`.
+`G9 Files/Documents selection -> G10 Documents readonly canary adapter -> G11 Documents E2E certification -> G12 Documents health/drift + Command Centre certification -> G13 next provider/vertical selection`.
 
 ## 6. Cross-vertical Command Centre requirements
 Persistent command/text interaction, capability health, simulation/execution visibility, approvals, execution timeline/failures, dedicated vertical workspaces, kill switches and audit/evidence access remain mandatory.
@@ -74,9 +74,9 @@ One coherent layer per PR, with tests, dependencies and next layer documented. V
 - Files & Documents D25-D32: complete architecture; provider mutation disabled by default and delete denied.
 - Phase E E1-E4: complete.
 - Phase F F1-F4: complete.
-- Phase G G1-G4: Research provider-specific canary path complete with network/production transport disabled.
-- G5-G7: Instagram selection, local draft-preview adapter and full E2E certification complete.
-- G8 complete: Instagram provider health evidence is persistent and freshness-bounded; provider/adapter/config drift fails closed; Command Centre exposes descriptor, health, actions, executions, reconciliation, stops and alerts; operator stop is persistent; text commands are recorded-not-executed; publish/write/network/production remain disabled.
-- Next after G8 merge: G9 — deterministic selection of the next provider/vertical. Trading remains consequential and must only be selected with an explicitly narrower safe canary scope and no live order placement by default.
+- Phase G G1-G4: Research provider-specific canary path complete.
+- Phase G G5-G8: Instagram provider-specific canary path complete with publish/write/network/production disabled.
+- G9 complete: deterministic next-canary policy excludes already certified Research/Instagram, rejects live Trading execution, and selects Files & Documents as the lowest-risk remaining safe local candidate with metadata/version-preview-only scope.
+- Next after G9 merge: G10 — implement `documents-readonly-canary-v1` with persistent local metadata/version-preview state, F2 execution compatibility, F3 result/stop compatibility, and no provider mutations or external transport.
 
 This checkpoint must be updated at each phase boundary or major activation milestone.
