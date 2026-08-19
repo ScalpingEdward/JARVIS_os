@@ -47,9 +47,9 @@ E1-E4 completed: common governance certification, deterministic cross-vertical s
 F1-F4 completed: bounded authorization, adapter-separated hard-budget execution, immediate result reconciliation/forced stop, and promotion/rollback/hold certification. Promotion never directly enables unrestricted production transport.
 
 ### Phase G — Provider-specific controlled canary integration
-G1-G4 complete the Research read-only canary path. G5-G8 complete the Instagram local draft-preview canary path.
+G1-G4 complete the Research read-only canary path. G5-G8 complete the Instagram local draft-preview canary path. G9-G12 complete the Files & Documents local read-only canary path.
 
-G9-G11 advance Files & Documents as the third provider-specific canary. G10 implements the local read-only adapter; G11 wires the full F1->F2->G10->F3->F4 chain and certifies provider/action identity, idempotent execution/reconciliation, promotion/hold semantics and the invariant that content read, mutation, delete, move, network transport and production transport remain disabled with zero external calls.
+G12 adds persistent provider-health evidence, bounded freshness, exact adapter descriptor fingerprinting, fail-closed provider/adapter/config drift detection and a provider-specific Documents Command Centre exposing actions, executions, reconciliation, stops and alerts. Operator stop remains persistent and command text is recorded-not-executed. Content read, mutation, delete, move, network transport and production transport remain disabled.
 
 Phase G continuation:
 `G9 Files/Documents selection -> G10 Documents readonly canary adapter -> G11 Documents E2E certification -> G12 Documents health/drift + Command Centre certification -> G13 next provider/vertical selection`.
@@ -76,9 +76,8 @@ One coherent layer per PR, with tests, dependencies and next layer documented. V
 - Phase F F1-F4: complete.
 - Phase G G1-G4: Research provider-specific canary path complete.
 - Phase G G5-G8: Instagram provider-specific canary path complete with publish/write/network/production disabled.
-- G9 complete: Files & Documents selected as the next safe local provider-specific canary.
-- G10 complete: Documents local read-only adapter is F2/F3 compatible and zero-external-call.
-- G11 complete: full Documents F1->F2->G10->F3->F4 chain is certifiable end-to-end; wrong provider/action fails before execution; repeated requests preserve deterministic IDs; health/approval drift yields hold; content read, mutation, delete, move, network and production transport remain disabled with zero external calls.
-- Next after G11 merge: G12 — Documents provider health/freshness/config-drift certification plus provider-specific Command Centre visibility, stop controls and audit evidence.
+- Phase G G9-G12: Files & Documents provider-specific canary path complete with metadata/version-preview-only behavior, zero external calls, health/freshness/config-drift certification, Command Centre visibility and persistent stop controls.
+- G12 complete: health evidence is freshness bounded; identity/config drift fails closed; Command Centre exposes descriptor, health, actions, executions, reconciliation, stops and alerts; commands are recorded-not-executed; content read, mutation/delete/move/network/production remain disabled.
+- Next after G12 merge: G13 — deterministic next provider/vertical selection. Communications is the next preferred side-effect-free local candidate; live Trading remains ineligible until shadow-only controls are explicitly selected and certified.
 
 This checkpoint must be updated at each phase boundary or major activation milestone.
