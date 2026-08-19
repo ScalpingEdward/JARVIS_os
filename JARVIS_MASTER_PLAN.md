@@ -39,12 +39,10 @@ E1-E4 completed.
 ### Phase F — Controlled provider canary program
 F1-F4 completed.
 ### Phase G — Provider-specific controlled canary integration
-Research G1-G4, Instagram G5-G8, Files & Documents G9-G12, Communications G13-G16 and Trading-shadow G17-G20 are complete.
-
-G21 aggregates evidence across all five provider-specific paths and issues a fail-closed promotion artifact. The only promoted scope is **external read-only sandbox contract design**, with Research selected as the lowest-risk first target. This promotion does not enable provider writes, network transport, production transport or live Trading.
+Research G1-G4, Instagram G5-G8, Files & Documents G9-G12, Communications G13-G16 and Trading-shadow G17-G20 are complete. G21 completes the evidence-driven expansion decision and selects Research for external read-only sandbox design only.
 
 ### Phase H — Controlled external-provider sandbox integration
-H1 begins with an external-provider contract registry and secretless sandbox boundary. The first target is Research read-only. Credentials, network transport and any provider activation remain separate later gates.
+H1 implements a persistent external-provider contract registry and secretless sandbox boundary. Contracts declare vertical/provider/adapter/environment/capabilities and may contain only an opaque credential reference; raw secret material is rejected. H1 allows only read-only sandbox contracts and cannot enable provider writes, network transport or production transport.
 
 Planned Phase H sequence:
 `H1 provider contract registry + secretless sandbox boundary -> H2 research external-readonly sandbox adapter -> H3 external sandbox E2E/reconciliation -> H4 health/drift/observability -> H5 explicit network-transport authorization decision`.
@@ -64,8 +62,8 @@ One coherent layer per PR, with tests, dependencies and next layer documented. V
 - Instagram C1-C8: architecture complete; writes gated.
 - Communications D1-D8, Research D9-D16, Automation D17-D24, Files & Documents D25-D32: complete.
 - Phase E E1-E4 and Phase F F1-F4: complete.
-- Phase G provider-specific canary paths: Research, Instagram, Files/Documents, Communications and Trading-shadow complete through G20.
-- G21 complete: cross-provider evidence is aggregated; incomplete, unhealthy or unexpectedly live/write-capable evidence holds fail-closed; Research is selected for the next low-risk external read-only sandbox design scope; promotion cannot enable network/production transport, unrestricted provider writes or live Trading.
-- Next after G21 merge: H1 — external-provider contract registry + secretless sandbox boundary. This layer defines provider contracts, capability declarations and credential references without storing secrets or making network calls.
+- Phase G provider-specific canary paths and G21 expansion decision: complete.
+- H1 complete: persistent external-provider contracts, bounded capability declarations and opaque credential references are supported; raw secrets are rejected; only read-only sandbox contracts are accepted; public descriptors never expose credential references; network/write/production transport remain unauthorized.
+- Next after H1 merge: H2 — Research external read-only sandbox adapter. It must consume an H1 contract and remain transport-disabled by default; credential resolution and real network calls remain separate authorization gates.
 
 This checkpoint must be updated at each phase boundary or major activation milestone.
