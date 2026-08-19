@@ -5,6 +5,7 @@ from app.trading.auron_trading_shadow_canary_health_command_centre_v21_607 impor
 from app.core.auron_integration_readiness_v21_607 import get_integration_readiness
 
 def build(tmp_path,max_age=300):
+    tmp_path.mkdir(parents=True,exist_ok=True)
     a=TradingShadowCanaryAdapter(tmp_path/'adapter.db'); return TradingShadowCanaryHealthCommandCentre(tmp_path/'cc.db',a,tmp_path/'exec.db',tmp_path/'rec.db',max_age_seconds=max_age),a
 
 def test_fresh_healthy_evidence_certifies_and_snapshot_keeps_live_trading_off(tmp_path):
