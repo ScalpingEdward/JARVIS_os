@@ -49,7 +49,7 @@ F1-F4 completed: bounded authorization, adapter-separated hard-budget execution,
 ### Phase G — Provider-specific controlled canary integration
 G1-G4 complete the Research read-only canary path. G5-G8 complete the Instagram local draft-preview canary path.
 
-G9 selects Files & Documents as the third provider-specific canary. G10 implements `documents-readonly-canary-v1` / `documents-local-readonly` with persistent local metadata/version-preview evidence and compatibility with F2 execution plus F3 result/stop boundaries. The adapter explicitly rejects content-bearing and mutation payloads; provider mutation, delete, move, network transport and production transport remain disabled.
+G9-G11 advance Files & Documents as the third provider-specific canary. G10 implements the local read-only adapter; G11 wires the full F1->F2->G10->F3->F4 chain and certifies provider/action identity, idempotent execution/reconciliation, promotion/hold semantics and the invariant that content read, mutation, delete, move, network transport and production transport remain disabled with zero external calls.
 
 Phase G continuation:
 `G9 Files/Documents selection -> G10 Documents readonly canary adapter -> G11 Documents E2E certification -> G12 Documents health/drift + Command Centre certification -> G13 next provider/vertical selection`.
@@ -77,7 +77,8 @@ One coherent layer per PR, with tests, dependencies and next layer documented. V
 - Phase G G1-G4: Research provider-specific canary path complete.
 - Phase G G5-G8: Instagram provider-specific canary path complete with publish/write/network/production disabled.
 - G9 complete: Files & Documents selected as the next safe local provider-specific canary.
-- G10 complete: Documents local read-only adapter persists metadata/version-preview actions, is F2/F3 compatible, guarantees zero external calls, refuses content/mutation fields, and keeps mutation/delete/move/network/production disabled.
-- Next after G10 merge: G11 — full Documents F1->F2->G10->F3->F4 end-to-end certification with idempotency, provider/action binding, reconciliation and fail-closed mutation-safety assertions.
+- G10 complete: Documents local read-only adapter is F2/F3 compatible and zero-external-call.
+- G11 complete: full Documents F1->F2->G10->F3->F4 chain is certifiable end-to-end; wrong provider/action fails before execution; repeated requests preserve deterministic IDs; health/approval drift yields hold; content read, mutation, delete, move, network and production transport remain disabled with zero external calls.
+- Next after G11 merge: G12 — Documents provider health/freshness/config-drift certification plus provider-specific Command Centre visibility, stop controls and audit evidence.
 
 This checkpoint must be updated at each phase boundary or major activation milestone.
