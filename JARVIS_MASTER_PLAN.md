@@ -49,7 +49,7 @@ F1-F4 completed.
 ### Phase G — Provider-specific controlled canary integration
 G1-G4 Research complete. G5-G8 Instagram complete. G9-G12 Files & Documents complete.
 
-G13 selects **Communications** as the fourth provider-specific canary under the same conservative sequencing policy. The selected provider/adapter is `communications-local-draft` / `communications-draft-canary-v1`, restricted to `render-message-preview` and `inspect-recipient-plan`. Outbound message sending, provider writes, network transport and production transport remain disabled. Trading shadow remains deferred until Communications completes; live order placement remains ineligible.
+G13 selects Communications as the fourth provider-specific canary. G14 implements `communications-draft-canary-v1` / `communications-local-draft` with persistent local message-preview and recipient-plan state, F2 execution compatibility and F3 result/stop compatibility. The adapter explicitly rejects outbound/provider transport fields; outbound sending, provider writes, network transport and production transport remain disabled.
 
 Phase G continuation:
 `G13 Communications selection -> G14 Communications draft canary adapter -> G15 Communications E2E certification -> G16 Communications health/drift + Command Centre certification -> G17 next provider/vertical selection`.
@@ -77,7 +77,8 @@ One coherent layer per PR, with tests, dependencies and next layer documented. V
 - Phase G G1-G4: Research provider-specific canary complete.
 - Phase G G5-G8: Instagram provider-specific canary complete.
 - Phase G G9-G12: Files & Documents provider-specific canary complete.
-- G13 complete: deterministic selection excludes the three completed provider canaries, selects Communications as the lowest-risk remaining side-effect-free local candidate, restricts it to message-preview/recipient-plan inspection, keeps outbound sends disabled, defers trading shadow, and keeps live Trading ineligible.
-- Next after G13 merge: G14 — implement `communications-draft-canary-v1` with persistent local preview/recipient-plan state, F2 execution compatibility, F3 result/stop compatibility and zero outbound/network transport.
+- G13 complete: Communications selected as the next safe local provider-specific canary.
+- G14 complete: Communications local draft adapter persists message-preview/recipient-plan actions, is F2/F3 compatible, guarantees zero external calls, refuses outbound/provider transport fields, and keeps send/write/network/production disabled.
+- Next after G14 merge: G15 — full Communications F1->F2->G14->F3->F4 end-to-end certification with provider/action binding, idempotency, reconciliation and explicit proof that no outbound message or external transport occurs.
 
 This checkpoint must be updated at each phase boundary or major activation milestone.
