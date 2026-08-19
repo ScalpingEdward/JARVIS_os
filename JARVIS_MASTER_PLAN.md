@@ -47,9 +47,9 @@ E1-E4 completed.
 F1-F4 completed.
 
 ### Phase G — Provider-specific controlled canary integration
-G1-G4 Research complete. G5-G8 Instagram complete. G9-G12 Files & Documents complete.
+G1-G4 Research complete. G5-G8 Instagram complete. G9-G12 Files & Documents complete. G13-G16 Communications complete.
 
-G13-G15 advance Communications as the fourth provider-specific canary. G14 implements the local draft/recipient-plan adapter; G15 wires the complete F1->F2->G14->F3->F4 chain and certifies provider/action identity, idempotent execution/reconciliation and promotion/hold semantics while proving no outbound send, provider write, network transport or production transport occurs and network calls remain zero.
+G16 adds persistent Communications provider-health evidence, bounded freshness, exact adapter descriptor fingerprinting and fail-closed provider/adapter/config drift detection. The provider-specific Command Centre exposes local actions, F2 executions, F3 reconciliation, stops and alerts, provides a persistent operator stop, and records command text as `recorded-not-executed`. Outbound send, provider write, network transport and production transport remain disabled.
 
 Phase G continuation:
 `G13 Communications selection -> G14 Communications draft canary adapter -> G15 Communications E2E certification -> G16 Communications health/drift + Command Centre certification -> G17 next provider/vertical selection`.
@@ -77,9 +77,8 @@ One coherent layer per PR, with tests, dependencies and next layer documented. V
 - Phase G G1-G4: Research provider-specific canary complete.
 - Phase G G5-G8: Instagram provider-specific canary complete.
 - Phase G G9-G12: Files & Documents provider-specific canary complete.
-- G13 complete: Communications selected as the next safe local provider-specific canary.
-- G14 complete: Communications local draft adapter is F2/F3 compatible, persistent and zero-external-call with outbound/provider transport disabled.
-- G15 complete: full Communications F1->F2->G14->F3->F4 chain is certifiable end-to-end; wrong provider/send action fails before execution; repeated requests preserve deterministic IDs; health/approval drift yields hold; recipient-plan inspection remains zero-send; outbound send/provider write/network/production stay disabled with zero network calls.
-- Next after G15 merge: G16 — Communications provider health/freshness/config-drift certification plus provider-specific Command Centre visibility, operator stop controls and audit evidence.
+- Phase G G13-G16: Communications provider-specific canary complete.
+- G16 complete: health evidence is persistent and freshness-bounded; provider/adapter/config drift and unhealthy/missing evidence fail closed; Command Centre exposes descriptor, health, actions, executions, reconciliation, stops and alerts; operator stop persists; commands are recorded-not-executed; outbound send/provider write/network/production remain disabled.
+- Next after G16 merge: G17 — deterministic next provider/vertical selection. With Research, Instagram, Documents and Communications complete, evaluate the remaining side-effect-free candidates; Trading may advance only as an explicitly shadow-only, no-order-placement canary while live Trading remains ineligible.
 
 This checkpoint must be updated at each phase boundary or major activation milestone.
