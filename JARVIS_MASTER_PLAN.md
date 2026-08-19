@@ -49,7 +49,7 @@ F1-F4 completed: bounded authorization, adapter-separated hard-budget execution,
 ### Phase G — Provider-specific controlled canary integration
 G1-G4 complete the Research read-only canary path. G5-G8 complete the Instagram local draft-preview canary path.
 
-G9 selects **Files & Documents** as the third provider-specific canary using the lowest-risk remaining side-effect-free local candidate policy. The selected provider/adapter is `documents-local-readonly` / `documents-readonly-canary-v1`, restricted to `inspect-file-metadata` and `preview-file-version`. Provider writes, deletes, moves, network transport and production transport remain disabled. Trading live order placement remains explicitly ineligible; trading shadow analysis remains deferred until lower-risk local verticals are completed.
+G9 selects Files & Documents as the third provider-specific canary. G10 implements `documents-readonly-canary-v1` / `documents-local-readonly` with persistent local metadata/version-preview evidence and compatibility with F2 execution plus F3 result/stop boundaries. The adapter explicitly rejects content-bearing and mutation payloads; provider mutation, delete, move, network transport and production transport remain disabled.
 
 Phase G continuation:
 `G9 Files/Documents selection -> G10 Documents readonly canary adapter -> G11 Documents E2E certification -> G12 Documents health/drift + Command Centre certification -> G13 next provider/vertical selection`.
@@ -76,7 +76,8 @@ One coherent layer per PR, with tests, dependencies and next layer documented. V
 - Phase F F1-F4: complete.
 - Phase G G1-G4: Research provider-specific canary path complete.
 - Phase G G5-G8: Instagram provider-specific canary path complete with publish/write/network/production disabled.
-- G9 complete: deterministic next-canary policy excludes already certified Research/Instagram, rejects live Trading execution, and selects Files & Documents as the lowest-risk remaining safe local candidate with metadata/version-preview-only scope.
-- Next after G9 merge: G10 — implement `documents-readonly-canary-v1` with persistent local metadata/version-preview state, F2 execution compatibility, F3 result/stop compatibility, and no provider mutations or external transport.
+- G9 complete: Files & Documents selected as the next safe local provider-specific canary.
+- G10 complete: Documents local read-only adapter persists metadata/version-preview actions, is F2/F3 compatible, guarantees zero external calls, refuses content/mutation fields, and keeps mutation/delete/move/network/production disabled.
+- Next after G10 merge: G11 — full Documents F1->F2->G10->F3->F4 end-to-end certification with idempotency, provider/action binding, reconciliation and fail-closed mutation-safety assertions.
 
 This checkpoint must be updated at each phase boundary or major activation milestone.
