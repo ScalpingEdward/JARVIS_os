@@ -49,7 +49,7 @@ F1-F4 completed: bounded authorization, adapter-separated hard-budget execution,
 ### Phase G — Provider-specific controlled canary integration
 G1-G4 complete the Research read-only canary path through adapter integration, end-to-end certification, health/drift certification and Command Centre controls.
 
-G5 selects Instagram Content as the second provider-specific canary vertical using a deterministic risk/utility policy. G6 implements `instagram-draft-preview-canary-v1` / `instagram-local-draft-preview` as a local side-effect-free adapter compatible with the F2 execution and F3 result/stop boundaries. It exposes only `render-draft-preview` and `inspect-draft-metadata`, persists local preview/inspection state, and keeps public publish, provider writes, network transport and production transport disabled.
+G5 selects Instagram Content as the second provider-specific canary vertical. G6 implements the local draft-preview adapter. G7 wires the complete F1->F2->G6->F3->F4 Instagram chain and certifies provider/action identity, idempotent execution/reconciliation, and promotion/hold semantics while public publish, provider writes, network transport and production transport stay disabled.
 
 Phase G continuation:
 `G5 next provider/vertical selection -> G6 Instagram draft-preview canary adapter -> G7 Instagram canary E2E certification -> G8 Instagram health/drift + Command Centre certification -> G9 next provider/vertical selection`.
@@ -75,8 +75,9 @@ One coherent layer per PR, with tests, dependencies and next layer documented. V
 - Phase E E1-E4: complete.
 - Phase F F1-F4: complete.
 - Phase G G1-G4: Research provider-specific canary path complete with network/production transport disabled.
-- G5 complete: risk/utility selection chooses Instagram Content as the second provider-specific canary using local draft-preview-only actions; publishing, external provider writes and trading execution remain disabled.
-- G6 complete: local Instagram draft-preview adapter is persistent, idempotent and F2/F3 compatible; preview and metadata actions are strictly validated; public publish, provider writes, network transport and production transport remain disabled.
-- Next after G6 merge: G7 — full F1->F2->G6->F3->F4 Instagram draft-preview end-to-end certification with promotion/hold semantics and zero public publish/network transport.
+- G5 complete: Instagram Content selected as second provider-specific canary.
+- G6 complete: local persistent idempotent Instagram draft-preview adapter is F2/F3 compatible with publish/write/network/production disabled.
+- G7 complete: full F1->F2->G6->F3->F4 Instagram draft-preview chain is certifiable end-to-end; wrong provider/action fails before execution; repeated requests preserve deterministic IDs; health or missing promotion approval yields hold; public publish, provider write, network and production transport remain disabled.
+- Next after G7 merge: G8 — Instagram health/drift + Command Centre certification, combining persistent provider-health evidence, descriptor fingerprint/freshness drift detection, E2E canary state, operator stop controls and audit visibility without enabling publish or external transport.
 
 This checkpoint must be updated at each phase boundary or major activation milestone.
