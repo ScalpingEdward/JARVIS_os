@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from typing import Iterable
 
 
@@ -24,6 +24,7 @@ class ProviderExpansionDecision:
     decision_id: str
     outcome: str
     selected_vertical: str | None
+    selected_provider_id: str | None
     selected_scope: str | None
     blockers: tuple[str, ...]
     rationale: tuple[str, ...]
@@ -33,13 +34,14 @@ class ProviderExpansionDecision:
 
 
 class ProviderExpansionPromotionPolicyV21_608:
-    """G21 promotes only the next *integration scope*, never live execution itself.
+    """G21 promotes an integration-design scope, never a live provider capability.
 
-    A passing decision may authorize work on one low-risk external read-only sandbox contract.
-    It cannot enable production transport, provider writes, or live Trading.
+    The only positive outcome authorizes design/integration work for one external read-only
+    sandbox boundary. It does not activate network transport, provider writes, production
+    transport or live Trading.
     """
 
-    PRIORITY = ('research','files-documents','instagram-content','communications','trading')
+    REQUIRED_VERTICALS = ('research','instagram-content','files-documents','communications','trading')
 
     @staticmethod
     def _decision_id(payload: dict) -> str:
@@ -47,50 +49,62 @@ class ProviderExpansionPromotionPolicyV21_608:
         return 'provider-expansion-'+digest[:24]
 
     def evaluate(self, evidence: Iterable[ProviderCanaryEvidence]) -> ProviderExpansionDecision:
-        records=tuple(evidence)
+        records=tuple(sorted(tuple(evidence),key=lambda e:(e.vertical,e.provider_id)))
         blockers=[]
         if not records:
             blockers.append('provider-canary-evidence-missing')
 
-        unsafe=[e for e in records if e.live_execution_enabled or e.production_transport_enabled or e.provider_write_enabled]
-        if unsafe:
-            blockers.append('unsafe-provider-capability-detected')
+        verticals=[e.vertical for e in records]
+        if len(verticals) != len(set(verticals)):
+            blockers.append('duplicate-vertical-evidence')
 
-        required={'research','instagram-content','files-documents','communications','trading'}
-        present={e.vertical for e in records}
-        missing=sorted(required-present)
-        if missing:
+        required=set(self.REQUIRED_VERTICALS)
+        if set(verticals) != required:
             blockers.append('required-canary-evidence-incomplete')
 
-        failed=[e.vertical for e in records if not e.certified or not e.health_certified]
-        if failed:
+        if any(not e.provider_id.strip() for e in records):
+            blockers.append('provider-identity-missing')
+        if any(e.risk_score < 0 or e.risk_score > 100 for e in records):
+            blockers.append('invalid-risk-score')
+        if any(e.live_execution_enabled or e.production_transport_enabled or e.provider_write_enabled for e in records):
+            blockers.append('unsafe-provider-capability-detected')
+        if any(not e.certified or not e.health_certified for e in records):
             blockers.append('canary-or-health-certification-incomplete')
 
         selected=None
         if not blockers:
-            eligible=[e for e in records if e.side_effect_free and not e.provider_write_enabled and not e.live_execution_enabled and not e.production_transport_enabled]
-            rank={name:i for i,name in enumerate(self.PRIORITY)}
-            eligible.sort(key=lambda e:(e.risk_score,rank.get(e.vertical,999),e.vertical,e.provider_id))
-            if eligible:
-                # Research is the preferred first network-facing expansion because the next phase is read-only sandbox design.
-                research=[e for e in eligible if e.vertical=='research']
-                selected=research[0] if research else eligible[0]
-            else:
-                blockers.append('no-side-effect-free-expansion-candidate')
+            eligible=[e for e in records if e.side_effect_free and not e.provider_write_enabled
+                      and not e.live_execution_enabled and not e.production_transport_enabled]
+            # Research is deliberately the first network-facing design target: read-only and
+            # non-consequential. Trading remains shadow-only even when its shadow evidence is green.
+            research=[e for e in eligible if e.vertical=='research']
+            selected=research[0] if research else None
+            if selected is None:
+                blockers.append('research-readonly-expansion-candidate-unavailable')
 
-        outcome='promote-readonly-sandbox-design' if selected and not blockers else 'hold'
-        scope='external-readonly-sandbox-contract-design-only' if selected else None
+        outcome='promote-readonly-sandbox-design' if selected is not None and not blockers else 'hold'
+        scope='external-readonly-sandbox-contract-design-only' if selected is not None and not blockers else None
         rationale=(
-            'all-provider-specific-canary-paths-certified',
-            'promotion-applies-to-integration-scope-not-live-capability',
-            'research-selected-as-low-risk-readonly-expansion-target',
-            'network-and-production-transport-remain-disabled-until-separate-gates',
-            'live-trading-remains-explicitly-ineligible',
-        ) if selected else ('expansion-held-until-complete-safe-evidence',)
-        payload={'records':[e.__dict__ for e in records],'blockers':blockers,'selected':None if selected is None else selected.__dict__,'outcome':outcome,'scope':scope}
+            'all-provider-specific-canary-and-health-evidence-certified',
+            'promotion-applies-to-design-scope-not-live-capability',
+            'research-selected-as-first-low-risk-readonly-network-facing-target',
+            'network-transport-remains-disabled-until-separate-authorization',
+            'provider-writes-and-production-transport-remain-disabled',
+            'trading-remains-shadow-only-and-live-execution-ineligible',
+        ) if outcome.startswith('promote') else ('expansion-held-until-complete-safe-evidence',)
+
+        payload={
+            'records':[asdict(e) for e in records],
+            'blockers':blockers,
+            'selected':None if selected is None else asdict(selected),
+            'outcome':outcome,
+            'scope':scope,
+        }
         return ProviderExpansionDecision(
-            self._decision_id(payload),outcome,None if selected is None else selected.vertical,scope,
-            tuple(blockers),rationale,False,False,False)
+            self._decision_id(payload),outcome,
+            None if selected is None else selected.vertical,
+            None if selected is None else selected.provider_id,
+            scope,tuple(blockers),rationale,False,False,False)
 
     @staticmethod
     def require_promoted(decision: ProviderExpansionDecision) -> ProviderExpansionDecision:
