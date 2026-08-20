@@ -42,7 +42,7 @@ F1-F4 completed.
 Research G1-G4, Instagram G5-G8, Files & Documents G9-G12, Communications G13-G16 and Trading-shadow G17-G20 are complete. G21 completes the evidence-driven expansion decision.
 
 ### Phase H — Controlled external-provider sandbox integration
-H1 provides persistent secretless provider contracts. H2 provides the contract-bound Research read-only sandbox adapter. H3 provides persistent E2E/reconciliation certification across H1->H2, requiring exact contract/adapter identity, bound capabilities and evidence that credential resolution, network calls, provider writes and all external calls remain absent. Any missing/mismatched evidence blocks certification.
+H1 provides persistent secretless provider contracts. H2 provides the contract-bound Research read-only sandbox adapter. H3 provides persistent E2E/reconciliation certification across H1->H2. H4 adds persistent provider-health snapshots, bounded freshness, H3 certification observability, contract and adapter fingerprints, and fail-closed operational blockers for missing/stale/unhealthy/drifted evidence. H4 still cannot enable credential resolution, network transport, provider writes or production transport.
 
 Planned Phase H sequence:
 `H1 provider contract registry + secretless sandbox boundary -> H2 research external-readonly sandbox adapter -> H3 external sandbox E2E/reconciliation -> H4 health/drift/observability -> H5 explicit network-transport authorization decision`.
@@ -62,7 +62,8 @@ One coherent layer per PR, with tests, dependencies and next layer documented. V
 - Phase E E1-E4, Phase F F1-F4 and Phase G through G21: complete.
 - H1 complete: secretless read-only sandbox provider contracts persistent; raw secrets/network/write/production transport forbidden.
 - H2 complete: Research contract-bound read-only sandbox adapter with deterministic transport-disabled evidence and zero external calls.
-- H3 complete: persistent Research external sandbox E2E/reconciliation certification validates exact contract/adapter identity, capability binding and zero-call evidence; missing or mismatched evidence fails closed. Credential resolution/network/write/production transport remain disabled.
-- Next after H3 merge: H4 — Research external sandbox health/drift/observability. Add persistent health snapshots, stale/missing evidence detection, contract/adapter drift detection and fail-closed operational blockers without enabling transport.
+- H3 complete: persistent Research external sandbox E2E/reconciliation certification validates exact contract/adapter identity, capability binding and zero-call evidence; missing or mismatched evidence fails closed.
+- H4 complete: provider-health snapshots are persistent/freshness-bounded; H3 certification state is observable; contract and adapter fingerprint drift is detected; missing/stale/unhealthy/drifted evidence blocks operational readiness. Credential resolution/network/write/production transport remain disabled.
+- Next after H4 merge: H5 — explicit network-transport authorization decision. This gate must consume H1-H4 evidence plus explicit operator approval and rollback/stop readiness, remain scope-bounded and fail closed, and must not automatically enable transport.
 
 This checkpoint must be updated at each phase boundary or major activation milestone.
