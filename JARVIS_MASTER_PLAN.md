@@ -42,10 +42,10 @@ F1-F4 completed.
 Research G1-G4, Instagram G5-G8, Files & Documents G9-G12, Communications G13-G16 and Trading-shadow G17-G20 are complete. G21 completes the evidence-driven expansion decision.
 
 ### Phase H — Controlled external-provider sandbox integration
-H1-H10 establish and structurally certify the Research real-provider contract path without enabling real traffic. H11 implements the provider adapter skeleton only: it requires a clean H10 certification, exposes deterministic HTTPS GET request previews, response-fixture normalization and audit-safe hash/metadata persistence, and explicitly refuses runtime execution. Injected resolver/transport interfaces may be supplied for shape compatibility but are never called in H11. Raw credentials and raw response bodies are not persisted.
+H1-H11 establish the governed Research provider path through a hard-disabled real-provider adapter skeleton. H12 certifies that skeleton end-to-end: deterministic GET/HTTPS previews, response normalization, audit hash integrity, no raw material persistence, fail-closed live execution and zero resolver/transport calls. H12 does not authorize or configure real provider traffic.
 
 Phase H continuation:
-`H1 contract registry -> H2 read-only sandbox adapter -> H3 E2E/reconciliation -> H4 health/drift/observability -> H5 network authorization decision -> H6 read-only network boundary -> H7 boundary E2E certification -> H8 real-provider readiness decision -> H9 provider adapter contract design -> H10 contract certification -> H11 provider adapter skeleton -> H12 skeleton certification`.
+`H1 contract registry -> H2 read-only sandbox adapter -> H3 E2E/reconciliation -> H4 health/drift/observability -> H5 network authorization decision -> H6 read-only network boundary -> H7 boundary E2E certification -> H8 real-provider readiness decision -> H9 provider adapter contract design -> H10 contract certification -> H11 provider adapter skeleton -> H12 skeleton E2E certification -> H13 real-provider activation boundary design`.
 
 ## 6. Cross-vertical Command Centre requirements
 Persistent command/text interaction, capability health, simulation/execution visibility, approvals, execution timeline/failures, dedicated vertical workspaces, kill switches and audit/evidence access remain mandatory.
@@ -60,9 +60,10 @@ One coherent layer per PR, with tests, dependencies and next layer documented. V
 - Foundation through v21.523 and Phase A A1-A6: complete.
 - Trading B1-B10, Instagram C1-C8 and Phase D vertical architecture: complete with consequential provider execution gated.
 - Phase E E1-E4, Phase F F1-F4 and Phase G through G21: complete.
-- H1-H7 complete: Research external read-only sandbox/network boundary is contract-bound, reconciled, health/drift observable and E2E-certified with deterministic fakes; no provider writes and no real provider transport enabled.
+- H1-H7 complete: Research external read-only sandbox/network boundary is contract-bound, reconciled, health/drift observable and E2E-certified with deterministic fakes.
 - H8-H10 complete: decision-only provider readiness, provider contract design and structural certification are complete; no real traffic or credential resolution is enabled.
-- H11 complete: the H10-bound provider adapter skeleton produces GET/HTTPS request previews, normalizes supplied response fixtures, persists only response hashes and audit-safe metadata, rejects unresolved templates, and hard-disables live execution even when resolver/transport implementations are injected. No raw credentials/responses, provider writes or real network traffic are permitted.
-- Next after H11 merge: H12 — certify the H11 skeleton end-to-end against H9/H10 structural evidence, including deterministic normalization, audit integrity, no-call guarantees and fail-closed execution-disabled behavior. Real provider activation remains out of scope.
+- H11 complete: certified-contract-bound provider adapter skeleton with deterministic request preview, fixture normalization, audit-safe evidence and hard-disabled live execution.
+- H12 complete: H11 E2E certification verifies GET/HTTPS preview invariants, deterministic normalization/hash integrity, safe audit flags, fail-closed execution and zero resolver/transport calls. Real-provider transport remains unused and disabled.
+- Next after H12 merge: H13 — Research real-provider activation boundary design. Define the final activation object, expiry, one-shot/bounded budgets, endpoint/capability pinning, credential-reference pinning, kill/rollback semantics and operator re-approval requirements. H13 remains design-only and must not activate traffic.
 
 This checkpoint must be updated at each phase boundary or major activation milestone.
