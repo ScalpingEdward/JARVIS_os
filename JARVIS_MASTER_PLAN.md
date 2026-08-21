@@ -42,10 +42,10 @@ F1-F4 completed.
 Research G1-G4, Instagram G5-G8, Files & Documents G9-G12, Communications G13-G16 and Trading-shadow G17-G20 are complete. G21 completes the evidence-driven expansion decision.
 
 ### Phase H — Controlled external-provider sandbox integration
-H1-H7 establish and certify the secretless Research read-only sandbox/network boundary without any real provider activation. H8 adds a persistent real-provider activation-readiness decision only. It requires a clean H7 certification, explicit non-production provider identity, HTTPS endpoint allowlist, safe credential provenance, read-only credential scope, operator approval and rollback/stop readiness. H8 still does not configure a provider client, resolve credentials or enable real network traffic.
+H1-H8 establish the Research read-only external-provider path through decision-only real-provider readiness without enabling real provider traffic. H9 defines the provider-specific adapter contract only: persistent non-production provider identity, GET-only HTTPS endpoint-to-capability mappings, normalized response-schema labels, secretref-only credential resolver semantics, and audit persistence rules that explicitly forbid raw credential and raw response-body storage. H9 includes no provider client, network implementation, write method or production transport.
 
 Phase H continuation:
-`H1 contract registry -> H2 read-only sandbox adapter -> H3 E2E/reconciliation -> H4 health/drift/observability -> H5 network authorization decision -> H6 read-only network boundary -> H7 boundary E2E certification -> H8 real-provider activation readiness decision -> H9 real-provider adapter contract design`.
+`H1 contract registry -> H2 read-only sandbox adapter -> H3 E2E/reconciliation -> H4 health/drift/observability -> H5 network authorization decision -> H6 read-only network boundary -> H7 boundary E2E certification -> H8 real-provider readiness decision -> H9 provider adapter contract design -> H10 provider adapter contract certification`.
 
 ## 6. Cross-vertical Command Centre requirements
 Persistent command/text interaction, capability health, simulation/execution visibility, approvals, execution timeline/failures, dedicated vertical workspaces, kill switches and audit/evidence access remain mandatory.
@@ -60,11 +60,9 @@ One coherent layer per PR, with tests, dependencies and next layer documented. V
 - Foundation through v21.523 and Phase A A1-A6: complete.
 - Trading B1-B10, Instagram C1-C8 and Phase D vertical architecture: complete with consequential provider execution gated.
 - Phase E E1-E4, Phase F F1-F4 and Phase G through G21: complete.
-- H1-H4 complete: Research external read-only sandbox path is contract-bound, reconciled, health/freshness/drift observable and fail-closed.
-- H5 complete: persistent decision-only authorization requires exact capability scope, credential reference, operator approval and stop/rollback readiness.
-- H6 complete: explicit read-only boundary with injected credential resolver/GET transport, HTTPS-only calls, bounded requests/timeouts and kill-switch stop.
-- H7 complete: H5->H6 is E2E-certified with deterministic fake resolver/transport; activation, accounting, budget exhaustion and stop semantics are verified; provider writes remain zero and real provider transport is out of scope.
-- H8 complete: real-provider activation readiness is now a persistent decision artifact requiring clean H7 evidence, non-production provider identity, strict HTTPS endpoint allowlist, safe credential provenance, read-only credential scope, explicit operator approval and stop/rollback readiness. The decision itself keeps real network, credential resolution, writes and production transport disabled.
-- Next after H8 merge: H9 — Research real-provider adapter contract design. Define the exact provider-specific read-only interface, endpoint-to-capability mapping, response normalization, credential-reference resolver contract and audit model without implementing real network calls yet.
+- H1-H7 complete: Research external read-only sandbox/network boundary is contract-bound, reconciled, health/drift observable and E2E-certified with deterministic fakes; no provider writes and no real provider transport enabled.
+- H8 complete: real-provider activation readiness is a persistent decision artifact requiring non-production provider identity, HTTPS allowlist, safe credential provenance, read-only scope, operator approval and stop/rollback readiness; no real traffic is activated.
+- H9 complete: persistent provider-specific adapter contract design defines GET-only HTTPS capability bindings for `search-readonly` and `inspect-source-metadata`, response normalization schema labels, secretref-only read-only resolver semantics, and audit rules that reject raw credential or raw response-body persistence. No provider client/network implementation is included; writes and production transport remain forbidden.
+- Next after H9 merge: H10 — certify the provider adapter contract against H8 readiness evidence and structural safety invariants, still without implementing or activating real network transport.
 
 This checkpoint must be updated at each phase boundary or major activation milestone.
