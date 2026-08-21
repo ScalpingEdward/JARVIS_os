@@ -42,10 +42,10 @@ F1-F4 completed.
 Research G1-G4, Instagram G5-G8, Files & Documents G9-G12, Communications G13-G16 and Trading-shadow G17-G20 are complete. G21 completes the evidence-driven expansion decision.
 
 ### Phase H — Controlled external-provider sandbox integration
-H1-H6 establish the secretless Research sandbox through the isolated read-only network boundary. H7 certifies the H5->H6 authorization/activation/call-budget/stop chain end-to-end using deterministic injected fake resolver and fake GET transport only. The certification verifies request accounting, hard budget exhaustion, persistent stop semantics and zero provider writes. It does not configure, authorize or attest any real provider transport.
+H1-H7 establish and certify the secretless Research read-only sandbox/network boundary without any real provider activation. H8 adds a persistent real-provider activation-readiness decision only. It requires a clean H7 certification, explicit non-production provider identity, HTTPS endpoint allowlist, safe credential provenance, read-only credential scope, operator approval and rollback/stop readiness. H8 still does not configure a provider client, resolve credentials or enable real network traffic.
 
 Phase H continuation:
-`H1 contract registry -> H2 read-only sandbox adapter -> H3 E2E/reconciliation -> H4 health/drift/observability -> H5 network authorization decision -> H6 read-only network boundary -> H7 boundary E2E certification -> H8 real-provider activation readiness decision`.
+`H1 contract registry -> H2 read-only sandbox adapter -> H3 E2E/reconciliation -> H4 health/drift/observability -> H5 network authorization decision -> H6 read-only network boundary -> H7 boundary E2E certification -> H8 real-provider activation readiness decision -> H9 real-provider adapter contract design`.
 
 ## 6. Cross-vertical Command Centre requirements
 Persistent command/text interaction, capability health, simulation/execution visibility, approvals, execution timeline/failures, dedicated vertical workspaces, kill switches and audit/evidence access remain mandatory.
@@ -63,7 +63,8 @@ One coherent layer per PR, with tests, dependencies and next layer documented. V
 - H1-H4 complete: Research external read-only sandbox path is contract-bound, reconciled, health/freshness/drift observable and fail-closed.
 - H5 complete: persistent decision-only authorization requires exact capability scope, credential reference, operator approval and stop/rollback readiness.
 - H6 complete: explicit read-only boundary with injected credential resolver/GET transport, HTTPS-only calls, bounded requests/timeouts and kill-switch stop.
-- H7 complete: H5->H6 is E2E-certifiable with deterministic fake resolver/transport; activation, request accounting, budget exhaustion and stop semantics are verified; provider writes remain zero and real provider transport is explicitly out of scope.
-- Next after H7 merge: H8 — Research real-provider activation readiness decision. Aggregate H1-H7 evidence and define the additional provider identity, endpoint allowlist, credential provenance, operator approval and rollback requirements needed before any real sandbox provider can even be considered. H8 remains decision-only and must not activate real network traffic.
+- H7 complete: H5->H6 is E2E-certified with deterministic fake resolver/transport; activation, accounting, budget exhaustion and stop semantics are verified; provider writes remain zero and real provider transport is out of scope.
+- H8 complete: real-provider activation readiness is now a persistent decision artifact requiring clean H7 evidence, non-production provider identity, strict HTTPS endpoint allowlist, safe credential provenance, read-only credential scope, explicit operator approval and stop/rollback readiness. The decision itself keeps real network, credential resolution, writes and production transport disabled.
+- Next after H8 merge: H9 — Research real-provider adapter contract design. Define the exact provider-specific read-only interface, endpoint-to-capability mapping, response normalization, credential-reference resolver contract and audit model without implementing real network calls yet.
 
 This checkpoint must be updated at each phase boundary or major activation milestone.
