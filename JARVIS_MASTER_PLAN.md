@@ -42,10 +42,10 @@ F1-F4 completed.
 Research G1-G4, Instagram G5-G8, Files & Documents G9-G12, Communications G13-G16 and Trading-shadow G17-G20 are complete. G21 completes the evidence-driven expansion decision.
 
 ### Phase H — Controlled external-provider sandbox integration
-H1-H5 establish the secretless Research sandbox contract, read-only adapter, E2E/reconciliation, health/drift observability and evidence-driven authorization decision. H6 adds the isolated Research read-only network transport boundary: positive H5 authorization is mandatory, activation is explicit, credential-reference resolution is injected and isolated, only HTTPS GET is exposed, request count/timeout are hard bounded, and kill-switch/stop controls fail closed. No concrete provider transport is supplied by the boundary and the system remains globally transport-disabled by default.
+H1-H6 establish the secretless Research sandbox through the isolated read-only network boundary. H7 certifies the H5->H6 authorization/activation/call-budget/stop chain end-to-end using deterministic injected fake resolver and fake GET transport only. The certification verifies request accounting, hard budget exhaustion, persistent stop semantics and zero provider writes. It does not configure, authorize or attest any real provider transport.
 
 Phase H continuation:
-`H1 contract registry -> H2 read-only sandbox adapter -> H3 E2E/reconciliation -> H4 health/drift/observability -> H5 network authorization decision -> H6 read-only network boundary -> H7 boundary E2E certification`.
+`H1 contract registry -> H2 read-only sandbox adapter -> H3 E2E/reconciliation -> H4 health/drift/observability -> H5 network authorization decision -> H6 read-only network boundary -> H7 boundary E2E certification -> H8 real-provider activation readiness decision`.
 
 ## 6. Cross-vertical Command Centre requirements
 Persistent command/text interaction, capability health, simulation/execution visibility, approvals, execution timeline/failures, dedicated vertical workspaces, kill switches and audit/evidence access remain mandatory.
@@ -60,9 +60,10 @@ One coherent layer per PR, with tests, dependencies and next layer documented. V
 - Foundation through v21.523 and Phase A A1-A6: complete.
 - Trading B1-B10, Instagram C1-C8 and Phase D vertical architecture: complete with consequential provider execution gated.
 - Phase E E1-E4, Phase F F1-F4 and Phase G through G21: complete.
-- H1-H4 complete: secretless Research external read-only sandbox path is contract-bound, reconciled, health/freshness/drift observable and fail-closed.
-- H5 complete: persistent decision-only authorization requires valid H1-H4 state, exact capability scope, credential reference, operator approval and stop/rollback readiness; it does not itself enable transport.
-- H6 complete: positive H5 decisions can be explicitly armed into a persistent read-only boundary; credentials are resolved only through an injected resolver at call time; only HTTPS GET exists; request/timeout budgets and kill-switch stop are enforced; provider writes are absent. No concrete provider client is bundled and global transport/credential-resolution readiness flags remain disabled by default.
-- Next after H6 merge: H7 — Research read-only network boundary E2E certification. Exercise H5->H6 with deterministic fake resolver/transport, verify authorization/activation/budget/stop/audit semantics end-to-end, and keep real provider/network activation out of scope.
+- H1-H4 complete: Research external read-only sandbox path is contract-bound, reconciled, health/freshness/drift observable and fail-closed.
+- H5 complete: persistent decision-only authorization requires exact capability scope, credential reference, operator approval and stop/rollback readiness.
+- H6 complete: explicit read-only boundary with injected credential resolver/GET transport, HTTPS-only calls, bounded requests/timeouts and kill-switch stop.
+- H7 complete: H5->H6 is E2E-certifiable with deterministic fake resolver/transport; activation, request accounting, budget exhaustion and stop semantics are verified; provider writes remain zero and real provider transport is explicitly out of scope.
+- Next after H7 merge: H8 — Research real-provider activation readiness decision. Aggregate H1-H7 evidence and define the additional provider identity, endpoint allowlist, credential provenance, operator approval and rollback requirements needed before any real sandbox provider can even be considered. H8 remains decision-only and must not activate real network traffic.
 
 This checkpoint must be updated at each phase boundary or major activation milestone.
