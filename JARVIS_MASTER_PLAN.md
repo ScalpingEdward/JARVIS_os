@@ -42,10 +42,10 @@ F1-F4 completed.
 Research G1-G4, Instagram G5-G8, Files & Documents G9-G12, Communications G13-G16 and Trading-shadow G17-G20 are complete. G21 completes the evidence-driven expansion decision.
 
 ### Phase H — Controlled external-provider sandbox integration
-H1-H8 establish the Research read-only external-provider path through decision-only real-provider readiness without enabling real provider traffic. H9 defines the provider-specific adapter contract only: persistent non-production provider identity, GET-only HTTPS endpoint-to-capability mappings, normalized response-schema labels, secretref-only credential resolver semantics, and audit persistence rules that explicitly forbid raw credential and raw response-body storage. H9 includes no provider client, network implementation, write method or production transport.
+H1-H9 establish the Research read-only external-provider path through real-provider contract design without enabling real provider traffic. H10 certifies the H9 provider contract against clean H8 readiness evidence and structural safety invariants: exact provider/environment binding, exact endpoint allowlist, GET-only approved capabilities, secretref-only read-only credential semantics, minimum audit evidence, no raw credential/response persistence, and preservation of the design-only boundary. H10 still implements no provider client, credential resolver or network transport.
 
 Phase H continuation:
-`H1 contract registry -> H2 read-only sandbox adapter -> H3 E2E/reconciliation -> H4 health/drift/observability -> H5 network authorization decision -> H6 read-only network boundary -> H7 boundary E2E certification -> H8 real-provider readiness decision -> H9 provider adapter contract design -> H10 provider adapter contract certification`.
+`H1 contract registry -> H2 read-only sandbox adapter -> H3 E2E/reconciliation -> H4 health/drift/observability -> H5 network authorization decision -> H6 read-only network boundary -> H7 boundary E2E certification -> H8 real-provider readiness decision -> H9 provider adapter contract design -> H10 provider adapter contract certification -> H11 provider adapter implementation skeleton`.
 
 ## 6. Cross-vertical Command Centre requirements
 Persistent command/text interaction, capability health, simulation/execution visibility, approvals, execution timeline/failures, dedicated vertical workspaces, kill switches and audit/evidence access remain mandatory.
@@ -62,7 +62,8 @@ One coherent layer per PR, with tests, dependencies and next layer documented. V
 - Phase E E1-E4, Phase F F1-F4 and Phase G through G21: complete.
 - H1-H7 complete: Research external read-only sandbox/network boundary is contract-bound, reconciled, health/drift observable and E2E-certified with deterministic fakes; no provider writes and no real provider transport enabled.
 - H8 complete: real-provider activation readiness is a persistent decision artifact requiring non-production provider identity, HTTPS allowlist, safe credential provenance, read-only scope, operator approval and stop/rollback readiness; no real traffic is activated.
-- H9 complete: persistent provider-specific adapter contract design defines GET-only HTTPS capability bindings for `search-readonly` and `inspect-source-metadata`, response normalization schema labels, secretref-only read-only resolver semantics, and audit rules that reject raw credential or raw response-body persistence. No provider client/network implementation is included; writes and production transport remain forbidden.
-- Next after H9 merge: H10 — certify the provider adapter contract against H8 readiness evidence and structural safety invariants, still without implementing or activating real network transport.
+- H9 complete: persistent provider-specific adapter contract design defines GET-only HTTPS capability bindings, response normalization labels, secretref-only read-only resolver semantics and safe audit persistence.
+- H10 complete: H8 readiness and H9 contract design are structurally certified together; provider/environment and endpoint allowlist must match, only approved GET capabilities are accepted, credential/audit contracts remain safe, and any provider client/network/write/production capability blocks certification. Real network, credential resolution, writes and production transport remain disabled.
+- Next after H10 merge: H11 — Research real-provider adapter implementation skeleton. Implement the provider-specific adapter shape and normalization/audit plumbing against injected resolver/transport interfaces only; keep concrete provider networking absent and runtime transport disabled by default.
 
 This checkpoint must be updated at each phase boundary or major activation milestone.
