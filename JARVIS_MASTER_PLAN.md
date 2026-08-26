@@ -42,10 +42,10 @@ F1-F4 completed.
 Research G1-G4, Instagram G5-G8, Files & Documents G9-G12, Communications G13-G16 and Trading-shadow G17-G20 are complete. G21 completes the evidence-driven expansion decision.
 
 ### Phase H — Controlled external-provider sandbox integration
-H1-H13 establish the governed Research provider path and a persistent design-only activation boundary. H14 certifies H13 pinning and safety: exact H12 certification/provider/environment/capability/endpoint/credential binding, future expiry, bounded 1..10 request budget, one-shot/kill/rollback/re-approval controls and zero transport/write state. H14 remains certification-only and cannot activate traffic.
+H1-H14 establish and certify the governed Research provider path through a zero-transport activation design. H15 adds the final one-shot canary activation gate: only a clean H14 certification matching its H13 design can yield a short-lived operator-bound activation token. Operator re-approval, kill-switch readiness and rollback readiness are mandatory. One token is issued per H14 certification and is revocable. The token state is `armed-not-executable`; it does not resolve credentials, configure transport or execute provider traffic.
 
 Phase H continuation:
-`H1 contract registry -> H2 read-only sandbox adapter -> H3 E2E/reconciliation -> H4 health/drift/observability -> H5 network authorization decision -> H6 read-only network boundary -> H7 boundary E2E certification -> H8 real-provider readiness decision -> H9 provider adapter contract design -> H10 contract certification -> H11 provider adapter skeleton -> H12 skeleton E2E certification -> H13 real-provider activation boundary design -> H14 activation boundary certification -> H15 one-shot canary activation gate`.
+`H1 contract registry -> H2 read-only sandbox adapter -> H3 E2E/reconciliation -> H4 health/drift/observability -> H5 network authorization decision -> H6 read-only network boundary -> H7 boundary E2E certification -> H8 real-provider readiness decision -> H9 provider adapter contract design -> H10 contract certification -> H11 provider adapter skeleton -> H12 skeleton E2E certification -> H13 real-provider activation boundary design -> H14 activation boundary certification -> H15 one-shot canary activation gate -> H16 canary execution boundary design`.
 
 ## 6. Cross-vertical Command Centre requirements
 Persistent command/text interaction, capability health, simulation/execution visibility, approvals, execution timeline/failures, dedicated vertical workspaces, kill switches and audit/evidence access remain mandatory.
@@ -61,8 +61,8 @@ One coherent layer per PR, with tests, dependencies and next layer documented. V
 - Trading B1-B10, Instagram C1-C8 and Phase D vertical architecture: complete with consequential provider execution gated.
 - Phase E E1-E4, Phase F F1-F4 and Phase G through G21: complete.
 - H1-H12 complete: Research provider path is contract-bound, reconciled, health/drift observable, structurally certified and skeleton-E2E-certified with zero real provider calls.
-- H13 complete: persistent design-only activation boundary pins provider identity/scope and requires expiry, bounded budget, one-shot, kill, rollback and operator re-approval.
-- H14 complete: activation design certification verifies exact identity/pinning, expiry/budget constraints, mandatory safety controls and zero transport/credential-resolution/write state. No provider traffic is activated.
-- Next after H14 merge: H15 — Research real-provider one-shot canary activation gate. Define the final operator-controlled gate that may produce an activation token only from a valid H14 certification; keep actual network execution separate and disabled until a later explicit execution layer.
+- H13-H14 complete: design-only activation boundary and its certification pin identity/scope, expiry/budget, one-shot/kill/rollback/re-approval controls and zero-transport state.
+- H15 complete: a clean H14 certification can produce exactly one short-lived, operator-bound, revocable `armed-not-executable` canary token. Token issuance requires fresh operator re-approval plus kill/rollback readiness; all network/credential-resolution/write/production flags remain disabled.
+- Next after H15 merge: H16 — Research real-provider canary execution boundary design. Define how an unexpired H15 token could be consumed exactly once by a separate execution boundary with endpoint/capability/request-budget enforcement, without yet implementing a concrete provider transport.
 
 This checkpoint must be updated at each phase boundary or major activation milestone.
