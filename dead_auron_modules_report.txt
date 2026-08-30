@@ -1,0 +1,69 @@
+DEAD AURON MODULES REPORT
+================================================================================
+
+Total auron_* modules: 343
+Reachable: 296
+Unreachable (DEAD): 47
+
+
+automation/ (8 dead modules):
+--------------------------------------------------------------------------------
+  backend/app/automation/auron_automation_adapter_onboarding_v21_564.py
+  backend/app/automation/auron_automation_catalog_read_health_v21_566.py
+  backend/app/automation/auron_automation_command_centre_v21_571.py
+  backend/app/automation/auron_automation_controlled_execution_v21_569.py
+  backend/app/automation/auron_automation_policy_approval_v21_567.py
+  backend/app/automation/auron_automation_reconciliation_retries_cancellation_v21_570.py
+  backend/app/automation/auron_automation_simulation_dry_run_v21_568.py
+  backend/app/automation/auron_automation_workflow_registry_v21_565.py
+
+communications/ (11 dead modules):
+--------------------------------------------------------------------------------
+  backend/app/communications/auron_communications_adapter_onboarding_v21_548.py
+  backend/app/communications/auron_communications_canary_e2e_certification_v21_602.py
+  backend/app/communications/auron_communications_canary_health_command_centre_v21_603.py
+  backend/app/communications/auron_communications_command_centre_v21_555.py
+  backend/app/communications/auron_communications_controlled_execution_v21_553.py
+  backend/app/communications/auron_communications_draft_canary_adapter_v21_601.py
+  backend/app/communications/auron_communications_policy_approval_v21_551.py
+  backend/app/communications/auron_communications_read_health_sync_v21_550.py
+  backend/app/communications/auron_communications_reconciliation_retries_v21_554.py
+  backend/app/communications/auron_communications_registry_state_v21_549.py
+  backend/app/communications/auron_communications_simulation_dry_run_v21_552.py
+
+content/ (3 dead modules):
+--------------------------------------------------------------------------------
+  backend/app/content/auron_instagram_canary_e2e_certification_v21_594.py
+  backend/app/content/auron_instagram_canary_health_command_centre_v21_595.py
+  backend/app/content/auron_instagram_draft_preview_canary_adapter_v21_593.py
+
+core/ (14 dead modules):
+--------------------------------------------------------------------------------
+  backend/app/core/auron_canary_certification_promotion_rollback_v21_587.py
+  backend/app/core/auron_canary_reconciliation_stop_enforcement_v21_586.py
+  backend/app/core/auron_controlled_canary_execution_boundary_v21_585.py
+  backend/app/core/auron_controlled_provider_canary_contract_v21_584.py
+  backend/app/core/auron_core_cutover_v21_529.py
+  backend/app/core/auron_cross_vertical_integration_certification_v21_580.py
+  backend/app/core/auron_cross_vertical_reconciliation_observability_v21_582.py
+  backend/app/core/auron_cross_vertical_simulation_harness_v21_581.py
+  backend/app/core/auron_external_provider_contract_registry_v21_609.py
+  backend/app/core/auron_next_canary_vertical_selection_v21_592.py
+  backend/app/core/auron_next_canary_vertical_selection_v21_596.py
+  backend/app/core/auron_next_canary_vertical_selection_v21_600.py
+  backend/app/core/auron_production_readiness_canary_gate_v21_583.py
+  backend/app/core/auron_provider_expansion_promotion_decision_v21_608.py
+
+documents/ (11 dead modules):
+--------------------------------------------------------------------------------
+  backend/app/documents/auron_documents_adapter_onboarding_v21_572.py
+  backend/app/documents/auron_documents_canary_e2e_certification_v21_598.py
+  backend/app/documents/auron_documents_canary_health_command_centre_v21_599.py
+  backend/app/documents/auron_documents_command_centre_v21_579.py
+  backend/app/documents/auron_documents_controlled_mutation_execution_v21_577.py
+  backend/app/documents/auron_documents_mutation_simulation_v21_576.py
+  backend/app/documents/auron_documents_provenance_access_policy_v21_575.py
+  backend/app/documents/auron_documents_read_integration_v21_574.py
+  backend/app/documents/auron_documents_readonly_canary_adapter_v21_597.py
+  backend/app/documents/auron_documents_reconciliation_conflicts_v21_578.py
+  backend/app/documents/auron_documents_registry_state_v21_573.py
