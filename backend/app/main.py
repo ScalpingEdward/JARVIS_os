@@ -2,6 +2,7 @@ from uuid import UUID
 
 from fastapi import FastAPI, HTTPException, Query, Response, status
 
+from .account_state_sync.api import router as account_state_sync_router
 from .accounts.api import router as accounts_router
 from .agent_adapters.api import router as agent_adapters_router
 from .api.routes.auron_demo1_approval_handoff_v21_260 import router as auron_demo1_approval_handoff_v21_260_router
@@ -97,6 +98,7 @@ from .workspace.api import router as workspace_router
 
 settings = get_settings()
 app = FastAPI(title=settings.app_name, version=settings.version)
+app.include_router(account_state_sync_router)
 app.include_router(accounts_router)
 app.include_router(agent_adapters_router)
 app.include_router(phoenix_demo1_router)
