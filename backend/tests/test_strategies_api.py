@@ -215,15 +215,17 @@ def test_find_setups_empty_when_no_setups() -> None:
 
 def test_find_setups_multiple_strategies() -> None:
     """find-setups can return multiple setups if multiple strategies match."""
-    # For now only scalping_3tp exists, so max 1 result
-    # When we add ict/smc/open_range, this test becomes more interesting
+    # The valid-long snapshot (london session, bullish FVG, price inside) matches
+    # both scalping_3tp (via order block) and ict_silver_bullet (session FVG).
     snapshot = _valid_long_snapshot()
     resp = client.post("/v1/strategies/find-setups", json=snapshot)
     assert resp.status_code == 200
     data = resp.json()
-    # Currently only scalping_3tp
-    assert len(data) == 1
-    assert data[0]["strategy_id"] == "scalping_3tp"
+    ids = {r["strategy_id"] for r in data}
+    assert "scalping_3tp" in ids
+    assert "ict_silver_bullet" in ids
+    # Every returned result must carry a real setup
+    assert all(r["setup"] is not None for r in data)
 
 
 # -- service layer tests (unit) ----------------------------------------------
@@ -293,8 +295,11 @@ def test_service_evaluate_all() -> None:
         htf_bias=HTFBias.neutral,
     )
     results = strategy_service.evaluate_all(snapshot)
-    assert len(results) >= 1
-    assert all(r.strategy_id in ["scalping_3tp"] for r in results)
+    # evaluate_all returns a result for every registered strategy (incl. no-setups)
+    assert len(results) >= 2
+    result_ids = {r.strategy_id for r in results}
+    assert "scalping_3tp" in result_ids
+    assert "ict_silver_bullet" in result_ids
 
 
 def test_service_find_setups() -> None:
