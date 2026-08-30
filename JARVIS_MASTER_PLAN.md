@@ -28,8 +28,14 @@ JARVIS is the master operating system. AURON is its controlled intelligence/orch
 Foundation successor governance closed at v21.523. Phase A core cutover is complete through A6.
 
 ## 5. Mandatory build sequence
-### Phase B — Trading
-Completed through B10; provider execution remains gated.
+### Phase B — Trading (reconciled)
+The real, wired path is `backend/app/trading/api.py` -> `service.py` (`GET /v1/trading/status`, `POST /v1/trading/evaluate`, setup listing) registered in `main.py`. This is genuinely usable today.
+
+Fourteen `auron_*_v21_53x` / `v21_604-607` modules in `backend/app/trading` and `backend/app/core` (registry, account state, signal intake, risk engine, multi-account allocation, guards, MT5 adapter, reconciliation canary, controlled live enablement, command centre, shadow-canary selection/adapter/certification/health) plus their `api/routes` command-centre file were audited the same way as the Research H21-H40 chain: never imported by `main.py`, never called by `trading/api.py` or `trading/service.py`, only importing and testing each other. They have been removed. Full suite green afterward (4615 passed).
+
+**Note preserved during audit:** `backend/app/core/auron_integration_readiness_vNNN.py` files form a sequential linked chain (each version imports the previous one, `v21_539` -> `v21_538` -> ... -> `v21_1`) shared across every vertical, not a per-vertical ledger. Deleting a file in the middle of this chain breaks every higher version that has not itself been reconciled/removed yet. Do not delete an `auron_integration_readiness_vNNN.py` file unless every version above it in the chain has already been removed or repointed. This chain itself is a candidate for a future, carefully-sequenced cleanup, not an ad hoc deletion.
+
+B1-B10 as a phase label is retired in favor of the concrete statement above: one real endpoint set exists and works; the rest was ceremony.
 ### Phase C — Instagram Content Manager
 Completed through C8; provider writes remain gated.
 ### Phase D — Additional verticals
