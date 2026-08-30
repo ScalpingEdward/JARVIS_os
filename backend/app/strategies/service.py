@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from .ict_silver_bullet.strategy import evaluate as evaluate_ict_silver_bullet
 from .models import MarketSnapshot, StrategyResult
 from .scalping_3tp.strategy import evaluate as evaluate_scalping_3tp
 
@@ -13,8 +14,16 @@ STRATEGIES = {
         "description": "FVG + Order Block mitigation with 3 TPs at 30%/50%/100% RR, min 1:2 RR",
         "evaluate": evaluate_scalping_3tp,
     },
+    "ict_silver_bullet": {
+        "id": "ict_silver_bullet",
+        "name": "ICT Silver Bullet (Session FVG + Structure)",
+        "description": (
+            "London/NY session-gated FVG entry, structure-based SL and nearest "
+            "structure-liquidity target with 2 TPs, min 1:2 RR"
+        ),
+        "evaluate": evaluate_ict_silver_bullet,
+    },
     # Future strategies will be added here:
-    # "ict": {...},
     # "smc": {...},
     # "open_range": {...},
 }
