@@ -1,6 +1,0 @@
-from __future__ import annotations
-from app.core.auron_integration_readiness_v21_622 import get_integration_readiness as previous_readiness
-
-def get_integration_readiness()->dict:
-    p=previous_readiness()
-    return {**p,'roadmap_version':'v21.623','current_phase':'H-controlled-external-provider-sandbox-integration','current_item':'H15-research-real-provider-one-shot-canary-activation-gate','completed_gates':tuple(p['completed_gates'])+('research-real-canary-token-h14-bound','research-real-canary-token-short-lived','research-real-canary-token-one-per-certification','research-real-canary-token-operator-reapproval-required','research-real-canary-token-kill-rollback-required','research-real-canary-token-revocable','research-real-canary-token-network-execution-disabled'),'next_item':'H16-research-real-provider-canary-execution-boundary-design','core_next_gate':'research-real-provider-canary-execution-boundary-design','live_transports_enabled':False,'external_provider_network_enabled':False,'external_provider_write_enabled':False,'external_provider_credential_resolution_enabled':False,'real_provider_transport_configured':False,'real_provider_activation_enabled':False,'real_provider_canary_token_enabled':True,'real_provider_canary_execution_enabled':False,'trading_execution_enabled':False}

@@ -1,0 +1,352 @@
+[
+  {
+    "id": "7c6bb6e1-ceea-4370-9a47-1305d07e7c61",
+    "plan": {
+      "id": "1b2943ef-be29-42c6-9945-6f4df14420dc",
+      "goal": "Build a safe Telegram parser",
+      "summary": "Dependency-aware multi-agent plan with 8 steps and independent reviews.",
+      "constraints": [],
+      "status": "ready",
+      "steps": [
+        {
+          "id": "40b9fceb-6505-40c1-b1d1-25c88b499471",
+          "sequence": 1,
+          "phase": "Discovery",
+          "title": "Analyse goal, constraints and acceptance criteria",
+          "description": "Turn the project goal into explicit functional, safety and operational requirements: Build a safe Telegram parser",
+          "deliverables": [
+            "requirements specification",
+            "risk register",
+            "acceptance criteria"
+          ],
+          "acceptance_criteria": [
+            "all user constraints are represented",
+            "unknowns and approval points are explicit"
+          ],
+          "required_capabilities": [
+            "requirements",
+            "architecture"
+          ],
+          "preferred_worker": "claude",
+          "reviewer_worker": "gemini",
+          "priority": 100,
+          "depends_on": [],
+          "approval_required": false,
+          "approval_reason": null,
+          "status": "ready",
+          "orchestrator_task_id": null
+        },
+        {
+          "id": "617f8f6c-c1b3-4e50-a2ac-31a868bb27e9",
+          "sequence": 2,
+          "phase": "Architecture",
+          "title": "Design system architecture and interfaces",
+          "description": "Define modules, data contracts, security boundaries, persistence and integration points.",
+          "deliverables": [
+            "architecture decision record",
+            "module map",
+            "API and data contracts"
+          ],
+          "acceptance_criteria": [
+            "components have clear ownership",
+            "failure and rollback paths are defined"
+          ],
+          "required_capabilities": [
+            "architecture",
+            "security"
+          ],
+          "preferred_worker": "claude",
+          "reviewer_worker": "openai",
+          "priority": 95,
+          "depends_on": [
+            "40b9fceb-6505-40c1-b1d1-25c88b499471"
+          ],
+          "approval_required": false,
+          "approval_reason": null,
+          "status": "pending",
+          "orchestrator_task_id": null
+        },
+        {
+          "id": "73ce9665-18a8-45cd-86c7-39c5805cd193",
+          "sequence": 3,
+          "phase": "Implementation",
+          "title": "Implement backend and core domain logic",
+          "description": "Build the smallest complete backend implementation behind existing approval and safety gates.",
+          "deliverables": [
+            "domain services",
+            "API endpoints",
+            "persistence integration"
+          ],
+          "acceptance_criteria": [
+            "core flows execute end to end",
+            "unsafe actions remain gated"
+          ],
+          "required_capabilities": [
+            "coding",
+            "python",
+            "backend"
+          ],
+          "preferred_worker": "codex",
+          "reviewer_worker": "claude",
+          "priority": 90,
+          "depends_on": [
+            "617f8f6c-c1b3-4e50-a2ac-31a868bb27e9"
+          ],
+          "approval_required": false,
+          "approval_reason": null,
+          "status": "pending",
+          "orchestrator_task_id": null
+        },
+        {
+          "id": "f3ebddf1-7d3d-46f6-bdd4-64e9fb1e5c9a",
+          "sequence": 4,
+          "phase": "Implementation",
+          "title": "Build operator interface",
+          "description": "Create a usable control surface for project state, approvals, agent assignments and failures.",
+          "deliverables": [
+            "responsive interface",
+            "project dashboard",
+            "approval controls"
+          ],
+          "acceptance_criteria": [
+            "critical state is visible",
+            "dangerous actions require explicit confirmation"
+          ],
+          "required_capabilities": [
+            "frontend",
+            "ux"
+          ],
+          "preferred_worker": "openai",
+          "reviewer_worker": "gemini",
+          "priority": 82,
+          "depends_on": [
+            "617f8f6c-c1b3-4e50-a2ac-31a868bb27e9"
+          ],
+          "approval_required": false,
+          "approval_reason": null,
+          "status": "pending",
+          "orchestrator_task_id": null
+        },
+        {
+          "id": "ed2bd4b8-2708-4849-8149-053366e693d3",
+          "sequence": 5,
+          "phase": "Verification",
+          "title": "Add automated and integration tests",
+          "description": "Verify happy paths, dependency ordering, validation, permissions, retries and regressions.",
+          "deliverables": [
+            "unit tests",
+            "integration tests",
+            "security regression tests"
+          ],
+          "acceptance_criteria": [
+            "all required checks pass",
+            "tests do not bypass approval controls"
+          ],
+          "required_capabilities": [
+            "testing",
+            "quality"
+          ],
+          "preferred_worker": "codex",
+          "reviewer_worker": "gemini",
+          "priority": 88,
+          "depends_on": [
+            "73ce9665-18a8-45cd-86c7-39c5805cd193",
+            "f3ebddf1-7d3d-46f6-bdd4-64e9fb1e5c9a"
+          ],
+          "approval_required": false,
+          "approval_reason": null,
+          "status": "pending",
+          "orchestrator_task_id": null
+        },
+        {
+          "id": "ef03e69d-06ff-44ef-8369-a9dcad53ade5",
+          "sequence": 6,
+          "phase": "Review",
+          "title": "Run independent security and quality review",
+          "description": "Review code, architecture, secrets handling, permissions, observability and operational failure modes.",
+          "deliverables": [
+            "review report",
+            "resolved findings",
+            "release recommendation"
+          ],
+          "acceptance_criteria": [
+            "no unresolved critical finding",
+            "reviewer differs from primary implementer"
+          ],
+          "required_capabilities": [
+            "review",
+            "security"
+          ],
+          "preferred_worker": "gemini",
+          "reviewer_worker": "claude",
+          "priority": 84,
+          "depends_on": [
+            "ed2bd4b8-2708-4849-8149-053366e693d3"
+          ],
+          "approval_required": false,
+          "approval_reason": null,
+          "status": "pending",
+          "orchestrator_task_id": null
+        },
+        {
+          "id": "6f2c1a6a-4e99-40cd-bcf6-65eda3a67c38",
+          "sequence": 7,
+          "phase": "Release",
+          "title": "Prepare operating documentation",
+          "description": "Document setup, configuration, credentials, limits, backup, recovery and troubleshooting.",
+          "deliverables": [
+            "operator guide",
+            "configuration reference",
+            "recovery runbook"
+          ],
+          "acceptance_criteria": [
+            "a new operator can deploy safely",
+            "no secrets appear in documentation"
+          ],
+          "required_capabilities": [
+            "documentation",
+            "operations"
+          ],
+          "preferred_worker": "openai",
+          "reviewer_worker": "claude",
+          "priority": 70,
+          "depends_on": [
+            "ef03e69d-06ff-44ef-8369-a9dcad53ade5"
+          ],
+          "approval_required": false,
+          "approval_reason": null,
+          "status": "pending",
+          "orchestrator_task_id": null
+        },
+        {
+          "id": "493a924d-a59a-4b85-9b1b-4ce0d8a5cc4b",
+          "sequence": 8,
+          "phase": "Release",
+          "title": "Prepare approved deployment",
+          "description": "Create a reversible deployment plan and stop before production activation until human approval.",
+          "deliverables": [
+            "deployment manifest",
+            "health verification",
+            "rollback procedure"
+          ],
+          "acceptance_criteria": [
+            "sandbox and CI are green",
+            "rollback is tested",
+            "human approval is recorded"
+          ],
+          "required_capabilities": [
+            "deployment",
+            "operations"
+          ],
+          "preferred_worker": "codex",
+          "reviewer_worker": "gemini",
+          "priority": 65,
+          "depends_on": [
+            "6f2c1a6a-4e99-40cd-bcf6-65eda3a67c38"
+          ],
+          "approval_required": true,
+          "approval_reason": "Production deployment requires explicit human approval.",
+          "status": "pending",
+          "orchestrator_task_id": null
+        }
+      ],
+      "created_task_ids": []
+    },
+    "status": "running",
+    "auto_dispatch": false,
+    "max_parallel_steps": 2,
+    "stop_on_failure": true,
+    "steps": [
+      {
+        "step_id": "40b9fceb-6505-40c1-b1d1-25c88b499471",
+        "title": "Analyse goal, constraints and acceptance criteria",
+        "status": "completed",
+        "runtime_run_id": null,
+        "approval_granted": false,
+        "output": null,
+        "error": null,
+        "started_at": null,
+        "finished_at": null
+      },
+      {
+        "step_id": "617f8f6c-c1b3-4e50-a2ac-31a868bb27e9",
+        "title": "Design system architecture and interfaces",
+        "status": "completed",
+        "runtime_run_id": null,
+        "approval_granted": false,
+        "output": null,
+        "error": null,
+        "started_at": null,
+        "finished_at": null
+      },
+      {
+        "step_id": "73ce9665-18a8-45cd-86c7-39c5805cd193",
+        "title": "Implement backend and core domain logic",
+        "status": "completed",
+        "runtime_run_id": null,
+        "approval_granted": false,
+        "output": null,
+        "error": null,
+        "started_at": null,
+        "finished_at": null
+      },
+      {
+        "step_id": "f3ebddf1-7d3d-46f6-bdd4-64e9fb1e5c9a",
+        "title": "Build operator interface",
+        "status": "completed",
+        "runtime_run_id": null,
+        "approval_granted": false,
+        "output": null,
+        "error": null,
+        "started_at": null,
+        "finished_at": null
+      },
+      {
+        "step_id": "ed2bd4b8-2708-4849-8149-053366e693d3",
+        "title": "Add automated and integration tests",
+        "status": "completed",
+        "runtime_run_id": null,
+        "approval_granted": false,
+        "output": null,
+        "error": null,
+        "started_at": null,
+        "finished_at": null
+      },
+      {
+        "step_id": "ef03e69d-06ff-44ef-8369-a9dcad53ade5",
+        "title": "Run independent security and quality review",
+        "status": "completed",
+        "runtime_run_id": null,
+        "approval_granted": false,
+        "output": null,
+        "error": null,
+        "started_at": null,
+        "finished_at": null
+      },
+      {
+        "step_id": "6f2c1a6a-4e99-40cd-bcf6-65eda3a67c38",
+        "title": "Prepare operating documentation",
+        "status": "completed",
+        "runtime_run_id": null,
+        "approval_granted": false,
+        "output": null,
+        "error": null,
+        "started_at": null,
+        "finished_at": null
+      },
+      {
+        "step_id": "493a924d-a59a-4b85-9b1b-4ce0d8a5cc4b",
+        "title": "Prepare approved deployment",
+        "status": "ready",
+        "runtime_run_id": null,
+        "approval_granted": true,
+        "output": null,
+        "error": null,
+        "started_at": null,
+        "finished_at": null
+      }
+    ],
+    "created_at": "2026-08-30T09:22:30.295456Z",
+    "updated_at": "2026-08-30T09:22:30.297044Z"
+  }
+]

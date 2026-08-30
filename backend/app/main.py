@@ -58,6 +58,7 @@ from .market_vision.api import router as market_vision_router
 from .memory.models import MemoryCreate, MemoryListResponse, MemoryRecord
 from .memory.service import memory_service
 from .mobile.api import router as mobile_router
+from .research.provider_api import router as research_provider_router
 from .models.api import GenerateRequest, GenerateResponse, ProvidersResponse
 from .models.contracts import ModelRequest
 from .models.router import UnknownProviderError, model_router
@@ -148,6 +149,7 @@ app.include_router(long_term_memory_router)
 app.include_router(market_intelligence_router)
 app.include_router(market_vision_router)
 app.include_router(mobile_router)
+app.include_router(research_provider_router)
 app.include_router(mt5_bridge_router)
 app.include_router(orderflow_router)
 app.include_router(planner_router)
