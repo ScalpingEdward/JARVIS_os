@@ -7,6 +7,7 @@ from .accounts.api import router as accounts_router
 from .agent_adapters.api import router as agent_adapters_router
 from .strategies.api import router as strategies_router
 from .setup_submission.api import router as setup_submission_router
+from .strategy_orchestrator.api import router as strategy_orchestrator_router
 from .api.routes.auron_demo1_approval_handoff_v21_260 import router as auron_demo1_approval_handoff_v21_260_router
 from .api.routes.auron_demo1_approval_resolution_v21_261 import router as auron_demo1_approval_resolution_v21_261_router
 from .api.routes.auron_demo1_approved_resume_gate_v21_262 import router as auron_demo1_approved_resume_gate_v21_262_router
@@ -54,6 +55,7 @@ from .execution.api import router as execution_router
 from .executive_mt5_portfolio_correlation_exposure.api import router as executive_mt5_portfolio_correlation_exposure_router
 from .github_remote.api import router as github_remote_router
 from .goal_execution.api import router as goal_execution_router
+from .instagram_content.api import router as instagram_content_router
 from .knowledge_graph.api import router as knowledge_graph_router
 from .live_analysis.api import router as live_analysis_router
 from .long_term_memory.api import router as long_term_memory_router
@@ -105,6 +107,7 @@ app.include_router(accounts_router)
 app.include_router(agent_adapters_router)
 app.include_router(strategies_router)
 app.include_router(setup_submission_router)
+app.include_router(strategy_orchestrator_router)
 app.include_router(phoenix_demo1_router)
 app.include_router(phoenix_demo1_runtime_readiness_router)
 app.include_router(phoenix_demo1_voice_adapter_router)
@@ -151,6 +154,7 @@ app.include_router(execution_router)
 app.include_router(executive_mt5_portfolio_correlation_exposure_router)
 app.include_router(github_remote_router)
 app.include_router(goal_execution_router)
+app.include_router(instagram_content_router)
 app.include_router(knowledge_graph_router)
 app.include_router(live_analysis_router)
 app.include_router(long_term_memory_router)
