@@ -216,3 +216,6 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Trading accounts registry runtime DB
+backend/data/accounts.db
