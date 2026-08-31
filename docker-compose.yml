@@ -56,7 +56,7 @@ services:
       timeout: 5s
       retries: 8
       start_period: 20s
-    networks: [jarvis_internal]
+    networks: [jarvis_internal, jarvis_shared]
 
   frontend:
     build:
@@ -103,6 +103,9 @@ volumes:
 networks:
   jarvis_internal:
     driver: bridge
+  jarvis_shared:
+    external: true
+    name: ${JARVIS_SHARED_NETWORK:-jarvis_shared}
 
 secrets:
   postgres_password:

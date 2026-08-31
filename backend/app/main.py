@@ -50,6 +50,7 @@ from .execution.api import router as execution_router
 from .executive_mt5_portfolio_correlation_exposure.api import router as executive_mt5_portfolio_correlation_exposure_router
 from .github_remote.api import router as github_remote_router
 from .goal_execution.api import router as goal_execution_router
+from .instagram_content.api import router as instagram_content_router
 from .knowledge_graph.api import router as knowledge_graph_router
 from .live_analysis.api import router as live_analysis_router
 from .long_term_memory.api import router as long_term_memory_router
@@ -143,6 +144,7 @@ app.include_router(execution_router)
 app.include_router(executive_mt5_portfolio_correlation_exposure_router)
 app.include_router(github_remote_router)
 app.include_router(goal_execution_router)
+app.include_router(instagram_content_router)
 app.include_router(knowledge_graph_router)
 app.include_router(live_analysis_router)
 app.include_router(long_term_memory_router)
