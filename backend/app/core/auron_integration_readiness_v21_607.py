@@ -1,6 +1,0 @@
-from __future__ import annotations
-from app.core.auron_integration_readiness_v21_606 import get_integration_readiness as previous_readiness
-
-def get_integration_readiness()->dict:
-    previous=previous_readiness()
-    return {**previous,'roadmap_version':'v21.607','current_phase':'G-provider-specific-canary-integration','current_item':'G20-trading-shadow-health-drift-command-centre-certification','completed_gates':tuple(previous['completed_gates'])+('trading-shadow-persistent-provider-health-evidence','trading-shadow-health-evidence-freshness-gate','trading-shadow-adapter-descriptor-fingerprint','trading-shadow-provider-config-drift-fail-closed','trading-shadow-command-centre-read-model','trading-shadow-operator-stop-control','trading-shadow-command-journal-recorded-not-executed','trading-shadow-command-centre-live-execution-disabled'),'next_item':'G21-provider-expansion-promotion-decision','core_next_gate':'provider-expansion-promotion-decision-after-shadow-certification','live_transports_enabled':False,'trading_execution_enabled':False,'trading_broker_network_enabled':False,'trading_position_mutation_enabled':False,'production_canary_auto_activation_enabled':False,'cross_vertical_direct_provider_bypass_allowed':False}
