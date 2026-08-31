@@ -6,6 +6,7 @@ from .account_state_sync.api import router as account_state_sync_router
 from .accounts.api import router as accounts_router
 from .agent_adapters.api import router as agent_adapters_router
 from .strategies.api import router as strategies_router
+from .setup_submission.api import router as setup_submission_router
 from .strategy_orchestrator.api import router as strategy_orchestrator_router
 from .api.routes.auron_demo1_approval_handoff_v21_260 import router as auron_demo1_approval_handoff_v21_260_router
 from .api.routes.auron_demo1_approval_resolution_v21_261 import router as auron_demo1_approval_resolution_v21_261_router
@@ -105,6 +106,7 @@ app.include_router(account_state_sync_router)
 app.include_router(accounts_router)
 app.include_router(agent_adapters_router)
 app.include_router(strategies_router)
+app.include_router(setup_submission_router)
 app.include_router(strategy_orchestrator_router)
 app.include_router(phoenix_demo1_router)
 app.include_router(phoenix_demo1_runtime_readiness_router)
