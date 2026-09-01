@@ -97,6 +97,15 @@ internet and no third-party automation platform is involved.
    Set the search API key once in `.env`:
    ```
    TAVILY_API_KEY=tvly-...
+   ```
+
+6. **You get a real notification when a post is ready, not just a status change.** Once `propose()` or `finalize()` produces a candidate with status `proposed`, AURON pushes a real message via `notification_hub` -- if `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` are set, this actually lands in Telegram; if not, it's still queued and visible via `GET /v1/instagram/dashboard` / `GET /v1/notification-hub/notifications`. Moderation-auto-rejected candidates don't notify (they're not waiting on you). Quiet hours (default 22:30-07:00 Europe/Berlin) defer non-critical notifications automatically -- configurable via `PUT /v1/notification-hub/preferences`.
+
+   Get `TELEGRAM_BOT_TOKEN` from [@BotFather](https://t.me/BotFather) (message it `/newbot`), and `TELEGRAM_CHAT_ID` by messaging your new bot once and checking `https://api.telegram.org/bot<token>/getUpdates` for your chat id.
+
+   ```
+   TELEGRAM_BOT_TOKEN=123456:AAExample...
+   TELEGRAM_CHAT_ID=123456789
 
 With this path, n8n's Instagram role shrinks to three mechanical steps: fetch bytes from Drive, forward them to AURON, and (after your approval) call the Meta Graph API to actually post. Every judgment call -- what a photo is, whether it fits the account, how to group it, what to write about it -- happens in AURON.
 5. From here it's the manual path: you approve, then publish triggers n8n.

@@ -203,6 +203,35 @@ def test_publisher_rejects_missing_media_id_in_response():
         publisher.publish(media_items, post_format, edit_plan, "caption", "req-1")
 
 
+def test_proposing_a_candidate_notifies_via_notification_hub():
+    from app.notification_hub.models import DeliveryState
+    from app.notification_hub.service import notification_hub_service
+
+    notification_hub_service.reset()
+    service = InstagramContentService()
+    item = service.propose(ContentCandidateCreate(**_candidate_payload()))
+
+    notifications = notification_hub_service.list_all()
+    matching = [n for n in notifications if n.source_id == str(item.id)]
+    assert len(matching) == 1
+    assert matching[0].domain == "instagram"
+    assert "ready for review" in matching[0].title.lower()
+    assert matching[0].state in (DeliveryState.delivered, DeliveryState.deferred)
+
+
+def test_moderation_rejected_candidate_does_not_notify():
+    from app.notification_hub.service import notification_hub_service
+
+    notification_hub_service.reset()
+    service = InstagramContentService()
+    item = service.propose(ContentCandidateCreate(**_candidate_payload(caption_draft="Follow4follow please!!")))
+    assert item.status == ContentStatus.moderation_rejected
+
+    notifications = notification_hub_service.list_all()
+    matching = [n for n in notifications if n.source_id == str(item.id)]
+    assert matching == []
+
+
 def test_api_flow_end_to_end():
     from app.instagram_content.service import instagram_content_service
 
