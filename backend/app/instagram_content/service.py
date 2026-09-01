@@ -12,6 +12,9 @@ from .models import ContentCandidate, ContentCandidateCreate, ContentDecision, C
 from .moderation import moderate
 from .publisher import N8nInstagramPublisher, N8nInstagramPublisherError
 
+from app.notification_hub.models import DeliveryPriority, NotificationCreate
+from app.notification_hub.service import notification_hub_service
+
 
 class InstagramContentError(ValueError):
     pass
@@ -67,7 +70,34 @@ class InstagramContentService:
                 item.audit_log.append("Hook warnings: " + "; ".join(hook_warnings))
 
         self._items[item.id] = item
+
+        if item.status == ContentStatus.proposed:
+            self._notify_ready_for_review(item)
+
         return item
+
+    def _notify_ready_for_review(self, item: ContentCandidate) -> None:
+        """A real notification, not just a silent status change -- this is
+        the 'ich bekomme nur, dass ein Post vorbereitet ist' loop closing.
+        Never lets a notification-delivery problem break candidate
+        creation itself; notification_hub's own create() already fails
+        soft per-channel (see telegram_delivery.py), this is just an extra
+        guard against anything unexpected from that call."""
+        try:
+            notification_hub_service.create(
+                NotificationCreate(
+                    title=f"Instagram: {item.post_format.value} ready for review",
+                    message=(
+                        f"{len(item.media_items)} media item(s), theme notes: {item.aesthetic_notes or 'none'}.\n"
+                        f"Caption: {item.caption_draft[:200]}"
+                    ),
+                    priority=DeliveryPriority.normal,
+                    domain="instagram",
+                    source_id=str(item.id),
+                )
+            )
+        except Exception:  # noqa: BLE001 -- deliberately broad: a notification problem must never break content creation
+            pass
 
     def list_all(self, status: ContentStatus | None = None) -> list[ContentCandidate]:
         items = list(self._items.values())

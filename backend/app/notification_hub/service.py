@@ -12,14 +12,16 @@ from .models import (
     NotificationPreferences,
     NotificationRecord,
 )
+from .telegram_delivery import TelegramDeliveryClient, TelegramDeliveryError
 
 
 class NotificationHubService:
     """Routes advisory notifications while preserving human control gates."""
 
-    def __init__(self) -> None:
+    def __init__(self, telegram_client: TelegramDeliveryClient | None = None) -> None:
         self._preferences = NotificationPreferences()
         self._records: dict[UUID, NotificationRecord] = {}
+        self._telegram_client = telegram_client or TelegramDeliveryClient()
 
     def reset(self) -> None:
         self._preferences = NotificationPreferences()
@@ -94,15 +96,31 @@ class NotificationHubService:
         )
 
     def _deliver(self, record: NotificationRecord) -> None:
-        record.attempts = [
-            DeliveryAttempt(
-                channel=channel,
-                state=DeliveryState.delivered,
-                detail="Delivery adapter accepted advisory notification",
-            )
-            for channel in record.channels
-        ]
-        record.state = DeliveryState.delivered
+        attempts: list[DeliveryAttempt] = []
+        any_success = False
+        for channel in record.channels:
+            if channel == DeliveryChannel.telegram:
+                try:
+                    self._telegram_client.send(record.title, record.message)
+                    attempts.append(DeliveryAttempt(channel=channel, state=DeliveryState.delivered, detail="Sent via Telegram Bot API."))
+                    any_success = True
+                except TelegramDeliveryError as exc:
+                    attempts.append(DeliveryAttempt(channel=channel, state=DeliveryState.failed, detail=str(exc)))
+            else:
+                # Other channels (dashboard, email, mobile_push, voice) have no
+                # real outbound adapter yet -- honestly labeled as advisory/
+                # simulated rather than silently pretending they're equivalent
+                # to the real Telegram delivery above.
+                attempts.append(
+                    DeliveryAttempt(
+                        channel=channel,
+                        state=DeliveryState.delivered,
+                        detail="No real delivery adapter for this channel yet; recorded as advisory only.",
+                    )
+                )
+                any_success = True
+        record.attempts = attempts
+        record.state = DeliveryState.delivered if any_success else DeliveryState.failed
 
     def _channels_for(self, priority: DeliveryPriority) -> list[DeliveryChannel]:
         if priority == DeliveryPriority.critical:
