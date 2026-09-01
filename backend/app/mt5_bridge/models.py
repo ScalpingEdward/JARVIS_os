@@ -108,6 +108,31 @@ class MT5JournalEntry(BaseModel):
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
+class MT5SymbolSpec(BaseModel):
+    """Contract specification for one instrument, as MT5's own symbol_info()
+    reports it. Pushed by the bridge alongside ticks/account data -- AURON
+    does not derive or guess any of this."""
+
+    symbol: str = Field(min_length=1, max_length=32)
+    point: float = Field(gt=0, description="Smallest price increment, e.g. 0.01 for XAUUSD, 0.0001 for EURUSD.")
+    digits: int = Field(ge=0, le=10)
+    volume_min: float = Field(gt=0)
+    volume_max: float = Field(gt=0)
+    volume_step: float = Field(gt=0)
+    trade_contract_size: float = Field(gt=0, description="Units of the base asset per 1.0 lot.")
+    trade_tick_size: float = Field(gt=0, description="Smallest price change MT5 will report a tick for.")
+    trade_tick_value: float = Field(gt=0, description="Account-currency value of one trade_tick_size move, per 1.0 lot.")
+    captured_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+    @property
+    def value_per_price_unit(self) -> float:
+        """Account-currency value of a 1.0 price move for one 1.0 lot --
+        exactly the quantity dynamic_risk_engine's value_per_price_unit
+        expects, derived from real broker-reported tick economics rather
+        than guessed."""
+        return self.trade_tick_value / self.trade_tick_size
+
+
 class MT5SnapshotIngest(BaseModel):
     account: MT5AccountSnapshot
     positions: list[MT5Position] = Field(default_factory=list)
@@ -116,6 +141,7 @@ class MT5SnapshotIngest(BaseModel):
     ticks: list[MT5Tick] = Field(default_factory=list)
     candles: list[MT5Candle] = Field(default_factory=list)
     journal: list[MT5JournalEntry] = Field(default_factory=list)
+    symbols: list[MT5SymbolSpec] = Field(default_factory=list)
 
 
 class MT5TerminalData(BaseModel):
@@ -127,6 +153,7 @@ class MT5TerminalData(BaseModel):
     ticks: list[MT5Tick] = Field(default_factory=list)
     candles: list[MT5Candle] = Field(default_factory=list)
     journal: list[MT5JournalEntry] = Field(default_factory=list)
+    symbols: list[MT5SymbolSpec] = Field(default_factory=list)
 
 
 class MT5BridgeStatus(BaseModel):

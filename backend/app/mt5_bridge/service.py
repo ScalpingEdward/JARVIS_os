@@ -57,6 +57,13 @@ class MT5BridgeService:
         data.ticks = payload.ticks[-500:]
         data.candles = payload.candles[-5000:]
         data.journal = payload.journal[-1000:]
+        if payload.symbols:
+            # Specs rarely change; replace by symbol rather than accumulating
+            # or dropping older entries the way the rolling lists above do.
+            by_symbol = {spec.symbol: spec for spec in data.symbols}
+            for spec in payload.symbols:
+                by_symbol[spec.symbol] = spec
+            data.symbols = list(by_symbol.values())
         data.terminal.last_heartbeat_at = datetime.now(timezone.utc)
         data.terminal.state = MT5ConnectionState.connected
         return deepcopy(data)
