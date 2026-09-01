@@ -145,6 +145,18 @@ def analyze_and_ingest_media(request: MediaAnalyzeAndIngestRequest) -> MediaAnal
     return analyze_and_ingest(request.items, AnthropicVisionAnalyzer(), media_pool_service)
 
 
+@router.post("/maintenance-cycle", response_model=CuratedDraftList)
+def maintenance_cycle(request: MediaAnalyzeAndIngestRequest | None = None, max_groups: int = 10) -> CuratedDraftList:
+    """One call for a scheduled trigger (n8n cron, etc.): analyze+ingest a
+    batch of new media if provided, then run curation. Same real logic as
+    calling /media-pool/analyze-and-ingest and /curate separately -- this
+    just saves an orchestration round-trip for a recurring job."""
+    if request is not None and request.items:
+        analyze_and_ingest(request.items, AnthropicVisionAnalyzer(), media_pool_service)
+    drafts = media_pool_service.run_curation(max_groups=max_groups)
+    return CuratedDraftList(items=drafts, count=len(drafts))
+
+
 @router.post("/media-pool/{item_id}/analyze-trim", response_model=MediaPoolItem)
 def analyze_trim(item_id: UUID, request: TrimAnalysisRequest) -> MediaPoolItem:
     """Real multi-frame analysis to pick a Reel trim window for an
