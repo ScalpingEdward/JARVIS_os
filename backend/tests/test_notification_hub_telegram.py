@@ -129,3 +129,29 @@ def test_record_fails_when_every_configured_channel_fails():
         now=datetime(2026, 7, 16, 12, 0, tzinfo=timezone.utc),
     )
     assert record.state == DeliveryState.failed
+
+
+def test_delivery_uses_the_real_email_client_for_the_email_channel():
+    from app.notification_hub.email_delivery import SmtpEmailDeliveryClient
+
+    sent: list[tuple[str, str]] = []
+
+    class FakeEmailClient:
+        def send(self, subject: str, body: str) -> None:
+            sent.append((subject, body))
+
+    service = NotificationHubService(email_client=FakeEmailClient())
+    record = service.create(
+        NotificationCreate(
+            title="Post ready",
+            message="A hero post is waiting for review.",
+            priority=DeliveryPriority.normal,
+            channels=[DeliveryChannel.email],
+        ),
+        now=datetime(2026, 7, 16, 12, 0, tzinfo=timezone.utc),
+    )
+
+    assert record.state == DeliveryState.delivered
+    assert sent == [("Post ready", "A hero post is waiting for review.")]
+    email_attempt = next(a for a in record.attempts if a.channel == DeliveryChannel.email)
+    assert email_attempt.state == DeliveryState.delivered

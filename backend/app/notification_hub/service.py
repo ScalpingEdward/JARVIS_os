@@ -13,15 +13,19 @@ from .models import (
     NotificationRecord,
 )
 from .telegram_delivery import TelegramDeliveryClient, TelegramDeliveryError
+from .email_delivery import EmailDeliveryError, SmtpEmailDeliveryClient
 
 
 class NotificationHubService:
     """Routes advisory notifications while preserving human control gates."""
 
-    def __init__(self, telegram_client: TelegramDeliveryClient | None = None) -> None:
+    def __init__(
+        self, telegram_client: TelegramDeliveryClient | None = None, email_client: SmtpEmailDeliveryClient | None = None
+    ) -> None:
         self._preferences = NotificationPreferences()
         self._records: dict[UUID, NotificationRecord] = {}
         self._telegram_client = telegram_client or TelegramDeliveryClient()
+        self._email_client = email_client or SmtpEmailDeliveryClient()
 
     def reset(self) -> None:
         self._preferences = NotificationPreferences()
@@ -106,11 +110,18 @@ class NotificationHubService:
                     any_success = True
                 except TelegramDeliveryError as exc:
                     attempts.append(DeliveryAttempt(channel=channel, state=DeliveryState.failed, detail=str(exc)))
+            elif channel == DeliveryChannel.email:
+                try:
+                    self._email_client.send(record.title, record.message)
+                    attempts.append(DeliveryAttempt(channel=channel, state=DeliveryState.delivered, detail="Sent via SMTP."))
+                    any_success = True
+                except EmailDeliveryError as exc:
+                    attempts.append(DeliveryAttempt(channel=channel, state=DeliveryState.failed, detail=str(exc)))
             else:
-                # Other channels (dashboard, email, mobile_push, voice) have no
-                # real outbound adapter yet -- honestly labeled as advisory/
-                # simulated rather than silently pretending they're equivalent
-                # to the real Telegram delivery above.
+                # dashboard, mobile_push, voice have no real outbound adapter
+                # yet -- honestly labeled as advisory/simulated rather than
+                # silently pretending they're equivalent to the real
+                # Telegram/email delivery above.
                 attempts.append(
                     DeliveryAttempt(
                         channel=channel,
