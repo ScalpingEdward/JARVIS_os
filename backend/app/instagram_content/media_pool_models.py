@@ -87,5 +87,9 @@ class CuratedDraftList(BaseModel):
 
 
 class FinalizeDraftRequest(BaseModel):
-    caption_draft: str = Field(min_length=1, max_length=2200)
+    caption_draft: str | None = Field(
+        default=None,
+        max_length=2200,
+        description="If omitted, AURON generates one itself via a real Anthropic API call (needs ANTHROPIC_API_KEY set).",
+    )
     aesthetic_notes: str = Field(default="", max_length=2000)

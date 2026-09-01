@@ -81,13 +81,21 @@ internet and no third-party automation platform is involved.
 1. **Analyze once, in n8n (or a script with Drive access) — not in AURON.** For each new photo/video in your Drive folder, run a vision-analysis step (your existing Claude API call is fine for this) to produce: a short `theme` label (e.g. `"gold-trading-desk"`, `"mystic-symbol"`, `"quote-card"` — consistent labels are what let AURON group photos into a coherent carousel), optional `tags`, and an `aesthetic_score` (0-1, how well it fits the account's look).
 2. Push the results to AURON: `POST /v1/instagram/media-pool/ingest` with a batch of `{media_ref, media_type, theme, tags, aesthetic_score, duration_seconds (video only)}`. Re-ingesting the same `media_ref` is a no-op (deduplicated), so it's safe to re-run this over the whole folder periodically.
 3. Trigger curation: `POST /v1/instagram/curate` — AURON groups the *unused* pool into hero posts (a standout single image), right-sized carousels (3-6 same-theme images), and standalone Reels (every video), reserving each item so nothing gets proposed twice. Nothing is posted yet; each result is a `CuratedDraft`.
-4. **A caption still needs to be attached — AURON does not write caption text itself.** This is deliberately still your existing n8n Claude-based captioning step, not duplicated inside AURON: fetch pending drafts (`GET /v1/instagram/curate/drafts`), have n8n generate a caption in your account's voice for each draft's theme/media, then call `POST /v1/instagram/curate/drafts/{draft_id}/finalize` with `{caption_draft}`. This runs the normal moderation/format/edit-plan pipeline and produces a real `ContentCandidate` (status `proposed`, unless moderation rejects it — in which case the photos are *not* consumed, so a corrected caption can be retried without burning fresh media).
+4. **AURON writes the caption itself now.** Call `POST /v1/instagram/curate/drafts/{draft_id}/finalize` with an empty body (or omit `caption_draft`), and AURON makes a real Anthropic API call (`ANTHROPIC_API_KEY` must be set in the backend's environment) to write the caption + hashtags in the account's voice, then runs it through the normal moderation/format/edit-plan pipeline. This closes the loop without an n8n round-trip. You can still pass `caption_draft` explicitly to skip generation for a one-off post -- both paths produce a real `ContentCandidate` (status `proposed`, unless moderation rejects it — in which case the photos are *not* consumed, so a retry, with a manual caption or by calling finalize again for a fresh generation, doesn't burn fresh media).
+
+   Set the API key once in `.env`:
+   ```
+   ANTHROPIC_API_KEY=sk-ant-...
+   AURON_CAPTION_MODEL=claude-sonnet-5   # optional, this is the default
+   ```
 5. From here it's the manual path: you approve, then publish triggers n8n.
 
 Each photo/video is only ever used once: `mark_finalized` (step 4) permanently flags the pool items as used, and a discarded draft (`POST /v1/instagram/curate/drafts/{draft_id}/discard`, e.g. if the grouping itself was wrong) releases its photos back to the pool instead.
 
-No API key or Meta credential ever needs to live in AURON's code or
-environment; those stay entirely inside your existing n8n workflow. The
-same is true for vision analysis and caption generation -- AURON works
-with the structured results (theme, tags, scores, captions), never the
-raw pixels or your Anthropic API key for that step.
+No Meta credential ever needs to live in AURON's code or environment --
+posting itself stays entirely inside your existing n8n workflow. Vision
+analysis (theme/tags/aesthetic_score) also stays external, wherever the
+files live. Caption generation is the one exception: AURON holds its own
+`ANTHROPIC_API_KEY` to write captions directly, since that's Anthropic's
+own API rather than a third-party credential, and it's the same key you'd
+already trust Claude with elsewhere in this project.
