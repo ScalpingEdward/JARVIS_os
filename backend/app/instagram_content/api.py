@@ -14,7 +14,10 @@ from .media_pool_models import (
     MediaAnalyzeAndIngestResponse,
     MediaPoolIngestRequest,
     MediaPoolIngestResponse,
+    MediaPoolItem,
     MediaPoolList,
+    TrimAnalysisRequest,
+    TrimAnalysisResult,
 )
 from .analyze_and_ingest import analyze_and_ingest
 from .media_pool_service import MediaPoolError, media_pool_service
@@ -24,6 +27,7 @@ from .posting_schedule import NOTE, PostingWindow, suggested_windows_for_weekday
 from .research_synthesizer import PlatformStrategyProposal, ResearchSynthesisConfig, ResearchSynthesisError, ResearchSynthesizer
 from .service import InstagramContentError, instagram_content_service
 from .vision_analysis import AnthropicVisionAnalyzer
+from .video_trim_analysis import AnthropicVideoTrimAnalyzer, VideoTrimAnalysisConfig, VideoTrimAnalysisError
 from .web_research import TavilyWebResearcher, WebResearchConfig, WebResearchError, WebResearchResponse
 
 router = APIRouter(prefix="/v1/instagram", tags=["instagram-content"])
@@ -113,6 +117,29 @@ def analyze_and_ingest_media(request: MediaAnalyzeAndIngestRequest) -> MediaAnal
     + ingested, or a specific failure reason) comes back individually; one
     bad item never blocks the rest of the batch."""
     return analyze_and_ingest(request.items, AnthropicVisionAnalyzer(), media_pool_service)
+
+
+@router.post("/media-pool/{item_id}/analyze-trim", response_model=MediaPoolItem)
+def analyze_trim(item_id: UUID, request: TrimAnalysisRequest) -> MediaPoolItem:
+    """Real multi-frame analysis to pick a Reel trim window for an
+    over-length video -- the caller supplies sampled still frames at known
+    timestamps (AURON never receives the video itself), and this asks
+    Claude to pick the strongest contiguous window drawn from those exact
+    sample points. Fails closed rather than clamping a hallucinated window
+    into range if the model returns something outside what was sampled.
+    Stores the result on the pool item so a later /curate -> /finalize run
+    picks it up automatically instead of leaving trim_start/trim_end unset."""
+    try:
+        analyzer = AnthropicVideoTrimAnalyzer(config=VideoTrimAnalysisConfig(api_key=os.getenv("ANTHROPIC_API_KEY")))
+        result = analyzer.analyze(request.frames, request.target_min_seconds, request.target_max_seconds)
+    except VideoTrimAnalysisError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    try:
+        return media_pool_service.set_trim_recommendation(
+            item_id, result.recommended_start_seconds, result.recommended_end_seconds, result.reasoning
+        )
+    except MediaPoolError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
 # -- curation: turning the pool into post-worthy groups -----------------------

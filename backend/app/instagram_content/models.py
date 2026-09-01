@@ -32,6 +32,10 @@ class MediaItem(BaseModel):
     media_type: MediaType
     aesthetic_score: float = Field(ge=0, le=1, description="How well this item fits the high-end account aesthetic")
     duration_seconds: float | None = Field(default=None, gt=0, description="Required for video, must be omitted for image")
+    recommended_trim_start_seconds: float | None = Field(
+        default=None, ge=0, description="Real, analyzed trim window (video only) -- never invented if absent."
+    )
+    recommended_trim_end_seconds: float | None = Field(default=None, gt=0)
 
     @model_validator(mode="after")
     def _duration_matches_type(self) -> "MediaItem":
@@ -56,7 +60,9 @@ class EditInstruction(BaseModel):
     )
     trim_needed: bool = False
     trim_start_seconds: float | None = Field(
-        default=None, description="Not set by AURON -- selecting the actual best segment needs human/real video analysis."
+        default=None,
+        description="Set only when video_trim_analysis.py has run on real sampled frames for this item -- "
+        "AURON never invents a value here from duration alone.",
     )
     trim_end_seconds: float | None = None
     notes: str = ""

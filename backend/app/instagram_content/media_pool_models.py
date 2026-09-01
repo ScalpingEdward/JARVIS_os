@@ -26,6 +26,14 @@ class MediaPoolItemCreate(BaseModel):
     aesthetic_score: float = Field(ge=0, le=1)
     duration_seconds: float | None = Field(default=None, gt=0)
     dominant_color_hex: str | None = Field(default=None, max_length=7)
+    recommended_trim_start_seconds: float | None = Field(
+        default=None,
+        ge=0,
+        description="Real, analyzed trim window (video only) -- set by video_trim_analysis.py from actual "
+        "sampled frames, never invented. None means no trim analysis has run for this item yet.",
+    )
+    recommended_trim_end_seconds: float | None = Field(default=None, gt=0)
+    trim_reasoning: str = Field(default="", max_length=1000)
     analyzed_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
     @model_validator(mode="after")
@@ -128,3 +136,31 @@ class MediaAnalyzeAndIngestResponse(BaseModel):
     results: list[MediaAnalyzeAndIngestItemResult]
     analyzed_and_ingested: int
     failed: int
+
+
+class FrameSample(BaseModel):
+    """One sampled still frame from a video, at a known timestamp. AURON
+    never receives or processes the video itself -- the caller (n8n, or a
+    script with Drive access) extracts frames at a regular interval and
+    supplies them here."""
+
+    timestamp_seconds: float = Field(ge=0)
+    image_base64: str | None = None
+    image_media_type: str | None = None
+    image_url: str | None = None
+
+
+class TrimAnalysisRequest(BaseModel):
+    frames: list[FrameSample] = Field(
+        min_length=3,
+        max_length=30,
+        description="Sampled frames across the video's full length, ideally at a regular interval.",
+    )
+    target_min_seconds: float = Field(default=15.0, gt=0)
+    target_max_seconds: float = Field(default=30.0, gt=0)
+
+
+class TrimAnalysisResult(BaseModel):
+    recommended_start_seconds: float
+    recommended_end_seconds: float
+    reasoning: str
