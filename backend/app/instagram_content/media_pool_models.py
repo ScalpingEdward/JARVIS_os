@@ -93,3 +93,38 @@ class FinalizeDraftRequest(BaseModel):
         description="If omitted, AURON generates one itself via a real Anthropic API call (needs ANTHROPIC_API_KEY set).",
     )
     aesthetic_notes: str = Field(default="", max_length=2000)
+
+
+class MediaAnalyzeAndIngestItem(BaseModel):
+    """One raw media reference to analyze and, on success, add to the pool.
+    AURON never fetches the file itself -- the caller supplies the bytes
+    or an already-fetchable URL. For video, this must be a representative
+    still frame (a thumbnail), not the video itself: Claude's vision
+    analyzes a single image, not motion/audio."""
+
+    media_ref: str = Field(min_length=1, max_length=2000)
+    media_type: MediaType
+    image_base64: str | None = Field(default=None, description="Base64-encoded image bytes (the photo, or a video thumbnail).")
+    image_media_type: str | None = Field(default=None, description="e.g. 'image/jpeg', required together with image_base64.")
+    image_url: str | None = Field(default=None, description="Alternative to image_base64: an already-fetchable image URL.")
+    duration_seconds: float | None = Field(default=None, gt=0, description="Required for video; ignored for image.")
+
+
+class MediaAnalyzeAndIngestRequest(BaseModel):
+    items: list[MediaAnalyzeAndIngestItem] = Field(min_length=1, max_length=50)
+
+
+class MediaAnalyzeAndIngestItemResult(BaseModel):
+    media_ref: str
+    success: bool
+    theme: str | None = None
+    tags: list[str] = Field(default_factory=list)
+    aesthetic_score: float | None = None
+    reasoning: str | None = None
+    error: str | None = None
+
+
+class MediaAnalyzeAndIngestResponse(BaseModel):
+    results: list[MediaAnalyzeAndIngestItemResult]
+    analyzed_and_ingested: int
+    failed: int

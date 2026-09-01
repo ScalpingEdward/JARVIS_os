@@ -78,24 +78,30 @@ internet and no third-party automation platform is involved.
 3. Only then can `POST /v1/instagram/candidates/{id}/publish` succeed — this is the one call that reaches n8n and actually posts. Calling it before approval returns a 409, on purpose.
 
 **Automated path from a photo folder** (the ~100-200-photo workflow):
-1. **Analyze once, in n8n (or a script with Drive access) — not in AURON.** For each new photo/video in your Drive folder, run a vision-analysis step (your existing Claude API call is fine for this) to produce: a short `theme` label (e.g. `"gold-trading-desk"`, `"mystic-symbol"`, `"quote-card"` — consistent labels are what let AURON group photos into a coherent carousel), optional `tags`, and an `aesthetic_score` (0-1, how well it fits the account's look).
-2. Push the results to AURON: `POST /v1/instagram/media-pool/ingest` with a batch of `{media_ref, media_type, theme, tags, aesthetic_score, duration_seconds (video only)}`. Re-ingesting the same `media_ref` is a no-op (deduplicated), so it's safe to re-run this over the whole folder periodically.
+1. **n8n's only job is fetching bytes -- AURON does the actual looking.** For each new photo (or a representative thumbnail frame for a video) in your Drive folder, n8n downloads it and calls `POST /v1/instagram/media-pool/analyze-and-ingest` with `{media_ref, media_type, image_base64 + image_media_type (or image_url), duration_seconds (video only)}`. AURON makes a real Claude vision call to actually look at the photo and derive a `theme` label (e.g. `"gold-trading-desk"`, `"mystic-symbol"`, `"quote-card"` — consistent labels are what let AURON group photos into a coherent carousel), `tags`, and a real `aesthetic_score` (0-1, judged from composition/lighting/coherence with the account's look, not guessed). Each item's outcome comes back individually, so one bad photo never blocks the rest of a 100-200-item batch. Video is analyzed via its thumbnail frame only -- Claude's vision reads a still image, not motion or audio, so treat a video's score/theme as a proxy from that one frame.
+2. Re-running this over the same folder is safe: `analyze-and-ingest` still calls the same deduplication-by-`media_ref` logic as plain `ingest` underneath.
 3. Trigger curation: `POST /v1/instagram/curate` — AURON groups the *unused* pool into hero posts (a standout single image), right-sized carousels (3-6 same-theme images), and standalone Reels (every video), reserving each item so nothing gets proposed twice. Nothing is posted yet; each result is a `CuratedDraft`.
-4. **AURON writes the caption itself now.** Call `POST /v1/instagram/curate/drafts/{draft_id}/finalize` with an empty body (or omit `caption_draft`), and AURON makes a real Anthropic API call (`ANTHROPIC_API_KEY` must be set in the backend's environment) to write the caption + hashtags in the account's voice, then runs it through the normal moderation/format/edit-plan pipeline. This closes the loop without an n8n round-trip. You can still pass `caption_draft` explicitly to skip generation for a one-off post -- both paths produce a real `ContentCandidate` (status `proposed`, unless moderation rejects it — in which case the photos are *not* consumed, so a retry, with a manual caption or by calling finalize again for a fresh generation, doesn't burn fresh media).
+4. **AURON writes the caption itself too.** Call `POST /v1/instagram/curate/drafts/{draft_id}/finalize` with an empty body (or omit `caption_draft`), and AURON makes a real Anthropic API call to write the caption + hashtags in the account's voice, then runs it through the normal moderation/format/edit-plan pipeline. You can still pass `caption_draft` explicitly to skip generation for a one-off post -- both paths produce a real `ContentCandidate` (status `proposed`, unless moderation rejects it — in which case the photos are *not* consumed, so a retry doesn't burn fresh media).
 
    Set the API key once in `.env`:
    ```
    ANTHROPIC_API_KEY=sk-ant-...
    AURON_CAPTION_MODEL=claude-sonnet-5   # optional, this is the default
+   AURON_VISION_MODEL=claude-sonnet-5    # optional, this is the default
    ```
+
+With this path, n8n's Instagram role shrinks to three mechanical steps: fetch bytes from Drive, forward them to AURON, and (after your approval) call the Meta Graph API to actually post. Every judgment call -- what a photo is, whether it fits the account, how to group it, what to write about it -- happens in AURON.
 5. From here it's the manual path: you approve, then publish triggers n8n.
 
 Each photo/video is only ever used once: `mark_finalized` (step 4) permanently flags the pool items as used, and a discarded draft (`POST /v1/instagram/curate/drafts/{draft_id}/discard`, e.g. if the grouping itself was wrong) releases its photos back to the pool instead.
 
 No Meta credential ever needs to live in AURON's code or environment --
-posting itself stays entirely inside your existing n8n workflow. Vision
-analysis (theme/tags/aesthetic_score) also stays external, wherever the
-files live. Caption generation is the one exception: AURON holds its own
-`ANTHROPIC_API_KEY` to write captions directly, since that's Anthropic's
+posting itself stays entirely inside your existing n8n workflow, and so
+does fetching the raw files from Drive (AURON never holds a Drive
+credential either). Vision analysis and caption generation both now run
+inside AURON, using its own `ANTHROPIC_API_KEY` -- since that's Anthropic's
 own API rather than a third-party credential, and it's the same key you'd
-already trust Claude with elsewhere in this project.
+already trust Claude with elsewhere in this project. The plain
+`POST /v1/instagram/media-pool/ingest` endpoint (pre-analyzed items, no
+vision call) still exists too, for cases where you already have
+theme/tags/aesthetic_score from somewhere else.
