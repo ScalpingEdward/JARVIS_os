@@ -3,19 +3,14 @@ from __future__ import annotations
 import re
 
 from .models import ContentCandidateCreate
+from .platform_strategy import platform_strategy_store
 
 # Deliberately explicit and editable in one place, not scattered constants --
 # this is the account's brand/compliance policy, not a technical detail.
+# Hashtag cap/range and aesthetic thresholds now live in platform_strategy.py
+# (dynamically updatable via researched proposals, applied only explicitly);
+# MAX_CAPTION_LENGTH is Instagram's own fixed API limit and never changes.
 MAX_CAPTION_LENGTH = 2200  # Instagram's own hard limit
-# Instagram enforces a HARD 5-hashtag cap platform-wide since December 2025
-# (applies to posts, Reels, and comments combined -- not a "best practice",
-# a publish-time restriction). Verified via web search 2026-08-31; re-verify
-# if this code is revisited far in the future, platform rules change.
-MAX_HASHTAGS = 5
-OPTIMAL_HASHTAG_RANGE = (3, 5)  # Meta's own official recommendation as of 2026; Instagram's head has stated
-# hashtags no longer drive reach directly, only content categorization -- precision over volume.
-MIN_AESTHETIC_SCORE_HARD = 0.35  # below this: not the account's aesthetic, auto-reject
-MIN_AESTHETIC_SCORE_SOFT = 0.6  # below this but above the hard floor: let a human decide, but flag it
 
 BANNED_PHRASES = (
     "follow4follow",
@@ -53,6 +48,8 @@ def moderate(candidate: ContentCandidateCreate, recent_captions: list[str]) -> M
     violations: list[str] = []
     warnings: list[str] = []
 
+    strategy = platform_strategy_store.current()
+
     caption = candidate.caption_draft.strip()
     if not caption:
         violations.append("Caption is empty.")
@@ -60,20 +57,20 @@ def moderate(candidate: ContentCandidateCreate, recent_captions: list[str]) -> M
         violations.append(f"Caption exceeds Instagram's {MAX_CAPTION_LENGTH}-character limit.")
 
     hashtags = _HASHTAG_RE.findall(caption)
-    if len(hashtags) > MAX_HASHTAGS:
+    if len(hashtags) > strategy.max_hashtags:
         violations.append(
-            f"{len(hashtags)} hashtags exceeds Instagram's platform-enforced {MAX_HASHTAGS}-hashtag cap "
-            "(publish-time restriction since Dec 2025, not just a style guideline)."
+            f"{len(hashtags)} hashtags exceeds Instagram's platform-enforced {strategy.max_hashtags}-hashtag cap "
+            "(publish-time restriction, not just a style guideline)."
         )
     elif len(hashtags) == 0:
         warnings.append(
             "No hashtags at all -- even though hashtags no longer drive reach directly, they still help "
             "Instagram categorize the post correctly; a missed classification signal."
         )
-    elif len(hashtags) < OPTIMAL_HASHTAG_RANGE[0]:
+    elif len(hashtags) < strategy.optimal_hashtag_min:
         warnings.append(
-            f"Only {len(hashtags)} hashtag(s); Meta's own current guidance is "
-            f"{OPTIMAL_HASHTAG_RANGE[0]}-{OPTIMAL_HASHTAG_RANGE[1]} for the clearest categorization signal."
+            f"Only {len(hashtags)} hashtag(s); current guidance is "
+            f"{strategy.optimal_hashtag_min}-{strategy.optimal_hashtag_max} for the clearest categorization signal."
         )
 
     lowered = caption.lower()
@@ -84,17 +81,22 @@ def moderate(candidate: ContentCandidateCreate, recent_captions: list[str]) -> M
     scores = [item.aesthetic_score for item in candidate.media_items]
     average_score = sum(scores) / len(scores)
     weakest_score = min(scores)
-    if average_score < MIN_AESTHETIC_SCORE_HARD:
+    # NOTE: aesthetic score thresholds are curation's ELITE_SOLO_THRESHOLD-adjacent
+    # concept but a separate, lower bar for "acceptable at all" -- kept as fixed
+    # values here (not in PlatformStrategy) since they're account-taste calls,
+    # not platform-rule facts a web search can verify.
+    min_aesthetic_hard = 0.35
+    min_aesthetic_soft = 0.6
+    if average_score < min_aesthetic_hard:
         violations.append(
-            f"Average aesthetic score {average_score:.2f} is below the account's minimum bar "
-            f"({MIN_AESTHETIC_SCORE_HARD})."
+            f"Average aesthetic score {average_score:.2f} is below the account's minimum bar ({min_aesthetic_hard})."
         )
-    elif average_score < MIN_AESTHETIC_SCORE_SOFT:
+    elif average_score < min_aesthetic_soft:
         warnings.append(
             f"Average aesthetic score {average_score:.2f} is below the usual bar "
-            f"({MIN_AESTHETIC_SCORE_SOFT}) -- borderline fit for the account."
+            f"({min_aesthetic_soft}) -- borderline fit for the account."
         )
-    if len(scores) > 1 and weakest_score < MIN_AESTHETIC_SCORE_HARD:
+    if len(scores) > 1 and weakest_score < min_aesthetic_hard:
         warnings.append(
             f"At least one media item scores {weakest_score:.2f}, below the account's minimum bar -- "
             "consider dropping it from the carousel even if the average is fine."
