@@ -75,6 +75,8 @@ class InstagramContentService:
 
         if item.status == ContentStatus.proposed:
             self._notify_ready_for_review(item)
+        elif item.status == ContentStatus.moderation_rejected:
+            self._notify_moderation_rejected(item)
 
         return item
 
@@ -99,6 +101,23 @@ class InstagramContentService:
                 )
             )
         except Exception:  # noqa: BLE001 -- deliberately broad: a notification problem must never break content creation
+            pass
+
+    def _notify_moderation_rejected(self, item: ContentCandidate) -> None:
+        """Low priority (not urgent -- these need eventual review for false
+        positives, not immediate action): a candidate you might want to
+        override via /decision, but never shown as pending review."""
+        try:
+            notification_hub_service.create(
+                NotificationCreate(
+                    title="Instagram: auto-rejected by moderation",
+                    message=f"{item.decision_reason or 'No reason recorded.'}\nCaption: {item.caption_draft[:200]}",
+                    priority=DeliveryPriority.low,
+                    domain="instagram",
+                    source_id=str(item.id),
+                )
+            )
+        except Exception:  # noqa: BLE001
             pass
 
     def _notify_publish_failed(self, item: ContentCandidate, exc: Exception) -> None:
