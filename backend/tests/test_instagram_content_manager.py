@@ -238,6 +238,7 @@ def test_publish_failure_sends_a_high_priority_notification():
     matching = [n for n in notification_hub_service.list_all() if n.source_id == str(item.id) and "failed" in n.title.lower()]
     assert len(matching) == 1
     assert matching[0].priority == DeliveryPriority.high
+    assert matching[0].requires_acknowledgement is True
 
 
 def test_publisher_rejects_missing_media_id_in_response():

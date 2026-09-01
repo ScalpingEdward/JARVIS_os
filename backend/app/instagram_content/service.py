@@ -132,6 +132,7 @@ class InstagramContentService:
                     priority=DeliveryPriority.high,
                     domain="instagram",
                     source_id=str(item.id),
+                    requires_acknowledgement=True,
                 )
             )
         except Exception:  # noqa: BLE001
