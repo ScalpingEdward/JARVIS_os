@@ -1,0 +1,28 @@
+from __future__ import annotations
+
+from uuid import UUID
+
+from fastapi import APIRouter, HTTPException
+
+from app.modules.dynamic_risk_engine.models import DynamicRiskRecord
+
+from .models import RiskAssessmentRequest
+from .service import TradeRiskPipelineError, trade_risk_pipeline_service
+
+router = APIRouter(prefix="/v1/trade-risk-pipeline", tags=["trade-risk-pipeline"])
+
+
+@router.post("/assess/{approval_request_id}", response_model=DynamicRiskRecord)
+def assess(approval_request_id: UUID, request: RiskAssessmentRequest = RiskAssessmentRequest()) -> DynamicRiskRecord:
+    """Runs a real, policy-bounded risk assessment for an already-approved setup.
+
+    Pulls the setup from setup_submission's approval queue and the account's
+    live state from the account registry -- nothing here re-specifies the
+    trade. Returns the dynamic_risk_engine record (risk-approved, human-
+    review-required, or blocked) with the actual recommended position size.
+    Does not open a position or place an order.
+    """
+    try:
+        return trade_risk_pipeline_service.assess(approval_request_id, request)
+    except TradeRiskPipelineError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
