@@ -31,9 +31,31 @@ internet and no third-party automation platform is involved.
    an external network there too, the same way it's declared here.
 
 4. In n8n, create a webhook-triggered workflow ("Webhook" node, POST) that:
-   - receives `{ "request_id": ..., "image_source_ref": ..., "caption": ... }`
-   - does the actual Instagram publish (Meta Graph API call using your
-     existing "JARVIS INST" app credentials)
+   - receives:
+     ```json
+     {
+       "request_id": "...",
+       "post_format": "single_image | carousel | reel",
+       "media_items": [
+         {"media_ref": "...", "media_type": "image | video", "aesthetic_score": 0.9, "duration_seconds": null}
+       ],
+       "edit_plan": [
+         {
+           "media_ref": "...",
+           "target_aspect_ratio": "4:5",
+           "color_grade_preset": "auron-warm-mystic-v1",
+           "target_duration_seconds": null,
+           "trim_needed": false,
+           "trim_start_seconds": null,
+           "trim_end_seconds": null,
+           "notes": "Crop to 4:5 and apply the account's standard grade for feed consistency."
+         }
+       ],
+       "caption": "..."
+     }
+     ```
+   - executes `edit_plan` for real: crops/grades each item per `color_grade_preset` (define this preset once in your own editing tool -- AURON only sends a stable name, it does not touch pixels), and if `trim_needed` is `true` for a video, either trims it based on your own manual review (AURON deliberately never invents `trim_start_seconds`/`trim_end_seconds`) or flags it back to you before posting
+   - posts as the right Instagram object based on `post_format` (single media, carousel container with all `media_items`, or Reel) via the Meta Graph API using your existing "JARVIS INST" app credentials
    - responds with `{ "media_id": "<the id Instagram returned>" }`
 
    Note the webhook path n8n gives you, e.g. `/webhook/instagram-post`.

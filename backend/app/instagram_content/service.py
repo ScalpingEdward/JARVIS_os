@@ -2,6 +2,9 @@ from __future__ import annotations
 
 from uuid import UUID
 
+from .edit_plan import build_edit_plan
+from .format_decision import decide_format
+from .hook import check_hook
 from .models import ContentCandidate, ContentCandidateCreate, ContentDecision, ContentStatus
 from .moderation import moderate
 from .publisher import N8nInstagramPublisher, N8nInstagramPublisherError
@@ -30,18 +33,32 @@ class InstagramContentService:
     def propose(self, payload: ContentCandidateCreate) -> ContentCandidate:
         recent_captions = [item.caption_draft.strip() for item in self._items.values()]
         result = moderate(payload, recent_captions)
+        hook_warnings = check_hook(payload.caption_draft)
 
-        item = ContentCandidate(**payload.model_dump())
+        post_format, format_reasoning = decide_format(payload.media_items)
+        edit_plan = build_edit_plan(payload.media_items, post_format)
+
+        item = ContentCandidate(
+            media_items=payload.media_items,
+            post_format=post_format,
+            format_reasoning=format_reasoning,
+            edit_plan=edit_plan,
+            caption_draft=payload.caption_draft,
+            aesthetic_notes=payload.aesthetic_notes,
+        )
         item.moderation_warnings = list(result.warnings)
+        item.hook_warnings = hook_warnings
 
         if not result.passed:
             item.status = ContentStatus.moderation_rejected
             item.decision_reason = "Auto-rejected by moderation: " + "; ".join(result.violations)
             item.audit_log.append(item.decision_reason)
         else:
-            item.audit_log.append(f"Proposed with aesthetic_score={item.aesthetic_score:.2f}")
+            item.audit_log.append(f"Proposed as {post_format.value}: {format_reasoning}")
             if result.warnings:
                 item.audit_log.append("Moderation warnings (still pending human review): " + "; ".join(result.warnings))
+            if hook_warnings:
+                item.audit_log.append("Hook warnings: " + "; ".join(hook_warnings))
 
         self._items[item.id] = item
         return item
@@ -84,7 +101,9 @@ class InstagramContentService:
 
         try:
             media_id = self._publisher.publish(
-                image_source_ref=item.image_source_ref,
+                media_items=item.media_items,
+                post_format=item.post_format,
+                edit_plan=item.edit_plan,
                 caption=item.caption_draft,
                 request_id=str(item.id),
             )

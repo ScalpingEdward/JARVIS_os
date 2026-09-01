@@ -5,6 +5,8 @@ from dataclasses import dataclass
 
 import httpx
 
+from .models import EditInstruction, MediaItem, PostFormat
+
 
 class N8nInstagramPublisherError(RuntimeError):
     pass
@@ -30,20 +32,35 @@ class N8nInstagramPublisher:
     This is called exactly once, and only after a candidate has status
     'approved' (enforced by InstagramContentService, not here -- this class
     has no opinion about approval, it only executes what it is told).
+
+    Sends the full media list, the format decision (single/carousel/reel),
+    and the edit plan (target aspect ratio, color-grade preset, trim
+    guidance) to n8n. AURON does not perform the actual image/video
+    processing or hold Drive/Meta credentials -- n8n's own workflow is
+    responsible for executing the edit plan and calling the Graph API.
     """
 
     def __init__(self, config: N8nInstagramPublisherConfig | None = None, client: httpx.Client | None = None) -> None:
         self.config = config or N8nInstagramPublisherConfig()
         self._client = client
 
-    def publish(self, image_source_ref: str, caption: str, request_id: str) -> str:
+    def publish(
+        self,
+        media_items: list[MediaItem],
+        post_format: PostFormat,
+        edit_plan: list[EditInstruction],
+        caption: str,
+        request_id: str,
+    ) -> str:
         client, should_close = (self._client, False) if self._client else (httpx.Client(), True)
         try:
             response = client.post(
                 self.config.webhook_url,
                 json={
                     "request_id": request_id,
-                    "image_source_ref": image_source_ref,
+                    "post_format": post_format.value,
+                    "media_items": [item.model_dump(mode="json") for item in media_items],
+                    "edit_plan": [instruction.model_dump(mode="json") for instruction in edit_plan],
                     "caption": caption,
                 },
                 timeout=self.config.timeout_seconds,

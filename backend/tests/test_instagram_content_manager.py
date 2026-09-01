@@ -1,8 +1,10 @@
+import json
+
 import httpx
 import pytest
 from fastapi.testclient import TestClient
 
-from app.instagram_content.models import ContentCandidateCreate, ContentDecision, ContentStatus
+from app.instagram_content.models import ContentCandidateCreate, ContentDecision, ContentStatus, PostFormat
 from app.instagram_content.publisher import N8nInstagramPublisher, N8nInstagramPublisherError
 from app.instagram_content.service import InstagramContentError, InstagramContentService
 from app.main import app
@@ -10,11 +12,18 @@ from app.main import app
 api_client = TestClient(app)
 
 
+def _image(ref="drive://file-123", score=0.9):
+    return {"media_ref": ref, "media_type": "image", "aesthetic_score": score}
+
+
+def _video(ref="drive://clip-1", score=0.9, duration=20.0):
+    return {"media_ref": ref, "media_type": "video", "aesthetic_score": score, "duration_seconds": duration}
+
+
 def _candidate_payload(**overrides):
     payload = dict(
-        image_source_ref="drive://file-123",
-        caption_draft="Build in silence.",
-        aesthetic_score=0.9,
+        media_items=[_image()],
+        caption_draft="Build in silence. Let the results make the noise.",
         aesthetic_notes="Clean composition, matches the high-end aesthetic.",
     )
     payload.update(overrides)
@@ -25,6 +34,94 @@ def _service_with_mock_publisher(handler):
     transport = httpx.MockTransport(handler)
     publisher = N8nInstagramPublisher(client=httpx.Client(transport=transport))
     return InstagramContentService(publisher=publisher)
+
+
+# -- format decision, wired through propose() --------------------------------
+
+
+def test_single_image_becomes_single_post():
+    service = InstagramContentService()
+    item = service.propose(ContentCandidateCreate(**_candidate_payload(media_items=[_image()])))
+    assert item.post_format == PostFormat.single_image
+
+
+def test_single_video_becomes_a_reel():
+    service = InstagramContentService()
+    item = service.propose(ContentCandidateCreate(**_candidate_payload(media_items=[_video()])))
+    assert item.post_format == PostFormat.reel
+
+
+def test_multiple_images_become_a_carousel():
+    service = InstagramContentService()
+    item = service.propose(
+        ContentCandidateCreate(**_candidate_payload(media_items=[_image("a"), _image("b"), _image("c")]))
+    )
+    assert item.post_format == PostFormat.carousel
+
+
+def test_mixed_image_and_video_still_becomes_a_carousel():
+    service = InstagramContentService()
+    item = service.propose(ContentCandidateCreate(**_candidate_payload(media_items=[_image("a"), _video("b")])))
+    assert item.post_format == PostFormat.carousel
+
+
+def test_carousel_is_capped_at_ten_items():
+    with pytest.raises(Exception):  # pydantic ValidationError
+        ContentCandidateCreate(**_candidate_payload(media_items=[_image(str(i)) for i in range(11)]))
+
+
+def test_video_requires_a_duration():
+    with pytest.raises(Exception):
+        ContentCandidateCreate(
+            **_candidate_payload(media_items=[{"media_ref": "x", "media_type": "video", "aesthetic_score": 0.9}])
+        )
+
+
+# -- edit plan ----------------------------------------------------------------
+
+
+def test_edit_plan_gives_every_item_the_same_grade_preset():
+    service = InstagramContentService()
+    item = service.propose(
+        ContentCandidateCreate(**_candidate_payload(media_items=[_image("a"), _image("b"), _video("c")]))
+    )
+    presets = {instruction.color_grade_preset for instruction in item.edit_plan}
+    assert len(presets) == 1  # one consistent look across the whole account
+
+
+def test_edit_plan_flags_an_overlong_reel_for_trimming_without_inventing_a_window():
+    service = InstagramContentService()
+    item = service.propose(ContentCandidateCreate(**_candidate_payload(media_items=[_video("c", duration=120.0)])))
+    instruction = item.edit_plan[0]
+    assert instruction.trim_needed is True
+    assert instruction.trim_start_seconds is None  # never invented
+    assert instruction.trim_end_seconds is None
+
+
+def test_edit_plan_does_not_flag_a_well_sized_reel():
+    service = InstagramContentService()
+    item = service.propose(ContentCandidateCreate(**_candidate_payload(media_items=[_video("c", duration=20.0)])))
+    assert item.edit_plan[0].trim_needed is False
+
+
+# -- hook check -----------------------------------------------------------
+
+
+def test_hook_warning_for_hashtag_opening():
+    service = InstagramContentService()
+    item = service.propose(ContentCandidateCreate(**_candidate_payload(caption_draft="#mystic #trading vibes only")))
+    assert any("hashtag" in w.lower() for w in item.hook_warnings)
+
+
+def test_no_hook_warning_for_a_solid_opening_line():
+    service = InstagramContentService()
+    item = service.propose(
+        ContentCandidateCreate(**_candidate_payload(caption_draft="Most people quit right before it clicks."))
+    )
+    assert item.hook_warnings == []
+
+
+# -- approval / publish flow, unchanged in spirit, updated for new schema --
 
 
 def test_publish_is_blocked_before_approval():
@@ -54,25 +151,26 @@ def test_approval_can_edit_the_caption():
     assert item.status == ContentStatus.approved
 
 
-def test_approved_publish_calls_n8n_and_records_media_id():
+def test_approved_publish_sends_media_items_format_and_edit_plan_to_n8n():
     calls: list[dict] = []
 
     def handler(request: httpx.Request) -> httpx.Response:
-        import json
-
         calls.append(json.loads(request.content))
         return httpx.Response(200, json={"media_id": "17895695668004550"})
 
     service = _service_with_mock_publisher(handler)
-    item = service.propose(ContentCandidateCreate(**_candidate_payload()))
-    service.decide(item.id, ContentDecision(approved=True, reason="Great shot"))
+    item = service.propose(ContentCandidateCreate(**_candidate_payload(media_items=[_image("a"), _image("b")])))
+    service.decide(item.id, ContentDecision(approved=True, reason="Great pair"))
 
     result = service.publish(item.id)
 
     assert result.status == ContentStatus.posted
     assert result.published_media_id == "17895695668004550"
     assert len(calls) == 1
-    assert calls[0]["image_source_ref"] == "drive://file-123"
+    assert calls[0]["post_format"] == "carousel"
+    assert [m["media_ref"] for m in calls[0]["media_items"]] == ["a", "b"]
+    assert len(calls[0]["edit_plan"]) == 2
+    assert calls[0]["edit_plan"][0]["color_grade_preset"]
 
 
 def test_n8n_failure_marks_post_failed_and_does_not_retry_silently():
@@ -90,12 +188,19 @@ def test_n8n_failure_marks_post_failed_and_does_not_retry_silently():
 
 
 def test_publisher_rejects_missing_media_id_in_response():
+    from app.instagram_content.edit_plan import build_edit_plan
+    from app.instagram_content.format_decision import decide_format
+    from app.instagram_content.models import MediaItem
+
     def handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(200, json={"ok": True})
 
     publisher = N8nInstagramPublisher(client=httpx.Client(transport=httpx.MockTransport(handler)))
+    media_items = [MediaItem(**_image())]
+    post_format, _ = decide_format(media_items)
+    edit_plan = build_edit_plan(media_items, post_format)
     with pytest.raises(N8nInstagramPublisherError, match="media_id"):
-        publisher.publish("drive://x", "caption", "req-1")
+        publisher.publish(media_items, post_format, edit_plan, "caption", "req-1")
 
 
 def test_api_flow_end_to_end():
@@ -105,6 +210,7 @@ def test_api_flow_end_to_end():
     created = api_client.post("/v1/instagram/candidates", json=_candidate_payload())
     assert created.status_code == 200
     candidate_id = created.json()["id"]
+    assert created.json()["post_format"] == "single_image"
 
     listed = api_client.get("/v1/instagram/candidates", params={"status": "proposed"})
     assert listed.json()["count"] == 1
@@ -117,3 +223,14 @@ def test_api_flow_end_to_end():
         json={"approved": True, "reason": "Looks great"},
     )
     assert decided.json()["status"] == "approved"
+
+
+def test_posting_schedule_endpoint():
+    response = api_client.get("/v1/instagram/posting-schedule/0")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["windows"]
+    assert "analytics" in body["note"].lower() or "insights" in body["note"].lower()
+
+    invalid = api_client.get("/v1/instagram/posting-schedule/9")
+    assert invalid.status_code == 422
