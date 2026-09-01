@@ -5,6 +5,7 @@ from uuid import UUID
 from fastapi import APIRouter, HTTPException
 
 from app.modules.dynamic_risk_engine.models import DynamicRiskRecord
+from app.modules.position_management_brain.models import PositionRecord
 
 from .models import RiskAssessmentRequest
 from .service import TradeRiskPipelineError, trade_risk_pipeline_service
@@ -24,5 +25,19 @@ def assess(approval_request_id: UUID, request: RiskAssessmentRequest = RiskAsses
     """
     try:
         return trade_risk_pipeline_service.assess(approval_request_id, request)
+    except TradeRiskPipelineError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@router.post("/accounts/{workspace_id}/open-position/{risk_record_id}", response_model=PositionRecord)
+def open_position(workspace_id: str, risk_record_id: str) -> PositionRecord:
+    """Opens a tracked position from an already risk-approved assessment.
+
+    Requires the risk record returned by /assess to be in the risk-approved
+    state. Maps the strategy's take-profits into real exit rules in
+    position_management_brain. Still does not place a broker order.
+    """
+    try:
+        return trade_risk_pipeline_service.open_position(workspace_id, risk_record_id)
     except TradeRiskPipelineError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
