@@ -252,7 +252,8 @@ def test_proposing_a_candidate_notifies_via_notification_hub():
     assert matching[0].state in (DeliveryState.delivered, DeliveryState.deferred)
 
 
-def test_moderation_rejected_candidate_does_not_notify():
+def test_moderation_rejected_candidate_sends_a_low_priority_notification():
+    from app.notification_hub.models import DeliveryPriority
     from app.notification_hub.service import notification_hub_service
 
     notification_hub_service.reset()
@@ -262,7 +263,9 @@ def test_moderation_rejected_candidate_does_not_notify():
 
     notifications = notification_hub_service.list_all()
     matching = [n for n in notifications if n.source_id == str(item.id)]
-    assert matching == []
+    assert len(matching) == 1
+    assert matching[0].priority == DeliveryPriority.low
+    assert "auto-rejected" in matching[0].title.lower()
 
 
 def test_api_flow_end_to_end():
