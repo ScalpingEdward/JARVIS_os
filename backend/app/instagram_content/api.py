@@ -9,14 +9,18 @@ from .media_pool_models import (
     CuratedDraft,
     CuratedDraftList,
     FinalizeDraftRequest,
+    MediaAnalyzeAndIngestRequest,
+    MediaAnalyzeAndIngestResponse,
     MediaPoolIngestRequest,
     MediaPoolIngestResponse,
     MediaPoolList,
 )
+from .analyze_and_ingest import analyze_and_ingest
 from .media_pool_service import MediaPoolError, media_pool_service
 from .models import ContentCandidate, ContentCandidateCreate, ContentCandidateList, ContentDecision, ContentStatus
 from .posting_schedule import NOTE, PostingWindow, suggested_windows_for_weekday
 from .service import InstagramContentError, instagram_content_service
+from .vision_analysis import AnthropicVisionAnalyzer
 
 router = APIRouter(prefix="/v1/instagram", tags=["instagram-content"])
 
@@ -89,6 +93,17 @@ def ingest_media(request: MediaPoolIngestRequest) -> MediaPoolIngestResponse:
 def list_media_pool(available_only: bool = False):
     items = media_pool_service.list_available() if available_only else media_pool_service.list_all()
     return MediaPoolList(items=items, count=len(items))
+
+
+@router.post("/media-pool/analyze-and-ingest", response_model=MediaAnalyzeAndIngestResponse)
+def analyze_and_ingest_media(request: MediaAnalyzeAndIngestRequest) -> MediaAnalyzeAndIngestResponse:
+    """AURON actually looks at each photo via Claude's vision, deriving the
+    theme, tags, and aesthetic score itself instead of requiring them as
+    input. AURON still never fetches the file -- the caller supplies image
+    bytes or an already-fetchable URL. Every item's real outcome (analyzed
+    + ingested, or a specific failure reason) comes back individually; one
+    bad item never blocks the rest of the batch."""
+    return analyze_and_ingest(request.items, AnthropicVisionAnalyzer(), media_pool_service)
 
 
 # -- curation: turning the pool into post-worthy groups -----------------------
