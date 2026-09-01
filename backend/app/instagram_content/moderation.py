@@ -7,9 +7,13 @@ from .models import ContentCandidateCreate
 # Deliberately explicit and editable in one place, not scattered constants --
 # this is the account's brand/compliance policy, not a technical detail.
 MAX_CAPTION_LENGTH = 2200  # Instagram's own hard limit
-MAX_HASHTAGS = 30  # Instagram rejects posts above this; going near it also reads as spam
-OPTIMAL_HASHTAG_RANGE = (3, 8)  # well-documented current guidance for reach on high-end/curated accounts;
-# maxing out the 30-tag limit reads as spammy and has trended toward lower reach, not higher, in recent years
+# Instagram enforces a HARD 5-hashtag cap platform-wide since December 2025
+# (applies to posts, Reels, and comments combined -- not a "best practice",
+# a publish-time restriction). Verified via web search 2026-08-31; re-verify
+# if this code is revisited far in the future, platform rules change.
+MAX_HASHTAGS = 5
+OPTIMAL_HASHTAG_RANGE = (3, 5)  # Meta's own official recommendation as of 2026; Instagram's head has stated
+# hashtags no longer drive reach directly, only content categorization -- precision over volume.
 MIN_AESTHETIC_SCORE_HARD = 0.35  # below this: not the account's aesthetic, auto-reject
 MIN_AESTHETIC_SCORE_SOFT = 0.6  # below this but above the hard floor: let a human decide, but flag it
 
@@ -57,15 +61,19 @@ def moderate(candidate: ContentCandidateCreate, recent_captions: list[str]) -> M
 
     hashtags = _HASHTAG_RE.findall(caption)
     if len(hashtags) > MAX_HASHTAGS:
-        violations.append(f"{len(hashtags)} hashtags exceeds Instagram's {MAX_HASHTAGS}-hashtag limit.")
-    elif len(hashtags) > MAX_HASHTAGS - 5:
-        warnings.append(f"{len(hashtags)} hashtags is close to the {MAX_HASHTAGS}-hashtag limit.")
+        violations.append(
+            f"{len(hashtags)} hashtags exceeds Instagram's platform-enforced {MAX_HASHTAGS}-hashtag cap "
+            "(publish-time restriction since Dec 2025, not just a style guideline)."
+        )
     elif len(hashtags) == 0:
-        warnings.append("No hashtags at all -- a missed discovery opportunity even for a curated account.")
-    elif not (OPTIMAL_HASHTAG_RANGE[0] <= len(hashtags) <= OPTIMAL_HASHTAG_RANGE[1]):
         warnings.append(
-            f"{len(hashtags)} hashtags is outside the {OPTIMAL_HASHTAG_RANGE[0]}-{OPTIMAL_HASHTAG_RANGE[1]} range "
-            "that currently reads as curated rather than spammy for reach-focused accounts."
+            "No hashtags at all -- even though hashtags no longer drive reach directly, they still help "
+            "Instagram categorize the post correctly; a missed classification signal."
+        )
+    elif len(hashtags) < OPTIMAL_HASHTAG_RANGE[0]:
+        warnings.append(
+            f"Only {len(hashtags)} hashtag(s); Meta's own current guidance is "
+            f"{OPTIMAL_HASHTAG_RANGE[0]}-{OPTIMAL_HASHTAG_RANGE[1]} for the clearest categorization signal."
         )
 
     lowered = caption.lower()

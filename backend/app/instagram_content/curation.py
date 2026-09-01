@@ -9,7 +9,11 @@ from .models import MediaType
 # Real, explicit high-end-account curation rules -- not a black box:
 ELITE_SOLO_THRESHOLD = 0.85  # an image this strong deserves its own post, not to be buried in a carousel
 CAROUSEL_MIN_SIZE = 3  # 2-image carousels read as an afterthought, not a curated set
-CAROUSEL_IDEAL_MAX_SIZE = 6  # past this, swipe-through completion drops; better to save the rest for next time
+# 2026 platform data consistently puts the carousel sweet spot at 7-10 slides
+# (highest average engagement, highest dwell time, algorithm reshow bonus for
+# swipe-through), not the 3-6 range that was common guidance in earlier years.
+# Verified via web search 2026-08-31.
+CAROUSEL_IDEAL_MAX_SIZE = 10
 
 
 @dataclass(frozen=True)
