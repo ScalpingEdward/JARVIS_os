@@ -1,15 +1,15 @@
 [
   {
-    "id": "fd147885-a446-4860-b9e2-a637b375e950",
+    "id": "4bcfbc43-ce3c-4c2c-b07c-c6f2487155b7",
     "plan": {
-      "id": "d2c84132-d69e-4b2b-bcd1-dbd5b11a7fbb",
+      "id": "79fce48a-d3e4-4339-bc54-4244259fc356",
       "goal": "Build a safe Telegram parser",
       "summary": "Dependency-aware multi-agent plan with 8 steps and independent reviews.",
       "constraints": [],
       "status": "ready",
       "steps": [
         {
-          "id": "977707cc-706e-4028-8442-4bb13531eb90",
+          "id": "066c30c8-3077-4e91-81ac-08785dc4b0ec",
           "sequence": 1,
           "phase": "Discovery",
           "title": "Analyse goal, constraints and acceptance criteria",
@@ -37,7 +37,7 @@
           "orchestrator_task_id": null
         },
         {
-          "id": "442bcbe4-5f02-4ac1-a96c-53966c5d9347",
+          "id": "f56c2e7f-5386-417a-97b8-b671058339d0",
           "sequence": 2,
           "phase": "Architecture",
           "title": "Design system architecture and interfaces",
@@ -59,7 +59,7 @@
           "reviewer_worker": "openai",
           "priority": 95,
           "depends_on": [
-            "977707cc-706e-4028-8442-4bb13531eb90"
+            "066c30c8-3077-4e91-81ac-08785dc4b0ec"
           ],
           "approval_required": false,
           "approval_reason": null,
@@ -67,7 +67,7 @@
           "orchestrator_task_id": null
         },
         {
-          "id": "98e82736-953c-4d82-86d0-9daf194ab11b",
+          "id": "b8267507-e4c3-4f92-bb8d-dd35d784a5e7",
           "sequence": 3,
           "phase": "Implementation",
           "title": "Implement backend and core domain logic",
@@ -90,7 +90,7 @@
           "reviewer_worker": "claude",
           "priority": 90,
           "depends_on": [
-            "442bcbe4-5f02-4ac1-a96c-53966c5d9347"
+            "f56c2e7f-5386-417a-97b8-b671058339d0"
           ],
           "approval_required": false,
           "approval_reason": null,
@@ -98,7 +98,7 @@
           "orchestrator_task_id": null
         },
         {
-          "id": "577816c9-f666-46a5-999c-c8220fa62d74",
+          "id": "0c36d58d-368f-466b-a8b6-b7c6682ae2af",
           "sequence": 4,
           "phase": "Implementation",
           "title": "Build operator interface",
@@ -120,7 +120,7 @@
           "reviewer_worker": "gemini",
           "priority": 82,
           "depends_on": [
-            "442bcbe4-5f02-4ac1-a96c-53966c5d9347"
+            "f56c2e7f-5386-417a-97b8-b671058339d0"
           ],
           "approval_required": false,
           "approval_reason": null,
@@ -128,7 +128,7 @@
           "orchestrator_task_id": null
         },
         {
-          "id": "bac6e46f-ab8f-4104-9f7f-3ba4fb79bcac",
+          "id": "ecd03b9f-aa56-40cf-80a7-550352e8772c",
           "sequence": 5,
           "phase": "Verification",
           "title": "Add automated and integration tests",
@@ -150,8 +150,8 @@
           "reviewer_worker": "gemini",
           "priority": 88,
           "depends_on": [
-            "98e82736-953c-4d82-86d0-9daf194ab11b",
-            "577816c9-f666-46a5-999c-c8220fa62d74"
+            "b8267507-e4c3-4f92-bb8d-dd35d784a5e7",
+            "0c36d58d-368f-466b-a8b6-b7c6682ae2af"
           ],
           "approval_required": false,
           "approval_reason": null,
@@ -159,7 +159,7 @@
           "orchestrator_task_id": null
         },
         {
-          "id": "2ab66df0-0367-4f8b-a7f8-109c762c9390",
+          "id": "9657cb72-e69c-458d-a7a6-681f4a4bd088",
           "sequence": 6,
           "phase": "Review",
           "title": "Run independent security and quality review",
@@ -181,7 +181,7 @@
           "reviewer_worker": "claude",
           "priority": 84,
           "depends_on": [
-            "bac6e46f-ab8f-4104-9f7f-3ba4fb79bcac"
+            "ecd03b9f-aa56-40cf-80a7-550352e8772c"
           ],
           "approval_required": false,
           "approval_reason": null,
@@ -189,7 +189,7 @@
           "orchestrator_task_id": null
         },
         {
-          "id": "81bd7098-505b-468d-b571-fde08219008c",
+          "id": "41b391e5-d9a1-4c8f-8c2c-baf674304827",
           "sequence": 7,
           "phase": "Release",
           "title": "Prepare operating documentation",
@@ -211,7 +211,7 @@
           "reviewer_worker": "claude",
           "priority": 70,
           "depends_on": [
-            "2ab66df0-0367-4f8b-a7f8-109c762c9390"
+            "9657cb72-e69c-458d-a7a6-681f4a4bd088"
           ],
           "approval_required": false,
           "approval_reason": null,
@@ -219,7 +219,7 @@
           "orchestrator_task_id": null
         },
         {
-          "id": "b75aec21-c4dd-4b17-9d80-f65bcb154a15",
+          "id": "a0929591-bc4a-4632-95f1-b020bdb23f13",
           "sequence": 8,
           "phase": "Release",
           "title": "Prepare approved deployment",
@@ -242,7 +242,7 @@
           "reviewer_worker": "gemini",
           "priority": 65,
           "depends_on": [
-            "81bd7098-505b-468d-b571-fde08219008c"
+            "41b391e5-d9a1-4c8f-8c2c-baf674304827"
           ],
           "approval_required": true,
           "approval_reason": "Production deployment requires explicit human approval.",
@@ -258,7 +258,7 @@
     "stop_on_failure": true,
     "steps": [
       {
-        "step_id": "977707cc-706e-4028-8442-4bb13531eb90",
+        "step_id": "066c30c8-3077-4e91-81ac-08785dc4b0ec",
         "title": "Analyse goal, constraints and acceptance criteria",
         "status": "completed",
         "runtime_run_id": null,
@@ -269,7 +269,7 @@
         "finished_at": null
       },
       {
-        "step_id": "442bcbe4-5f02-4ac1-a96c-53966c5d9347",
+        "step_id": "f56c2e7f-5386-417a-97b8-b671058339d0",
         "title": "Design system architecture and interfaces",
         "status": "completed",
         "runtime_run_id": null,
@@ -280,7 +280,7 @@
         "finished_at": null
       },
       {
-        "step_id": "98e82736-953c-4d82-86d0-9daf194ab11b",
+        "step_id": "b8267507-e4c3-4f92-bb8d-dd35d784a5e7",
         "title": "Implement backend and core domain logic",
         "status": "completed",
         "runtime_run_id": null,
@@ -291,7 +291,7 @@
         "finished_at": null
       },
       {
-        "step_id": "577816c9-f666-46a5-999c-c8220fa62d74",
+        "step_id": "0c36d58d-368f-466b-a8b6-b7c6682ae2af",
         "title": "Build operator interface",
         "status": "completed",
         "runtime_run_id": null,
@@ -302,7 +302,7 @@
         "finished_at": null
       },
       {
-        "step_id": "bac6e46f-ab8f-4104-9f7f-3ba4fb79bcac",
+        "step_id": "ecd03b9f-aa56-40cf-80a7-550352e8772c",
         "title": "Add automated and integration tests",
         "status": "completed",
         "runtime_run_id": null,
@@ -313,7 +313,7 @@
         "finished_at": null
       },
       {
-        "step_id": "2ab66df0-0367-4f8b-a7f8-109c762c9390",
+        "step_id": "9657cb72-e69c-458d-a7a6-681f4a4bd088",
         "title": "Run independent security and quality review",
         "status": "completed",
         "runtime_run_id": null,
@@ -324,7 +324,7 @@
         "finished_at": null
       },
       {
-        "step_id": "81bd7098-505b-468d-b571-fde08219008c",
+        "step_id": "41b391e5-d9a1-4c8f-8c2c-baf674304827",
         "title": "Prepare operating documentation",
         "status": "completed",
         "runtime_run_id": null,
@@ -335,7 +335,7 @@
         "finished_at": null
       },
       {
-        "step_id": "b75aec21-c4dd-4b17-9d80-f65bcb154a15",
+        "step_id": "a0929591-bc4a-4632-95f1-b020bdb23f13",
         "title": "Prepare approved deployment",
         "status": "ready",
         "runtime_run_id": null,
@@ -346,7 +346,7 @@
         "finished_at": null
       }
     ],
-    "created_at": "2026-09-01T18:42:53.281636Z",
-    "updated_at": "2026-09-01T18:42:53.283065Z"
+    "created_at": "2026-09-01T18:50:13.970639Z",
+    "updated_at": "2026-09-01T18:50:13.972276Z"
   }
 ]

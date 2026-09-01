@@ -1,15 +1,24 @@
 from __future__ import annotations
 
+import httpx
+import pytest
 from fastapi.testclient import TestClient
 
 from app.instagram_content.dashboard import build_dashboard
 from app.instagram_content.media_pool_models import MediaPoolIngestRequest, MediaPoolItemCreate
 from app.instagram_content.media_pool_service import media_pool_service
 from app.instagram_content.models import ContentCandidateCreate, ContentDecision
-from app.instagram_content.service import instagram_content_service
+from app.instagram_content.publisher import N8nInstagramPublisher
+from app.instagram_content.service import InstagramContentError, InstagramContentService, instagram_content_service
 from app.main import app
 
 api_client = TestClient(app)
+
+
+def _service_with_mock_publisher(handler):
+    transport = httpx.MockTransport(handler)
+    publisher = N8nInstagramPublisher(client=httpx.Client(transport=transport))
+    return InstagramContentService(publisher=publisher)
 
 
 def _reset_all():
@@ -118,3 +127,35 @@ def test_dashboard_via_the_api():
     assert body["needs_your_review"] == 1
     assert "platform_strategy" in body
     assert "todays_posting_windows" in body
+
+
+def test_dashboard_shows_unacknowledged_critical_notifications(monkeypatch):
+    from app.instagram_content.service import instagram_content_service
+    from app.notification_hub.service import notification_hub_service
+
+    _reset_all()
+    notification_hub_service.reset()
+
+    def fake_publish(media_items, post_format, edit_plan, caption, request_id):
+        from app.instagram_content.publisher import N8nInstagramPublisherError
+
+        raise N8nInstagramPublisherError("upstream error")
+
+    monkeypatch.setattr(instagram_content_service._publisher, "publish", fake_publish)
+
+    item = instagram_content_service.propose(ContentCandidateCreate(**{
+        "media_items": [{"media_ref": "x", "media_type": "image", "aesthetic_score": 0.9}],
+        "caption_draft": "Quiet mornings. #tradingmindset #discipline #patience",
+    }))
+    instagram_content_service.decide(item.id, ContentDecision(approved=True, reason="Approved"))
+    with pytest.raises(InstagramContentError):
+        instagram_content_service.publish(item.id)
+
+    summary = build_dashboard()
+    assert summary.unacknowledged_critical_notifications == 1
+
+    failed_notification = next(n for n in notification_hub_service.list_all() if n.requires_acknowledgement)
+    notification_hub_service.acknowledge(failed_notification.id)
+
+    summary = build_dashboard()
+    assert summary.unacknowledged_critical_notifications == 0
