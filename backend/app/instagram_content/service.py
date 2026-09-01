@@ -5,7 +5,9 @@ from uuid import UUID
 from .edit_plan import build_edit_plan
 from .format_decision import decide_format
 from .hook import check_hook
-from .models import ContentCandidate, ContentCandidateCreate, ContentDecision, ContentStatus
+from .media_pool_models import FinalizeDraftRequest
+from .media_pool_service import MediaPoolError, media_pool_service
+from .models import ContentCandidate, ContentCandidateCreate, ContentDecision, ContentStatus, MediaItem
 from .moderation import moderate
 from .publisher import N8nInstagramPublisher, N8nInstagramPublisherError
 
@@ -116,6 +118,56 @@ class InstagramContentService:
         item.published_media_id = media_id
         item.audit_log.append(f"Published via n8n, media_id={media_id}")
         return item
+
+    def finalize_draft(self, draft_id: UUID, request: FinalizeDraftRequest) -> ContentCandidate:
+        """Turns a curated draft (media already grouped and reserved out of
+        the pool) into a real, moderated candidate, once a caption exists
+        for it. AURON does not write the caption itself here -- that's
+        still a separate step (e.g. n8n's existing Claude-based captioning),
+        deliberately not duplicated inside this pipeline.
+
+        Pool items are only marked permanently 'used' if the candidate
+        clears moderation. A moderation rejection (e.g. a bad caption)
+        leaves the draft pending so a corrected caption can be retried
+        without burning fresh photos on what was really a caption problem.
+        """
+        try:
+            draft = media_pool_service.get_draft(draft_id)
+        except MediaPoolError as exc:
+            raise InstagramContentError(str(exc)) from exc
+
+        if draft.finalized or draft.discarded:
+            raise InstagramContentError(f"Draft {draft_id} is already {'finalized' if draft.finalized else 'discarded'}")
+
+        pool_items = media_pool_service.draft_media_items(draft)
+        media_items = [
+            MediaItem(
+                media_ref=pi.media_ref,
+                media_type=pi.media_type,
+                aesthetic_score=pi.aesthetic_score,
+                duration_seconds=pi.duration_seconds,
+            )
+            for pi in pool_items
+        ]
+
+        candidate = self.propose(
+            ContentCandidateCreate(
+                media_items=media_items,
+                caption_draft=request.caption_draft,
+                aesthetic_notes=request.aesthetic_notes or f"Curated from theme '{draft.theme}': {draft.reasoning}",
+            )
+        )
+
+        if candidate.status != ContentStatus.moderation_rejected:
+            media_pool_service.mark_finalized(draft_id, candidate.id)
+            candidate.audit_log.append(f"Finalized from curated draft {draft_id} (theme: {draft.theme}).")
+        else:
+            candidate.audit_log.append(
+                f"Finalization attempt from draft {draft_id} was moderation-rejected; draft remains pending "
+                "for a retry with a corrected caption -- photos were not consumed."
+            )
+
+        return candidate
 
 
 instagram_content_service = InstagramContentService()

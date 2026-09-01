@@ -8,6 +8,8 @@ from .models import ContentCandidateCreate
 # this is the account's brand/compliance policy, not a technical detail.
 MAX_CAPTION_LENGTH = 2200  # Instagram's own hard limit
 MAX_HASHTAGS = 30  # Instagram rejects posts above this; going near it also reads as spam
+OPTIMAL_HASHTAG_RANGE = (3, 8)  # well-documented current guidance for reach on high-end/curated accounts;
+# maxing out the 30-tag limit reads as spammy and has trended toward lower reach, not higher, in recent years
 MIN_AESTHETIC_SCORE_HARD = 0.35  # below this: not the account's aesthetic, auto-reject
 MIN_AESTHETIC_SCORE_SOFT = 0.6  # below this but above the hard floor: let a human decide, but flag it
 
@@ -58,6 +60,13 @@ def moderate(candidate: ContentCandidateCreate, recent_captions: list[str]) -> M
         violations.append(f"{len(hashtags)} hashtags exceeds Instagram's {MAX_HASHTAGS}-hashtag limit.")
     elif len(hashtags) > MAX_HASHTAGS - 5:
         warnings.append(f"{len(hashtags)} hashtags is close to the {MAX_HASHTAGS}-hashtag limit.")
+    elif len(hashtags) == 0:
+        warnings.append("No hashtags at all -- a missed discovery opportunity even for a curated account.")
+    elif not (OPTIMAL_HASHTAG_RANGE[0] <= len(hashtags) <= OPTIMAL_HASHTAG_RANGE[1]):
+        warnings.append(
+            f"{len(hashtags)} hashtags is outside the {OPTIMAL_HASHTAG_RANGE[0]}-{OPTIMAL_HASHTAG_RANGE[1]} range "
+            "that currently reads as curated rather than spammy for reach-focused accounts."
+        )
 
     lowered = caption.lower()
     hit_phrases = [phrase for phrase in BANNED_PHRASES if phrase in lowered]

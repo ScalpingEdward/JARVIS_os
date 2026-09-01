@@ -72,14 +72,22 @@ internet and no third-party automation platform is involved.
 
 ## How the flow works once this is wired
 
-1. `POST /v1/instagram/candidates` — a candidate image + caption draft is
-   proposed (status: `proposed`). Nothing is sent to n8n yet.
-2. You review it (via the Command Centre once that's built, or directly via
-   the API for now) and call `POST /v1/instagram/candidates/{id}/decision`
-   with `approved: true` (optionally editing the caption).
-3. Only then can `POST /v1/instagram/candidates/{id}/publish` succeed — this
-   is the one call that reaches n8n and actually posts. Calling it before
-   approval returns a 409, on purpose.
+**Manual path** (still works, useful for one-off posts):
+1. `POST /v1/instagram/candidates` — a candidate with one or more media items + caption is proposed (status: `proposed`). Nothing is sent to n8n yet.
+2. You review it and call `POST /v1/instagram/candidates/{id}/decision` with `approved: true` (optionally editing the caption).
+3. Only then can `POST /v1/instagram/candidates/{id}/publish` succeed — this is the one call that reaches n8n and actually posts. Calling it before approval returns a 409, on purpose.
+
+**Automated path from a photo folder** (the ~100-200-photo workflow):
+1. **Analyze once, in n8n (or a script with Drive access) — not in AURON.** For each new photo/video in your Drive folder, run a vision-analysis step (your existing Claude API call is fine for this) to produce: a short `theme` label (e.g. `"gold-trading-desk"`, `"mystic-symbol"`, `"quote-card"` — consistent labels are what let AURON group photos into a coherent carousel), optional `tags`, and an `aesthetic_score` (0-1, how well it fits the account's look).
+2. Push the results to AURON: `POST /v1/instagram/media-pool/ingest` with a batch of `{media_ref, media_type, theme, tags, aesthetic_score, duration_seconds (video only)}`. Re-ingesting the same `media_ref` is a no-op (deduplicated), so it's safe to re-run this over the whole folder periodically.
+3. Trigger curation: `POST /v1/instagram/curate` — AURON groups the *unused* pool into hero posts (a standout single image), right-sized carousels (3-6 same-theme images), and standalone Reels (every video), reserving each item so nothing gets proposed twice. Nothing is posted yet; each result is a `CuratedDraft`.
+4. **A caption still needs to be attached — AURON does not write caption text itself.** This is deliberately still your existing n8n Claude-based captioning step, not duplicated inside AURON: fetch pending drafts (`GET /v1/instagram/curate/drafts`), have n8n generate a caption in your account's voice for each draft's theme/media, then call `POST /v1/instagram/curate/drafts/{draft_id}/finalize` with `{caption_draft}`. This runs the normal moderation/format/edit-plan pipeline and produces a real `ContentCandidate` (status `proposed`, unless moderation rejects it — in which case the photos are *not* consumed, so a corrected caption can be retried without burning fresh media).
+5. From here it's the manual path: you approve, then publish triggers n8n.
+
+Each photo/video is only ever used once: `mark_finalized` (step 4) permanently flags the pool items as used, and a discarded draft (`POST /v1/instagram/curate/drafts/{draft_id}/discard`, e.g. if the grouping itself was wrong) releases its photos back to the pool instead.
 
 No API key or Meta credential ever needs to live in AURON's code or
-environment; those stay entirely inside your existing n8n workflow.
+environment; those stay entirely inside your existing n8n workflow. The
+same is true for vision analysis and caption generation -- AURON works
+with the structured results (theme, tags, scores, captions), never the
+raw pixels or your Anthropic API key for that step.

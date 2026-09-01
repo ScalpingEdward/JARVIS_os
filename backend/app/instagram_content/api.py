@@ -5,6 +5,15 @@ from uuid import UUID
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
+from .media_pool_models import (
+    CuratedDraft,
+    CuratedDraftList,
+    FinalizeDraftRequest,
+    MediaPoolIngestRequest,
+    MediaPoolIngestResponse,
+    MediaPoolList,
+)
+from .media_pool_service import MediaPoolError, media_pool_service
 from .models import ContentCandidate, ContentCandidateCreate, ContentCandidateList, ContentDecision, ContentStatus
 from .posting_schedule import NOTE, PostingWindow, suggested_windows_for_weekday
 from .service import InstagramContentError, instagram_content_service
@@ -63,3 +72,69 @@ def posting_schedule(weekday: int) -> PostingScheduleResponse:
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     return PostingScheduleResponse(windows=windows, note=NOTE)
+
+
+# -- media pool: the source folder's analyzed contents -----------------------
+
+
+@router.post("/media-pool/ingest", response_model=MediaPoolIngestResponse)
+def ingest_media(request: MediaPoolIngestRequest) -> MediaPoolIngestResponse:
+    """Adds analyzed photos/videos to the pool AURON curates from. AURON
+    does not analyze pixels itself -- theme/tags/aesthetic_score come from
+    whatever vision-analysis step runs where the files actually live."""
+    return media_pool_service.ingest(request)
+
+
+@router.get("/media-pool", response_model=MediaPoolList)
+def list_media_pool(available_only: bool = False):
+    items = media_pool_service.list_available() if available_only else media_pool_service.list_all()
+    return MediaPoolList(items=items, count=len(items))
+
+
+# -- curation: turning the pool into post-worthy groups -----------------------
+
+
+@router.post("/curate", response_model=CuratedDraftList)
+def run_curation(max_groups: int = 10) -> CuratedDraftList:
+    """Groups available pool items into hero posts / right-sized carousels
+    by theme, reserving each item so a second curation run never proposes
+    the same photo twice. Nothing is posted or even a full candidate yet --
+    each result still needs a caption via /curate/{draft_id}/finalize."""
+    drafts = media_pool_service.run_curation(max_groups=max_groups)
+    return CuratedDraftList(items=drafts, count=len(drafts))
+
+
+@router.get("/curate/drafts", response_model=CuratedDraftList)
+def list_drafts(pending_only: bool = True) -> CuratedDraftList:
+    drafts = media_pool_service.list_drafts(pending_only=pending_only)
+    return CuratedDraftList(items=drafts, count=len(drafts))
+
+
+@router.get("/curate/drafts/{draft_id}", response_model=CuratedDraft)
+def get_draft(draft_id: UUID) -> CuratedDraft:
+    try:
+        return media_pool_service.get_draft(draft_id)
+    except MediaPoolError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.post("/curate/drafts/{draft_id}/finalize", response_model=ContentCandidate)
+def finalize_draft(draft_id: UUID, request: FinalizeDraftRequest) -> ContentCandidate:
+    """Attaches a caption to a curated draft and runs it through the normal
+    moderation/format/edit-plan pipeline. Only marks the underlying photos
+    permanently 'used' if moderation actually passes."""
+    try:
+        return instagram_content_service.finalize_draft(draft_id, request)
+    except InstagramContentError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@router.post("/curate/drafts/{draft_id}/discard", response_model=CuratedDraft)
+def discard_draft(draft_id: UUID) -> CuratedDraft:
+    """Releases a draft's reserved photos back into the available pool
+    without ever creating a candidate -- e.g. the grouping itself was wrong,
+    not just the caption."""
+    try:
+        return media_pool_service.discard_draft(draft_id)
+    except MediaPoolError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc

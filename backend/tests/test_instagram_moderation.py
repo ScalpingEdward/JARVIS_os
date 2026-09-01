@@ -23,7 +23,7 @@ def _payload(aesthetic_score=0.9, image_source_ref="drive://file-1", **overrides
 
 
 def test_moderate_passes_a_clean_candidate():
-    result = moderate(_payload(), recent_captions=[])
+    result = moderate(_payload(caption_draft="Build in silence. #tradingmindset #discipline #consistency"), recent_captions=[])
     assert result.passed
     assert result.violations == []
     assert result.warnings == []
