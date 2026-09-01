@@ -389,3 +389,99 @@ def test_prepare_live_order_unknown_position_fails_closed() -> None:
                 account_login=12345678, quote_bid=1.1, quote_ask=1.1001, quote_age_seconds=1.0, symbol_point=0.0001
             ),
         )
+
+
+# -- prepare_live_order: real live-quote lookup via mt5_bridge --------------
+
+
+def test_prepare_live_order_looks_up_a_real_tick_when_quote_omitted() -> None:
+    from app.mt5_bridge.models import MT5AccountSnapshot, MT5SnapshotIngest, MT5Tick, MT5TerminalRegister
+    from app.mt5_bridge.service import mt5_bridge_service
+
+    mt5_bridge_service.reset()
+    workspace_id, position_id = _open_a_position()
+    account = account_registry_service.get_account(UUID(workspace_id))
+
+    terminal = mt5_bridge_service.register(
+        MT5TerminalRegister(
+            name="Test Terminal",
+            terminal_path="C:/MT5/terminal64.exe",
+            account_login=int(account.login),
+            broker="TestBroker",
+            server=account.server,
+        )
+    )
+    mt5_bridge_service.ingest(
+        terminal.id,
+        MT5SnapshotIngest(
+            account=MT5AccountSnapshot(balance=100000, equity=100000, margin=0, free_margin=100000),
+            ticks=[MT5Tick(symbol="EURUSD", bid=1.10500, ask=1.10510)],
+        ),
+    )
+
+    order = trade_risk_pipeline_service.prepare_live_order(
+        workspace_id,
+        position_id,
+        LiveOrderPrepareRequest(account_login=int(account.login), native_adapter_ready=True, symbol_point=0.0001),
+    )
+    assert order.request.quote_bid == pytest.approx(1.10500)
+    assert order.request.quote_ask == pytest.approx(1.10510)
+    assert order.request.quote_age_seconds < 5  # just ingested
+
+
+def test_prepare_live_order_fails_closed_with_no_bridge_terminal_and_no_quote() -> None:
+    from app.mt5_bridge.service import mt5_bridge_service
+
+    mt5_bridge_service.reset()
+    workspace_id, position_id = _open_a_position()
+    account = account_registry_service.get_account(UUID(workspace_id))
+
+    with pytest.raises(TradeRiskPipelineError, match="No mt5_bridge terminal is registered"):
+        trade_risk_pipeline_service.prepare_live_order(
+            workspace_id,
+            position_id,
+            LiveOrderPrepareRequest(account_login=int(account.login), symbol_point=0.0001),
+        )
+
+
+def test_prepare_live_order_fails_closed_with_bridge_terminal_but_no_tick_for_symbol() -> None:
+    from app.mt5_bridge.models import MT5AccountSnapshot, MT5SnapshotIngest, MT5TerminalRegister
+    from app.mt5_bridge.service import mt5_bridge_service
+
+    mt5_bridge_service.reset()
+    workspace_id, position_id = _open_a_position()
+    account = account_registry_service.get_account(UUID(workspace_id))
+
+    terminal = mt5_bridge_service.register(
+        MT5TerminalRegister(
+            name="Test Terminal",
+            terminal_path="C:/MT5/terminal64.exe",
+            account_login=int(account.login),
+            broker="TestBroker",
+            server=account.server,
+        )
+    )
+    # ingest with no ticks at all for this symbol
+    mt5_bridge_service.ingest(
+        terminal.id,
+        MT5SnapshotIngest(account=MT5AccountSnapshot(balance=100000, equity=100000, margin=0, free_margin=100000)),
+    )
+
+    with pytest.raises(TradeRiskPipelineError, match="no recent tick"):
+        trade_risk_pipeline_service.prepare_live_order(
+            workspace_id,
+            position_id,
+            LiveOrderPrepareRequest(account_login=int(account.login), symbol_point=0.0001),
+        )
+
+
+def test_prepare_live_order_rejects_partial_quote_overrides() -> None:
+    workspace_id, position_id = _open_a_position()
+    account = account_registry_service.get_account(UUID(workspace_id))
+
+    with pytest.raises(TradeRiskPipelineError, match="all supplied or all omitted"):
+        trade_risk_pipeline_service.prepare_live_order(
+            workspace_id,
+            position_id,
+            LiveOrderPrepareRequest(account_login=int(account.login), quote_bid=1.1, symbol_point=0.0001),
+        )

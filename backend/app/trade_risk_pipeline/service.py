@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from uuid import UUID
 
 from app.accounts.models import AccountStatus, TradingAccountRecord
@@ -15,6 +16,7 @@ from app.executive_mt5_live_order_executor.models import LiveOrderCreate, LiveOr
 from app.executive_mt5_live_order_executor.service import live_order_executor_service
 from app.modules.dynamic_risk_engine.router import service as dynamic_risk_service
 from app.modules.dynamic_risk_engine.service import DynamicRiskError
+from app.mt5_bridge.service import mt5_bridge_service
 from app.modules.execution_supervisor.models import StageTelemetry, SupervisionCreate, SupervisionRecord
 from app.modules.execution_supervisor.router import service as execution_supervisor_service
 from app.modules.execution_supervisor.service import ExecutionSupervisorError
@@ -256,6 +258,33 @@ class TradeRiskPipelineService:
         except ExecutionSupervisorError as exc:
             raise TradeRiskPipelineError(str(exc)) from exc
 
+    def _live_quote(self, account: TradingAccountRecord, symbol: str) -> tuple[float, float, float]:
+        """Looks up the freshest real tick for `symbol` from the mt5_bridge
+        terminal matched to this account by (login, server) -- the same
+        matching account_state_sync already uses. Fails closed: no matching
+        terminal or no tick for this symbol means no quote, not a guess."""
+        terminal = next(
+            (
+                data
+                for data in mt5_bridge_service.list()
+                if str(data.terminal.account_login) == account.login and data.terminal.server == account.server
+            ),
+            None,
+        )
+        if terminal is None:
+            raise TradeRiskPipelineError(
+                f"No mt5_bridge terminal is registered for account login={account.login} server={account.server}; "
+                "cannot look up a live quote. Either pass quote_bid/quote_ask explicitly, or connect the bridge."
+            )
+        tick = next((t for t in reversed(terminal.ticks) if t.symbol == symbol), None)
+        if tick is None:
+            raise TradeRiskPipelineError(
+                f"mt5_bridge terminal for account login={account.login} has no recent tick for {symbol}; "
+                "cannot look up a live quote."
+            )
+        age_seconds = max(0.0, (datetime.now(timezone.utc) - tick.captured_at).total_seconds())
+        return tick.bid, tick.ask, age_seconds
+
     def prepare_live_order(
         self, workspace_id: str, position_id: str, request: LiveOrderPrepareRequest
     ) -> LiveOrderRecord:
@@ -303,6 +332,16 @@ class TradeRiskPipelineService:
 
         approved_logins = request.approved_account_logins or [request.account_login]
 
+        if request.quote_bid is not None and request.quote_ask is not None and request.quote_age_seconds is not None:
+            quote_bid, quote_ask, quote_age_seconds = request.quote_bid, request.quote_ask, request.quote_age_seconds
+        elif request.quote_bid is None and request.quote_ask is None and request.quote_age_seconds is None:
+            quote_bid, quote_ask, quote_age_seconds = self._live_quote(account, position.symbol)
+        else:
+            raise TradeRiskPipelineError(
+                "quote_bid, quote_ask, and quote_age_seconds must be all supplied or all omitted -- "
+                "partial overrides are not allowed."
+            )
+
         payload = LiveOrderCreate(
             workspace_id=workspace_id,
             source_key=position_id,
@@ -315,9 +354,9 @@ class TradeRiskPipelineService:
             order_type=request.order_type,
             volume=position.position_size,
             stop_loss=position.current_stop_price,
-            quote_bid=request.quote_bid,
-            quote_ask=request.quote_ask,
-            quote_age_seconds=request.quote_age_seconds,
+            quote_bid=quote_bid,
+            quote_ask=quote_ask,
+            quote_age_seconds=quote_age_seconds,
             symbol_point=request.symbol_point,
             min_volume=request.min_volume,
             max_volume=request.max_volume,
