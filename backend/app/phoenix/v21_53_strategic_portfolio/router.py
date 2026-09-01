@@ -4,7 +4,7 @@ from .models import AuditEvent, PortfolioActionRequest, StrategicPortfolioCreate
 from .service import StrategicPortfolioError, service
 
 router = APIRouter(
-    prefix="/v1/strategic-portfolio",
+    prefix="/v1/phoenix/strategic-portfolio",
     tags=["PHOENIX v21.53 Strategic Portfolio Orchestration Governance"],
 )
 

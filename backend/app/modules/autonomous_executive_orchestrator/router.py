@@ -5,7 +5,7 @@ from fastapi import APIRouter, Header, HTTPException, Query, status
 from .models import AuditEvent, OrchestrationAction, OrchestrationCreate, OrchestrationRecord
 from .service import AutonomousExecutiveOrchestratorService, OrchestrationError
 
-router = APIRouter(prefix="/v1/orchestrator", tags=["PHOENIX v21.10 Orchestrator"])
+router = APIRouter(prefix="/v1/autonomous-executive-orchestrator", tags=["PHOENIX v21.10 Orchestrator"])
 service = AutonomousExecutiveOrchestratorService()
 
 
