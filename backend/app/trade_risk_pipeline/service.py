@@ -11,6 +11,8 @@ from app.modules.dynamic_risk_engine.models import (
     RiskPolicy,
     RiskState,
 )
+from app.executive_mt5_live_order_executor.models import LiveOrderCreate, LiveOrderRecord
+from app.executive_mt5_live_order_executor.service import live_order_executor_service
 from app.modules.dynamic_risk_engine.router import service as dynamic_risk_service
 from app.modules.dynamic_risk_engine.service import DynamicRiskError
 from app.modules.execution_supervisor.models import StageTelemetry, SupervisionCreate, SupervisionRecord
@@ -22,7 +24,7 @@ from app.modules.position_management_brain.service import PositionManagementErro
 from app.setup_submission.models import SubmittedSetup, TradeSide
 from app.setup_submission.service import setup_submission_service
 
-from .models import RiskAssessmentRequest, SupervisionStartRequest
+from .models import RiskAssessmentRequest, SupervisionStartRequest, LiveOrderPrepareRequest
 
 _SUPERVISABLE_POSITION_STATES = {
     PositionState.PLANNED,
@@ -252,6 +254,85 @@ class TradeRiskPipelineService:
         try:
             return execution_supervisor_service.create(payload, actor="trade_risk_pipeline")
         except ExecutionSupervisorError as exc:
+            raise TradeRiskPipelineError(str(exc)) from exc
+
+    def prepare_live_order(
+        self, workspace_id: str, position_id: str, request: LiveOrderPrepareRequest
+    ) -> LiveOrderRecord:
+        """Runs live-order preflight for a planned/approved position. This is
+        the fourth link and the one closest to real money -- read carefully.
+
+        This calls the live order executor's *create* step only, which runs
+        deterministic preflight checks (quote freshness, price deviation,
+        volume/stop validity, risk limits) and produces a record in either
+        'preflight-ready' or 'approval-required' state. It NEVER calls
+        /execute and NEVER sets human_approved=True itself -- submitting to
+        the broker is a separate, explicit action outside this pipeline,
+        deliberately, so no chain of automatic calls can end in a live order.
+
+        Even if that separate call happens, nothing reaches a real broker
+        unless the caller's own MT5 terminal, logged into the target
+        account, is reachable by whatever process is running AURON --
+        native_executor.py requires the Windows-only MetaTrader5 package,
+        which is not installed or usable in this environment. There is no
+        real live quote or symbol-spec source yet either; every quote,
+        point size, and volume limit here is exactly what the caller passes
+        in, not something AURON derived on its own.
+
+        Only the initial stop-loss is carried into the broker order.
+        Partial take-profits are position_management_brain's exit rules,
+        applied incrementally after the position is open -- not part of the
+        initial order send.
+        """
+        try:
+            position = position_management_service.get(workspace_id, position_id)
+        except PositionManagementError as exc:
+            raise TradeRiskPipelineError(str(exc)) from exc
+
+        if position.state not in {PositionState.PLANNED, PositionState.APPROVED}:
+            raise TradeRiskPipelineError(
+                f"Position {position_id} is {position.state}; live-order preparation requires "
+                "'planned' or 'approved', not an already-open, blocked, or terminal state"
+            )
+
+        account = account_registry_service.get_account(UUID(workspace_id))
+        if account.status != AccountStatus.active:
+            raise TradeRiskPipelineError(
+                f"Account {account.id} is {account.status}, not active; refusing to prepare a live order for it"
+            )
+
+        approved_logins = request.approved_account_logins or [request.account_login]
+
+        payload = LiveOrderCreate(
+            workspace_id=workspace_id,
+            source_key=position_id,
+            actor_id="trade_risk_pipeline",
+            native_adapter_ready=request.native_adapter_ready,
+            account_login=request.account_login,
+            approved_account_logins=approved_logins,
+            symbol=position.symbol,
+            side="buy" if position.direction == "long" else "sell",
+            order_type=request.order_type,
+            volume=position.position_size,
+            stop_loss=position.current_stop_price,
+            quote_bid=request.quote_bid,
+            quote_ask=request.quote_ask,
+            quote_age_seconds=request.quote_age_seconds,
+            symbol_point=request.symbol_point,
+            min_volume=request.min_volume,
+            max_volume=request.max_volume,
+            volume_step=request.volume_step,
+            min_stop_distance_points=request.min_stop_distance_points,
+            max_deviation_points=request.max_deviation_points,
+            expected_risk_amount=position.risk_amount,
+            max_risk_amount=position.risk_amount,
+            account_risk_approved=True,
+            prop_rules_approved=True,
+            human_approved=False,
+        )
+        try:
+            return live_order_executor_service.create(payload)
+        except ValueError as exc:
             raise TradeRiskPipelineError(str(exc)) from exc
 
 

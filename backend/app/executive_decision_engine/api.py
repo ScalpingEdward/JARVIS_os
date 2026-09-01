@@ -25,7 +25,6 @@ from ..executive_market_data.api import router as executive_market_data_router
 from ..executive_module_executor_adapter.api import router as executive_module_executor_adapter_router
 from ..executive_mt5_break_even_scale_out.api import router as executive_mt5_break_even_scale_out_router
 from ..executive_mt5_end_to_end_runtime_validation.api import router as executive_mt5_end_to_end_runtime_validation_router
-from ..executive_mt5_live_order_executor.api import router as executive_mt5_live_order_executor_router
 from ..executive_mt5_live_state_sync.api import router as executive_mt5_live_state_sync_router
 from ..executive_mt5_native_adapter_runtime.api import router as executive_mt5_native_adapter_runtime_router
 from ..executive_mt5_order_command_deal_ingestion.api import router as executive_mt5_order_command_deal_ingestion_router
@@ -162,7 +161,8 @@ router.include_router(executive_mt5_trading_session_news_filter_router)
 router.include_router(executive_mt5_strategy_runtime_orchestrator_router)
 router.include_router(executive_mt5_end_to_end_runtime_validation_router)
 router.include_router(executive_mt5_native_adapter_runtime_router)
-router.include_router(executive_mt5_live_order_executor_router)
+# executive_mt5_live_order_executor_router is registered directly in
+# main.py; re-including it here duplicated every one of its routes.
 router.include_router(executive_mt5_live_state_sync_router)
 router.include_router(executive_live_account_portfolio_state_router)
 router.include_router(executive_portfolio_risk_brain_router)

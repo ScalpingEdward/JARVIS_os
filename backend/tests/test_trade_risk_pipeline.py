@@ -15,9 +15,11 @@ from app.accounts.models import (
     TradingAccountCreate,
 )
 from app.accounts.service import account_registry_service
+from app.executive_mt5_live_order_executor.models import LiveOrderState
 from app.modules.dynamic_risk_engine.models import RiskState
 from app.modules.execution_supervisor.models import SupervisionState
 from app.modules.position_management_brain.models import PositionState
+from app.modules.position_management_brain.router import service as position_management_service
 from app.setup_submission.service import setup_submission_service
 from app.strategies.models import (
     FairValueGap,
@@ -28,6 +30,7 @@ from app.strategies.models import (
     StructureLevel,
 )
 from app.setup_submission.models import SetupSubmissionRequest
+from app.trade_risk_pipeline.models import LiveOrderPrepareRequest
 
 from app.trade_risk_pipeline.models import RiskAssessmentRequest
 from app.trade_risk_pipeline.service import TradeRiskPipelineError, trade_risk_pipeline_service
@@ -285,3 +288,104 @@ def test_start_supervision_cannot_be_started_twice_for_the_same_position() -> No
 
     with pytest.raises(TradeRiskPipelineError, match="duplicate source_key"):
         trade_risk_pipeline_service.start_supervision(workspace_id, position_id)
+
+
+# -- prepare_live_order: the fourth link, closest to real money -------------
+
+
+def test_prepare_live_order_never_auto_approves_or_executes() -> None:
+    """The single most important property of this whole pipeline: nothing
+    it does can, by itself, result in a broker order. human_approved must
+    always come back False, and this only ever calls create() (preflight),
+    never execute()."""
+    workspace_id, position_id = _open_a_position()
+    order = trade_risk_pipeline_service.prepare_live_order(
+        workspace_id,
+        position_id,
+        LiveOrderPrepareRequest(
+            account_login=12345678,
+            quote_bid=1.09995,
+            quote_ask=1.10005,
+            quote_age_seconds=1.0,
+            symbol_point=0.0001,
+        ),
+    )
+    assert order.request.human_approved is False
+    assert order.state != LiveOrderState.EXECUTED
+    assert order.state != LiveOrderState.SUBMISSION_PENDING
+    assert order.broker_order_id is None
+    assert order.broker_deal_id is None
+
+
+def test_prepare_live_order_defaults_native_adapter_to_not_ready() -> None:
+    """Without an explicit, real signal that a broker terminal is actually
+    connected, the order must come back requiring the adapter -- never
+    silently 'ready'."""
+    workspace_id, position_id = _open_a_position()
+    order = trade_risk_pipeline_service.prepare_live_order(
+        workspace_id,
+        position_id,
+        LiveOrderPrepareRequest(
+            account_login=12345678, quote_bid=1.09995, quote_ask=1.10005, quote_age_seconds=1.0, symbol_point=0.0001
+        ),
+    )
+    assert order.state == LiveOrderState.ADAPTER_REQUIRED
+
+
+def test_prepare_live_order_carries_the_real_risk_approved_size_and_stop() -> None:
+    workspace_id, position_id = _open_a_position()
+    position = position_management_service.get(workspace_id, position_id)
+
+    order = trade_risk_pipeline_service.prepare_live_order(
+        workspace_id,
+        position_id,
+        LiveOrderPrepareRequest(
+            account_login=12345678,
+            native_adapter_ready=True,
+            quote_bid=1.09995,
+            quote_ask=1.10005,
+            quote_age_seconds=1.0,
+            symbol_point=0.0001,
+            min_stop_distance_points=0,
+        ),
+    )
+    assert order.request.volume == pytest.approx(position.position_size)
+    assert order.request.stop_loss == pytest.approx(position.current_stop_price)
+    assert order.request.symbol == position.symbol
+    assert order.request.side == "buy"  # scalping_3tp's bullish fixture is a long/buy setup
+    assert order.request.approved_account_logins == [12345678]
+
+
+def test_prepare_live_order_refuses_an_already_open_position() -> None:
+    workspace_id, position_id = _open_a_position()
+
+    from app.modules.position_management_brain.models import PositionAction, PositionCommand
+
+    position_management_service.execute(
+        workspace_id, position_id, PositionAction(command=PositionCommand.APPROVE, actor="test")
+    )
+    position_management_service.execute(
+        workspace_id,
+        position_id,
+        PositionAction(command=PositionCommand.MARK_OPEN, actor="test", downstream_receipt="receipt-x"),
+    )
+
+    with pytest.raises(TradeRiskPipelineError, match="'planned' or 'approved'"):
+        trade_risk_pipeline_service.prepare_live_order(
+            workspace_id,
+            position_id,
+            LiveOrderPrepareRequest(
+                account_login=12345678, quote_bid=1.1, quote_ask=1.1001, quote_age_seconds=1.0, symbol_point=0.0001
+            ),
+        )
+
+
+def test_prepare_live_order_unknown_position_fails_closed() -> None:
+    with pytest.raises(TradeRiskPipelineError, match="record not found"):
+        trade_risk_pipeline_service.prepare_live_order(
+            "some-workspace",
+            "does-not-exist",
+            LiveOrderPrepareRequest(
+                account_login=12345678, quote_bid=1.1, quote_ask=1.1001, quote_age_seconds=1.0, symbol_point=0.0001
+            ),
+        )
