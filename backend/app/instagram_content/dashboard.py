@@ -4,6 +4,9 @@ from datetime import datetime, timezone
 
 from pydantic import BaseModel, Field
 
+from app.notification_hub.models import DeliveryState, NotificationRecord
+from app.notification_hub.service import notification_hub_service
+
 from .media_pool_service import media_pool_service
 from .models import ContentCandidate, ContentStatus
 from .platform_strategy import PlatformStrategy, platform_strategy_store
@@ -31,6 +34,13 @@ class InstagramDashboard(BaseModel):
     platform_strategy: PlatformStrategy
     todays_posting_windows: list[PostingWindow]
     posting_windows_note: str
+    recent_notifications: list[NotificationRecord] = Field(
+        description="Recent notification_hub deliveries for this domain -- shows whether you were actually notified, "
+        "not just that a candidate exists. A notification here in state 'failed' with no working channel "
+        "configured means a real post is waiting and you were never told."
+    )
+    notifications_delivered_today: int
+    notifications_failed_today: int
     generated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
@@ -42,6 +52,10 @@ def build_dashboard(recent_limit: int = 10) -> InstagramDashboard:
 
     pool_items = media_pool_service.list_all()
     today_weekday = datetime.now(timezone.utc).weekday()
+
+    now = datetime.now(timezone.utc)
+    instagram_notifications = [n for n in notification_hub_service.list_all() if n.domain == "instagram"]
+    today_notifications = [n for n in instagram_notifications if n.created_at.date() == now.date()]
 
     return InstagramDashboard(
         needs_your_review=count(ContentStatus.proposed),
@@ -56,4 +70,7 @@ def build_dashboard(recent_limit: int = 10) -> InstagramDashboard:
         platform_strategy=platform_strategy_store.current(),
         todays_posting_windows=suggested_windows_for_weekday(today_weekday),
         posting_windows_note=NOTE,
+        recent_notifications=instagram_notifications[:recent_limit],
+        notifications_delivered_today=sum(1 for n in today_notifications if n.state == DeliveryState.delivered),
+        notifications_failed_today=sum(1 for n in today_notifications if n.state == DeliveryState.failed),
     )
