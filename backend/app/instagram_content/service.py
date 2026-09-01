@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from uuid import UUID
 
+from .caption_writer import AnthropicCaptionWriter, CaptionWriterError
 from .edit_plan import build_edit_plan
 from .format_decision import decide_format
 from .hook import check_hook
@@ -25,9 +26,12 @@ class InstagramContentService:
     execution boundary, and it is gated by ContentStatus.approved only.
     """
 
-    def __init__(self, publisher: N8nInstagramPublisher | None = None) -> None:
+    def __init__(
+        self, publisher: N8nInstagramPublisher | None = None, caption_writer: AnthropicCaptionWriter | None = None
+    ) -> None:
         self._items: dict[UUID, ContentCandidate] = {}
         self._publisher = publisher or N8nInstagramPublisher()
+        self._caption_writer = caption_writer or AnthropicCaptionWriter()
 
     def reset(self) -> None:
         self._items.clear()
@@ -119,18 +123,24 @@ class InstagramContentService:
         item.audit_log.append(f"Published via n8n, media_id={media_id}")
         return item
 
-    def finalize_draft(self, draft_id: UUID, request: FinalizeDraftRequest) -> ContentCandidate:
+    def finalize_draft(self, draft_id: UUID, request: FinalizeDraftRequest | None = None) -> ContentCandidate:
         """Turns a curated draft (media already grouped and reserved out of
-        the pool) into a real, moderated candidate, once a caption exists
-        for it. AURON does not write the caption itself here -- that's
-        still a separate step (e.g. n8n's existing Claude-based captioning),
-        deliberately not duplicated inside this pipeline.
+        the pool) into a real, moderated candidate.
+
+        If `caption_draft` is omitted, AURON writes it itself via a real,
+        bounded Anthropic API call (AnthropicCaptionWriter) -- the direct
+        replacement for the old n8n-Claude round trip, not an addition on
+        top of it. Still fails closed if ANTHROPIC_API_KEY isn't set,
+        rather than fabricating a caption or silently falling back to
+        something generic.
 
         Pool items are only marked permanently 'used' if the candidate
         clears moderation. A moderation rejection (e.g. a bad caption)
         leaves the draft pending so a corrected caption can be retried
         without burning fresh photos on what was really a caption problem.
         """
+        request = request or FinalizeDraftRequest()
+
         try:
             draft = media_pool_service.get_draft(draft_id)
         except MediaPoolError as exc:
@@ -149,11 +159,19 @@ class InstagramContentService:
             )
             for pi in pool_items
         ]
+        post_format, _ = decide_format(media_items)
+
+        caption_draft = request.caption_draft
+        if caption_draft is None:
+            try:
+                caption_draft = self._caption_writer.generate(draft.theme, pool_items, post_format.value)
+            except CaptionWriterError as exc:
+                raise InstagramContentError(f"Caption generation failed: {exc}") from exc
 
         candidate = self.propose(
             ContentCandidateCreate(
                 media_items=media_items,
-                caption_draft=request.caption_draft,
+                caption_draft=caption_draft,
                 aesthetic_notes=request.aesthetic_notes or f"Curated from theme '{draft.theme}': {draft.reasoning}",
             )
         )

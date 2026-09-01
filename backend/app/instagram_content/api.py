@@ -119,10 +119,11 @@ def get_draft(draft_id: UUID) -> CuratedDraft:
 
 
 @router.post("/curate/drafts/{draft_id}/finalize", response_model=ContentCandidate)
-def finalize_draft(draft_id: UUID, request: FinalizeDraftRequest) -> ContentCandidate:
+def finalize_draft(draft_id: UUID, request: FinalizeDraftRequest = FinalizeDraftRequest()) -> ContentCandidate:
     """Attaches a caption to a curated draft and runs it through the normal
-    moderation/format/edit-plan pipeline. Only marks the underlying photos
-    permanently 'used' if moderation actually passes."""
+    moderation/format/edit-plan pipeline. If caption_draft is omitted,
+    AURON writes it itself via a real Anthropic API call. Only marks the
+    underlying photos permanently 'used' if moderation actually passes."""
     try:
         return instagram_content_service.finalize_draft(draft_id, request)
     except InstagramContentError as exc:
