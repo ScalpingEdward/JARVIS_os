@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from difflib import ndiff
 from uuid import UUID
 
+from .document_ai_analyzer import AnthropicDocumentAnalyzer, DocumentAIAnalysisError
 from .models import (
     AnalysisRecord,
     AnalysisRequest,
@@ -24,16 +25,19 @@ from .models import (
 
 
 class DocumentIntelligenceService:
-    def __init__(self) -> None:
+    def __init__(self, ai_analyzer: AnthropicDocumentAnalyzer | None = None) -> None:
         self.documents: dict[UUID, DocumentRecord] = {}
         self.analyses: list[AnalysisRecord] = []
         self.audit: list[AuditRecord] = []
+        self._ai_analyzer = ai_analyzer or AnthropicDocumentAnalyzer()
 
     def reset(self) -> None:
-        self.__init__()
+        ai_analyzer = self._ai_analyzer
+        self.__init__(ai_analyzer=ai_analyzer)
 
     def status(self) -> DocumentIntelligenceStatus:
         return DocumentIntelligenceStatus(
+            version="8.5",
             documents=len(self.documents),
             analyses=len(self.analyses),
             completed_analyses=sum(a.state == AnalysisState.COMPLETED for a in self.analyses),
@@ -41,6 +45,7 @@ class DocumentIntelligenceService:
             extracted_fields=sum(len(a.extracted_fields) for a in self.analyses),
             extracted_tables=sum(len(a.extracted_tables) for a in self.analyses),
             risk_findings=sum(len(a.risks) for a in self.analyses),
+            external_ai_execution=True,
         )
 
     def create_document(self, payload: DocumentCreate) -> DocumentRecord:
@@ -92,6 +97,32 @@ class DocumentIntelligenceService:
         tables = self._extract_tables(text)
         risks = self._find_risks(text)
         differences = self._compare(comparison.text_content, text) if comparison else []
+        ai_key_points: list[str] = []
+
+        if payload.use_external_ai:
+            try:
+                ai_result = self._ai_analyzer.analyze(document.title, text, payload.maximum_summary_sentences)
+            except DocumentAIAnalysisError as exc:
+                return self._failed(payload, document, comparison, f"AI-based analysis failed: {exc}")
+            try:
+                category = DocumentCategory(ai_result.category)
+            except ValueError:
+                category = DocumentCategory.UNKNOWN
+            confidence = ai_result.category_confidence
+            summary = ai_result.summary
+            # AI-found risks are real reasoning over the actual text, not
+            # invented -- merged with (not replacing) the deterministic
+            # regex-based findings, which catch different, complementary
+            # patterns (explicit clause markers regex is good at, that a
+            # summary-style read can miss).
+            risks = [
+                *risks,
+                *[
+                    RiskFinding(code="ai-flagged", severity="medium", description=risk_text)
+                    for risk_text in ai_result.risks
+                ],
+            ]
+            ai_key_points = ai_result.key_points
 
         requested = payload.analysis_type
         record = AnalysisRecord(
@@ -109,6 +140,8 @@ class DocumentIntelligenceService:
             risks=risks if requested in {AnalysisType.FIND_RISKS, AnalysisType.FULL} else [],
             differences=differences if requested in {AnalysisType.COMPARE, AnalysisType.FULL} and comparison else [],
             citations=self._citations(text),
+            external_ai_used=payload.use_external_ai,
+            ai_key_points=ai_key_points if requested in {AnalysisType.SUMMARIZE, AnalysisType.FULL} else [],
         )
         self.analyses.append(record)
         self._audit(payload.workspace_id, payload.requester_id, "analysis.completed", "analysis", str(record.id), {"type": requested.value})
@@ -132,6 +165,25 @@ class DocumentIntelligenceService:
         )
         self.analyses.append(record)
         self._audit(payload.workspace_id, payload.requester_id, "analysis.blocked", "analysis", str(record.id), {"reason": reason})
+        return record
+
+    def _failed(self, payload: AnalysisRequest, document: DocumentRecord, comparison: DocumentRecord | None, reason: str) -> AnalysisRecord:
+        """Distinct from _blocked: the document/request were valid, but an
+        opted-in capability (AI analysis) failed at runtime. Never silently
+        falls back to the deterministic result and calls it a success --
+        the caller asked for AI analysis and didn't get it."""
+        record = AnalysisRecord(
+            workspace_id=payload.workspace_id,
+            requester_id=payload.requester_id,
+            document_id=document.id,
+            comparison_document_id=comparison.id if comparison else None,
+            analysis_type=payload.analysis_type,
+            state=AnalysisState.FAILED,
+            blocked_reason=reason,
+            external_ai_used=True,
+        )
+        self.analyses.append(record)
+        self._audit(payload.workspace_id, payload.requester_id, "analysis.failed", "analysis", str(record.id), {"reason": reason})
         return record
 
     def _classify(self, text: str, title: str) -> tuple[DocumentCategory, float]:
