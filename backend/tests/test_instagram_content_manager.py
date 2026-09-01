@@ -151,6 +151,39 @@ def test_approval_can_edit_the_caption():
     assert item.status == ContentStatus.approved
 
 
+def test_publish_records_a_permanent_knowledge_graph_node():
+    from app.knowledge_graph.service import knowledge_graph_service
+
+    knowledge_graph_service.reset()
+    service = _service_with_mock_publisher(lambda request: httpx.Response(200, json={"media_id": "17895695668004550"}))
+    item = service.propose(ContentCandidateCreate(**_candidate_payload(caption_draft="Quiet mornings. #tradingmindset #discipline")))
+    service.decide(item.id, ContentDecision(approved=True, reason="Good"))
+    service.publish(item.id)
+
+    nodes = knowledge_graph_service.search_nodes("tradingmindset", kind="event")
+    assert len(nodes) == 1
+    assert "instagram" in nodes[0].tags
+    assert nodes[0].properties["media_id"] == "17895695668004550"
+
+
+def test_publish_failure_does_not_record_a_knowledge_graph_node():
+    from app.knowledge_graph.service import knowledge_graph_service
+
+    knowledge_graph_service.reset()
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(500, text="upstream error")
+
+    service = _service_with_mock_publisher(handler)
+    item = service.propose(ContentCandidateCreate(**_candidate_payload(caption_draft="Never posted. #tradingmindset")))
+    service.decide(item.id, ContentDecision(approved=True, reason="Approved"))
+    with pytest.raises(InstagramContentError):
+        service.publish(item.id)
+
+    nodes = knowledge_graph_service.search_nodes("tradingmindset", kind="event")
+    assert nodes == []
+
+
 def test_approved_publish_sends_media_items_format_and_edit_plan_to_n8n():
     calls: list[dict] = []
 
@@ -252,6 +285,34 @@ def test_api_flow_end_to_end():
         json={"approved": True, "reason": "Looks great"},
     )
     assert decided.json()["status"] == "approved"
+
+
+def test_history_search_via_the_api(monkeypatch):
+    from app.instagram_content.service import instagram_content_service
+    from app.knowledge_graph.service import knowledge_graph_service
+
+    instagram_content_service.reset()
+    knowledge_graph_service.reset()
+
+    def fake_publish(media_items, post_format, edit_plan, caption, request_id):
+        return "17895695668004550"
+
+    monkeypatch.setattr(instagram_content_service._publisher, "publish", fake_publish)
+
+    created = api_client.post(
+        "/v1/instagram/candidates",
+        json=_candidate_payload(caption_draft="Desert mornings. #tradingmindset #discipline"),
+    )
+    candidate_id = created.json()["id"]
+    api_client.post(f"/v1/instagram/candidates/{candidate_id}/decision", json={"approved": True, "reason": "Good"})
+    publish_response = api_client.post(f"/v1/instagram/candidates/{candidate_id}/publish")
+    assert publish_response.status_code == 200
+
+    search_response = api_client.get("/v1/instagram/history/search", params={"query": "tradingmindset"})
+    assert search_response.status_code == 200
+    results = search_response.json()
+    assert len(results) == 1
+    assert "instagram" in results[0]["tags"]
 
 
 def test_posting_schedule_endpoint():
