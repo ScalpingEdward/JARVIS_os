@@ -3,6 +3,7 @@ from __future__ import annotations
 from uuid import UUID
 
 from .models import ContentCandidate, ContentCandidateCreate, ContentDecision, ContentStatus
+from .moderation import moderate
 from .publisher import N8nInstagramPublisher, N8nInstagramPublisherError
 
 
@@ -27,8 +28,21 @@ class InstagramContentService:
         self._items.clear()
 
     def propose(self, payload: ContentCandidateCreate) -> ContentCandidate:
+        recent_captions = [item.caption_draft.strip() for item in self._items.values()]
+        result = moderate(payload, recent_captions)
+
         item = ContentCandidate(**payload.model_dump())
-        item.audit_log.append(f"Proposed with aesthetic_score={item.aesthetic_score:.2f}")
+        item.moderation_warnings = list(result.warnings)
+
+        if not result.passed:
+            item.status = ContentStatus.moderation_rejected
+            item.decision_reason = "Auto-rejected by moderation: " + "; ".join(result.violations)
+            item.audit_log.append(item.decision_reason)
+        else:
+            item.audit_log.append(f"Proposed with aesthetic_score={item.aesthetic_score:.2f}")
+            if result.warnings:
+                item.audit_log.append("Moderation warnings (still pending human review): " + "; ".join(result.warnings))
+
         self._items[item.id] = item
         return item
 
@@ -46,8 +60,10 @@ class InstagramContentService:
 
     def decide(self, candidate_id: UUID, decision: ContentDecision) -> ContentCandidate:
         item = self.get(candidate_id)
-        if item.status != ContentStatus.proposed:
+        if item.status not in (ContentStatus.proposed, ContentStatus.moderation_rejected):
             raise InstagramContentError(f"Cannot decide on a candidate in status {item.status}")
+
+        was_moderation_rejected = item.status == ContentStatus.moderation_rejected
 
         if decision.edited_caption is not None:
             item.caption_draft = decision.edited_caption
@@ -55,6 +71,8 @@ class InstagramContentService:
         item.status = ContentStatus.approved if decision.approved else ContentStatus.rejected
         item.decision_reason = decision.reason
         item.audit_log.append(f"{'Approved' if decision.approved else 'Rejected'}: {decision.reason}")
+        if was_moderation_rejected and decision.approved:
+            item.audit_log.append("Human override: approved despite automated moderation rejection.")
         return item
 
     def publish(self, candidate_id: UUID) -> ContentCandidate:

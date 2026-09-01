@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 
 class ContentStatus(StrEnum):
     proposed = "proposed"
+    moderation_rejected = "moderation_rejected"
     approved = "approved"
     rejected = "rejected"
     posted = "posted"
@@ -36,6 +37,7 @@ class ContentCandidate(BaseModel):
     aesthetic_notes: str = ""
     status: ContentStatus = ContentStatus.proposed
     decision_reason: str | None = None
+    moderation_warnings: list[str] = Field(default_factory=list)
     published_media_id: str | None = None
     audit_log: list[str] = Field(default_factory=list)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
