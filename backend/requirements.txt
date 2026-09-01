@@ -3,6 +3,10 @@ uvicorn[standard]==0.35.0
 pydantic-settings==2.10.1
 pytest==8.4.1
 httpx==0.28.1
+# Not used by the backend runtime itself -- only needed so
+# test_mt5_bridge_pusher_schema.py can import bridge/mt5_pusher.py and
+# validate its output against the real MT5SnapshotIngest schema.
+requests==2.32.3
 anthropic>=0.64.0,<1.0.0
 openai>=1.99.0,<2.0.0
 SQLAlchemy>=2.0.43,<3.0.0
