@@ -12,6 +12,8 @@ from .models import ContentCandidate, ContentCandidateCreate, ContentDecision, C
 from .moderation import moderate
 from .publisher import N8nInstagramPublisher, N8nInstagramPublisherError
 
+from app.knowledge_graph.models import NodeCreate, NodeKind
+from app.knowledge_graph.service import knowledge_graph_service
 from app.notification_hub.models import DeliveryPriority, NotificationCreate
 from app.notification_hub.service import notification_hub_service
 
@@ -151,7 +153,33 @@ class InstagramContentService:
         item.status = ContentStatus.posted
         item.published_media_id = media_id
         item.audit_log.append(f"Published via n8n, media_id={media_id}")
+        self._record_post_in_knowledge_graph(item)
         return item
+
+    def _record_post_in_knowledge_graph(self, item: ContentCandidate) -> None:
+        """Every real, published post becomes a permanent, queryable node --
+        AURON's own persistent memory of what it has actually posted, unlike
+        the in-process recent_captions list moderation.py uses (which is
+        lost on restart). Never lets a knowledge-graph problem break a
+        publish that already succeeded."""
+        try:
+            hashtags = [tag.lstrip("#").lower() for tag in item.caption_draft.split() if tag.startswith("#")]
+            knowledge_graph_service.create_node(
+                NodeCreate(
+                    name=f"Instagram post: {item.caption_draft[:80]}",
+                    kind=NodeKind.event,
+                    tags={"instagram", item.post_format.value, *hashtags},
+                    properties={
+                        "candidate_id": str(item.id),
+                        "media_id": item.published_media_id or "",
+                        "post_format": item.post_format.value,
+                        "media_item_count": len(item.media_items),
+                    },
+                    source_refs=[m.media_ref for m in item.media_items],
+                )
+            )
+        except Exception:  # noqa: BLE001 -- a knowledge-graph problem must never undo an already-successful publish
+            pass
 
     def finalize_draft(self, draft_id: UUID, request: FinalizeDraftRequest | None = None) -> ContentCandidate:
         """Turns a curated draft (media already grouped and reserved out of

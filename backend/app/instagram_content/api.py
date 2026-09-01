@@ -21,6 +21,9 @@ from .media_pool_models import (
 )
 from .analyze_and_ingest import analyze_and_ingest
 from .dashboard import InstagramDashboard, build_dashboard
+
+from app.knowledge_graph.models import NodeRecord
+from app.knowledge_graph.service import knowledge_graph_service
 from .media_pool_service import MediaPoolError, media_pool_service
 from .models import ContentCandidate, ContentCandidateCreate, ContentCandidateList, ContentDecision, ContentStatus
 from .platform_strategy import PlatformStrategy, platform_strategy_store
@@ -41,6 +44,19 @@ def dashboard(recent_limit: int = 10) -> InstagramDashboard:
     the media pool's real state, and the platform rules currently in
     effect. Every number is computed live, not cached."""
     return build_dashboard(recent_limit=recent_limit)
+
+
+@router.get("/history/search", response_model=list[NodeRecord])
+def search_post_history(query: str, limit: int = 20) -> list[NodeRecord]:
+    """Searches AURON's permanent record of everything it has actually
+    published (every successful publish() creates a knowledge_graph node --
+    see service.py's _record_post_in_knowledge_graph). Matches against the
+    post's caption text, hashtags, and format. Useful for checking "have I
+    posted about this theme recently" before curating something new, or
+    just for you to browse what's gone out."""
+    results = knowledge_graph_service.search_nodes(query, kind="event")
+    instagram_only = sorted((n for n in results if "instagram" in n.tags), key=lambda n: n.created_at, reverse=True)
+    return instagram_only[:limit]
 
 
 class PostingScheduleResponse(BaseModel):
