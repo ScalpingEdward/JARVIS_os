@@ -106,6 +106,16 @@ internet and no third-party automation platform is involved.
    ```
    TELEGRAM_BOT_TOKEN=123456:AAExample...
    TELEGRAM_CHAT_ID=123456789
+   ```
+
+   Email delivery works the same way, via standard SMTP (Gmail app password, or any transactional-email provider):
+   ```
+   SMTP_HOST=smtp.gmail.com
+   SMTP_PORT=587
+   SMTP_USERNAME=your-address@gmail.com
+   SMTP_PASSWORD=your-app-password
+   NOTIFICATION_EMAIL_FROM=your-address@gmail.com
+   NOTIFICATION_EMAIL_TO=where-you-want-it@example.com
 
 With this path, n8n's Instagram role shrinks to three mechanical steps: fetch bytes from Drive, forward them to AURON, and (after your approval) call the Meta Graph API to actually post. Every judgment call -- what a photo is, whether it fits the account, how to group it, what to write about it -- happens in AURON.
 5. From here it's the manual path: you approve, then publish triggers n8n.
