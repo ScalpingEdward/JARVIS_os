@@ -20,6 +20,7 @@ from .media_pool_models import (
     TrimAnalysisResult,
 )
 from .analyze_and_ingest import analyze_and_ingest
+from .dashboard import InstagramDashboard, build_dashboard
 from .media_pool_service import MediaPoolError, media_pool_service
 from .models import ContentCandidate, ContentCandidateCreate, ContentCandidateList, ContentDecision, ContentStatus
 from .platform_strategy import PlatformStrategy, platform_strategy_store
@@ -31,6 +32,15 @@ from .video_trim_analysis import AnthropicVideoTrimAnalyzer, VideoTrimAnalysisCo
 from .web_research import TavilyWebResearcher, WebResearchConfig, WebResearchError, WebResearchResponse
 
 router = APIRouter(prefix="/v1/instagram", tags=["instagram-content"])
+
+
+@router.get("/dashboard", response_model=InstagramDashboard)
+def dashboard(recent_limit: int = 10) -> InstagramDashboard:
+    """The Instagram Command Centre view: what needs your review right now,
+    what's queued behind it (curated drafts, approved-but-not-published),
+    the media pool's real state, and the platform rules currently in
+    effect. Every number is computed live, not cached."""
+    return build_dashboard(recent_limit=recent_limit)
 
 
 class PostingScheduleResponse(BaseModel):
