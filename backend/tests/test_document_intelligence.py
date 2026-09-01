@@ -108,7 +108,29 @@ def test_compare_versions():
     assert any(item.kind == "added" for item in result.differences)
 
 
-def test_safety_rejects_external_ai_upload_and_ocr():
+def test_analysis_request_allows_external_ai_but_still_blocks_upload():
+    service = DocumentIntelligenceService()
+    document = service.create_document(document_payload())
+    # use_external_ai is deliberately allowed now (2026-08-31) -- AURON's own
+    # document analysis may use a real, opt-in Anthropic call; this must not
+    # raise.
+    request = AnalysisRequest(
+        workspace_id="workspace-1",
+        requester_id="owner-1",
+        document_id=document.id,
+        use_external_ai=True,
+    )
+    assert request.use_external_ai is True
+    with pytest.raises(ValidationError):
+        AnalysisRequest(
+            workspace_id="workspace-1",
+            requester_id="owner-1",
+            document_id=document.id,
+            upload_document=True,
+        )
+
+
+def test_safety_rejects_cloud_upload_and_ocr():
     with pytest.raises(ValidationError):
         DocumentCreate(
             workspace_id="w",
@@ -127,28 +149,12 @@ def test_safety_rejects_external_ai_upload_and_ocr():
             format=DocumentFormat.IMAGE,
             external_ocr_request=True,
         )
-    service = DocumentIntelligenceService()
-    document = service.create_document(document_payload())
-    with pytest.raises(ValidationError):
-        AnalysisRequest(
-            workspace_id="workspace-1",
-            requester_id="owner-1",
-            document_id=document.id,
-            use_external_ai=True,
-        )
-    with pytest.raises(ValidationError):
-        AnalysisRequest(
-            workspace_id="workspace-1",
-            requester_id="owner-1",
-            document_id=document.id,
-            upload_document=True,
-        )
 
 
 def test_status_reports_safety_defaults():
     status = DocumentIntelligenceService().status()
-    assert status.version == "8.4"
+    assert status.version == "8.5"
     assert status.deterministic_local_analysis is True
-    assert status.external_ai_execution is False
+    assert status.external_ai_execution is True  # real, opt-in capability as of 2026-08-31
     assert status.automatic_cloud_uploads is False
     assert status.external_ocr_execution is False

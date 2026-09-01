@@ -122,8 +122,16 @@ class AnalysisRequest(BaseModel):
     def enforce_analysis_safety(self) -> "AnalysisRequest":
         if not self.human_approved:
             raise ValueError("human approval is required")
-        if not self.dry_run or self.use_external_ai:
-            raise ValueError("v8.4 permits deterministic local analysis only")
+        if not self.dry_run:
+            raise ValueError("live (non-dry-run) document mutation from an analysis request is not implemented")
+        # use_external_ai was hard-blocked here ("v8.4 permits deterministic
+        # local analysis only") with the field itself never wired to any real
+        # behavior in service.py -- a fenced-off placeholder, not an active
+        # capability. Deliberately unblocked 2026-08-31: AURON's own document
+        # analysis may now use a real Anthropic call (ANTHROPIC_API_KEY),
+        # same as captions/vision/research elsewhere in this build. The
+        # deterministic local analysis remains the default and the fallback
+        # when no API key is configured.
         if self.upload_document:
             raise ValueError("document upload to external services is disabled")
         if self.analysis_type == AnalysisType.COMPARE and self.comparison_document_id is None:
@@ -184,6 +192,7 @@ class AnalysisRecord(BaseModel):
     blocked_reason: str | None = None
     external_ai_used: bool = False
     external_upload_performed: bool = False
+    ai_key_points: list[str] = Field(default_factory=list)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
