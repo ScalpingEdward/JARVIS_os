@@ -134,7 +134,8 @@ router.routes.extend(_auron_v21_244_router.routes)
 from app.api.routes.auron_demo1_contextual_long_term_memory_v21_245 import router as _auron_v21_245_router
 router.routes.extend(_auron_v21_245_router.routes)
 
-# v21.255 depends on v21.254, so attach it only after the full 244→254 chain has initialized.
-# This avoids the circular-import timing issue that prevented the v21.255 routes from reaching FastAPI.
-from app.api.routes.auron_demo1_retry_recovery_v21_255 import router as _auron_v21_255_router
-router.routes.extend(_auron_v21_255_router.routes)
+# v21.255 is registered directly in main.py (app.include_router), so it is
+# deliberately NOT re-merged here anymore -- the previous merge caused every
+# v21.255 route to be registered twice (once here, once directly), which
+# silently shadowed one of the two copies. See JARVIS_MASTER_PLAN.md
+# (route-collision reconciliation) for the full audit.
