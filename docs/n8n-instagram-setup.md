@@ -132,3 +132,8 @@ already trust Claude with elsewhere in this project. The plain
 `POST /v1/instagram/media-pool/ingest` endpoint (pre-analyzed items, no
 vision call) still exists too, for cases where you already have
 theme/tags/aesthetic_score from somewhere else.
+
+## Two things n8n should call on a schedule
+
+1. `POST /v1/instagram/maintenance-cycle` -- analyze+ingest new media (if any) and run curation, in one call. Point n8n's Schedule Trigger at this (e.g. daily).
+2. `POST /v1/notification-hub/process-due` -- delivers any notifications that were deferred by quiet hours (default 22:30-07:00 Europe/Berlin). Without this being called periodically, a deferred notification just stays `deferred` forever -- nothing else triggers it. Point a second Schedule Trigger at this too (e.g. every 30 min).

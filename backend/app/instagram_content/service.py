@@ -120,6 +120,23 @@ class InstagramContentService:
         except Exception:  # noqa: BLE001
             pass
 
+    def _notify_publish_failed(self, item: ContentCandidate, exc: Exception) -> None:
+        """A failed publish is exactly the kind of thing that must not sit
+        silent until someone happens to check the dashboard -- high
+        priority so it reaches Telegram/email even during quiet hours."""
+        try:
+            notification_hub_service.create(
+                NotificationCreate(
+                    title="Instagram: publish failed",
+                    message=f"Post {item.id} failed to publish: {exc}",
+                    priority=DeliveryPriority.high,
+                    domain="instagram",
+                    source_id=str(item.id),
+                )
+            )
+        except Exception:  # noqa: BLE001
+            pass
+
     def list_all(self, status: ContentStatus | None = None) -> list[ContentCandidate]:
         items = list(self._items.values())
         if status is not None:
@@ -167,6 +184,7 @@ class InstagramContentService:
         except N8nInstagramPublisherError as exc:
             item.status = ContentStatus.post_failed
             item.audit_log.append(f"Publish failed: {exc}")
+            self._notify_publish_failed(item, exc)
             raise InstagramContentError(str(exc)) from exc
 
         item.status = ContentStatus.posted
