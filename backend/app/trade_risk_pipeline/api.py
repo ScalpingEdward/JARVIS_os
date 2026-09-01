@@ -5,9 +5,10 @@ from uuid import UUID
 from fastapi import APIRouter, HTTPException
 
 from app.modules.dynamic_risk_engine.models import DynamicRiskRecord
+from app.modules.execution_supervisor.models import SupervisionRecord
 from app.modules.position_management_brain.models import PositionRecord
 
-from .models import RiskAssessmentRequest
+from .models import RiskAssessmentRequest, SupervisionStartRequest
 from .service import TradeRiskPipelineError, trade_risk_pipeline_service
 
 router = APIRouter(prefix="/v1/trade-risk-pipeline", tags=["trade-risk-pipeline"])
@@ -39,5 +40,21 @@ def open_position(workspace_id: str, risk_record_id: str) -> PositionRecord:
     """
     try:
         return trade_risk_pipeline_service.open_position(workspace_id, risk_record_id)
+    except TradeRiskPipelineError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@router.post("/accounts/{workspace_id}/positions/{position_id}/start-supervision", response_model=SupervisionRecord)
+def start_supervision(
+    workspace_id: str, position_id: str, request: SupervisionStartRequest = SupervisionStartRequest()
+) -> SupervisionRecord:
+    """Starts execution_supervisor health tracking for an already-opened position.
+
+    Requires the position to be in an open/planned/approved/protected/
+    scaling-out state. Refuses closed, blocked, invalidated, or archived
+    positions.
+    """
+    try:
+        return trade_risk_pipeline_service.start_supervision(workspace_id, position_id, request)
     except TradeRiskPipelineError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
