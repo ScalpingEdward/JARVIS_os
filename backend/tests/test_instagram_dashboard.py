@@ -80,6 +80,35 @@ def test_dashboard_includes_current_platform_strategy_and_posting_windows():
     assert "analytics" in summary.posting_windows_note.lower() or "insights" in summary.posting_windows_note.lower()
 
 
+def test_dashboard_reflects_real_notification_activity():
+    from app.notification_hub.service import notification_hub_service
+
+    _reset_all()
+    notification_hub_service.reset()
+    _propose("Notify me. #tradingmindset #discipline #patience")
+
+    summary = build_dashboard()
+    assert len(summary.recent_notifications) == 1
+    assert summary.recent_notifications[0].domain == "instagram"
+    assert summary.notifications_delivered_today + summary.notifications_failed_today == 1
+
+
+def test_dashboard_notifications_exclude_other_domains():
+    from app.notification_hub.models import DeliveryPriority, NotificationCreate
+    from app.notification_hub.service import notification_hub_service
+
+    _reset_all()
+    notification_hub_service.reset()
+    notification_hub_service.create(
+        NotificationCreate(title="Unrelated", message="Not Instagram.", priority=DeliveryPriority.normal, domain="trading")
+    )
+    _propose("Real one. #tradingmindset #discipline #patience")
+
+    summary = build_dashboard()
+    assert len(summary.recent_notifications) == 1
+    assert summary.recent_notifications[0].domain == "instagram"
+
+
 def test_dashboard_via_the_api():
     _reset_all()
     _propose()
