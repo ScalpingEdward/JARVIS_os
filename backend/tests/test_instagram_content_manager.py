@@ -220,6 +220,26 @@ def test_n8n_failure_marks_post_failed_and_does_not_retry_silently():
     assert service.get(item.id).status == ContentStatus.post_failed
 
 
+def test_publish_failure_sends_a_high_priority_notification():
+    from app.notification_hub.models import DeliveryPriority
+    from app.notification_hub.service import notification_hub_service
+
+    notification_hub_service.reset()
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(500, text="upstream error")
+
+    service = _service_with_mock_publisher(handler)
+    item = service.propose(ContentCandidateCreate(**_candidate_payload()))
+    service.decide(item.id, ContentDecision(approved=True, reason="Approved"))
+    with pytest.raises(InstagramContentError):
+        service.publish(item.id)
+
+    matching = [n for n in notification_hub_service.list_all() if n.source_id == str(item.id) and "failed" in n.title.lower()]
+    assert len(matching) == 1
+    assert matching[0].priority == DeliveryPriority.high
+
+
 def test_publisher_rejects_missing_media_id_in_response():
     from app.instagram_content.edit_plan import build_edit_plan
     from app.instagram_content.format_decision import decide_format
