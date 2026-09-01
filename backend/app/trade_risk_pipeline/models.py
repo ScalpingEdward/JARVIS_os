@@ -48,3 +48,43 @@ class SupervisionStartRequest(BaseModel):
     stale_heartbeat_seconds: int = Field(default=300, gt=0, le=86400)
     minimum_quality_score: float = Field(default=70, ge=0, le=100)
     maximum_error_rate: float = Field(default=0.2, ge=0, le=1)
+
+
+class LiveOrderPrepareRequest(BaseModel):
+    """Everything AURON does not yet have a real data source for, and must
+    be supplied fresh by the caller for every single order. None of these
+    default to something that would make an order look more ready than it
+    is -- there is no safe default for a live quote or a broker login.
+
+    This only ever calls the live order executor's *create* (preflight)
+    step. Actually submitting to the broker requires a separate, explicit
+    call to its /execute endpoint with human_approved=True -- this pipeline
+    never sets that itself.
+    """
+
+    account_login: int = Field(gt=0, description="The MT5 account login this order will be submitted under.")
+    native_adapter_ready: bool = Field(
+        default=False,
+        description=(
+            "Whether a real, connected MT5 terminal adapter is actually "
+            "reachable right now. Defaults to False -- AURON cannot detect "
+            "this itself; only set True from the environment that actually "
+            "has the MetaTrader5 package and a logged-in terminal."
+        ),
+    )
+    quote_bid: float = Field(gt=0, description="Current bid, as fresh as possible -- there is no live feed wired yet.")
+    quote_ask: float = Field(gt=0, description="Current ask, as fresh as possible -- there is no live feed wired yet.")
+    quote_age_seconds: float = Field(
+        ge=0, description="Age of the quote above in seconds. Preflight rejects stale quotes; do not fake this."
+    )
+    order_type: str = Field(default="market", description="market, limit, or stop.")
+    symbol_point: float = Field(gt=0, description="The instrument's point size (e.g. 0.01 for XAUUSD, 0.0001 for EURUSD).")
+    min_volume: float = Field(default=0.01, gt=0)
+    max_volume: float = Field(default=100.0, gt=0)
+    volume_step: float = Field(default=0.01, gt=0)
+    min_stop_distance_points: int = Field(default=0, ge=0)
+    max_deviation_points: int = Field(default=30, ge=0)
+    approved_account_logins: list[int] | None = Field(
+        default=None,
+        description="Allowlist of logins this order may run under. Defaults to [account_login] only -- i.e. no other account is implicitly trusted.",
+    )

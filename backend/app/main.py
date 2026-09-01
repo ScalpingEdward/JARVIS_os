@@ -96,6 +96,7 @@ from .simulation_engine.api import router as simulation_engine_router
 from .strategic_planner.api import router as strategic_planner_router
 from .tools.api import router as tools_router
 from .trade_analyst.api import router as trade_analyst_router
+from .executive_mt5_live_order_executor.api import router as executive_mt5_live_order_executor_router
 from .trade_risk_pipeline.api import router as trade_risk_pipeline_router
 from .trading.api import router as trading_router
 from .tradingview_sync.api import router as tradingview_sync_router
@@ -264,6 +265,7 @@ app.include_router(simulation_engine_router)
 app.include_router(strategic_planner_router)
 app.include_router(tools_router)
 app.include_router(trade_analyst_router)
+app.include_router(executive_mt5_live_order_executor_router)
 app.include_router(trade_risk_pipeline_router)
 app.include_router(trading_router)
 app.include_router(tradingview_sync_router)
