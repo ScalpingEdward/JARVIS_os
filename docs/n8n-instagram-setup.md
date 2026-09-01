@@ -90,6 +90,12 @@ internet and no third-party automation platform is involved.
    AURON_VISION_MODEL=claude-sonnet-5    # optional, this is the default
    ```
 
+5. **AURON can also research its own platform rules now.** `GET /v1/instagram/research/platform-rules` shows the hashtag-cap/carousel-size values currently enforced (seeded from a 2026-08-31 web search). `POST /v1/instagram/research/platform-rules/refresh` runs a real, current web search (via [Tavily](https://tavily.com), an API built for AI agents) and returns a *proposed* update with reasoning and sources -- it never changes what's actually enforced. Review the proposal, then `POST /v1/instagram/research/platform-rules/apply` with the values you want to adopt (typically the `proposed` object from the refresh response) to make them live. `POST /v1/instagram/research/query` also exists for ad-hoc research (e.g. "what's working for high-end trading accounts right now") -- purely informational, nothing auto-applies from it.
+
+   Set the search API key once in `.env`:
+   ```
+   TAVILY_API_KEY=tvly-...
+
 With this path, n8n's Instagram role shrinks to three mechanical steps: fetch bytes from Drive, forward them to AURON, and (after your approval) call the Meta Graph API to actually post. Every judgment call -- what a photo is, whether it fits the account, how to group it, what to write about it -- happens in AURON.
 5. From here it's the manual path: you approve, then publish triggers n8n.
 

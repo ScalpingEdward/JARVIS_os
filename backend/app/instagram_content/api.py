@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from uuid import UUID
 
 from fastapi import APIRouter, HTTPException
@@ -18,9 +19,12 @@ from .media_pool_models import (
 from .analyze_and_ingest import analyze_and_ingest
 from .media_pool_service import MediaPoolError, media_pool_service
 from .models import ContentCandidate, ContentCandidateCreate, ContentCandidateList, ContentDecision, ContentStatus
+from .platform_strategy import PlatformStrategy, platform_strategy_store
 from .posting_schedule import NOTE, PostingWindow, suggested_windows_for_weekday
+from .research_synthesizer import PlatformStrategyProposal, ResearchSynthesisConfig, ResearchSynthesisError, ResearchSynthesizer
 from .service import InstagramContentError, instagram_content_service
 from .vision_analysis import AnthropicVisionAnalyzer
+from .web_research import TavilyWebResearcher, WebResearchConfig, WebResearchError, WebResearchResponse
 
 router = APIRouter(prefix="/v1/instagram", tags=["instagram-content"])
 
@@ -28,6 +32,11 @@ router = APIRouter(prefix="/v1/instagram", tags=["instagram-content"])
 class PostingScheduleResponse(BaseModel):
     windows: list[PostingWindow]
     note: str
+
+
+class WebResearchQueryRequest(BaseModel):
+    query: str
+    max_results: int | None = None
 
 
 @router.post("/candidates", response_model=ContentCandidate)
@@ -154,3 +163,55 @@ def discard_draft(draft_id: UUID) -> CuratedDraft:
         return media_pool_service.discard_draft(draft_id)
     except MediaPoolError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+# -- web research: AURON's own ongoing trend/pattern research ---------------
+
+
+@router.post("/research/query", response_model=WebResearchResponse)
+def research_query(request: WebResearchQueryRequest) -> WebResearchResponse:
+    """Ad-hoc real web search (Tavily) on AURON's own behalf -- e.g. "what's
+    working for high-end trading Instagram accounts right now". Informational
+    only: results are returned for review, never automatically applied to
+    any moderation/curation rule."""
+    try:
+        return TavilyWebResearcher().search(request.query, max_results=request.max_results)
+    except WebResearchError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+
+@router.get("/research/platform-rules", response_model=PlatformStrategy)
+def get_platform_rules() -> PlatformStrategy:
+    """The platform-rule values (hashtag cap/range, carousel size) currently
+    enforced by moderation.py and curation.py, and why they're set that way."""
+    return platform_strategy_store.current()
+
+
+@router.post("/research/platform-rules/refresh", response_model=PlatformStrategyProposal)
+def refresh_platform_rules() -> PlatformStrategyProposal:
+    """Runs real, current research on Instagram's hashtag and carousel rules
+    and returns a PROPOSED update -- this never changes what's actually
+    enforced. Call /research/platform-rules/apply with the proposed values
+    to actually adopt them, after reviewing the reasoning and sources."""
+    try:
+        researcher = TavilyWebResearcher()
+        research = [
+            researcher.search("Instagram hashtag limit best practice current"),
+            researcher.search("Instagram carousel slide count engagement algorithm current"),
+        ]
+    except WebResearchError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    try:
+        synthesizer = ResearchSynthesizer(config=ResearchSynthesisConfig(api_key=os.getenv("ANTHROPIC_API_KEY")))
+        return synthesizer.synthesize(platform_strategy_store.current(), research)
+    except ResearchSynthesisError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+
+@router.post("/research/platform-rules/apply", response_model=PlatformStrategy)
+def apply_platform_rules(strategy: PlatformStrategy) -> PlatformStrategy:
+    """Explicitly adopts a new PlatformStrategy (typically the `proposed`
+    field from a /refresh response, after review) -- the only way these
+    values ever change. Never called automatically by /refresh."""
+    return platform_strategy_store.apply(strategy)

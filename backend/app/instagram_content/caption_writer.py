@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 import httpx
 
 from .media_pool_models import MediaPoolItem
-from .moderation import OPTIMAL_HASHTAG_RANGE
+from .platform_strategy import platform_strategy_store
 
 ANTHROPIC_MESSAGES_URL = "https://api.anthropic.com/v1/messages"
 ANTHROPIC_API_VERSION = "2023-06-01"
@@ -50,6 +50,7 @@ class AnthropicCaptionWriter:
 
     def _build_prompt(self, theme: str, media_items: list[MediaPoolItem], post_format: str) -> str:
         tag_hint = ", ".join(sorted({t for item in media_items for t in item.tags})) or "none provided"
+        strategy = platform_strategy_store.current()
         return (
             f"Write one Instagram caption for a {post_format.replace('_', ' ')} post on a high-end, "
             f"growth-focused account.\n\n"
@@ -60,9 +61,9 @@ class AnthropicCaptionWriter:
             f"Requirements:\n"
             f"- Opening line must work as a scroll-stopping hook, under 125 characters, "
             f"not a hashtag, not written in all caps.\n"
-            f"- Include exactly {OPTIMAL_HASHTAG_RANGE[0]}-{OPTIMAL_HASHTAG_RANGE[1]} relevant hashtags at the end -- "
-            f"Instagram enforces a hard 5-hashtag cap platform-wide as of 2026, and Meta's own guidance is that "
-            f"hashtags now categorize content rather than drive reach, so precision matters more than count.\n"
+            f"- Include exactly {strategy.optimal_hashtag_min}-{strategy.optimal_hashtag_max} relevant hashtags at the end -- "
+            f"Instagram enforces a hard {strategy.max_hashtags}-hashtag cap platform-wide as of 2026, and Meta's own "
+            f"guidance is that hashtags now categorize content rather than drive reach, so precision matters more than count.\n"
             f"- No engagement-bait phrases (\"like4like\", \"tag a friend\", \"link in bio now\", \"follow for more\").\n"
             f"- Return ONLY the caption text itself -- no preamble, no explanation, no quotation marks around it.\n"
         )

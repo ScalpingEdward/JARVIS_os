@@ -5,15 +5,16 @@ from dataclasses import dataclass
 
 from .media_pool_models import MediaPoolItem
 from .models import MediaType
+from .platform_strategy import PlatformStrategy, platform_strategy_store
 
-# Real, explicit high-end-account curation rules -- not a black box:
-ELITE_SOLO_THRESHOLD = 0.85  # an image this strong deserves its own post, not to be buried in a carousel
-CAROUSEL_MIN_SIZE = 3  # 2-image carousels read as an afterthought, not a curated set
-# 2026 platform data consistently puts the carousel sweet spot at 7-10 slides
-# (highest average engagement, highest dwell time, algorithm reshow bonus for
-# swipe-through), not the 3-6 range that was common guidance in earlier years.
-# Verified via web search 2026-08-31.
-CAROUSEL_IDEAL_MAX_SIZE = 10
+# Convenience re-exports of the default strategy's values, for callers/tests
+# that want the current baseline without pulling the whole store. curate()
+# itself always reads platform_strategy_store.current() live, so a research-
+# driven update (see platform_strategy.py) takes effect without a code change.
+_DEFAULTS = PlatformStrategy()
+ELITE_SOLO_THRESHOLD = _DEFAULTS.elite_solo_threshold
+CAROUSEL_MIN_SIZE = _DEFAULTS.carousel_min_size
+CAROUSEL_IDEAL_MAX_SIZE = _DEFAULTS.carousel_ideal_max_size
 
 
 @dataclass(frozen=True)
@@ -32,6 +33,7 @@ def curate(pool_items: list[MediaPoolItem], max_groups: int = 10) -> list[Curate
     marking items 'used' for real happens one layer up once a group is
     actually turned into a submitted candidate).
     """
+    strategy = platform_strategy_store.current()
     unused = [item for item in pool_items if item.available]
     by_theme: dict[str, list[MediaPoolItem]] = defaultdict(list)
     for item in unused:
@@ -52,14 +54,14 @@ def curate(pool_items: list[MediaPoolItem], max_groups: int = 10) -> list[Curate
                         reasoning=f"Video in theme '{theme}' -- always a standalone Reel, never grouped.",
                     )
                 )
-            elif item.aesthetic_score >= ELITE_SOLO_THRESHOLD:
+            elif item.aesthetic_score >= strategy.elite_solo_threshold:
                 groups.append(
                     CuratedGroup(
                         theme=theme,
                         media_items=[item],
                         reasoning=(
                             f"Aesthetic score {item.aesthetic_score:.2f} is above the elite solo bar "
-                            f"({ELITE_SOLO_THRESHOLD}) -- stands better alone than diluted into a carousel."
+                            f"({strategy.elite_solo_threshold}) -- stands better alone than diluted into a carousel."
                         ),
                     )
                 )
@@ -69,7 +71,7 @@ def curate(pool_items: list[MediaPoolItem], max_groups: int = 10) -> list[Curate
         batch: list[MediaPoolItem] = []
         for item in remaining:
             batch.append(item)
-            if len(batch) == CAROUSEL_IDEAL_MAX_SIZE:
+            if len(batch) == strategy.carousel_ideal_max_size:
                 groups.append(
                     CuratedGroup(
                         theme=theme,
@@ -78,7 +80,7 @@ def curate(pool_items: list[MediaPoolItem], max_groups: int = 10) -> list[Curate
                     )
                 )
                 batch = []
-        if len(batch) >= CAROUSEL_MIN_SIZE:
+        if len(batch) >= strategy.carousel_min_size:
             groups.append(
                 CuratedGroup(
                     theme=theme,
