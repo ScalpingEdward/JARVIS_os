@@ -41,6 +41,9 @@ class InstagramDashboard(BaseModel):
     )
     notifications_delivered_today: int
     notifications_failed_today: int
+    unacknowledged_critical_notifications: int = Field(
+        description="Notifications requiring acknowledgement (e.g. publish failures) that haven't been seen yet."
+    )
     generated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
@@ -73,4 +76,7 @@ def build_dashboard(recent_limit: int = 10) -> InstagramDashboard:
         recent_notifications=instagram_notifications[:recent_limit],
         notifications_delivered_today=sum(1 for n in today_notifications if n.state == DeliveryState.delivered),
         notifications_failed_today=sum(1 for n in today_notifications if n.state == DeliveryState.failed),
+        unacknowledged_critical_notifications=sum(
+            1 for n in instagram_notifications if n.requires_acknowledgement and n.state == DeliveryState.delivered
+        ),
     )
