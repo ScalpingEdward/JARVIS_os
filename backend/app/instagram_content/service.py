@@ -156,6 +156,8 @@ class InstagramContentService:
                 media_type=pi.media_type,
                 aesthetic_score=pi.aesthetic_score,
                 duration_seconds=pi.duration_seconds,
+                recommended_trim_start_seconds=pi.recommended_trim_start_seconds,
+                recommended_trim_end_seconds=pi.recommended_trim_end_seconds,
             )
             for pi in pool_items
         ]

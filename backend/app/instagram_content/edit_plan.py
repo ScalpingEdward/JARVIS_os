@@ -23,6 +23,16 @@ def build_edit_plan(media_items: list[MediaItem], post_format: PostFormat) -> li
         if item.media_type == MediaType.video:
             notes = reel_duration_notes(item)
             needs_trim = item.duration_seconds is not None and item.duration_seconds > REEL_MAX_DURATION_SECONDS
+            has_real_trim = item.recommended_trim_start_seconds is not None and item.recommended_trim_end_seconds is not None
+            if needs_trim and has_real_trim:
+                trim_notes = (
+                    f"Trim to {item.recommended_trim_start_seconds:.1f}s-{item.recommended_trim_end_seconds:.1f}s "
+                    "-- a real window chosen from analyzed sampled frames, not invented."
+                )
+            elif needs_trim:
+                trim_notes = "; ".join(notes) if notes else "Needs trimming, but no frame-sampled analysis has run yet."
+            else:
+                trim_notes = "Duration is within range; no trim needed."
             instructions.append(
                 EditInstruction(
                     media_ref=item.media_ref,
@@ -30,7 +40,9 @@ def build_edit_plan(media_items: list[MediaItem], post_format: PostFormat) -> li
                     color_grade_preset=BRAND_COLOR_GRADE_PRESET,
                     target_duration_seconds=REEL_IDEAL_DURATION_SECONDS,
                     trim_needed=needs_trim,
-                    notes="; ".join(notes) if notes else "Duration is within range; no trim needed.",
+                    trim_start_seconds=item.recommended_trim_start_seconds if has_real_trim else None,
+                    trim_end_seconds=item.recommended_trim_end_seconds if has_real_trim else None,
+                    notes=trim_notes,
                 )
             )
         else:

@@ -59,6 +59,13 @@ class MediaPoolService:
             raise MediaPoolError("Media pool item not found")
         return item
 
+    def set_trim_recommendation(self, item_id: UUID, start_seconds: float, end_seconds: float, reasoning: str) -> MediaPoolItem:
+        item = self.get(item_id)
+        item.recommended_trim_start_seconds = start_seconds
+        item.recommended_trim_end_seconds = end_seconds
+        item.trim_reasoning = reasoning
+        return item
+
     # -- curation drafts ------------------------------------------------
 
     def run_curation(self, max_groups: int = 10) -> list[CuratedDraft]:
