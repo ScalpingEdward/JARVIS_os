@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass, field
 
 from .models import ContentCandidateCreate
 
@@ -26,10 +25,10 @@ BANNED_PHRASES = (
 _HASHTAG_RE = re.compile(r"#\w+")
 
 
-@dataclass(frozen=True)
 class ModerationResult:
-    violations: list[str] = field(default_factory=list)
-    warnings: list[str] = field(default_factory=list)
+    def __init__(self, violations: list[str] | None = None, warnings: list[str] | None = None) -> None:
+        self.violations = violations or []
+        self.warnings = warnings or []
 
     @property
     def passed(self) -> bool:
@@ -65,15 +64,23 @@ def moderate(candidate: ContentCandidateCreate, recent_captions: list[str]) -> M
     if hit_phrases:
         violations.append(f"Caption contains spam-pattern phrase(s): {', '.join(hit_phrases)}.")
 
-    if candidate.aesthetic_score < MIN_AESTHETIC_SCORE_HARD:
+    scores = [item.aesthetic_score for item in candidate.media_items]
+    average_score = sum(scores) / len(scores)
+    weakest_score = min(scores)
+    if average_score < MIN_AESTHETIC_SCORE_HARD:
         violations.append(
-            f"Aesthetic score {candidate.aesthetic_score:.2f} is below the account's minimum bar "
+            f"Average aesthetic score {average_score:.2f} is below the account's minimum bar "
             f"({MIN_AESTHETIC_SCORE_HARD})."
         )
-    elif candidate.aesthetic_score < MIN_AESTHETIC_SCORE_SOFT:
+    elif average_score < MIN_AESTHETIC_SCORE_SOFT:
         warnings.append(
-            f"Aesthetic score {candidate.aesthetic_score:.2f} is below the usual bar "
+            f"Average aesthetic score {average_score:.2f} is below the usual bar "
             f"({MIN_AESTHETIC_SCORE_SOFT}) -- borderline fit for the account."
+        )
+    if len(scores) > 1 and weakest_score < MIN_AESTHETIC_SCORE_HARD:
+        warnings.append(
+            f"At least one media item scores {weakest_score:.2f}, below the account's minimum bar -- "
+            "consider dropping it from the carousel even if the average is fine."
         )
 
     if caption in recent_captions:

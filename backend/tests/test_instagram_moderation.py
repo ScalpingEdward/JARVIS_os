@@ -10,11 +10,10 @@ from app.instagram_content.moderation import moderate
 from app.instagram_content.service import InstagramContentService
 
 
-def _payload(**overrides):
+def _payload(aesthetic_score=0.9, image_source_ref="drive://file-1", **overrides):
     base = dict(
-        image_source_ref="drive://file-1",
+        media_items=[{"media_ref": image_source_ref, "media_type": "image", "aesthetic_score": aesthetic_score}],
         caption_draft="Build in silence. Let the results make the noise.",
-        aesthetic_score=0.9,
     )
     base.update(overrides)
     return ContentCandidateCreate(**base)
