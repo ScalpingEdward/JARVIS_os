@@ -11,16 +11,16 @@ class RiskAssessmentRequest(BaseModel):
     setup and the account registry -- nothing here re-specifies the trade.
     """
 
-    value_per_price_unit: float = Field(
-        default=1.0,
+    value_per_price_unit: float | None = Field(
+        default=None,
         gt=0,
         description=(
             "Account-currency value of a 1.0 price move for one standard "
-            "unit of the traded instrument (i.e. pip/point value). AURON "
-            "does not yet track per-instrument contract specs, so this "
-            "must be supplied by the caller until that exists; the default "
-            "of 1.0 is almost certainly wrong for anything but a sanity "
-            "check and should not be relied on for real sizing."
+            "unit of the traded instrument (i.e. pip/point value). If "
+            "omitted, AURON looks up the real contract spec from the "
+            "mt5_bridge terminal matched to this account for the setup's "
+            "symbol and fails closed if none is available. Pass this "
+            "explicitly to override."
         ),
     )
     base_risk_percent: float | None = Field(
@@ -96,10 +96,19 @@ class LiveOrderPrepareRequest(BaseModel):
         description="Age of the quote above. Only meaningful together with quote_bid/quote_ask; ignored otherwise.",
     )
     order_type: str = Field(default="market", description="market, limit, or stop.")
-    symbol_point: float = Field(gt=0, description="The instrument's point size (e.g. 0.01 for XAUUSD, 0.0001 for EURUSD).")
-    min_volume: float = Field(default=0.01, gt=0)
-    max_volume: float = Field(default=100.0, gt=0)
-    volume_step: float = Field(default=0.01, gt=0)
+    symbol_point: float | None = Field(
+        default=None,
+        gt=0,
+        description=(
+            "The instrument's point size. If omitted (along with min/max "
+            "volume and volume_step below), AURON looks up the real "
+            "contract spec from the mt5_bridge terminal matched to this "
+            "account and fails closed if none is available."
+        ),
+    )
+    min_volume: float | None = Field(default=None, gt=0)
+    max_volume: float | None = Field(default=None, gt=0)
+    volume_step: float | None = Field(default=None, gt=0)
     min_stop_distance_points: int = Field(default=0, ge=0)
     max_deviation_points: int = Field(default=30, ge=0)
     approved_account_logins: list[int] | None = Field(

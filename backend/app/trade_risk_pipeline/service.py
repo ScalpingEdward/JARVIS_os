@@ -135,6 +135,10 @@ class TradeRiskPipelineService:
                 f"Account {account.id} is {account.status}, not active; refusing to size a position for it"
             )
 
+        value_per_price_unit = request.value_per_price_unit
+        if value_per_price_unit is None:
+            value_per_price_unit = self._symbol_spec(account, setup.symbol).value_per_price_unit
+
         payload = DynamicRiskCreate(
             workspace_id=str(account.id),
             source_key=str(setup.approval_request_id),
@@ -152,7 +156,7 @@ class TradeRiskPipelineService:
             setup_confidence_score=setup.confidence,
             entry_price=setup.entry_price,
             stop_price=setup.stop_loss,
-            value_per_price_unit=request.value_per_price_unit,
+            value_per_price_unit=value_per_price_unit,
             account=_account_snapshot(account),
             policy=_policy_from_account(account, request.base_risk_percent),
         )
@@ -263,6 +267,17 @@ class TradeRiskPipelineService:
         terminal matched to this account by (login, server) -- the same
         matching account_state_sync already uses. Fails closed: no matching
         terminal or no tick for this symbol means no quote, not a guess."""
+        terminal = self._matched_terminal(account)
+        tick = next((t for t in reversed(terminal.ticks) if t.symbol == symbol), None)
+        if tick is None:
+            raise TradeRiskPipelineError(
+                f"mt5_bridge terminal for account login={account.login} has no recent tick for {symbol}; "
+                "cannot look up a live quote."
+            )
+        age_seconds = max(0.0, (datetime.now(timezone.utc) - tick.captured_at).total_seconds())
+        return tick.bid, tick.ask, age_seconds
+
+    def _matched_terminal(self, account: TradingAccountRecord):
         terminal = next(
             (
                 data
@@ -274,16 +289,19 @@ class TradeRiskPipelineService:
         if terminal is None:
             raise TradeRiskPipelineError(
                 f"No mt5_bridge terminal is registered for account login={account.login} server={account.server}; "
-                "cannot look up a live quote. Either pass quote_bid/quote_ask explicitly, or connect the bridge."
+                "cannot look up real broker data for it."
             )
-        tick = next((t for t in reversed(terminal.ticks) if t.symbol == symbol), None)
-        if tick is None:
+        return terminal
+
+    def _symbol_spec(self, account: TradingAccountRecord, symbol: str):
+        terminal = self._matched_terminal(account)
+        spec = next((s for s in terminal.symbols if s.symbol == symbol), None)
+        if spec is None:
             raise TradeRiskPipelineError(
-                f"mt5_bridge terminal for account login={account.login} has no recent tick for {symbol}; "
-                "cannot look up a live quote."
+                f"mt5_bridge terminal for account login={account.login} has no contract spec for {symbol}; "
+                "cannot size or validate an order for it without one."
             )
-        age_seconds = max(0.0, (datetime.now(timezone.utc) - tick.captured_at).total_seconds())
-        return tick.bid, tick.ask, age_seconds
+        return spec
 
     def prepare_live_order(
         self, workspace_id: str, position_id: str, request: LiveOrderPrepareRequest
@@ -303,10 +321,13 @@ class TradeRiskPipelineService:
         unless the caller's own MT5 terminal, logged into the target
         account, is reachable by whatever process is running AURON --
         native_executor.py requires the Windows-only MetaTrader5 package,
-        which is not installed or usable in this environment. There is no
-        real live quote or symbol-spec source yet either; every quote,
-        point size, and volume limit here is exactly what the caller passes
-        in, not something AURON derived on its own.
+        which is not installed or usable in this environment.
+
+        Quote and contract-spec data now have a real source: if omitted,
+        both are looked up from the mt5_bridge terminal matched to this
+        account (by login+server), and this fails closed if no matching
+        terminal, tick, or symbol spec is available. Pass them explicitly
+        to override.
 
         Only the initial stop-loss is carried into the broker order.
         Partial take-profits are position_management_brain's exit rules,
@@ -342,6 +363,23 @@ class TradeRiskPipelineService:
                 "partial overrides are not allowed."
             )
 
+        spec_fields = (request.symbol_point, request.min_volume, request.max_volume, request.volume_step)
+        if all(f is not None for f in spec_fields):
+            symbol_point, min_volume, max_volume, volume_step = spec_fields
+        elif all(f is None for f in spec_fields):
+            spec = self._symbol_spec(account, position.symbol)
+            symbol_point, min_volume, max_volume, volume_step = (
+                spec.point,
+                spec.volume_min,
+                spec.volume_max,
+                spec.volume_step,
+            )
+        else:
+            raise TradeRiskPipelineError(
+                "symbol_point, min_volume, max_volume, and volume_step must be all supplied or all omitted -- "
+                "partial overrides are not allowed."
+            )
+
         payload = LiveOrderCreate(
             workspace_id=workspace_id,
             source_key=position_id,
@@ -357,10 +395,10 @@ class TradeRiskPipelineService:
             quote_bid=quote_bid,
             quote_ask=quote_ask,
             quote_age_seconds=quote_age_seconds,
-            symbol_point=request.symbol_point,
-            min_volume=request.min_volume,
-            max_volume=request.max_volume,
-            volume_step=request.volume_step,
+            symbol_point=symbol_point,
+            min_volume=min_volume,
+            max_volume=max_volume,
+            volume_step=volume_step,
             min_stop_distance_points=request.min_stop_distance_points,
             max_deviation_points=request.max_deviation_points,
             expected_risk_amount=position.risk_amount,

@@ -308,6 +308,9 @@ def test_prepare_live_order_never_auto_approves_or_executes() -> None:
             quote_ask=1.10005,
             quote_age_seconds=1.0,
             symbol_point=0.0001,
+            min_volume=0.01,
+            max_volume=100.0,
+            volume_step=0.01,
         ),
     )
     assert order.request.human_approved is False
@@ -326,7 +329,14 @@ def test_prepare_live_order_defaults_native_adapter_to_not_ready() -> None:
         workspace_id,
         position_id,
         LiveOrderPrepareRequest(
-            account_login=12345678, quote_bid=1.09995, quote_ask=1.10005, quote_age_seconds=1.0, symbol_point=0.0001
+            account_login=12345678,
+            quote_bid=1.09995,
+            quote_ask=1.10005,
+            quote_age_seconds=1.0,
+            symbol_point=0.0001,
+            min_volume=0.01,
+            max_volume=100.0,
+            volume_step=0.01,
         ),
     )
     assert order.state == LiveOrderState.ADAPTER_REQUIRED
@@ -346,6 +356,9 @@ def test_prepare_live_order_carries_the_real_risk_approved_size_and_stop() -> No
             quote_ask=1.10005,
             quote_age_seconds=1.0,
             symbol_point=0.0001,
+            min_volume=0.01,
+            max_volume=100.0,
+            volume_step=0.01,
             min_stop_distance_points=0,
         ),
     )
@@ -422,7 +435,14 @@ def test_prepare_live_order_looks_up_a_real_tick_when_quote_omitted() -> None:
     order = trade_risk_pipeline_service.prepare_live_order(
         workspace_id,
         position_id,
-        LiveOrderPrepareRequest(account_login=int(account.login), native_adapter_ready=True, symbol_point=0.0001),
+        LiveOrderPrepareRequest(
+            account_login=int(account.login),
+            native_adapter_ready=True,
+            symbol_point=0.0001,
+            min_volume=0.01,
+            max_volume=100.0,
+            volume_step=0.01,
+        ),
     )
     assert order.request.quote_bid == pytest.approx(1.10500)
     assert order.request.quote_ask == pytest.approx(1.10510)
@@ -473,6 +493,151 @@ def test_prepare_live_order_fails_closed_with_bridge_terminal_but_no_tick_for_sy
             position_id,
             LiveOrderPrepareRequest(account_login=int(account.login), symbol_point=0.0001),
         )
+
+
+def test_prepare_live_order_looks_up_a_real_symbol_spec_when_omitted() -> None:
+    from app.mt5_bridge.models import (
+        MT5AccountSnapshot,
+        MT5SnapshotIngest,
+        MT5SymbolSpec,
+        MT5Tick,
+        MT5TerminalRegister,
+    )
+    from app.mt5_bridge.service import mt5_bridge_service
+
+    mt5_bridge_service.reset()
+    workspace_id, position_id = _open_a_position()
+    account = account_registry_service.get_account(UUID(workspace_id))
+
+    terminal = mt5_bridge_service.register(
+        MT5TerminalRegister(
+            name="Test Terminal",
+            terminal_path="C:/MT5/terminal64.exe",
+            account_login=int(account.login),
+            broker="TestBroker",
+            server=account.server,
+        )
+    )
+    mt5_bridge_service.ingest(
+        terminal.id,
+        MT5SnapshotIngest(
+            account=MT5AccountSnapshot(balance=100000, equity=100000, margin=0, free_margin=100000),
+            ticks=[MT5Tick(symbol="EURUSD", bid=1.10500, ask=1.10510)],
+            symbols=[
+                MT5SymbolSpec(
+                    symbol="EURUSD",
+                    point=0.00001,
+                    digits=5,
+                    volume_min=0.01,
+                    volume_max=50.0,
+                    volume_step=0.01,
+                    trade_contract_size=100000,
+                    trade_tick_size=0.00001,
+                    trade_tick_value=1.0,
+                )
+            ],
+        ),
+    )
+
+    order = trade_risk_pipeline_service.prepare_live_order(
+        workspace_id,
+        position_id,
+        LiveOrderPrepareRequest(account_login=int(account.login), native_adapter_ready=True),
+    )
+    assert order.request.symbol_point == pytest.approx(0.00001)
+    assert order.request.min_volume == pytest.approx(0.01)
+    assert order.request.max_volume == pytest.approx(50.0)
+    assert order.request.volume_step == pytest.approx(0.01)
+
+
+def test_prepare_live_order_fails_closed_with_no_symbol_spec() -> None:
+    from app.mt5_bridge.models import MT5AccountSnapshot, MT5SnapshotIngest, MT5Tick, MT5TerminalRegister
+    from app.mt5_bridge.service import mt5_bridge_service
+
+    mt5_bridge_service.reset()
+    workspace_id, position_id = _open_a_position()
+    account = account_registry_service.get_account(UUID(workspace_id))
+
+    terminal = mt5_bridge_service.register(
+        MT5TerminalRegister(
+            name="Test Terminal",
+            terminal_path="C:/MT5/terminal64.exe",
+            account_login=int(account.login),
+            broker="TestBroker",
+            server=account.server,
+        )
+    )
+    # tick present, but no symbol spec ingested
+    mt5_bridge_service.ingest(
+        terminal.id,
+        MT5SnapshotIngest(
+            account=MT5AccountSnapshot(balance=100000, equity=100000, margin=0, free_margin=100000),
+            ticks=[MT5Tick(symbol="EURUSD", bid=1.10500, ask=1.10510)],
+        ),
+    )
+
+    with pytest.raises(TradeRiskPipelineError, match="no contract spec"):
+        trade_risk_pipeline_service.prepare_live_order(
+            workspace_id,
+            position_id,
+            LiveOrderPrepareRequest(account_login=int(account.login), native_adapter_ready=True),
+        )
+
+
+def test_assess_looks_up_real_value_per_price_unit_from_symbol_spec() -> None:
+    from app.mt5_bridge.models import MT5AccountSnapshot, MT5SnapshotIngest, MT5SymbolSpec, MT5TerminalRegister
+    from app.mt5_bridge.service import mt5_bridge_service
+
+    mt5_bridge_service.reset()
+    approval_request_id = _submit_one_setup()
+    setup = setup_submission_service.get_approval(approval_request_id)
+    account = account_registry_service.get_account(setup.account_id)
+
+    terminal = mt5_bridge_service.register(
+        MT5TerminalRegister(
+            name="Test Terminal",
+            terminal_path="C:/MT5/terminal64.exe",
+            account_login=int(account.login),
+            broker="TestBroker",
+            server=account.server,
+        )
+    )
+    mt5_bridge_service.ingest(
+        terminal.id,
+        MT5SnapshotIngest(
+            account=MT5AccountSnapshot(balance=100000, equity=100000, margin=0, free_margin=100000),
+            symbols=[
+                MT5SymbolSpec(
+                    symbol="EURUSD",
+                    point=0.00001,
+                    digits=5,
+                    volume_min=0.01,
+                    volume_max=50.0,
+                    volume_step=0.01,
+                    trade_contract_size=100000,
+                    trade_tick_size=0.00001,
+                    trade_tick_value=1.0,
+                )
+            ],
+        ),
+    )
+
+    record = trade_risk_pipeline_service.assess(approval_request_id)  # no value_per_price_unit override
+    assert record.state == RiskState.RISK_APPROVED
+    # trade_tick_value=1.0 / trade_tick_size=0.00001 = 100000 (real, not the old 1.0 sanity default)
+    assert record.assessment.recommended_position_units == pytest.approx(
+        record.assessment.recommended_risk_amount / (record.assessment.stop_distance * 100000.0), rel=1e-6
+    )
+
+
+def test_assess_fails_closed_with_no_symbol_spec_and_no_override() -> None:
+    from app.mt5_bridge.service import mt5_bridge_service
+
+    mt5_bridge_service.reset()
+    approval_request_id = _submit_one_setup()
+
+    with pytest.raises(TradeRiskPipelineError, match="No mt5_bridge terminal is registered"):
+        trade_risk_pipeline_service.assess(approval_request_id)
 
 
 def test_prepare_live_order_rejects_partial_quote_overrides() -> None:
