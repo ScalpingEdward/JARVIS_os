@@ -51,10 +51,16 @@ class SupervisionStartRequest(BaseModel):
 
 
 class LiveOrderPrepareRequest(BaseModel):
-    """Everything AURON does not yet have a real data source for, and must
-    be supplied fresh by the caller for every single order. None of these
-    default to something that would make an order look more ready than it
-    is -- there is no safe default for a live quote or a broker login.
+    """Everything AURON does not yet have a fully real data source for.
+
+    Live quotes now have a real source: if quote_bid/quote_ask/quote_age_seconds
+    are all omitted, AURON looks up the freshest tick pushed by the mt5_bridge
+    terminal matched to this account (by login+server) for the position's
+    symbol, and fails closed if no matching terminal or no recent tick
+    exists. Pass all three explicitly to override (e.g. for testing).
+
+    Contract specs (symbol point size, volume limits) still have no real
+    source and must be supplied by the caller every time.
 
     This only ever calls the live order executor's *create* (preflight)
     step. Actually submitting to the broker requires a separate, explicit
@@ -72,10 +78,22 @@ class LiveOrderPrepareRequest(BaseModel):
             "has the MetaTrader5 package and a logged-in terminal."
         ),
     )
-    quote_bid: float = Field(gt=0, description="Current bid, as fresh as possible -- there is no live feed wired yet.")
-    quote_ask: float = Field(gt=0, description="Current ask, as fresh as possible -- there is no live feed wired yet.")
-    quote_age_seconds: float = Field(
-        ge=0, description="Age of the quote above in seconds. Preflight rejects stale quotes; do not fake this."
+    quote_bid: float | None = Field(
+        default=None,
+        gt=0,
+        description=(
+            "Current bid. If omitted, AURON looks up the latest tick pushed "
+            "by the mt5_bridge terminal matched to this account (by login+"
+            "server) for this position's symbol. If no matching terminal or "
+            "no recent tick exists, the call fails closed -- it never "
+            "invents a quote."
+        ),
+    )
+    quote_ask: float | None = Field(default=None, gt=0, description="Same as quote_bid but for the ask.")
+    quote_age_seconds: float | None = Field(
+        default=None,
+        ge=0,
+        description="Age of the quote above. Only meaningful together with quote_bid/quote_ask; ignored otherwise.",
     )
     order_type: str = Field(default="market", description="market, limit, or stop.")
     symbol_point: float = Field(gt=0, description="The instrument's point size (e.g. 0.01 for XAUUSD, 0.0001 for EURUSD).")
