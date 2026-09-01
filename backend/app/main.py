@@ -19,10 +19,14 @@ from .api.routes.auron_demo1_adapter_dry_run_simulation_v21_267 import router as
 from .api.routes.auron_demo1_execution_preview_review_v21_268 import router as auron_demo1_execution_preview_review_v21_268_router
 from .api.routes.auron_demo1_conversational_core_v21_242 import router as auron_demo1_conversational_core_v21_242_router
 from .api.routes.auron_demo1_conversation_memory_v21_243 import router as auron_demo1_conversation_memory_v21_243_router
+# v21.255 must be imported before v21.257 below: v21.257 -> v21.256 -> v21.255
+# forms a circular import that only resolves if v21.255 has already finished
+# defining its own symbols by the time v21.256 asks for them (v21.255 imports
+# v21.256 itself, near the end of its own file, and merges its routes).
+from .api.routes.auron_demo1_retry_recovery_v21_255 import router as auron_demo1_retry_recovery_v21_255_router
 from .api.routes.auron_demo1_execution_admission_gate_v21_257 import router as auron_demo1_execution_admission_gate_v21_257_router
 from .api.routes.auron_demo1_execution_policy_controller_v21_258 import router as auron_demo1_execution_policy_controller_v21_258_router
 from .api.routes.auron_demo1_policy_decision_ledger_v21_259 import router as auron_demo1_policy_decision_ledger_v21_259_router
-from .api.routes.auron_demo1_retry_recovery_v21_255 import router as auron_demo1_retry_recovery_v21_255_router
 from .api.routes.phoenix_demo1_approval_inbox_v21_228 import router as phoenix_demo1_approval_inbox_router
 from .api.routes.phoenix_demo1_execution_orchestrator_v21_237 import router as phoenix_demo1_execution_orchestrator_router
 from .api.routes.phoenix_demo1_integration_validation_v21_232 import router as phoenix_demo1_integration_validation_router

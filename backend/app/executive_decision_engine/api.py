@@ -30,7 +30,6 @@ from ..executive_mt5_live_state_sync.api import router as executive_mt5_live_sta
 from ..executive_mt5_native_adapter_runtime.api import router as executive_mt5_native_adapter_runtime_router
 from ..executive_mt5_order_command_deal_ingestion.api import router as executive_mt5_order_command_deal_ingestion_router
 from ..executive_mt5_pending_order_oco.api import router as executive_mt5_pending_order_oco_router
-from ..executive_mt5_portfolio_correlation_exposure.api import router as executive_mt5_portfolio_correlation_exposure_router
 from ..executive_mt5_position_lifecycle.api import router as executive_mt5_position_lifecycle_router
 from ..executive_mt5_position_stream_trailing_stop.api import router as executive_mt5_position_stream_trailing_stop_router
 from ..executive_mt5_runtime_bridge.api import router as executive_mt5_runtime_bridge_router
@@ -158,7 +157,8 @@ router.include_router(executive_mt5_position_stream_trailing_stop_router)
 router.include_router(executive_mt5_break_even_scale_out_router)
 router.include_router(executive_mt5_pending_order_oco_router)
 router.include_router(executive_mt5_trading_session_news_filter_router)
-router.include_router(executive_mt5_portfolio_correlation_exposure_router)
+# executive_mt5_portfolio_correlation_exposure_router is registered directly
+# in main.py; re-including it here duplicated every one of its routes.
 router.include_router(executive_mt5_strategy_runtime_orchestrator_router)
 router.include_router(executive_mt5_end_to_end_runtime_validation_router)
 router.include_router(executive_mt5_native_adapter_runtime_router)
