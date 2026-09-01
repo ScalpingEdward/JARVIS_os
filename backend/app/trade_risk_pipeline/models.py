@@ -29,3 +29,22 @@ class RiskAssessmentRequest(BaseModel):
         le=10,
         description="Override the account's default base risk-per-trade percent.",
     )
+
+
+class SupervisionStartRequest(BaseModel):
+    """Optional overrides for starting position supervision."""
+
+    timeout_seconds: int = Field(
+        default=86400,
+        gt=0,
+        le=2_592_000,
+        description=(
+            "Max time this position is expected to stay open before it's "
+            "flagged for review. AURON does not yet know a strategy's "
+            "intended hold time, so this defaults to 24h; override per call "
+            "until strategies carry their own max-hold metadata."
+        ),
+    )
+    stale_heartbeat_seconds: int = Field(default=300, gt=0, le=86400)
+    minimum_quality_score: float = Field(default=70, ge=0, le=100)
+    maximum_error_rate: float = Field(default=0.2, ge=0, le=1)

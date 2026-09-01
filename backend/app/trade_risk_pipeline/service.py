@@ -13,12 +13,24 @@ from app.modules.dynamic_risk_engine.models import (
 )
 from app.modules.dynamic_risk_engine.router import service as dynamic_risk_service
 from app.modules.dynamic_risk_engine.service import DynamicRiskError
-from app.modules.position_management_brain.models import ExitRule, PositionCreate, PositionRecord
+from app.modules.execution_supervisor.models import StageTelemetry, SupervisionCreate, SupervisionRecord
+from app.modules.execution_supervisor.router import service as execution_supervisor_service
+from app.modules.execution_supervisor.service import ExecutionSupervisorError
+from app.modules.position_management_brain.models import ExitRule, PositionCreate, PositionRecord, PositionState
 from app.modules.position_management_brain.router import service as position_management_service
+from app.modules.position_management_brain.service import PositionManagementError
 from app.setup_submission.models import SubmittedSetup, TradeSide
 from app.setup_submission.service import setup_submission_service
 
-from .models import RiskAssessmentRequest
+from .models import RiskAssessmentRequest, SupervisionStartRequest
+
+_SUPERVISABLE_POSITION_STATES = {
+    PositionState.PLANNED,
+    PositionState.APPROVED,
+    PositionState.OPEN,
+    PositionState.PROTECTED,
+    PositionState.SCALING_OUT,
+}
 
 
 class TradeRiskPipelineError(ValueError):
@@ -193,6 +205,54 @@ class TradeRiskPipelineService:
             exit_rules=exit_rules,
         )
         return position_management_service.create(payload, actor="trade_risk_pipeline")
+
+    def start_supervision(
+        self, workspace_id: str, position_id: str, request: SupervisionStartRequest | None = None
+    ) -> SupervisionRecord:
+        """Starts execution_supervisor tracking for an already-opened position.
+
+        The third real link: dynamic_risk_engine sized it, position_management_brain
+        opened it, this puts it under ongoing health supervision (stale-heartbeat,
+        error-rate, quality-score monitoring) so degradation gets flagged instead
+        of a position silently going unmonitored after it's opened.
+        """
+        request = request or SupervisionStartRequest()
+
+        try:
+            position = position_management_service.get(workspace_id, position_id)
+        except PositionManagementError as exc:
+            raise TradeRiskPipelineError(str(exc)) from exc
+
+        if position.state not in _SUPERVISABLE_POSITION_STATES:
+            raise TradeRiskPipelineError(
+                f"Position {position_id} is {position.state}, not in a supervisable state "
+                f"({sorted(s.value for s in _SUPERVISABLE_POSITION_STATES)}); refusing to start supervision"
+            )
+
+        stage = StageTelemetry(
+            stage_key="position-lifecycle",
+            status=position.state.value,
+            progress_percent=max(0.0, 100.0 - position.remaining_percent),
+            elapsed_seconds=0,
+            timeout_seconds=request.timeout_seconds,
+            dependency_healthy=True,
+            metadata={"symbol": position.symbol, "direction": position.direction},
+        )
+        payload = SupervisionCreate(
+            workspace_id=workspace_id,
+            source_key=position_id,
+            workflow_id=position_id,
+            workflow_approved=True,
+            v21_10_evidence={"source": "trade_risk_pipeline", "position_id": position_id},
+            stale_heartbeat_seconds=request.stale_heartbeat_seconds,
+            minimum_quality_score=request.minimum_quality_score,
+            maximum_error_rate=request.maximum_error_rate,
+            stages=[stage],
+        )
+        try:
+            return execution_supervisor_service.create(payload, actor="trade_risk_pipeline")
+        except ExecutionSupervisorError as exc:
+            raise TradeRiskPipelineError(str(exc)) from exc
 
 
 trade_risk_pipeline_service = TradeRiskPipelineService()

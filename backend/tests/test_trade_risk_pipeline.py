@@ -16,6 +16,7 @@ from app.accounts.models import (
 )
 from app.accounts.service import account_registry_service
 from app.modules.dynamic_risk_engine.models import RiskState
+from app.modules.execution_supervisor.models import SupervisionState
 from app.modules.position_management_brain.models import PositionState
 from app.setup_submission.service import setup_submission_service
 from app.strategies.models import (
@@ -222,3 +223,65 @@ def test_open_position_unknown_risk_record_fails_closed() -> None:
     setup = setup_submission_service.get_approval(approval_request_id)
     with pytest.raises(TradeRiskPipelineError, match="record not found"):
         trade_risk_pipeline_service.open_position(str(setup.account_id), "does-not-exist")
+
+
+# -- start_supervision: the third real link ----------------------------------
+
+
+def _open_a_position() -> tuple[str, str]:
+    """Runs the full assess -> open_position chain and returns (workspace_id, position_id)."""
+    approval_request_id = _submit_one_setup()
+    setup = setup_submission_service.get_approval(approval_request_id)
+    record = trade_risk_pipeline_service.assess(approval_request_id, RiskAssessmentRequest(value_per_price_unit=10.0))
+    assert record.state == RiskState.RISK_APPROVED
+    position = trade_risk_pipeline_service.open_position(str(setup.account_id), record.id)
+    return str(setup.account_id), position.id
+
+
+def test_start_supervision_on_a_freshly_opened_position() -> None:
+    workspace_id, position_id = _open_a_position()
+    record = trade_risk_pipeline_service.start_supervision(workspace_id, position_id)
+
+    assert record.workflow_id == position_id
+    assert record.total_stages == 1
+    assert record.stage_snapshots[0].stage_key == "position-lifecycle"
+    assert record.state != SupervisionState.EVIDENCE_REQUIRED
+    assert record.state != SupervisionState.BLOCKED
+
+
+def test_start_supervision_unknown_position_fails_closed() -> None:
+    with pytest.raises(TradeRiskPipelineError, match="record not found"):
+        trade_risk_pipeline_service.start_supervision("some-workspace", "does-not-exist")
+
+
+def test_start_supervision_refuses_a_closed_position() -> None:
+    workspace_id, position_id = _open_a_position()
+
+    from app.modules.position_management_brain.models import PositionAction, PositionCommand
+    from app.modules.position_management_brain.router import service as position_management_service
+
+    # Drive the position through its real lifecycle (approve -> mark-open ->
+    # close) using its own commands, then confirm supervision refuses a
+    # closed position.
+    position_management_service.execute(
+        workspace_id, position_id, PositionAction(command=PositionCommand.APPROVE, actor="test")
+    )
+    position_management_service.execute(
+        workspace_id,
+        position_id,
+        PositionAction(command=PositionCommand.MARK_OPEN, actor="test", downstream_receipt="receipt-1"),
+    )
+    position_management_service.execute(
+        workspace_id, position_id, PositionAction(command=PositionCommand.CLOSE, actor="test", realized_r_multiple=1.5)
+    )
+
+    with pytest.raises(TradeRiskPipelineError, match="not in a supervisable state"):
+        trade_risk_pipeline_service.start_supervision(workspace_id, position_id)
+
+
+def test_start_supervision_cannot_be_started_twice_for_the_same_position() -> None:
+    workspace_id, position_id = _open_a_position()
+    trade_risk_pipeline_service.start_supervision(workspace_id, position_id)
+
+    with pytest.raises(TradeRiskPipelineError, match="duplicate source_key"):
+        trade_risk_pipeline_service.start_supervision(workspace_id, position_id)
