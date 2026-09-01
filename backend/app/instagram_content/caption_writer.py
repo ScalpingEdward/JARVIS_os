@@ -60,8 +60,9 @@ class AnthropicCaptionWriter:
             f"Requirements:\n"
             f"- Opening line must work as a scroll-stopping hook, under 125 characters, "
             f"not a hashtag, not written in all caps.\n"
-            f"- Include {OPTIMAL_HASHTAG_RANGE[0]}-{OPTIMAL_HASHTAG_RANGE[1]} relevant hashtags at the end, "
-            f"mixing niche and broader tags -- not 15+, that reads as spam for this account.\n"
+            f"- Include exactly {OPTIMAL_HASHTAG_RANGE[0]}-{OPTIMAL_HASHTAG_RANGE[1]} relevant hashtags at the end -- "
+            f"Instagram enforces a hard 5-hashtag cap platform-wide as of 2026, and Meta's own guidance is that "
+            f"hashtags now categorize content rather than drive reach, so precision matters more than count.\n"
             f"- No engagement-bait phrases (\"like4like\", \"tag a friend\", \"link in bio now\", \"follow for more\").\n"
             f"- Return ONLY the caption text itself -- no preamble, no explanation, no quotation marks around it.\n"
         )

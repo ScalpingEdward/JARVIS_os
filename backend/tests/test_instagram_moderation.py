@@ -30,14 +30,14 @@ def test_moderate_passes_a_clean_candidate():
 
 
 def test_moderate_rejects_too_many_hashtags():
-    caption = "Quiet confidence. " + " ".join(f"#tag{i}" for i in range(31))
+    caption = "Quiet confidence. " + " ".join(f"#tag{i}" for i in range(6))
     result = moderate(_payload(caption_draft=caption), recent_captions=[])
     assert not result.passed
     assert any("hashtag" in v.lower() for v in result.violations)
 
 
-def test_moderate_warns_when_close_to_the_hashtag_limit():
-    caption = "Quiet confidence. " + " ".join(f"#tag{i}" for i in range(27))
+def test_moderate_warns_below_the_optimal_hashtag_range():
+    caption = "Quiet confidence. #onehashtag"
     result = moderate(_payload(caption_draft=caption), recent_captions=[])
     assert result.passed
     assert any("hashtag" in w.lower() for w in result.warnings)
