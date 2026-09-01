@@ -15,6 +15,8 @@ from app.accounts.models import (
     TradingAccountCreate,
 )
 from app.accounts.service import account_registry_service
+from app.modules.dynamic_risk_engine.models import RiskState
+from app.modules.position_management_brain.models import PositionState
 from app.setup_submission.service import setup_submission_service
 from app.strategies.models import (
     FairValueGap,
@@ -139,3 +141,84 @@ def test_assess_blocks_when_daily_loss_limit_already_breached() -> None:
 
     with pytest.raises(TradeRiskPipelineError, match="not active"):
         trade_risk_pipeline_service.assess(approval_request_id)
+
+
+# -- open_position: the second real link ------------------------------------
+
+
+def test_open_position_requires_a_risk_approved_record() -> None:
+    approval_request_id = _submit_one_setup()
+    setup = setup_submission_service.get_approval(approval_request_id)
+    record = trade_risk_pipeline_service.assess(approval_request_id, RiskAssessmentRequest(value_per_price_unit=10.0))
+
+    # A freshly-assessed A-grade setup on a healthy account should come back
+    # risk-approved; if it didn't, the rest of this test would be moot.
+    assert record.state == RiskState.RISK_APPROVED
+
+    position = trade_risk_pipeline_service.open_position(str(setup.account_id), record.id)
+
+    assert position.symbol == setup.symbol
+    assert position.position_size == pytest.approx(record.assessment.recommended_position_units)
+    assert position.risk_amount == pytest.approx(record.assessment.recommended_risk_amount)
+    assert position.entry_price == setup.entry_price
+    assert position.current_stop_price == setup.stop_loss
+    assert position.state in (PositionState.PLANNED, PositionState.APPROVED, PositionState.HUMAN_REVIEW_REQUIRED)
+
+
+def test_open_position_converts_cumulative_take_profits_to_incremental_exit_rules() -> None:
+    """setup_submission's TakeProfit.close_pct is cumulative (e.g. 30/50/100);
+    position_management_brain's ExitRule.close_percent is incremental and must
+    not sum past 100. This must be converted, not passed through as-is."""
+    from app.strategies.models import TakeProfit
+    from app.trade_risk_pipeline.service import _exit_rules_from_take_profits
+
+    take_profits = [
+        TakeProfit(price=1.1010, close_pct=30, label="TP1"),
+        TakeProfit(price=1.1020, close_pct=50, label="TP2"),
+        TakeProfit(price=1.1030, close_pct=100, label="TP3"),
+    ]
+    rules = _exit_rules_from_take_profits(take_profits, "scalping_3tp")
+
+    assert [round(r.close_percent, 6) for r in rules] == [30, 20, 50]
+    assert sum(r.close_percent for r in rules) == pytest.approx(100)
+    assert all(r.kind == "take-profit" for r in rules)
+    assert [r.trigger_price for r in rules] == [1.1010, 1.1020, 1.1030]
+
+
+def test_open_position_refuses_a_record_that_is_not_risk_approved() -> None:
+    """Directly constructs a non-approved dynamic_risk_engine record (via its
+    own API, not our heuristics) so this test doesn't depend on which inputs
+    happen to trigger a block -- it only tests open_position's own guard."""
+    approval_request_id = _submit_one_setup()
+    setup = setup_submission_service.get_approval(approval_request_id)
+
+    from app.modules.dynamic_risk_engine.models import AccountRiskSnapshot, DynamicRiskCreate
+    from app.modules.dynamic_risk_engine.router import service as dynamic_risk_service
+
+    not_approved_record = dynamic_risk_service.create(
+        DynamicRiskCreate(
+            workspace_id=str(setup.account_id),
+            source_key=str(setup.approval_request_id),
+            position_management_record_id=str(setup.approval_request_id),
+            v21_16_approved=False,  # deterministically yields EVIDENCE_REQUIRED, never risk-approved
+            symbol=setup.symbol,
+            direction="long" if setup.side.value == "buy" else "short",
+            setup_grade="B",
+            setup_confidence_score=setup.confidence,
+            entry_price=setup.entry_price,
+            stop_price=setup.stop_loss,
+            value_per_price_unit=10.0,
+            account=AccountRiskSnapshot(balance=100000, equity=100000, daily_start_equity=100000, initial_account_size=100000),
+        )
+    )
+    assert not_approved_record.state != RiskState.RISK_APPROVED
+
+    with pytest.raises(TradeRiskPipelineError, match="not risk-approved"):
+        trade_risk_pipeline_service.open_position(str(setup.account_id), not_approved_record.id)
+
+
+def test_open_position_unknown_risk_record_fails_closed() -> None:
+    approval_request_id = _submit_one_setup()
+    setup = setup_submission_service.get_approval(approval_request_id)
+    with pytest.raises(TradeRiskPipelineError, match="record not found"):
+        trade_risk_pipeline_service.open_position(str(setup.account_id), "does-not-exist")

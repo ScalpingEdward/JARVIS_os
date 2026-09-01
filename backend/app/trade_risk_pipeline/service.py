@@ -9,8 +9,12 @@ from app.modules.dynamic_risk_engine.models import (
     DynamicRiskCreate,
     DynamicRiskRecord,
     RiskPolicy,
+    RiskState,
 )
 from app.modules.dynamic_risk_engine.router import service as dynamic_risk_service
+from app.modules.dynamic_risk_engine.service import DynamicRiskError
+from app.modules.position_management_brain.models import ExitRule, PositionCreate, PositionRecord
+from app.modules.position_management_brain.router import service as position_management_service
 from app.setup_submission.models import SubmittedSetup, TradeSide
 from app.setup_submission.service import setup_submission_service
 
@@ -56,6 +60,29 @@ def _policy_from_account(account: TradingAccountRecord, base_risk_percent: float
     return RiskPolicy(**kwargs)
 
 
+def _exit_rules_from_take_profits(take_profits: list, strategy_id: str) -> list[ExitRule]:
+    """Converts setup_submission's *cumulative* TakeProfit.close_pct (e.g.
+    30/50/100) into position_management_brain's *incremental* ExitRule.close_percent,
+    which must not sum past 100. Pulled out as its own function so the
+    conversion itself is directly testable without touching either service's
+    internal state."""
+    rules: list[ExitRule] = []
+    previous_cumulative = 0.0
+    for index, tp in enumerate(take_profits, start=1):
+        incremental = max(0.0, tp.close_pct - previous_cumulative)
+        previous_cumulative = tp.close_pct
+        rules.append(
+            ExitRule(
+                key=f"strategy-tp-{index}",
+                kind="take-profit",
+                trigger_price=tp.price,
+                close_percent=incremental,
+                evidence_ref=f"strategy:{strategy_id}",
+            )
+        )
+    return rules
+
+
 class TradeRiskPipelineService:
     """The real link between an approved setup and a governed position size.
 
@@ -72,6 +99,12 @@ class TradeRiskPipelineService:
     DynamicRiskRecord (risk-approved, human-review-required, or blocked)
     that a later, still-gated step would need before any execution.
     """
+
+    def _get_risk_record(self, workspace_id: str, risk_record_id: str) -> DynamicRiskRecord:
+        try:
+            return dynamic_risk_service.get(workspace_id, risk_record_id)
+        except DynamicRiskError as exc:
+            raise TradeRiskPipelineError(str(exc)) from exc
 
     def assess(self, approval_request_id: UUID, request: RiskAssessmentRequest | None = None) -> DynamicRiskRecord:
         request = request or RiskAssessmentRequest()
@@ -108,6 +141,58 @@ class TradeRiskPipelineService:
             policy=_policy_from_account(account, request.base_risk_percent),
         )
         return dynamic_risk_service.create(payload, actor="trade_risk_pipeline")
+
+    def open_position(self, workspace_id: str, risk_record_id: str) -> PositionRecord:
+        """Opens a tracked position from an already risk-approved assessment.
+
+        This is the second real link: dynamic_risk_engine already computed a
+        governed position size (assess() above); this takes that approved
+        record and opens the position in position_management_brain with the
+        strategy's own take-profits mapped to real exit rules, so partial
+        closes / break-even / trailing-stop management has something real to
+        act on later instead of a setup that was only ever "approved" on
+        paper. Still does not place a broker order.
+        """
+        risk_record = self._get_risk_record(workspace_id, risk_record_id)
+        if risk_record.state != RiskState.RISK_APPROVED:
+            raise TradeRiskPipelineError(
+                f"Risk record {risk_record_id} is {risk_record.state}, not risk-approved; refusing to open a position"
+            )
+
+        account = account_registry_service.get_account(UUID(workspace_id))
+        if account.status != AccountStatus.active:
+            raise TradeRiskPipelineError(
+                f"Account {account.id} is {account.status}, not active; refusing to open a position for it"
+            )
+
+        approval_request_id = UUID(risk_record.source_key)
+        setup = setup_submission_service.get_approval(approval_request_id)
+        if setup is None:
+            raise TradeRiskPipelineError(f"No setup found for risk record {risk_record_id} (source_key {risk_record.source_key})")
+
+        # Strategy take-profits express *cumulative* close percentage;
+        # position_management_brain's exit rules need incremental values.
+        exit_rules = _exit_rules_from_take_profits(setup.take_profits, setup.strategy_id)
+
+        payload = PositionCreate(
+            workspace_id=workspace_id,
+            source_key=str(approval_request_id),
+            trade_setup_record_id=str(approval_request_id),
+            v21_15_approved=True,
+            v21_15_evidence={
+                "risk_record_id": risk_record_id,
+                "risk_state": risk_record.state.value,
+                "source": "trade_risk_pipeline",
+            },
+            symbol=setup.symbol,
+            direction="long" if setup.side == TradeSide.buy else "short",
+            entry_price=setup.entry_price,
+            initial_stop_price=setup.stop_loss,
+            position_size=risk_record.assessment.recommended_position_units,
+            risk_amount=risk_record.assessment.recommended_risk_amount,
+            exit_rules=exit_rules,
+        )
+        return position_management_service.create(payload, actor="trade_risk_pipeline")
 
 
 trade_risk_pipeline_service = TradeRiskPipelineService()
