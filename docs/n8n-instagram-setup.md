@@ -137,3 +137,4 @@ theme/tags/aesthetic_score from somewhere else.
 
 1. `POST /v1/instagram/maintenance-cycle` -- analyze+ingest new media (if any) and run curation, in one call. Point n8n's Schedule Trigger at this (e.g. daily).
 2. `POST /v1/notification-hub/process-due` -- delivers any notifications that were deferred by quiet hours (default 22:30-07:00 Europe/Berlin). Without this being called periodically, a deferred notification just stays `deferred` forever -- nothing else triggers it. Point a second Schedule Trigger at this too (e.g. every 30 min).
+3. `POST /v1/notification-hub/escalate-overdue` -- re-sends any notification that required acknowledgement, was delivered, and still hasn't been acknowledged past `escalation_minutes` (default 10). A publish-failure notification you missed gets a real second Telegram/email send, not just a flag. Point a third Schedule Trigger here too.

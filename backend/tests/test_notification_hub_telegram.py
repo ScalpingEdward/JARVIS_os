@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import httpx
 import pytest
@@ -129,6 +129,56 @@ def test_record_fails_when_every_configured_channel_fails():
         now=datetime(2026, 7, 16, 12, 0, tzinfo=timezone.utc),
     )
     assert record.state == DeliveryState.failed
+
+
+def test_escalate_overdue_redelivers_an_unacknowledged_critical_notification():
+    sent: list[str] = []
+
+    class TrackingTelegramClient:
+        def send(self, title: str, message: str) -> None:
+            sent.append(title)
+
+    service = NotificationHubService(telegram_client=TrackingTelegramClient())
+    created_at = datetime(2026, 7, 16, 12, 0, tzinfo=timezone.utc)
+    record = service.create(
+        NotificationCreate(
+            title="Publish failed",
+            message="Needs attention.",
+            priority=DeliveryPriority.high,
+            requires_acknowledgement=True,
+        ),
+        now=created_at,
+    )
+    assert len(sent) == 1  # initial delivery
+
+    # not yet past the default 10-minute escalation window
+    escalated = service.escalate_overdue(now=created_at + timedelta(minutes=5))
+    assert escalated == []
+    assert len(sent) == 1
+
+    escalated = service.escalate_overdue(now=created_at + timedelta(minutes=11))
+    assert len(escalated) == 1
+    assert escalated[0].id == record.id
+    assert len(sent) == 2  # actually re-delivered, not just flagged
+
+
+def test_escalate_overdue_skips_acknowledged_notifications():
+    service = NotificationHubService(telegram_client=TelegramDeliveryClient(config=TelegramDeliveryConfig(bot_token=None, chat_id=None)))
+    created_at = datetime(2026, 7, 16, 12, 0, tzinfo=timezone.utc)
+    record = service.create(
+        NotificationCreate(
+            title="Publish failed",
+            message="Needs attention.",
+            priority=DeliveryPriority.high,
+            requires_acknowledgement=True,
+            channels=[DeliveryChannel.dashboard],  # avoid the real telegram fail-closed path here
+        ),
+        now=created_at,
+    )
+    service.acknowledge(record.id)
+
+    escalated = service.escalate_overdue(now=created_at + timedelta(minutes=30))
+    assert escalated == []
 
 
 def test_delivery_uses_the_real_email_client_for_the_email_channel():

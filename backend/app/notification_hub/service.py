@@ -51,6 +51,7 @@ class NotificationHubService:
             channels=channels,
             state=state,
             deliver_after=deliver_after,
+            created_at=current,
         )
         self._records[record.id] = record
         if state == DeliveryState.queued:
@@ -85,6 +86,26 @@ class NotificationHubService:
                 self._deliver(record)
                 processed.append(record.model_copy(deep=True))
         return processed
+
+    def escalate_overdue(self, *, now: datetime | None = None) -> list[NotificationRecord]:
+        """escalation_minutes was a defined preference with nothing ever
+        checking it. A notification that requires acknowledgement, was
+        delivered, and still hasn't been acknowledged past that window gets
+        re-delivered (a real re-send, not just a flag) so it doesn't just
+        sit as 'delivered' forever if it was missed the first time."""
+        current = now or datetime.now(timezone.utc)
+        window = timedelta(minutes=self._preferences.escalation_minutes)
+        escalated: list[NotificationRecord] = []
+        for record in self._records.values():
+            if (
+                record.requires_acknowledgement
+                and record.state == DeliveryState.delivered
+                and record.acknowledged_at is None
+                and (current - record.created_at) >= window
+            ):
+                self._deliver(record)
+                escalated.append(record.model_copy(deep=True))
+        return escalated
 
     def status(self) -> NotificationHubStatus:
         records = list(self._records.values())
