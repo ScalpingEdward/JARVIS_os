@@ -12,8 +12,6 @@ COPY requirements.txt ./requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY app ./app
-COPY alembic.ini ./alembic.ini
-COPY alembic ./alembic
 
 RUN mkdir -p /data /logs && chown -R jarvis:jarvis /app /data /logs
 USER jarvis
