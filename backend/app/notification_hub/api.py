@@ -62,3 +62,13 @@ def acknowledge_notification(notification_id: UUID) -> NotificationRecord:
 def process_due_notifications() -> NotificationList:
     items = notification_hub_service.process_due()
     return NotificationList(items=items, count=len(items))
+
+
+@router.post("/escalate-overdue", response_model=NotificationList)
+def escalate_overdue_notifications() -> NotificationList:
+    """Re-delivers notifications that required acknowledgement, were sent,
+    and still haven't been acknowledged past the configured
+    escalation_minutes window. Call this on a schedule alongside
+    /process-due."""
+    items = notification_hub_service.escalate_overdue()
+    return NotificationList(items=items, count=len(items))
