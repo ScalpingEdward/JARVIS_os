@@ -126,10 +126,23 @@ def collect_snapshot(symbols: list[str], deal_history_days: int) -> dict:
     ticks = []
     symbol_specs = []
     for symbol in symbols:
+        info = mt5.symbol_info(symbol)
+        if info is None:
+            print(f"[warn] {symbol}: not found on this broker (check exact symbol name in Market Watch)", file=sys.stderr)
+            continue
+        if not info.visible:
+            # MT5 only streams ticks for symbols visible in Market Watch --
+            # symbol_info_tick() silently returns None otherwise. select it.
+            if not mt5.symbol_select(symbol, True):
+                print(f"[warn] {symbol}: found but could not add to Market Watch: {mt5.last_error()}", file=sys.stderr)
+                continue
+            info = mt5.symbol_info(symbol)  # re-fetch now that it's visible
+
         tick = mt5.symbol_info_tick(symbol)
         if tick is not None:
             ticks.append({"symbol": symbol, "bid": tick.bid, "ask": tick.ask, "last": tick.last, "captured_at": _utc(tick.time)})
-        info = mt5.symbol_info(symbol)
+        else:
+            print(f"[warn] {symbol}: still no tick after selecting -- market may be closed", file=sys.stderr)
         if info is not None:
             symbol_specs.append(
                 {
