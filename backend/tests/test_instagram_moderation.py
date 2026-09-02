@@ -68,6 +68,39 @@ def test_moderate_rejects_near_duplicate_caption():
     assert any("duplicate" in v.lower() for v in result.violations)
 
 
+def test_moderate_warns_on_thematic_repetition_from_knowledge_graph():
+    from app.knowledge_graph.models import NodeCreate, NodeKind
+    from app.knowledge_graph.service import knowledge_graph_service
+
+    knowledge_graph_service.reset()
+    knowledge_graph_service.create_node(
+        NodeCreate(
+            name="Instagram post: Old post about discipline",
+            kind=NodeKind.event,
+            tags={"instagram", "tradingmindset", "discipline", "patience"},
+        )
+    )
+    result = moderate(
+        _payload(caption_draft="New post. #tradingmindset #discipline #patience"), recent_captions=[]
+    )
+    assert result.passed  # warning, not a hard rejection
+    assert any("overlap" in w.lower() for w in result.warnings)
+
+
+def test_moderate_does_not_warn_on_thematic_repetition_for_different_topic():
+    from app.knowledge_graph.models import NodeCreate, NodeKind
+    from app.knowledge_graph.service import knowledge_graph_service
+
+    knowledge_graph_service.reset()
+    knowledge_graph_service.create_node(
+        NodeCreate(name="Instagram post: Unrelated", kind=NodeKind.event, tags={"instagram", "travel", "sunset"})
+    )
+    result = moderate(
+        _payload(caption_draft="New post. #tradingmindset #discipline #patience"), recent_captions=[]
+    )
+    assert not any("overlap" in w.lower() for w in result.warnings)
+
+
 # -- service wiring: propose() actually applies moderation ------------------
 
 
