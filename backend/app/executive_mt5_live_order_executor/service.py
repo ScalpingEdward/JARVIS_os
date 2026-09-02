@@ -9,6 +9,7 @@ from .models import (
     LiveOrderRecord,
     LiveOrderState,
     LiveOrderStatus,
+    RemoteExecutionReport,
 )
 from .native_executor import MetaTrader5OrderExecutor, NativeOrderExecutor
 
@@ -92,9 +93,18 @@ class LiveOrderExecutorService:
         if executor is None:
             try:
                 executor = MetaTrader5OrderExecutor()
-            except RuntimeError as exc:
-                record.state, record.detail = LiveOrderState.FAILED, str(exc)
-                return self._save(record, request.actor_id, "executor-unavailable")
+            except RuntimeError:
+                # No local native adapter -- e.g. AURON running in a Linux
+                # Docker container, which can't load the Windows-only
+                # MetaTrader5 package. Leave the record at PREFLIGHT_READY
+                # rather than failing: a remote execution agent (real
+                # MetaTrader5, running on the machine with the terminal)
+                # picks up orders in this state via GET .../pending-execution
+                # and reports the real result via POST .../report-execution.
+                # This is not a fallback that fakes success -- nothing is
+                # submitted until the remote agent actually calls order_send().
+                record.detail = "Preflight passed; awaiting a remote execution agent to submit this order."
+                return self._save(record, request.actor_id, "awaiting-remote-execution")
         info = executor.symbol_info(record.request.symbol)
         tick = executor.symbol_info_tick(record.request.symbol)
         if info is None or tick is None:
@@ -119,6 +129,15 @@ class LiveOrderExecutorService:
         record.broker_comment = getattr(result, "comment", None)
         record.filled_volume = float(getattr(result, "volume", 0) or 0)
         record.average_price = getattr(result, "price", None)
+        self._classify_broker_result(record)
+        return self._save(record, request.actor_id, "submitted")
+
+    @staticmethod
+    def _classify_broker_result(record: LiveOrderRecord) -> None:
+        """The one place that turns a raw broker response into a
+        LiveOrderState -- used identically whether the response came from
+        AURON's own native executor (rare: only when AURON runs somewhere
+        with real MT5 access) or from a remote execution agent's report."""
         if record.broker_retcode not in {10008, 10009, 10010}:
             record.state, record.detail = LiveOrderState.BROKER_REJECTED, "Broker rejected order submission"
         elif 0 < record.filled_volume < record.request.volume:
@@ -127,7 +146,29 @@ class LiveOrderExecutorService:
             record.state, record.detail = LiveOrderState.RECONCILIATION_REQUIRED, "Broker accepted order; position/order reconciliation required"
         else:
             record.state, record.detail = LiveOrderState.EXECUTED, "Order execution completed"
-        return self._save(record, request.actor_id, "submitted")
+
+    def pending_execution(self, workspace_id: str) -> list[LiveOrderRecord]:
+        """Orders that already passed every deterministic + human-approval
+        check and are waiting for a remote execution agent to actually
+        submit them. Nothing in this list has been decided by the agent --
+        every decision already happened before a record can reach here."""
+        return [r for r in self.list_records(workspace_id) if r.state == LiveOrderState.PREFLIGHT_READY]
+
+    def report_execution(self, record_id: UUID, workspace_id: str, report: RemoteExecutionReport) -> LiveOrderRecord:
+        record = self.get(record_id, workspace_id)
+        if record is None:
+            raise KeyError("live order record not found")
+        if record.state != LiveOrderState.PREFLIGHT_READY:
+            raise ValueError(f"record is {record.state.value}, not awaiting execution")
+        record.state, record.detail = LiveOrderState.SUBMISSION_PENDING, "Remote agent is submitting the order"
+        record.broker_retcode = report.broker_retcode
+        record.broker_order_id = report.broker_order_id
+        record.broker_deal_id = report.broker_deal_id
+        record.broker_comment = report.broker_comment
+        record.filled_volume = report.filled_volume
+        record.average_price = report.average_price
+        self._classify_broker_result(record)
+        return self._save(record, report.actor_id, "remote-execution-reported")
 
     @staticmethod
     def _generic_request(payload: LiveOrderCreate) -> dict:

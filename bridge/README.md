@@ -75,3 +75,34 @@ each ingest, not accumulated, so there's no cleanup needed either.
 Ctrl+C. The terminal record on the AURON side will show as `stale` after
 30 seconds without a heartbeat, and `disconnected` after 2 minutes -- it
 doesn't need to be explicitly deregistered.
+
+## Real execution: mt5_execution_agent.py
+
+`mt5_pusher.py` above is read-only. `mt5_execution_agent.py` is a
+**separate script that can place real orders.**
+
+AURON's own backend runs in a Linux Docker container and cannot load the
+Windows-only `MetaTrader5` package, so it cannot submit an order by
+itself. `POST /v1/trade-risk-pipeline/.../prepare-live-order` and
+`POST /v1/executive-mt5-live-order-executor/orders/{id}/execute` (with
+`human_approved=true`) run every deterministic check on the AURON side and
+leave the order at `preflight-ready` -- nothing is submitted yet.
+
+`mt5_execution_agent.py` polls for orders already at `preflight-ready` for
+one account (`--workspace-id`), calls the real MetaTrader5 API
+(`symbol_info` / `symbol_info_tick` / `order_check` / `order_send`), and
+reports the real broker response back to AURON. It makes no trading
+decisions of its own -- every decision (strategy, sizing, risk, human
+approval) already happened before an order can reach `preflight-ready`.
+
+```
+python mt5_execution_agent.py \
+    --backend-url http://localhost:8000 \
+    --workspace-id <your AURON account_id> \
+    --i-understand-this-places-real-orders \
+    --interval 5
+```
+
+`--i-understand-this-places-real-orders` is required on every run -- there
+is no way to suppress it. Only run this against a demo account until
+you've watched it work end to end and trust it.
