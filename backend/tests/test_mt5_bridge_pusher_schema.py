@@ -89,7 +89,9 @@ def mt5_pusher_module(monkeypatch):
         trade_contract_size=100000.0,
         trade_tick_size=0.00001,
         trade_tick_value=1.0,
+        visible=True,
     )
+    fake_mt5.symbol_select = lambda symbol, enable: True
     fake_mt5.initialize = lambda: True
     fake_mt5.shutdown = lambda: None
     fake_mt5.last_error = lambda: (0, "no error")
@@ -146,3 +148,38 @@ def test_collect_snapshot_handles_no_stop_loss_or_take_profit(mt5_pusher_module,
     validated = MT5SnapshotIngest(**snapshot)
     assert validated.positions[0].stop_loss is None
     assert validated.positions[0].take_profit is None
+
+
+def test_collect_snapshot_selects_a_symbol_not_yet_visible_in_market_watch(mt5_pusher_module, monkeypatch):
+    """The real bug found live with Brano: a symbol not in Market Watch
+    returns no tick from symbol_info_tick() until explicitly selected."""
+    select_calls: list[str] = []
+    info_calls = {"count": 0}
+
+    def fake_symbol_info(symbol):
+        info_calls["count"] += 1
+        # not visible on the first call (before select), visible after
+        visible = info_calls["count"] > 1
+        return SimpleNamespace(
+            point=0.01, digits=2, volume_min=0.01, volume_max=50.0, volume_step=0.01,
+            trade_contract_size=100.0, trade_tick_size=0.01, trade_tick_value=1.0, visible=visible,
+        )
+
+    def fake_symbol_select(symbol, enable):
+        select_calls.append(symbol)
+        return True
+
+    monkeypatch.setattr(sys.modules["MetaTrader5"], "symbol_info", fake_symbol_info)
+    monkeypatch.setattr(sys.modules["MetaTrader5"], "symbol_select", fake_symbol_select)
+
+    snapshot = mt5_pusher_module.collect_snapshot(["XAUUSD"], deal_history_days=7)
+    assert select_calls == ["XAUUSD"]
+    assert len(snapshot["symbols"]) == 1
+    assert len(snapshot["ticks"]) == 1
+
+
+def test_collect_snapshot_skips_a_symbol_that_does_not_exist(mt5_pusher_module, monkeypatch):
+    monkeypatch.setattr(sys.modules["MetaTrader5"], "symbol_info", lambda symbol: None)
+    snapshot = mt5_pusher_module.collect_snapshot(["NOTAREALSYMBOL"], deal_history_days=7)
+    assert snapshot["symbols"] == []
+    assert snapshot["ticks"] == []
