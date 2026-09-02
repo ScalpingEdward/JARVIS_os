@@ -108,6 +108,22 @@ class LiveOrderStatus(BaseModel):
     blocked_records: int
 
 
+class RemoteExecutionReport(BaseModel):
+    """What a remote execution agent (real MetaTrader5 package, running on
+    Windows next to the actual terminal -- AURON's own container can't load
+    that package) reports back after it actually calls order_send() for a
+    record AURON already marked PREFLIGHT_READY. AURON never re-derives or
+    guesses any of this; it's the broker's own response, relayed as-is."""
+
+    actor_id: str = Field(default="remote-execution-agent", min_length=1, max_length=100)
+    broker_retcode: int | None = None
+    broker_order_id: int | None = None
+    broker_deal_id: int | None = None
+    broker_comment: str | None = Field(default=None, max_length=500)
+    filled_volume: float = Field(default=0, ge=0)
+    average_price: float | None = Field(default=None, gt=0)
+
+
 class LiveOrderAudit(BaseModel):
     record_id: UUID
     workspace_id: str

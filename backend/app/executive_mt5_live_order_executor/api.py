@@ -2,7 +2,14 @@ from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Query, status
 
-from .models import LiveOrderAudit, LiveOrderCreate, LiveOrderExecuteRequest, LiveOrderRecord, LiveOrderStatus
+from .models import (
+    LiveOrderAudit,
+    LiveOrderCreate,
+    LiveOrderExecuteRequest,
+    LiveOrderRecord,
+    LiveOrderStatus,
+    RemoteExecutionReport,
+)
 from .service import live_order_executor_service
 
 router = APIRouter(prefix="/v1/executive-mt5-live-order-executor", tags=["executive-mt5-live-order-executor"])
@@ -26,6 +33,16 @@ def list_orders(workspace_id: str = Query(min_length=1, max_length=100)) -> list
     return live_order_executor_service.list_records(workspace_id)
 
 
+@router.get("/orders/pending-execution", response_model=list[LiveOrderRecord])
+def pending_execution(workspace_id: str = Query(min_length=1, max_length=100)) -> list[LiveOrderRecord]:
+    """Orders already fully checked and human-approved, waiting for a
+    remote execution agent (real MetaTrader5, on the machine with the
+    terminal) to actually submit them. Registered before /orders/{record_id}
+    deliberately -- otherwise FastAPI would try to parse "pending-execution"
+    as a UUID."""
+    return live_order_executor_service.pending_execution(workspace_id)
+
+
 @router.get("/orders/{record_id}", response_model=LiveOrderRecord)
 def get_order(record_id: UUID, workspace_id: str = Query(min_length=1, max_length=100)) -> LiveOrderRecord:
     record = live_order_executor_service.get(record_id, workspace_id)
@@ -38,6 +55,22 @@ def get_order(record_id: UUID, workspace_id: str = Query(min_length=1, max_lengt
 def execute_order(record_id: UUID, request: LiveOrderExecuteRequest, workspace_id: str = Query(min_length=1, max_length=100)) -> LiveOrderRecord:
     try:
         return live_order_executor_service.execute(record_id, workspace_id, request)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@router.post("/orders/{record_id}/report-execution", response_model=LiveOrderRecord)
+def report_execution(
+    record_id: UUID, report: RemoteExecutionReport, workspace_id: str = Query(min_length=1, max_length=100)
+) -> LiveOrderRecord:
+    """Called by the remote execution agent after it actually calls
+    order_send() on the real MetaTrader5 terminal. Only accepted for a
+    record currently PREFLIGHT_READY -- an already-executed, blocked, or
+    cancelled record cannot be re-reported."""
+    try:
+        return live_order_executor_service.report_execution(record_id, workspace_id, report)
     except KeyError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except ValueError as exc:
