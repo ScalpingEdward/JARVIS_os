@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import re
 
+from app.knowledge_graph.service import knowledge_graph_service
+
 from .models import ContentCandidateCreate
 from .platform_strategy import platform_strategy_store
 
@@ -105,4 +107,37 @@ def moderate(candidate: ContentCandidateCreate, recent_captions: list[str]) -> M
     if caption in recent_captions:
         violations.append("This exact caption was already proposed recently (near-duplicate content).")
 
+    warnings.extend(_check_thematic_repetition([tag.lstrip("#") for tag in hashtags]))
+
     return ModerationResult(violations=violations, warnings=warnings)
+
+
+THEMATIC_REPETITION_THRESHOLD = 0.6  # jaccard overlap of hashtags vs a past real post
+
+
+def _check_thematic_repetition(hashtags: list[str]) -> list[str]:
+    """Persistent history check, unlike the exact-caption recent_captions
+    list above (which is lost on restart): compares this caption's
+    hashtags against every real, previously published post recorded in
+    knowledge_graph (see instagram_content/service.py's publish() hook).
+    Warning only -- thematic overlap alone isn't grounds to auto-reject,
+    just something worth a human glance."""
+    if not hashtags:
+        return []
+    tag_set = {tag.lower() for tag in hashtags}
+    warnings: list[str] = []
+    for node in knowledge_graph_service.search_nodes("", kind="event"):
+        if "instagram" not in node.tags:
+            continue
+        overlap = tag_set & {t.lower() for t in node.tags}
+        union = tag_set | {t.lower() for t in node.tags}
+        if not union:
+            continue
+        score = len(overlap) / len(union)
+        if score >= THEMATIC_REPETITION_THRESHOLD:
+            warnings.append(
+                f"Hashtags overlap {score:.0%} with a previously published post ('{node.name}') -- "
+                "check /v1/instagram/history/search before posting something too similar."
+            )
+            break  # one warning is enough signal; don't spam for every close match
+    return warnings
