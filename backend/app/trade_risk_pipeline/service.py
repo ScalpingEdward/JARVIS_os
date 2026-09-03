@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from datetime import datetime, timezone
 from uuid import UUID
 
@@ -380,6 +381,18 @@ class TradeRiskPipelineService:
                 "partial overrides are not allowed."
             )
 
+        # dynamic_risk_engine computes a theoretical position size from risk%
+        # and stop distance -- it has no knowledge of the broker's real
+        # volume_step, so it almost never lands exactly on a valid multiple.
+        # Round DOWN to the nearest valid step: rounding down can only ever
+        # under-risk relative to what was approved, never over-risk. If that
+        # pushes the size below min_volume, the executor's own volume check
+        # below still catches and reports it correctly -- not silently
+        # forced up to the minimum, which would exceed the approved risk.
+        raw_volume = position.position_size
+        steps = math.floor((raw_volume - min_volume) / volume_step + 1e-9)
+        volume = round(min_volume + max(steps, 0) * volume_step, 8)
+
         payload = LiveOrderCreate(
             workspace_id=workspace_id,
             source_key=position_id,
@@ -390,7 +403,7 @@ class TradeRiskPipelineService:
             symbol=position.symbol,
             side="buy" if position.direction == "long" else "sell",
             order_type=request.order_type,
-            volume=position.position_size,
+            volume=volume,
             stop_loss=position.current_stop_price,
             quote_bid=quote_bid,
             quote_ask=quote_ask,
