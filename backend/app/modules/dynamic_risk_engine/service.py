@@ -60,7 +60,7 @@ class DynamicRiskService:
             workspace_id=payload.workspace_id,
             source_key=payload.source_key,
             position_management_record_id=payload.position_management_record_id,
-            symbol=payload.symbol.upper(),
+            symbol=payload.symbol,
             direction=payload.direction,
             state=state,
             assessment=assessment,

@@ -130,3 +130,14 @@ def test_duplicate_source_and_workspace_isolation() -> None:
 def test_invalid_long_geometry_is_rejected() -> None:
     with pytest.raises(ValueError, match="long stop"):
         payload(stop_price=2410.0)
+
+
+def test_symbol_case_is_preserved_exactly() -> None:
+    """Same bug class as position_management_brain (#963): broker symbol
+    suffixes are case-sensitive, and downstream live-quote/contract-spec
+    lookups do an exact string match against mt5_bridge. Found live on the
+    same real-account pipeline run that caught the position_management_brain
+    version."""
+    service = DynamicRiskService()
+    record = service.create(payload(symbol="XAUUSD.s"))
+    assert record.symbol == "XAUUSD.s"
