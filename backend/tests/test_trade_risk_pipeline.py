@@ -369,6 +369,38 @@ def test_prepare_live_order_carries_the_real_risk_approved_size_and_stop() -> No
     assert order.request.approved_account_logins == [12345678]
 
 
+def test_prepare_live_order_rounds_volume_down_to_the_real_broker_step() -> None:
+    """dynamic_risk_engine computes a theoretical size with no knowledge of
+    the broker's real volume_step -- found live testing against a real
+    account where the exact theoretical size (e.g. 0.136925) was rejected
+    outright by the executor's volume-step check. Must round DOWN (never
+    up, which would exceed the approved risk) to the nearest valid step."""
+    from app.modules.position_management_brain.router import service as position_management_service
+
+    workspace_id, position_id = _open_a_position()
+    position = position_management_service.get(workspace_id, position_id)
+    position.position_size = 0.136925  # deliberately not a clean multiple of 0.01
+
+    order = trade_risk_pipeline_service.prepare_live_order(
+        workspace_id,
+        position_id,
+        LiveOrderPrepareRequest(
+            account_login=12345678,
+            native_adapter_ready=True,
+            quote_bid=1.09995,
+            quote_ask=1.10005,
+            quote_age_seconds=1.0,
+            symbol_point=0.0001,
+            min_volume=0.01,
+            max_volume=100.0,
+            volume_step=0.01,
+            min_stop_distance_points=0,
+        ),
+    )
+    assert order.request.volume == pytest.approx(0.13)  # rounded down, not to 0.14
+    assert order.state != LiveOrderState.VOLUME_REJECTED
+
+
 def test_prepare_live_order_refuses_an_already_open_position() -> None:
     workspace_id, position_id = _open_a_position()
 
