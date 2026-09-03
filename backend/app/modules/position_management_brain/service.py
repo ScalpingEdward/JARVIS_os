@@ -44,7 +44,7 @@ class PositionManagementService:
             workspace_id=payload.workspace_id,
             source_key=payload.source_key,
             trade_setup_record_id=payload.trade_setup_record_id,
-            symbol=payload.symbol.upper(),
+            symbol=payload.symbol,
             direction=payload.direction,
             state=state,
             entry_price=payload.entry_price,

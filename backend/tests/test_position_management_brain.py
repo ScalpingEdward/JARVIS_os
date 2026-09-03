@@ -92,3 +92,15 @@ def test_close_records_realized_r() -> None:
     assert record.state == PositionState.CLOSED
     assert record.remaining_percent == 0
     assert record.realized_r_multiple == 2.4
+
+
+def test_symbol_case_is_preserved_exactly() -> None:
+    """Broker symbol suffixes are case-sensitive (e.g. 'XAUUSD.s' vs
+    'XAUUSD.S' can be different tradeable symbols, or the live-quote lookup
+    against mt5_bridge is an exact string match either way). The service
+    must never silently uppercase the symbol it was given -- found live
+    while testing against a real broker where this exact mismatch broke
+    the quote lookup."""
+    service = PositionManagementService()
+    record = service.create(payload(source_key="lowercase-symbol", symbol="XAUUSD.s"))
+    assert record.symbol == "XAUUSD.s"
