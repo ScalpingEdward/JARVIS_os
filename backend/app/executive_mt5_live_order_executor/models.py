@@ -121,7 +121,7 @@ class RemoteExecutionReport(BaseModel):
     broker_deal_id: int | None = None
     broker_comment: str | None = Field(default=None, max_length=500)
     filled_volume: float = Field(default=0, ge=0)
-    average_price: float | None = Field(default=None, gt=0)
+    average_price: float | None = Field(default=None, ge=0)
 
 
 class LiveOrderAudit(BaseModel):
