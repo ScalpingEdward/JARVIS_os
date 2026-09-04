@@ -162,6 +162,27 @@ def execute_one(order: dict) -> dict:
         return {"broker_comment": f"execution agent error: {exc}", "filled_volume": 0}
 
 
+def process_pending(client: "AuronClient", workspace_id: str, already_executed: dict) -> None:
+    """One polling cycle's worth of work -- pulled out of main() so the
+    critical safety property (order_send called at most once per record,
+    even across many cycles of a failing report) is directly testable."""
+    pending = client.pending_execution(workspace_id)
+    for order in pending:
+        order_id = order["id"]
+        if order_id in already_executed:
+            report = already_executed[order_id]
+            print(f"[re-reporting] {order_id} (already executed this run, only retrying the report)")
+        else:
+            print(f"[executing] {order_id} {order['request']['symbol']} {order['request']['side']} {order['request']['volume']}")
+            report = execute_one(order)
+            already_executed[order_id] = report
+        try:
+            client.report_execution(workspace_id, order_id, report)
+            print(f"[reported] {order_id} -> {report}")
+        except requests.HTTPError as exc:
+            print(f"[warn] report-execution rejected for {order_id}, will retry the report (not re-execute): {exc}", file=sys.stderr)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--backend-url", required=True)
@@ -180,6 +201,11 @@ def main() -> None:
         sys.exit(1)
 
     client = AuronClient(args.backend_url)
+    # Every record.id is executed AT MOST ONCE per agent run, no matter how
+    # many polling cycles it takes to successfully report the result back.
+    # A failed *report* is retried with the cached result; order_send()
+    # itself is never called a second time for the same record.
+    already_executed: dict[str, dict] = {}
 
     print(f"*** LIVE EXECUTION AGENT RUNNING for workspace {args.workspace_id} ***")
     print("Any preflight-ready, human-approved order for this account will be sent to the real broker.")
@@ -189,12 +215,7 @@ def main() -> None:
         while True:
             start = time.monotonic()
             try:
-                pending = client.pending_execution(args.workspace_id)
-                for order in pending:
-                    print(f"[executing] {order['id']} {order['request']['symbol']} {order['request']['side']} {order['request']['volume']}")
-                    report = execute_one(order)
-                    client.report_execution(args.workspace_id, order["id"], report)
-                    print(f"[reported] {order['id']} -> {report}")
+                process_pending(client, args.workspace_id, already_executed)
             except requests.RequestException as exc:
                 print(f"[warn] AURON communication failed, will retry next cycle: {exc}", file=sys.stderr)
             elapsed = time.monotonic() - start
