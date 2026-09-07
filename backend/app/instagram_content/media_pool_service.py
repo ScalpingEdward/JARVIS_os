@@ -3,8 +3,9 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from uuid import UUID
 
-from .curation import curate
+from .curation import analyze_gaps, curate
 from .media_pool_models import (
+    ContentGapReport,
     CuratedDraft,
     MediaPoolIngestRequest,
     MediaPoolIngestResponse,
@@ -67,6 +68,9 @@ class MediaPoolService:
         return item
 
     # -- curation drafts ------------------------------------------------
+
+    def content_gaps(self) -> ContentGapReport:
+        return analyze_gaps(self.list_available())
 
     def run_curation(self, max_groups: int = 10) -> list[CuratedDraft]:
         groups = curate(self.list_available(), max_groups=max_groups)

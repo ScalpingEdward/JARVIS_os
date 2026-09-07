@@ -7,6 +7,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from .media_pool_models import (
+    ContentGapReport,
     CuratedDraft,
     CuratedDraftList,
     FinalizeDraftRequest,
@@ -132,6 +133,14 @@ def ingest_media(request: MediaPoolIngestRequest) -> MediaPoolIngestResponse:
 def list_media_pool(available_only: bool = False):
     items = media_pool_service.list_available() if available_only else media_pool_service.list_all()
     return MediaPoolList(items=items, count=len(items))
+
+
+@router.get("/media-pool/gaps", response_model=ContentGapReport)
+def media_pool_gaps() -> ContentGapReport:
+    """What the pool is missing right now: themes stuck below a postable
+    carousel size, and whether the pool overall is running low. Read-only --
+    nothing is reserved or changed by calling this."""
+    return media_pool_service.content_gaps()
 
 
 @router.post("/media-pool/analyze-and-ingest", response_model=MediaAnalyzeAndIngestResponse)
