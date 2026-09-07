@@ -28,6 +28,17 @@ class TelegramApprovalConfig:
 
     callback_secret: str | None = field(default_factory=lambda: os.getenv("TELEGRAM_CALLBACK_SECRET"))
     allowed_chat_id: str | None = field(default_factory=lambda: os.getenv("TELEGRAM_CHAT_ID"))
+    #: Off by default, deliberately. Tapping Approve always records the
+    #: decision -- that part is unconditional. Whether a tap should *also*
+    #: immediately run risk sizing, open a tracked position, and start
+    #: supervision (advance_to_preflight) is a bigger behavioral commitment
+    #: than the buttons themselves: it creates real, persisted records the
+    #: moment you tap, not just an approval note. Set
+    #: TELEGRAM_AUTO_ADVANCE=true once you want that; until then, advancing
+    #: stays an explicit separate call.
+    auto_advance: bool = field(
+        default_factory=lambda: os.getenv("TELEGRAM_AUTO_ADVANCE", "").lower() in ("1", "true", "yes")
+    )
 
 
 class TelegramWebhookUpdate(BaseModel):

@@ -1,9 +1,12 @@
 """Sends a setup as an approval card, and turns a tap back into a decision.
 
-Two responsibilities only. Composing the message and calling
-setup_submission.decide() -- nothing here evaluates a strategy, sizes a
-position, or reaches a broker. Those all happen elsewhere, gated on the
-decision this module records.
+Composing the message and calling setup_submission.decide() -- nothing here
+evaluates a strategy, sizes a position, or reaches a broker by default.
+Optionally (see TelegramApprovalConfig.auto_advance, off unless explicitly
+enabled) an Approve tap also runs trade_risk_pipeline.advance_to_preflight()
+and reports the outcome back as a follow-up message -- still stops exactly
+where that pipeline already stops: human_approved always False, no broker
+call, ever, from anything reachable through this module.
 """
 
 from __future__ import annotations
@@ -20,6 +23,8 @@ from app.setup_submission.models import (
     SubmittedSetup,
 )
 from app.setup_submission.service import SetupSubmissionError, setup_submission_service
+from app.trade_risk_pipeline.models import AdvanceToPreflightFailure, AdvanceToPreflightResult
+from app.trade_risk_pipeline.service import trade_risk_pipeline_service
 
 from . import tokens
 from .models import (
@@ -166,12 +171,50 @@ class TelegramApprovalService:
         decision = SetupDecisionStatus.approved if action == tokens.APPROVE else SetupDecisionStatus.rejected
 
         try:
-            return setup_submission_service.decide(
+            decided = setup_submission_service.decide(
                 approval_request_id,
                 SetupDecisionRequest(decision=decision, decided_by=who),
             )
         except SetupSubmissionError as exc:
             raise TelegramApprovalError(str(exc)) from exc
+
+        if decision == SetupDecisionStatus.approved and self.config.auto_advance:
+            self._advance_and_report(approval_request_id)
+
+        return decided
+
+    def _advance_and_report(self, approval_request_id: UUID) -> None:
+        """Best-effort follow-up: the decision above already succeeded and
+        is returned regardless of what happens here. A problem advancing
+        (bad quote data, no matching mt5_bridge terminal, whatever) is
+        reported back as a Telegram message, not raised -- the tap itself
+        must not appear to fail just because the next, optional step did.
+        """
+        try:
+            result = trade_risk_pipeline_service.advance_to_preflight(approval_request_id)
+        except Exception:
+            log.exception("telegram_approvals: advance_to_preflight crashed for %s", approval_request_id)
+            self._safe_send("Preflight failed", f"Unerwarteter Fehler bei {approval_request_id}.")
+            return
+
+        if isinstance(result, AdvanceToPreflightResult):
+            self._safe_send(
+                "Preflight bereit",
+                f"Risk: {result.risk_record.state.value}\n"
+                f"Position: {result.position.state.value}, size={result.position.position_size:.4f}\n"
+                f"Live-Order: {result.live_order.state.value}",
+            )
+        elif isinstance(result, AdvanceToPreflightFailure):
+            self._safe_send(
+                f"Preflight gestoppt bei {result.failed_at}",
+                result.error,
+            )
+
+    def _safe_send(self, title: str, message: str) -> None:
+        try:
+            self._client.send(title, message)
+        except TelegramDeliveryError:
+            log.exception("telegram_approvals: could not deliver the follow-up message")
 
 
 telegram_approval_service = TelegramApprovalService()
