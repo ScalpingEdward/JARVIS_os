@@ -79,6 +79,13 @@ class MarketSnapshot(BaseModel):
     fvgs: list[FairValueGap] = Field(default_factory=list)
     order_blocks: list[OrderBlock] = Field(default_factory=list)
     structure_levels: list[StructureLevel] = Field(default_factory=list)
+    opening_range_high: float | None = Field(
+        default=None, gt=0,
+        description="High of the session's opening range, e.g. the first 15-30min "
+        "after session open. Optional -- only open_range strategy uses this; every "
+        "other strategy ignores it. None means no opening-range data is available yet.",
+    )
+    opening_range_low: float | None = Field(default=None, gt=0)
     captured_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 

@@ -4,7 +4,9 @@ from __future__ import annotations
 
 from .ict_silver_bullet.strategy import evaluate as evaluate_ict_silver_bullet
 from .models import MarketSnapshot, StrategyResult
+from .open_range.strategy import evaluate as evaluate_open_range
 from .scalping_3tp.strategy import evaluate as evaluate_scalping_3tp
+from .smc.strategy import evaluate as evaluate_smc
 
 # Registry of all available strategies
 STRATEGIES = {
@@ -23,9 +25,24 @@ STRATEGIES = {
         ),
         "evaluate": evaluate_ict_silver_bullet,
     },
-    # Future strategies will be added here:
-    # "smc": {...},
-    # "open_range": {...},
+    "smc": {
+        "id": "smc",
+        "name": "SMC Premium/Discount (Order Block + Range)",
+        "description": (
+            "Order Block retest in the discount/premium half of the nearest "
+            "structure range, single TP at the opposing range side, min 1:2 RR"
+        ),
+        "evaluate": evaluate_smc,
+    },
+    "open_range": {
+        "id": "open_range",
+        "name": "Opening Range Breakout (Measured Move)",
+        "description": (
+            "Breakout of the session opening range with a measured-move target, "
+            "single TP, min 1:2 RR"
+        ),
+        "evaluate": evaluate_open_range,
+    },
 }
 
 
