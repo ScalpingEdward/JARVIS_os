@@ -100,10 +100,18 @@ class AutomationJobCreate(BaseModel):
 
     @model_validator(mode="after")
     def enforce_safety(self) -> "AutomationJobCreate":
-        if self.external_action:
-            raise ValueError("automatic external actions are disabled")
-        if not self.dry_run:
-            raise ValueError("v8.0 only permits dry-run jobs")
+        # Whether a *real* action is even permitted depends on the connector's
+        # type, which this model cannot see (only connector_id) -- that gate
+        # lives in AutomationRuntimeService.create_job(), where the real
+        # connector record is available. What this model can and must still
+        # enforce on its own: a job is either a dry run or a real external
+        # action, never an inconsistent mix of both flags.
+        if self.dry_run == self.external_action:
+            raise ValueError(
+                "dry_run and external_action must be opposites -- set "
+                "dry_run=False and external_action=True together for a real "
+                "action, or leave both at their defaults for a dry run"
+            )
         return self
 
 
@@ -116,6 +124,7 @@ class AutomationJobRecord(BaseModel):
     payload: dict[str, Any]
     idempotency_key: str
     dry_run: bool = True
+    external_action: bool = False
     requires_human_approval: bool = True
     human_approved: bool = False
     state: JobState
@@ -144,7 +153,7 @@ class JobCompletion(BaseModel):
 
 class RuntimeStatus(BaseModel):
     service: str = "automation-runtime"
-    version: str = "8.0"
+    version: str = "8.1"
     registered_connectors: int
     active_connectors: int
     queued_jobs: int
@@ -153,7 +162,14 @@ class RuntimeStatus(BaseModel):
     completed_jobs: int
     failed_jobs: int
     blocked_jobs: int
-    dry_run_only: bool = True
+    #: True only while nothing real has ever been permitted -- see
+    #: real_execution_connector_types. Kept rather than hardcoded so it
+    #: reflects the actual, current policy instead of a stale label.
+    dry_run_only: bool = False
     automatic_external_actions: bool = False
+    #: Connector types allowed a real (non-dry-run) job, explicitly and by
+    #: name -- everything else stays dry-run-only regardless of connector
+    #: state or approval, enforced in AutomationRuntimeService.create_job().
+    real_execution_connector_types: list[str] = Field(default_factory=lambda: ["telegram"])
     idempotency_enabled: bool = True
     rate_limiting_enabled: bool = True

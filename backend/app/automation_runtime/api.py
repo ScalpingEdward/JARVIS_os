@@ -142,6 +142,23 @@ def complete_job(
     return job
 
 
+@router.post("/jobs/{job_id}/execute-telegram", response_model=AutomationJobRecord)
+def execute_telegram_job(
+    job_id: UUID, workspace_id: str = Query(min_length=1, max_length=120)
+) -> AutomationJobRecord:
+    """Performs the one real, currently-permitted external action -- sending
+    a Telegram message for a claimed, real Telegram-connector job -- and
+    records the outcome. Every other connector type stays dry-run only,
+    enforced when the job was created, not here."""
+    try:
+        job = automation_runtime_service.execute_telegram_job(job_id, workspace_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    if job is None:
+        raise HTTPException(status_code=404, detail="Automation job not found")
+    return job
+
+
 @router.post("/jobs/{job_id}/cancel", response_model=AutomationJobRecord)
 def cancel_job(job_id: UUID, workspace_id: str = Query(min_length=1, max_length=120)) -> AutomationJobRecord:
     job = automation_runtime_service.cancel_job(job_id, workspace_id)

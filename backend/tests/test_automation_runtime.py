@@ -11,6 +11,7 @@ from app.automation_runtime.models import (
     JobState,
 )
 from app.automation_runtime.service import AutomationRuntimeService
+from app.notification_hub.telegram_delivery import TelegramDeliveryError
 
 
 def connector_payload(**overrides) -> ConnectorRegister:
@@ -140,3 +141,147 @@ def test_external_or_non_dry_run_jobs_are_rejected() -> None:
         job_payload(connector.id, dry_run=False)
     with pytest.raises(ValidationError):
         connector_payload(human_approved=False)
+
+
+# -- real (non-dry-run) execution: telegram only, everything else stays dry-run --
+
+
+class FakeTelegramClient:
+    """Records calls instead of touching the network -- see
+    test_notification_hub_telegram.py for the real wire-format tests this
+    module does not need to repeat."""
+
+    def __init__(self, raises: TelegramDeliveryError | None = None) -> None:
+        self.calls: list[tuple[str, str]] = []
+        self._raises = raises
+
+    def send(self, title: str, message: str) -> None:
+        self.calls.append((title, message))
+        if self._raises:
+            raise self._raises
+
+
+def telegram_connector_payload(**overrides):
+    values = {
+        "connector_key": "telegram.brano",
+        "connector_type": ConnectorType.TELEGRAM,
+        "display_name": "Telegram (Brano)",
+        "capabilities": ["messaging.send"],
+        "actions": ["send_message"],
+    }
+    values.update(overrides)
+    return connector_payload(**values)
+
+
+def real_job_payload(connector_id, **overrides):
+    values = {"action": "send_message", "dry_run": False, "external_action": True,
+              "payload": {"title": "Alert", "message": "Setup approved"}}
+    values.update(overrides)
+    return job_payload(connector_id, **values)
+
+
+def test_a_real_job_is_refused_for_a_non_telegram_connector() -> None:
+    service = AutomationRuntimeService()
+    connector = active_connector(service)  # Instagram, from connector_payload()'s default
+    job = service.create_job(real_job_payload(connector.id, action="preview_post", human_approved=True))
+    assert job.state == JobState.BLOCKED
+    assert "telegram" in job.blocked_reason.lower()
+    assert job.dry_run is False and job.external_action is True, "still recorded honestly, even though blocked"
+
+
+def test_a_real_job_is_accepted_for_a_telegram_connector() -> None:
+    service = AutomationRuntimeService()
+    connector = service.register_connector(telegram_connector_payload())
+    service.activate_connector(connector.id, "phoenix-main", "owner-1", ConnectorMutation())
+    job = service.create_job(real_job_payload(connector.id, human_approved=True))
+    assert job.state == JobState.READY
+    assert job.dry_run is False and job.external_action is True
+
+
+def test_dispatch_next_does_not_fabricate_a_result_for_a_real_job() -> None:
+    """A real job's result must be empty after claiming -- nothing was
+    validated or simulated, unlike the dry-run placeholder."""
+    service = AutomationRuntimeService()
+    connector = service.register_connector(telegram_connector_payload())
+    service.activate_connector(connector.id, "phoenix-main", "owner-1", ConnectorMutation())
+    service.create_job(real_job_payload(connector.id, human_approved=True))
+    running = service.dispatch_next("phoenix-main")
+    assert running.state == JobState.RUNNING
+    assert running.result == {}
+
+
+def test_execute_telegram_job_sends_and_completes() -> None:
+    fake = FakeTelegramClient()
+    service = AutomationRuntimeService(telegram_client=fake)
+    connector = service.register_connector(telegram_connector_payload())
+    service.activate_connector(connector.id, "phoenix-main", "owner-1", ConnectorMutation())
+    job = service.create_job(real_job_payload(connector.id, human_approved=True))
+    service.dispatch_next("phoenix-main")
+
+    completed = service.execute_telegram_job(job.id, "phoenix-main")
+
+    assert fake.calls == [("Alert", "Setup approved")]
+    assert completed.state == JobState.COMPLETED
+    assert completed.result["channel"] == "telegram"
+    assert completed.result["external_side_effect"] is True, "a real send actually happened"
+
+
+def test_a_dry_run_jobs_external_side_effect_stays_false() -> None:
+    """Regression guard for the fix: complete_job() used to hardcode
+    external_side_effect=False unconditionally, which happened to be
+    correct for dry runs but would have been wrong once a real path
+    existed. This confirms the derived value still comes out right for the
+    ordinary case."""
+    service = AutomationRuntimeService()
+    connector = active_connector(service)
+    job = service.create_job(job_payload(connector.id, human_approved=True))
+    service.dispatch_next("phoenix-main")
+    completed = service.complete_job(job.id, "phoenix-main", JobCompletion(success=True, result={}))
+    assert completed.result["external_side_effect"] is False
+
+
+def test_execute_telegram_job_reports_a_delivery_failure() -> None:
+    fake = FakeTelegramClient(raises=TelegramDeliveryError("no bot token configured"))
+    service = AutomationRuntimeService(telegram_client=fake)
+    connector = service.register_connector(telegram_connector_payload())
+    service.activate_connector(connector.id, "phoenix-main", "owner-1", ConnectorMutation())
+    job = service.create_job(real_job_payload(connector.id, human_approved=True, max_retries=0))
+    service.dispatch_next("phoenix-main")
+
+    failed = service.execute_telegram_job(job.id, "phoenix-main")
+    assert failed.state == JobState.FAILED
+    assert "no bot token" in failed.error
+
+
+def test_execute_telegram_job_refuses_a_job_that_is_not_running() -> None:
+    fake = FakeTelegramClient()
+    service = AutomationRuntimeService(telegram_client=fake)
+    connector = service.register_connector(telegram_connector_payload())
+    service.activate_connector(connector.id, "phoenix-main", "owner-1", ConnectorMutation())
+    job = service.create_job(real_job_payload(connector.id, human_approved=True))
+    # never dispatched -- still READY, not RUNNING
+    with pytest.raises(ValueError, match="not running"):
+        service.execute_telegram_job(job.id, "phoenix-main")
+    assert fake.calls == []
+
+
+def test_execute_telegram_job_refuses_an_ordinary_dry_run_job() -> None:
+    """Defense in depth: even a RUNNING job must actually be a real,
+    Telegram job -- a normal dry-run job that happens to be RUNNING must
+    not be executable through this method."""
+    fake = FakeTelegramClient()
+    service = AutomationRuntimeService(telegram_client=fake)
+    connector = service.register_connector(telegram_connector_payload())
+    service.activate_connector(connector.id, "phoenix-main", "owner-1", ConnectorMutation())
+    job = service.create_job(job_payload(connector.id, action="send_message", human_approved=True))
+    service.dispatch_next("phoenix-main")
+    with pytest.raises(ValueError, match="dry run"):
+        service.execute_telegram_job(job.id, "phoenix-main")
+    assert fake.calls == []
+
+
+def test_runtime_status_names_telegram_as_the_one_real_connector() -> None:
+    service = AutomationRuntimeService()
+    status = service.status()
+    assert status.real_execution_connector_types == ["telegram"]
+    assert status.dry_run_only is False
