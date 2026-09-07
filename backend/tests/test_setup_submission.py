@@ -14,8 +14,16 @@ from app.accounts.models import (
 )
 from app.accounts.service import AccountRegistryService, account_registry_service
 from app.main import app
-from app.setup_submission.models import SetupSubmissionRequest
-from app.setup_submission.service import SetupSubmissionService, setup_submission_service
+from app.setup_submission.models import (
+    SetupDecisionRequest,
+    SetupDecisionStatus,
+    SetupSubmissionRequest,
+)
+from app.setup_submission.service import (
+    SetupSubmissionError,
+    SetupSubmissionService,
+    setup_submission_service,
+)
 from app.strategies.models import (
     FairValueGap,
     HTFBias,
@@ -326,3 +334,136 @@ def test_api_get_single_pending() -> None:
 def test_api_get_unknown_pending_returns_404() -> None:
     resp = client.get(f"/v1/setup-submission/pending/{uuid4()}")
     assert resp.status_code == 404
+
+
+# -- decision gate: service-level -------------------------------------------
+
+
+def test_new_setup_is_pending_by_default(
+    service: SetupSubmissionService, registry: AccountRegistryService
+) -> None:
+    _register_account(registry, strategies=["scalping_3tp"])
+    report = service.submit(SetupSubmissionRequest(snapshot=_both_setups_snapshot()))
+    setup = report.submitted_setups[0]
+    assert setup.decision == SetupDecisionStatus.pending
+    assert setup.decided_by is None
+    assert setup.decided_at is None
+
+
+def test_approve_records_who_and_when(
+    service: SetupSubmissionService, registry: AccountRegistryService
+) -> None:
+    _register_account(registry, strategies=["scalping_3tp"])
+    report = service.submit(SetupSubmissionRequest(snapshot=_both_setups_snapshot()))
+    approval_id = report.submitted_setups[0].approval_request_id
+
+    decided = service.decide(
+        approval_id,
+        SetupDecisionRequest(decision=SetupDecisionStatus.approved, decided_by="brano", note="looks good"),
+    )
+    assert decided.decision == SetupDecisionStatus.approved
+    assert decided.decided_by == "brano"
+    assert decided.decision_note == "looks good"
+    assert decided.decided_at is not None
+
+    # persisted -- a fresh get_approval() sees the same decision
+    assert service.get_approval(approval_id).decision == SetupDecisionStatus.approved
+
+
+def test_reject_is_also_a_final_decision(
+    service: SetupSubmissionService, registry: AccountRegistryService
+) -> None:
+    _register_account(registry, strategies=["scalping_3tp"])
+    report = service.submit(SetupSubmissionRequest(snapshot=_both_setups_snapshot()))
+    approval_id = report.submitted_setups[0].approval_request_id
+
+    decided = service.decide(
+        approval_id, SetupDecisionRequest(decision=SetupDecisionStatus.rejected, decided_by="brano")
+    )
+    assert decided.decision == SetupDecisionStatus.rejected
+
+
+def test_deciding_an_unknown_id_fails_closed(service: SetupSubmissionService) -> None:
+    with pytest.raises(SetupSubmissionError, match="unknown"):
+        service.decide(
+            uuid4(), SetupDecisionRequest(decision=SetupDecisionStatus.approved, decided_by="brano")
+        )
+
+
+def test_deciding_twice_is_refused(
+    service: SetupSubmissionService, registry: AccountRegistryService
+) -> None:
+    """One-shot: a second decision must not silently overwrite the first."""
+    _register_account(registry, strategies=["scalping_3tp"])
+    report = service.submit(SetupSubmissionRequest(snapshot=_both_setups_snapshot()))
+    approval_id = report.submitted_setups[0].approval_request_id
+
+    service.decide(approval_id, SetupDecisionRequest(decision=SetupDecisionStatus.approved, decided_by="brano"))
+    with pytest.raises(SetupSubmissionError, match="already approved"):
+        service.decide(
+            approval_id, SetupDecisionRequest(decision=SetupDecisionStatus.rejected, decided_by="someone_else")
+        )
+    # the original decision stands, untouched
+    assert service.get_approval(approval_id).decided_by == "brano"
+
+
+def test_decision_request_rejects_pending_as_a_target_state() -> None:
+    """'pending' is not something you decide *to* -- it's the absence of a decision."""
+    with pytest.raises(ValueError):
+        SetupDecisionRequest(decision=SetupDecisionStatus.pending, decided_by="brano")
+
+
+# -- decision gate: API-level -------------------------------------------------
+
+
+def test_api_decide_approve() -> None:
+    _register_account(account_registry_service, strategies=["scalping_3tp"])
+    body = {"snapshot": _both_setups_snapshot().model_dump(mode="json")}
+    submit_resp = client.post("/v1/setup-submission/submit", json=body)
+    approval_id = submit_resp.json()["submitted_setups"][0]["approval_request_id"]
+
+    resp = client.post(
+        f"/v1/setup-submission/pending/{approval_id}/decision",
+        json={"decision": "approved", "decided_by": "brano"},
+    )
+    assert resp.status_code == 200
+    assert resp.json()["decision"] == "approved"
+    assert resp.json()["decided_by"] == "brano"
+
+
+def test_api_decide_unknown_id_returns_404() -> None:
+    resp = client.post(
+        f"/v1/setup-submission/pending/{uuid4()}/decision",
+        json={"decision": "approved", "decided_by": "brano"},
+    )
+    assert resp.status_code == 404
+
+
+def test_api_decide_twice_returns_409() -> None:
+    _register_account(account_registry_service, strategies=["scalping_3tp"])
+    body = {"snapshot": _both_setups_snapshot().model_dump(mode="json")}
+    submit_resp = client.post("/v1/setup-submission/submit", json=body)
+    approval_id = submit_resp.json()["submitted_setups"][0]["approval_request_id"]
+
+    client.post(
+        f"/v1/setup-submission/pending/{approval_id}/decision",
+        json={"decision": "approved", "decided_by": "brano"},
+    )
+    resp = client.post(
+        f"/v1/setup-submission/pending/{approval_id}/decision",
+        json={"decision": "rejected", "decided_by": "brano"},
+    )
+    assert resp.status_code == 409
+
+
+def test_api_decide_rejects_pending_as_target_state() -> None:
+    _register_account(account_registry_service, strategies=["scalping_3tp"])
+    body = {"snapshot": _both_setups_snapshot().model_dump(mode="json")}
+    submit_resp = client.post("/v1/setup-submission/submit", json=body)
+    approval_id = submit_resp.json()["submitted_setups"][0]["approval_request_id"]
+
+    resp = client.post(
+        f"/v1/setup-submission/pending/{approval_id}/decision",
+        json={"decision": "pending", "decided_by": "brano"},
+    )
+    assert resp.status_code == 422

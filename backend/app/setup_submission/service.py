@@ -13,6 +13,7 @@ have setups sent to the approval gate.
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from uuid import UUID, uuid4
 
 from app.accounts.models import AccountStatus
@@ -23,7 +24,17 @@ from app.strategies.service import (
     strategy_service,
 )
 
-from .models import SetupSubmissionRequest, SetupSubmissionReport, SubmittedSetup
+from .models import (
+    SetupDecisionRequest,
+    SetupDecisionStatus,
+    SetupSubmissionRequest,
+    SetupSubmissionReport,
+    SubmittedSetup,
+)
+
+
+class SetupSubmissionError(ValueError):
+    pass
 
 
 class SetupSubmissionService:
@@ -121,6 +132,34 @@ class SetupSubmissionService:
     def get_approval(self, approval_request_id: UUID) -> SubmittedSetup | None:
         """Return a single pending approval request, or None if unknown."""
         return self._approvals.get(approval_request_id)
+
+    def decide(self, approval_request_id: UUID, request: SetupDecisionRequest) -> SubmittedSetup:
+        """Record a human's approve/reject decision. One-shot, fail-closed.
+
+        This is the actual approval gate -- ``submit()`` only proposes which
+        setups exist; nothing downstream (trade_risk_pipeline.assess() first
+        among them) proceeds until a decision is recorded here as approved.
+        A setup already decided cannot be decided again: the second call
+        raises rather than silently overwriting who decided what, same
+        one-shot discipline the rest of this codebase already uses (moderation
+        decisions, research proposals, platform-strategy apply).
+        """
+        setup = self._approvals.get(approval_request_id)
+        if setup is None:
+            raise SetupSubmissionError(f"unknown approval_request_id {approval_request_id}")
+        if setup.decision != SetupDecisionStatus.pending:
+            raise SetupSubmissionError(
+                f"approval_request_id {approval_request_id} was already "
+                f"{setup.decision.value} by {setup.decided_by} -- decisions are one-shot"
+            )
+        decided = setup.model_copy(update={
+            "decision": request.decision,
+            "decided_by": request.decided_by,
+            "decided_at": datetime.now(timezone.utc),
+            "decision_note": request.note,
+        })
+        self._approvals[approval_request_id] = decided
+        return decided
 
     def reset(self) -> None:
         """Clear all pending approval requests. Intended for tests/local resets."""
