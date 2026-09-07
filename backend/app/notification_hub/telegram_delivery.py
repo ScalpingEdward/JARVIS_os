@@ -34,17 +34,35 @@ class TelegramDeliveryClient:
         self._client = client
 
     def send(self, title: str, message: str) -> None:
+        self._post_message(f"*{title}*\n{message}" if title else message)
+
+    def send_with_keyboard(self, text: str, keyboard: list[list[dict]]) -> int:
+        """Same delivery as send(), plus an inline keyboard, returning the
+        sent message's id. Kept as a separate method rather than adding an
+        optional param to send() so send()'s existing call sites and tests
+        are entirely unaffected -- this is additive, not a signature change.
+        """
+        result = self._post_message(text, reply_markup={"inline_keyboard": keyboard})
+        message_id = result.get("message_id")
+        if message_id is None:
+            raise TelegramDeliveryError(f"Telegram API response had no message_id: {result}")
+        return int(message_id)
+
+    def _post_message(self, text: str, reply_markup: dict | None = None) -> dict:
         if not self.config.bot_token or not self.config.chat_id:
             raise TelegramDeliveryError(
                 "TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID must both be set -- AURON cannot deliver to Telegram without them."
             )
 
-        text = f"*{title}*\n{message}" if title else message
+        payload: dict = {"chat_id": self.config.chat_id, "text": text, "parse_mode": "Markdown"}
+        if reply_markup is not None:
+            payload["reply_markup"] = reply_markup
+
         client, should_close = (self._client, False) if self._client else (httpx.Client(), True)
         try:
             response = client.post(
                 f"https://api.telegram.org/bot{self.config.bot_token}/sendMessage",
-                json={"chat_id": self.config.chat_id, "text": text, "parse_mode": "Markdown"},
+                json=payload,
                 timeout=self.config.timeout_seconds,
             )
             if response.status_code >= 400:
@@ -52,6 +70,7 @@ class TelegramDeliveryClient:
             data = response.json()
             if not data.get("ok"):
                 raise TelegramDeliveryError(f"Telegram API reported failure: {data}")
+            return data.get("result", {})
         except httpx.HTTPError as exc:
             raise TelegramDeliveryError(f"Could not reach the Telegram API: {exc}") from exc
         finally:

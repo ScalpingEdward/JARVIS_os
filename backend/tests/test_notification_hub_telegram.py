@@ -40,6 +40,72 @@ def test_send_posts_to_the_real_telegram_api():
     assert "A carousel is waiting" in captured["body"]["text"]
 
 
+def test_send_with_keyboard_fails_closed_without_credentials():
+    client = TelegramDeliveryClient(config=TelegramDeliveryConfig(bot_token=None, chat_id=None))
+    with pytest.raises(TelegramDeliveryError, match="TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID"):
+        client.send_with_keyboard("Text", [[{"text": "Approve", "callback_data": "x"}]])
+
+
+def test_send_with_keyboard_includes_the_reply_markup():
+    captured: dict = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["body"] = json.loads(request.content)
+        return httpx.Response(200, json={"ok": True, "result": {"message_id": 456}})
+
+    client = TelegramDeliveryClient(
+        config=TelegramDeliveryConfig(bot_token="123:ABC", chat_id="999"),
+        client=httpx.Client(transport=httpx.MockTransport(handler)),
+    )
+    keyboard = [[{"text": "\u2705 Approve", "callback_data": "abc:a:sig"},
+                {"text": "\u274c Reject", "callback_data": "abc:r:sig"}]]
+    message_id = client.send_with_keyboard("Setup pending", keyboard)
+
+    assert message_id == 456
+    assert captured["body"]["reply_markup"]["inline_keyboard"] == keyboard
+    assert captured["body"]["text"] == "Setup pending"
+
+
+def test_send_with_keyboard_raises_without_a_message_id_in_the_response():
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"ok": True, "result": {}})
+
+    client = TelegramDeliveryClient(
+        config=TelegramDeliveryConfig(bot_token="123:ABC", chat_id="999"),
+        client=httpx.Client(transport=httpx.MockTransport(handler)),
+    )
+    with pytest.raises(TelegramDeliveryError, match="no message_id"):
+        client.send_with_keyboard("Text", [[{"text": "Approve", "callback_data": "x"}]])
+
+
+def test_send_with_keyboard_propagates_api_error_status():
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(400, text="Bad Request: invalid keyboard")
+
+    client = TelegramDeliveryClient(
+        config=TelegramDeliveryConfig(bot_token="123:ABC", chat_id="999"),
+        client=httpx.Client(transport=httpx.MockTransport(handler)),
+    )
+    with pytest.raises(TelegramDeliveryError, match="400"):
+        client.send_with_keyboard("Text", [[{"text": "Approve", "callback_data": "x"}]])
+
+
+def test_plain_send_is_completely_unaffected_by_the_keyboard_addition():
+    """Regression guard: send() must still never include reply_markup."""
+    captured: dict = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["body"] = json.loads(request.content)
+        return httpx.Response(200, json={"ok": True, "result": {"message_id": 1}})
+
+    client = TelegramDeliveryClient(
+        config=TelegramDeliveryConfig(bot_token="123:ABC", chat_id="999"),
+        client=httpx.Client(transport=httpx.MockTransport(handler)),
+    )
+    client.send("Title", "Message")
+    assert "reply_markup" not in captured["body"]
+
+
 def test_send_raises_on_api_error_status():
     def handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(401, text="Unauthorized")
