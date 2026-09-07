@@ -12,11 +12,23 @@ import logging
 from uuid import UUID
 
 from app.notification_hub.telegram_delivery import TelegramDeliveryClient, TelegramDeliveryError
-from app.setup_submission.models import SetupDecisionRequest, SetupDecisionStatus, SubmittedSetup
+from app.setup_submission.models import (
+    SetupDecisionRequest,
+    SetupDecisionStatus,
+    SetupSubmissionReport,
+    SetupSubmissionRequest,
+    SubmittedSetup,
+)
 from app.setup_submission.service import SetupSubmissionError, setup_submission_service
 
 from . import tokens
-from .models import TelegramApprovalConfig, TelegramWebhookUpdate
+from .models import (
+    NotifyOutcome,
+    NotifyPendingResult,
+    SubmitAndNotifyResult,
+    TelegramApprovalConfig,
+    TelegramWebhookUpdate,
+)
 
 log = logging.getLogger(__name__)
 
@@ -74,6 +86,54 @@ class TelegramApprovalService:
             return self._client.send_with_keyboard(_format_card(setup), keyboard)
         except TelegramDeliveryError as exc:
             raise TelegramApprovalError(f"could not deliver the approval card: {exc}") from exc
+
+    def notify_pending(self) -> NotifyPendingResult:
+        """Send a card for every still-undecided pending setup.
+
+        One failing delivery must not stop the rest -- same principle as
+        the trading worker's own task isolation (a broker hiccup on one
+        card is not a reason to leave three other operators' setups
+        unannounced). Returns which ids were sent and which failed, with
+        the reason, rather than raising on the first problem.
+        """
+        sent: list[NotifyOutcome] = []
+        failed: list[NotifyOutcome] = []
+        for setup in setup_submission_service.get_pending_approvals():
+            if setup.decision != SetupDecisionStatus.pending:
+                continue
+            try:
+                message_id = self.notify(setup.approval_request_id)
+                sent.append(NotifyOutcome(approval_request_id=setup.approval_request_id, message_id=message_id))
+            except TelegramApprovalError as exc:
+                log.warning("telegram_approvals: could not notify %s: %s",
+                           setup.approval_request_id, exc)
+                failed.append(NotifyOutcome(approval_request_id=setup.approval_request_id, error=str(exc)))
+        return NotifyPendingResult(sent=sent, failed=failed)
+
+    def submit_and_notify(self, request: SetupSubmissionRequest) -> SubmitAndNotifyResult:
+        """Submit against a snapshot, then send a card for every setup it
+        just produced. One call from the operator's side: run the
+        strategies, and the phone lights up for whatever came out of it.
+
+        Kept here rather than inside setup_submission.submit() itself so
+        that module's dependency direction stays one-way -- setup_submission
+        knows nothing about Telegram, this module depends on it, not the
+        other way around. A caller who wants both calls this method (or the
+        /submit-and-notify route); one who only wants the evaluation, with
+        no notification, still has plain submit() available untouched.
+        """
+        report: SetupSubmissionReport = setup_submission_service.submit(request)
+        sent: list[NotifyOutcome] = []
+        failed: list[NotifyOutcome] = []
+        for setup in report.submitted_setups:
+            try:
+                message_id = self.notify(setup.approval_request_id)
+                sent.append(NotifyOutcome(approval_request_id=setup.approval_request_id, message_id=message_id))
+            except TelegramApprovalError as exc:
+                log.warning("telegram_approvals: could not notify %s: %s",
+                           setup.approval_request_id, exc)
+                failed.append(NotifyOutcome(approval_request_id=setup.approval_request_id, error=str(exc)))
+        return SubmitAndNotifyResult(report=report, notified=NotifyPendingResult(sent=sent, failed=failed))
 
     # -------------------------------------------------------------- inbound
 

@@ -11,7 +11,7 @@ import pytest
 from app.accounts.models import AccountType, StrategyAssignmentCreate, TradingAccountCreate
 from app.accounts.service import AccountRegistryService, account_registry_service
 from app.notification_hub.telegram_delivery import TelegramDeliveryClient, TelegramDeliveryConfig
-from app.setup_submission.models import SetupSubmissionRequest
+from app.setup_submission.models import SetupDecisionRequest, SetupDecisionStatus, SetupSubmissionRequest
 from app.setup_submission.service import SetupSubmissionService, setup_submission_service
 from app.strategies.models import FairValueGap, HTFBias, MarketSnapshot, OrderBlock, OrderBlockType
 from app.telegram_approvals.models import TelegramApprovalConfig
@@ -261,3 +261,115 @@ def test_no_allowed_chat_configured_refuses_everything():
     svc.config = TelegramApprovalConfig(callback_secret=SECRET, allowed_chat_id=None)
     with pytest.raises(TelegramApprovalError, match="not authorized"):
         svc.handle_update(_callback_update(make_token(SECRET, uuid4(), APPROVE)))
+
+
+# -- notify_pending() ----------------------------------------------------------
+
+
+def test_notify_pending_sends_every_undecided_setup():
+    _register_account(account_registry_service)
+    _register_account(account_registry_service)
+    report = setup_submission_service.submit(SetupSubmissionRequest(snapshot=_snapshot()))
+    assert len(report.submitted_setups) == 2
+
+    svc, captured_calls = _service_multi()
+    result = svc.notify_pending()
+
+    assert len(result.sent) == 2
+    assert result.failed == []
+    sent_ids = {o.approval_request_id for o in result.sent}
+    assert sent_ids == {s.approval_request_id for s in report.submitted_setups}
+
+
+def test_notify_pending_skips_already_decided_setups():
+    _register_account(account_registry_service)
+    _register_account(account_registry_service)
+    report = setup_submission_service.submit(SetupSubmissionRequest(snapshot=_snapshot()))
+    setup_submission_service.decide(
+        report.submitted_setups[0].approval_request_id,
+        SetupDecisionRequest(decision=SetupDecisionStatus.approved, decided_by="brano"),
+    )
+
+    svc, _ = _service_multi()
+    result = svc.notify_pending()
+
+    assert len(result.sent) == 1
+    assert result.sent[0].approval_request_id == report.submitted_setups[1].approval_request_id
+
+
+def test_notify_pending_one_failure_does_not_stop_the_rest():
+    _register_account(account_registry_service)
+    _register_account(account_registry_service)
+    report = setup_submission_service.submit(SetupSubmissionRequest(snapshot=_snapshot()))
+    first_id = report.submitted_setups[0].approval_request_id
+
+    calls = {"n": 0}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls["n"] += 1
+        if calls["n"] == 1:
+            return httpx.Response(400, text="Bad Request")
+        return httpx.Response(200, json={"ok": True, "result": {"message_id": 99}})
+
+    tg_client = TelegramDeliveryClient(
+        config=TelegramDeliveryConfig(bot_token="123:ABC", chat_id=CHAT_ID),
+        client=httpx.Client(transport=httpx.MockTransport(handler)),
+    )
+    svc = TelegramApprovalService(
+        config=TelegramApprovalConfig(callback_secret=SECRET, allowed_chat_id=CHAT_ID), client=tg_client,
+    )
+    result = svc.notify_pending()
+
+    assert len(result.failed) == 1 and len(result.sent) == 1
+    assert "could not deliver" in result.failed[0].error
+
+
+def test_notify_pending_with_nothing_pending_is_empty():
+    svc, _ = _service_multi()
+    result = svc.notify_pending()
+    assert result.sent == [] and result.failed == []
+
+
+# -- submit_and_notify() --------------------------------------------------------
+
+
+def test_submit_and_notify_submits_and_sends_in_one_call():
+    _register_account(account_registry_service)
+    svc, _ = _service_multi()
+
+    result = svc.submit_and_notify(SetupSubmissionRequest(snapshot=_snapshot()))
+
+    assert result.report.total_submitted == 1
+    assert len(result.notified.sent) == 1
+    assert result.notified.sent[0].approval_request_id == result.report.submitted_setups[0].approval_request_id
+    # and it is genuinely in the pending queue now, same as plain submit()
+    assert setup_submission_service.get_approval(
+        result.report.submitted_setups[0].approval_request_id
+    ) is not None
+
+
+def test_submit_and_notify_with_no_setups_notifies_nothing():
+    svc, _ = _service_multi()
+    result = svc.submit_and_notify(SetupSubmissionRequest(snapshot=_snapshot()))
+    assert result.report.total_submitted == 0
+    assert result.notified.sent == [] and result.notified.failed == []
+
+
+def _service_multi():
+    """Same as _service() but with a transport that answers every call
+    successfully with a distinct message_id -- for tests that expect
+    multiple cards to go out in one method call."""
+    counter = {"n": 100}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        counter["n"] += 1
+        return httpx.Response(200, json={"ok": True, "result": {"message_id": counter["n"]}})
+
+    tg_client = TelegramDeliveryClient(
+        config=TelegramDeliveryConfig(bot_token="123:ABC", chat_id=CHAT_ID),
+        client=httpx.Client(transport=httpx.MockTransport(handler)),
+    )
+    svc = TelegramApprovalService(
+        config=TelegramApprovalConfig(callback_secret=SECRET, allowed_chat_id=CHAT_ID), client=tg_client,
+    )
+    return svc, handler

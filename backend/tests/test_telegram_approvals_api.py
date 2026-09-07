@@ -50,7 +50,7 @@ def _submit_one() -> str:
     account_registry_service.assign_strategy(account.id, StrategyAssignmentCreate(
         strategy_id="scalping_3tp", strategy_name="scalping_3tp", allocation_pct=100.0, enabled=True,
     ))
-    body = {"snapshot": _snapshot().model_dump(mode="json")}
+    body = {"snapshot": _snapshot().model_dump(mode="json"), "account_ids": [str(account.id)]}
     resp = client.post("/v1/setup-submission/submit", json=body)
     return resp.json()["submitted_setups"][0]["approval_request_id"]
 
@@ -138,3 +138,46 @@ def test_webhook_forged_token_returns_403():
     resp = client.post("/v1/telegram-approvals/webhook", json=_callback_body(forged))
     assert resp.status_code == 403
     assert setup_submission_service.get_approval(UUID(approval_id)).decision.value == "pending"
+
+
+def test_notify_pending_endpoint_sends_every_undecided_setup():
+    _submit_one()
+    _submit_one()
+    resp = client.post("/v1/telegram-approvals/notify-pending")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert len(body["sent"]) == 2
+    assert body["failed"] == []
+
+
+def test_notify_pending_endpoint_with_nothing_pending():
+    resp = client.post("/v1/telegram-approvals/notify-pending")
+    assert resp.status_code == 200
+    assert resp.json() == {"sent": [], "failed": []}
+
+
+def test_submit_and_notify_endpoint_does_both_in_one_call():
+    login = _next_login()
+    account = account_registry_service.register_account(TradingAccountCreate(
+        label=f"Demo {login}", account_type=AccountType.demo, broker="TestBroker",
+        login=login, server="Test-Server", currency="USD", initial_balance=100000.0,
+    ))
+    account_registry_service.assign_strategy(account.id, StrategyAssignmentCreate(
+        strategy_id="scalping_3tp", strategy_name="scalping_3tp", allocation_pct=100.0, enabled=True,
+    ))
+
+    body = {"snapshot": _snapshot().model_dump(mode="json")}
+    resp = client.post("/v1/telegram-approvals/submit-and-notify", json=body)
+    assert resp.status_code == 200
+    payload = resp.json()
+    assert payload["report"]["total_submitted"] == 1
+    assert len(payload["notified"]["sent"]) == 1
+
+
+def test_submit_and_notify_endpoint_with_no_matching_setups():
+    body = {"snapshot": _snapshot().model_dump(mode="json")}
+    resp = client.post("/v1/telegram-approvals/submit-and-notify", json=body)
+    assert resp.status_code == 200
+    payload = resp.json()
+    assert payload["report"]["total_submitted"] == 0
+    assert payload["notified"]["sent"] == []

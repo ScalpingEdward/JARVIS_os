@@ -3,8 +3,11 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass, field
 from typing import Any
+from uuid import UUID
 
 from pydantic import BaseModel
+
+from app.setup_submission.models import SetupSubmissionReport
 
 
 @dataclass(frozen=True)
@@ -35,3 +38,19 @@ class TelegramWebhookUpdate(BaseModel):
 
     update_id: int
     callback_query: dict[str, Any] | None = None
+
+
+class NotifyOutcome(BaseModel):
+    approval_request_id: UUID
+    message_id: int | None = None
+    error: str | None = None
+
+
+class NotifyPendingResult(BaseModel):
+    sent: list[NotifyOutcome]
+    failed: list[NotifyOutcome]
+
+
+class SubmitAndNotifyResult(BaseModel):
+    report: SetupSubmissionReport
+    notified: NotifyPendingResult
