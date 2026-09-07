@@ -263,6 +263,149 @@ def test_no_allowed_chat_configured_refuses_everything():
         svc.handle_update(_callback_update(make_token(SECRET, uuid4(), APPROVE)))
 
 
+# -- auto_advance: off by default, opt-in follow-up to advance_to_preflight ---
+
+
+def test_auto_advance_is_off_by_default():
+    assert TelegramApprovalConfig(callback_secret=SECRET, allowed_chat_id=CHAT_ID).auto_advance is False
+
+
+def test_auto_advance_disabled_sends_no_followup_message():
+    _register_account(account_registry_service)
+    report = setup_submission_service.submit(SetupSubmissionRequest(snapshot=_snapshot()))
+    approval_id = report.submitted_setups[0].approval_request_id
+    calls = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(json.loads(request.content))
+        return httpx.Response(200, json={"ok": True, "result": {"message_id": 1}})
+
+    tg_client = TelegramDeliveryClient(
+        config=TelegramDeliveryConfig(bot_token="123:ABC", chat_id=CHAT_ID),
+        client=httpx.Client(transport=httpx.MockTransport(handler)),
+    )
+    svc = TelegramApprovalService(
+        config=TelegramApprovalConfig(callback_secret=SECRET, allowed_chat_id=CHAT_ID, auto_advance=False),
+        client=tg_client,
+    )
+    svc.handle_update(_callback_update(make_token(SECRET, approval_id, APPROVE)))
+    assert calls == []
+
+
+def test_auto_advance_enabled_reports_a_failure_as_a_followup_message():
+    """No mt5_bridge terminal registered -> advance_to_preflight fails at
+    'assess' -> that must come back as a Telegram message, not silently."""
+    _register_account(account_registry_service)
+    report = setup_submission_service.submit(SetupSubmissionRequest(snapshot=_snapshot()))
+    approval_id = report.submitted_setups[0].approval_request_id
+    calls = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(json.loads(request.content))
+        return httpx.Response(200, json={"ok": True, "result": {"message_id": 1}})
+
+    tg_client = TelegramDeliveryClient(
+        config=TelegramDeliveryConfig(bot_token="123:ABC", chat_id=CHAT_ID),
+        client=httpx.Client(transport=httpx.MockTransport(handler)),
+    )
+    svc = TelegramApprovalService(
+        config=TelegramApprovalConfig(callback_secret=SECRET, allowed_chat_id=CHAT_ID, auto_advance=True),
+        client=tg_client,
+    )
+    svc.handle_update(_callback_update(make_token(SECRET, approval_id, APPROVE)))
+
+    assert len(calls) == 1
+    assert "Preflight gestoppt bei assess" in calls[0]["text"]
+    assert "mt5_bridge" in calls[0]["text"]
+
+
+def test_auto_advance_enabled_reports_success_as_a_followup_message():
+    """The real end-to-end case: a genuinely registered terminal, real
+    symbol spec, real tick -- advance_to_preflight actually succeeds, and
+    the tap reports the whole outcome back without a second manual call."""
+    from app.mt5_bridge.models import MT5AccountSnapshot, MT5SnapshotIngest, MT5SymbolSpec, MT5TerminalRegister, MT5Tick
+    from app.mt5_bridge.service import mt5_bridge_service
+
+    mt5_bridge_service.reset()
+    _register_account(account_registry_service)
+    report = setup_submission_service.submit(SetupSubmissionRequest(snapshot=_snapshot()))
+    approval_id = report.submitted_setups[0].approval_request_id
+    setup = setup_submission_service.get_approval(approval_id)
+    account = account_registry_service.get_account(setup.account_id)
+
+    terminal = mt5_bridge_service.register(MT5TerminalRegister(
+        name="Test Terminal", terminal_path="C:/MT5/terminal64.exe",
+        account_login=int(account.login), broker="TestBroker", server=account.server,
+    ))
+    mt5_bridge_service.ingest(terminal.id, MT5SnapshotIngest(
+        account=MT5AccountSnapshot(balance=100000, equity=100000, margin=0, free_margin=100000),
+        ticks=[MT5Tick(symbol="EURUSD", bid=1.09995, ask=1.10005)],
+        symbols=[MT5SymbolSpec(
+            symbol="EURUSD", point=0.00001, digits=5, volume_min=0.01, volume_max=50.0,
+            volume_step=0.01, trade_contract_size=100000, trade_tick_size=0.00001, trade_tick_value=1.0,
+        )],
+    ))
+
+    calls = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(json.loads(request.content))
+        return httpx.Response(200, json={"ok": True, "result": {"message_id": 1}})
+
+    tg_client = TelegramDeliveryClient(
+        config=TelegramDeliveryConfig(bot_token="123:ABC", chat_id=CHAT_ID),
+        client=httpx.Client(transport=httpx.MockTransport(handler)),
+    )
+    svc = TelegramApprovalService(
+        config=TelegramApprovalConfig(callback_secret=SECRET, allowed_chat_id=CHAT_ID, auto_advance=True),
+        client=tg_client,
+    )
+    svc.handle_update(_callback_update(make_token(SECRET, approval_id, APPROVE)))
+
+    assert len(calls) == 1
+    assert "Preflight bereit" in calls[0]["text"]
+    assert "risk-approved" in calls[0]["text"]
+    assert calls[0].get("reply_markup") is None, "the follow-up is a plain status message, not another card"
+
+
+def test_auto_advance_never_triggers_on_reject():
+    _register_account(account_registry_service)
+    report = setup_submission_service.submit(SetupSubmissionRequest(snapshot=_snapshot()))
+    approval_id = report.submitted_setups[0].approval_request_id
+    calls = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(json.loads(request.content))
+        return httpx.Response(200, json={"ok": True, "result": {"message_id": 1}})
+
+    tg_client = TelegramDeliveryClient(
+        config=TelegramDeliveryConfig(bot_token="123:ABC", chat_id=CHAT_ID),
+        client=httpx.Client(transport=httpx.MockTransport(handler)),
+    )
+    svc = TelegramApprovalService(
+        config=TelegramApprovalConfig(callback_secret=SECRET, allowed_chat_id=CHAT_ID, auto_advance=True),
+        client=tg_client,
+    )
+    svc.handle_update(_callback_update(make_token(SECRET, approval_id, REJECT)))
+    assert calls == []
+
+
+def test_auto_advance_reads_the_env_variable():
+    import os
+
+    old = os.environ.get("TELEGRAM_AUTO_ADVANCE")
+    try:
+        os.environ["TELEGRAM_AUTO_ADVANCE"] = "true"
+        assert TelegramApprovalConfig().auto_advance is True
+        os.environ["TELEGRAM_AUTO_ADVANCE"] = "false"
+        assert TelegramApprovalConfig().auto_advance is False
+    finally:
+        if old is None:
+            os.environ.pop("TELEGRAM_AUTO_ADVANCE", None)
+        else:
+            os.environ["TELEGRAM_AUTO_ADVANCE"] = old
+
+
 # -- notify_pending() ----------------------------------------------------------
 
 
