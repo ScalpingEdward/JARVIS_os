@@ -24,7 +24,7 @@ from app.modules.execution_supervisor.service import ExecutionSupervisorError
 from app.modules.position_management_brain.models import ExitRule, PositionCreate, PositionRecord, PositionState
 from app.modules.position_management_brain.router import service as position_management_service
 from app.modules.position_management_brain.service import PositionManagementError
-from app.setup_submission.models import SubmittedSetup, TradeSide
+from app.setup_submission.models import SetupDecisionStatus, SubmittedSetup, TradeSide
 from app.setup_submission.service import setup_submission_service
 
 from .models import RiskAssessmentRequest, SupervisionStartRequest, LiveOrderPrepareRequest
@@ -103,8 +103,8 @@ def _exit_rules_from_take_profits(take_profits: list, strategy_id: str) -> list[
 class TradeRiskPipelineService:
     """The real link between an approved setup and a governed position size.
 
-    setup_submission already gates *which* setups reach a human for
-    approval. This is the next real link in the chain: once approved, it
+    setup_submission.decide() is the actual human approval gate -- assess()
+    below refuses anything not explicitly approved there. Once approved, this
     pulls the account's live balance/equity/prop-firm rules and runs them
     through dynamic_risk_engine to get an actual, policy-bounded position
     size -- rather than leaving position sizing as manual judgment, which
@@ -129,6 +129,11 @@ class TradeRiskPipelineService:
         setup = setup_submission_service.get_approval(approval_request_id)
         if setup is None:
             raise TradeRiskPipelineError(f"No pending/approved setup found for {approval_request_id}")
+        if setup.decision != SetupDecisionStatus.approved:
+            raise TradeRiskPipelineError(
+                f"Setup {approval_request_id} is {setup.decision.value}, not approved "
+                "-- refusing to size a position for a setup nobody has signed off on"
+            )
 
         account = account_registry_service.get_account(setup.account_id)
         if account.status != AccountStatus.active:
