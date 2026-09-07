@@ -61,6 +61,30 @@ class MediaPoolIngestRequest(BaseModel):
     items: list[MediaPoolItemCreate] = Field(min_length=1, max_length=500)
 
 
+class ThemeGap(BaseModel):
+    """A theme with too few available items to become a post on its own --
+    curate() deliberately leaves these unposted (see curation.py) rather than
+    forcing a thin carousel. This surfaces that silent state so a human knows
+    what to go shoot, instead of the photos just sitting there unexplained."""
+
+    theme: str
+    available_count: int
+    needed_for_carousel: int = Field(description="How many more same-theme items would complete a real carousel")
+    sample_tags: list[str] = Field(default_factory=list, description="Tags from the existing item(s), as a style hint")
+    sample_media_refs: list[str] = Field(default_factory=list)
+
+
+class ContentGapReport(BaseModel):
+    """Read-only. Changes nothing -- purely tells Brano what the pool is
+    missing so he can go shoot the right thing, or knows when it's simply
+    time to refill the folder."""
+
+    available_count: int
+    theme_gaps: list[ThemeGap]
+    pool_low: bool = Field(description="True when available_count is at or below the configured low-water mark")
+    low_water_mark: int
+
+
 class MediaPoolIngestResponse(BaseModel):
     ingested: int
     skipped_duplicates: int

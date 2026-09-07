@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections import defaultdict
 from dataclasses import dataclass
 
-from .media_pool_models import MediaPoolItem
+from .media_pool_models import ContentGapReport, MediaPoolItem, ThemeGap
 from .models import MediaType
 from .platform_strategy import PlatformStrategy, platform_strategy_store
 
@@ -94,3 +94,56 @@ def curate(pool_items: list[MediaPoolItem], max_groups: int = 10) -> list[Curate
 
     groups.sort(key=lambda g: sum(i.aesthetic_score for i in g.media_items) / len(g.media_items), reverse=True)
     return groups[:max_groups]
+
+
+DEFAULT_LOW_WATER_MARK = 12
+
+
+def analyze_gaps(pool_items: list[MediaPoolItem], low_water_mark: int = DEFAULT_LOW_WATER_MARK) -> ContentGapReport:
+    """What the pool is missing, in plain terms -- never posts anything,
+    never reserves anything, purely a read of the current state.
+
+    Reuses exactly the same theme grouping and thresholds `curate()` uses,
+    so a theme reported here as "1 short of a carousel" is the same theme
+    `curate()` would silently skip on its next run. Videos and items already
+    above the elite solo threshold are never gaps -- they already have a
+    path to becoming a post on their own; only same-theme images stuck below
+    `carousel_min_size` are.
+    """
+    strategy = platform_strategy_store.current()
+    unused = [item for item in pool_items if item.available]
+
+    by_theme: dict[str, list[MediaPoolItem]] = defaultdict(list)
+    for item in unused:
+        by_theme[item.theme].append(item)
+
+    gaps: list[ThemeGap] = []
+    for theme, items in sorted(by_theme.items()):
+        stuck = [
+            item for item in items
+            if item.media_type == MediaType.image
+            and item.aesthetic_score < strategy.elite_solo_threshold
+        ]
+        # Only the *leftover remainder* is a gap: curate() already turns
+        # every full-sized batch into a carousel, so a theme with e.g. 13
+        # stuck images has zero gap (12 become carousels, 1 is the leftover).
+        remainder = len(stuck) % strategy.carousel_ideal_max_size
+        if remainder == 0 or remainder >= strategy.carousel_min_size:
+            continue
+
+        needed = strategy.carousel_min_size - remainder
+        sample = stuck[-remainder:] if remainder else []
+        gaps.append(ThemeGap(
+            theme=theme,
+            available_count=remainder,
+            needed_for_carousel=needed,
+            sample_tags=sorted({tag for item in sample for tag in item.tags}),
+            sample_media_refs=[item.media_ref for item in sample],
+        ))
+
+    return ContentGapReport(
+        available_count=len(unused),
+        theme_gaps=gaps,
+        pool_low=len(unused) <= low_water_mark,
+        low_water_mark=low_water_mark,
+    )
