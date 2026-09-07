@@ -1,6 +1,8 @@
 from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
+from app.notification_hub.telegram_delivery import TelegramDeliveryClient, TelegramDeliveryError
+
 from .models import (
     AutomationJobCreate,
     AutomationJobRecord,
@@ -8,6 +10,7 @@ from .models import (
     ConnectorRecord,
     ConnectorRegister,
     ConnectorState,
+    ConnectorType,
     JobApproval,
     JobCompletion,
     JobState,
@@ -16,10 +19,17 @@ from .models import (
 
 
 class AutomationRuntimeService:
-    def __init__(self) -> None:
+    #: Connector types allowed a real (non-dry-run) job. Everything else is
+    #: refused at create_job(), regardless of connector state or approval --
+    #: this is the one place that decision is enforced; nothing downstream
+    #: (dispatch_next, execute_telegram_job) re-derives or can widen it.
+    REAL_EXECUTION_CONNECTOR_TYPES = frozenset({ConnectorType.TELEGRAM})
+
+    def __init__(self, telegram_client: TelegramDeliveryClient | None = None) -> None:
         self._connectors: dict[UUID, ConnectorRecord] = {}
         self._jobs: dict[UUID, AutomationJobRecord] = {}
         self._idempotency: dict[tuple[str, str], UUID] = {}
+        self._telegram_client = telegram_client or TelegramDeliveryClient()
 
     def status(self) -> RuntimeStatus:
         jobs = list(self._jobs.values())
@@ -126,8 +136,17 @@ class AutomationRuntimeService:
             state, reason = JobState.BLOCKED, "Connector is not active."
         elif payload.action.strip().lower() not in connector.actions:
             state, reason = JobState.BLOCKED, "Action is not declared by connector."
-        elif not connector.supports_dry_run:
+        elif payload.dry_run and not connector.supports_dry_run:
             state, reason = JobState.BLOCKED, "Connector does not support dry-run execution."
+        elif payload.external_action and connector.connector_type not in self.REAL_EXECUTION_CONNECTOR_TYPES:
+            # The one enforcement point for this policy -- see
+            # REAL_EXECUTION_CONNECTOR_TYPES. Every other connector type
+            # stays dry-run-only no matter what the caller asks for.
+            state, reason = JobState.BLOCKED, (
+                f"Real execution is only permitted for "
+                f"{', '.join(sorted(t.value for t in self.REAL_EXECUTION_CONNECTOR_TYPES))} "
+                f"connectors; {connector.connector_type.value} remains dry-run only."
+            )
         elif payload.requires_human_approval and not payload.human_approved:
             state, reason = JobState.WAITING_APPROVAL, None
         else:
@@ -140,6 +159,8 @@ class AutomationRuntimeService:
             action=payload.action.strip().lower(),
             payload=payload.payload,
             idempotency_key=payload.idempotency_key.strip(),
+            dry_run=payload.dry_run,
+            external_action=payload.external_action,
             requires_human_approval=payload.requires_human_approval,
             human_approved=payload.human_approved,
             state=state,
@@ -192,12 +213,17 @@ class AutomationRuntimeService:
             job.state = JobState.RUNNING
             job.started_at = datetime.now(timezone.utc)
             job.updated_at = job.started_at
-            job.result = {
-                "mode": "dry_run",
-                "connector": connector.connector_key,
-                "action": job.action,
-                "validated": True,
-            }
+            if job.dry_run:
+                job.result = {
+                    "mode": "dry_run",
+                    "connector": connector.connector_key,
+                    "action": job.action,
+                    "validated": True,
+                }
+            # A real job is claimed here but not yet performed -- nothing
+            # simulates a result for it. execute_telegram_job() (or, for a
+            # future connector type, its equivalent) does the actual send
+            # and calls complete_job() itself with the real outcome.
             return job
         return None
 
@@ -213,7 +239,12 @@ class AutomationRuntimeService:
         now = datetime.now(timezone.utc)
         if payload.success:
             job.state = JobState.COMPLETED
-            job.result = {**job.result, **payload.result, "external_side_effect": False}
+            # Reflects what this job actually was, not a hardcoded constant:
+            # a real (external_action=True) job had a real side effect if it
+            # reached here successfully; a dry run never did. Previously this
+            # was hardcoded to False unconditionally, which would have
+            # under-reported a real Telegram send as simulated.
+            job.result = {**job.result, **payload.result, "external_side_effect": job.external_action}
             job.error = None
             job.completed_at = now
         elif job.retry_count < job.max_retries:
@@ -226,6 +257,48 @@ class AutomationRuntimeService:
             job.completed_at = now
         job.updated_at = now
         return job
+
+    def execute_telegram_job(self, job_id: UUID, workspace_id: str) -> AutomationJobRecord | None:
+        """Performs the one real, currently-permitted external action:
+        sending a Telegram message for a claimed, real (dry_run=False)
+        Telegram-connector job. Everything before this point (create_job's
+        connector-type gate, dispatch_next's claim) already established that
+        this is allowed and this specific job is real -- this method still
+        re-checks both rather than trusting that, since a job record is a
+        long-lived value a caller could otherwise pass in from anywhere.
+
+        Expects job.payload to carry 'title' and/or 'message' -- both
+        optional, matching TelegramDeliveryClient.send()'s own shape; an
+        empty payload sends an empty-titled message rather than refusing,
+        since the payload's exact contents are the caller's business, not
+        this method's to validate beyond what sending actually requires.
+        """
+        job = self.get_job(job_id, workspace_id)
+        if job is None:
+            return None
+        if job.state != JobState.RUNNING:
+            raise ValueError(f"Job {job_id} is {job.state.value}, not running -- nothing to execute")
+        if job.dry_run or not job.external_action:
+            raise ValueError(f"Job {job_id} is a dry run, not a real action -- nothing to execute")
+
+        connector = self.get_connector(job.connector_id, workspace_id)
+        if connector is None or connector.connector_type != ConnectorType.TELEGRAM:
+            raise ValueError(
+                f"Job {job_id}'s connector is not a Telegram connector -- "
+                "execute_telegram_job cannot act on it"
+            )
+
+        title = str(job.payload.get("title", ""))
+        message = str(job.payload.get("message", ""))
+        try:
+            self._telegram_client.send(title, message)
+        except TelegramDeliveryError as exc:
+            return self.complete_job(job_id, workspace_id, JobCompletion(success=False, error=str(exc)))
+
+        return self.complete_job(
+            job_id, workspace_id,
+            JobCompletion(success=True, result={"channel": "telegram", "title": title}),
+        )
 
     def cancel_job(self, job_id: UUID, workspace_id: str) -> AutomationJobRecord | None:
         job = self.get_job(job_id, workspace_id)
