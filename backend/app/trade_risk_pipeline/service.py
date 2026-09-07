@@ -27,7 +27,14 @@ from app.modules.position_management_brain.service import PositionManagementErro
 from app.setup_submission.models import SetupDecisionStatus, SubmittedSetup, TradeSide
 from app.setup_submission.service import setup_submission_service
 
-from .models import RiskAssessmentRequest, SupervisionStartRequest, LiveOrderPrepareRequest
+from .models import (
+    AdvanceToPreflightFailure,
+    AdvanceToPreflightRequest,
+    AdvanceToPreflightResult,
+    LiveOrderPrepareRequest,
+    RiskAssessmentRequest,
+    SupervisionStartRequest,
+)
 
 _SUPERVISABLE_POSITION_STATES = {
     PositionState.PLANNED,
@@ -429,6 +436,72 @@ class TradeRiskPipelineService:
             return live_order_executor_service.create(payload)
         except ValueError as exc:
             raise TradeRiskPipelineError(str(exc)) from exc
+
+    def advance_to_preflight(
+        self, approval_request_id: UUID, request: AdvanceToPreflightRequest | None = None,
+    ) -> AdvanceToPreflightResult | AdvanceToPreflightFailure:
+        """Chains assess -> open_position -> start_supervision ->
+        prepare_live_order for one approved setup in a single call.
+
+        This removes friction, not a safety gate: calling the four methods
+        above by hand, tracking workspace_id/risk_record_id/position_id
+        across each call, already reaches exactly the same end state this
+        does -- 'preflight-ready' or 'approval-required', human_approved
+        always False, execute() never called. Nothing here shortcuts that;
+        it only means an operator (or the Telegram approval flow) does not
+        have to be the one carrying those ids from one call to the next.
+
+        Returns AdvanceToPreflightFailure rather than raising when a step
+        past the first one fails -- the earlier steps already succeeded and
+        left real records behind (a risk-approved size, a tracked position,
+        maybe supervision already running). Raising and discarding that
+        context would make the caller re-derive what already happened from
+        scratch; returning it means a failed prepare_live_order, say, is
+        visibly "position tracked, one step short", not "nothing happened".
+        """
+        request = request or AdvanceToPreflightRequest()
+
+        try:
+            risk_record = self.assess(approval_request_id, request.assessment)
+        except TradeRiskPipelineError as exc:
+            return AdvanceToPreflightFailure(failed_at="assess", error=str(exc))
+
+        try:
+            position = self.open_position(risk_record.workspace_id, risk_record.id)
+        except TradeRiskPipelineError as exc:
+            return AdvanceToPreflightFailure(
+                failed_at="open_position", error=str(exc), risk_record=risk_record,
+            )
+
+        try:
+            supervision = self.start_supervision(
+                risk_record.workspace_id, position.id, request.supervision,
+            )
+        except TradeRiskPipelineError as exc:
+            return AdvanceToPreflightFailure(
+                failed_at="start_supervision", error=str(exc),
+                risk_record=risk_record, position=position,
+            )
+
+        account = account_registry_service.get_account(UUID(risk_record.workspace_id))
+        live_order_request = LiveOrderPrepareRequest(
+            account_login=int(account.login),
+            **request.live_order.model_dump(),
+        )
+        try:
+            live_order = self.prepare_live_order(
+                risk_record.workspace_id, position.id, live_order_request,
+            )
+        except TradeRiskPipelineError as exc:
+            return AdvanceToPreflightFailure(
+                failed_at="prepare_live_order", error=str(exc),
+                risk_record=risk_record, position=position, supervision=supervision,
+            )
+
+        return AdvanceToPreflightResult(
+            risk_record=risk_record, position=position,
+            supervision=supervision, live_order=live_order,
+        )
 
 
 trade_risk_pipeline_service = TradeRiskPipelineService()

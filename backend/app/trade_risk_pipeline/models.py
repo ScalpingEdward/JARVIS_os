@@ -1,6 +1,13 @@
 from __future__ import annotations
 
+from enum import Enum
+
 from pydantic import BaseModel, Field
+
+from app.modules.dynamic_risk_engine.models import DynamicRiskRecord
+from app.modules.execution_supervisor.models import SupervisionRecord
+from app.modules.position_management_brain.models import PositionRecord
+from app.executive_mt5_live_order_executor.models import LiveOrderRecord
 
 
 class RiskAssessmentRequest(BaseModel):
@@ -115,3 +122,62 @@ class LiveOrderPrepareRequest(BaseModel):
         default=None,
         description="Allowlist of logins this order may run under. Defaults to [account_login] only -- i.e. no other account is implicitly trusted.",
     )
+
+
+class LiveOrderPrepareOverrides(BaseModel):
+    """Same fields as LiveOrderPrepareRequest, minus account_login and
+    approved_account_logins -- both are derived from the approved setup's
+    own account record when advance_to_preflight() builds the real request,
+    so the caller never has to look up a login and pass it back in."""
+
+    native_adapter_ready: bool = False
+    quote_bid: float | None = Field(default=None, gt=0)
+    quote_ask: float | None = Field(default=None, gt=0)
+    quote_age_seconds: float | None = Field(default=None, ge=0)
+    order_type: str = "market"
+    symbol_point: float | None = Field(default=None, gt=0)
+    min_volume: float | None = Field(default=None, gt=0)
+    max_volume: float | None = Field(default=None, gt=0)
+    volume_step: float | None = Field(default=None, gt=0)
+    min_stop_distance_points: int = Field(default=0, ge=0)
+    max_deviation_points: int = Field(default=30, ge=0)
+
+
+class AdvanceToPreflightRequest(BaseModel):
+    """Optional overrides threaded through to each of the four chained
+    steps assess -> open_position -> start_supervision -> prepare_live_order.
+    Every field defaults to exactly what calling the four steps by hand
+    with no overrides would already do."""
+
+    assessment: RiskAssessmentRequest = Field(default_factory=RiskAssessmentRequest)
+    supervision: SupervisionStartRequest = Field(default_factory=SupervisionStartRequest)
+    live_order: LiveOrderPrepareOverrides = Field(default_factory=LiveOrderPrepareOverrides)
+
+
+class AdvanceToPreflightResult(BaseModel):
+    """Everything produced by successfully chaining all four steps for one
+    approved setup. live_order.human_approved is always False here -- this
+    stops in exactly the same place prepare_live_order already stops when
+    called by hand. It only removes the friction of tracking
+    workspace_id/risk_record_id/position_id across four separate manual
+    calls; it does not remove or shortcut the human_approved gate."""
+
+    risk_record: DynamicRiskRecord
+    position: PositionRecord
+    supervision: SupervisionRecord
+    live_order: LiveOrderRecord
+
+
+class AdvanceToPreflightFailure(BaseModel):
+    """What a partial failure looks like. The records that already
+    succeeded are real, persisted, and still exist -- this is a report of
+    where the chain stopped and why, not a rollback. A failure at
+    'prepare_live_order', for instance, still leaves a real tracked
+    position under supervision; only the live-order preflight itself
+    needs to be retried once the reported problem is fixed."""
+
+    failed_at: str
+    error: str
+    risk_record: DynamicRiskRecord | None = None
+    position: PositionRecord | None = None
+    supervision: SupervisionRecord | None = None

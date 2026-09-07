@@ -9,7 +9,14 @@ from app.modules.dynamic_risk_engine.models import DynamicRiskRecord
 from app.modules.execution_supervisor.models import SupervisionRecord
 from app.modules.position_management_brain.models import PositionRecord
 
-from .models import LiveOrderPrepareRequest, RiskAssessmentRequest, SupervisionStartRequest
+from .models import (
+    AdvanceToPreflightFailure,
+    AdvanceToPreflightRequest,
+    AdvanceToPreflightResult,
+    LiveOrderPrepareRequest,
+    RiskAssessmentRequest,
+    SupervisionStartRequest,
+)
 from .service import TradeRiskPipelineError, trade_risk_pipeline_service
 
 router = APIRouter(prefix="/v1/trade-risk-pipeline", tags=["trade-risk-pipeline"])
@@ -79,3 +86,27 @@ def prepare_live_order(
         return trade_risk_pipeline_service.prepare_live_order(workspace_id, position_id, request)
     except TradeRiskPipelineError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@router.post(
+    "/advance-to-preflight/{approval_request_id}",
+    response_model=AdvanceToPreflightResult | AdvanceToPreflightFailure,
+)
+def advance_to_preflight(
+    approval_request_id: UUID, request: AdvanceToPreflightRequest = AdvanceToPreflightRequest(),
+) -> AdvanceToPreflightResult | AdvanceToPreflightFailure:
+    """Chains assess -> open_position -> start_supervision ->
+    prepare_live_order for one approved setup in a single call.
+
+    Removes the friction of tracking workspace_id/risk_record_id/
+    position_id across four separate manual calls -- does not remove or
+    shortcut anything they already enforce. Always returns 200: a partial
+    failure (some steps succeeded, one did not) is a real, informative
+    result with the records that already exist attached, not an error --
+    same reasoning as /telegram-approvals/notify-pending returning sent/
+    failed lists instead of raising on the first problem. Ends at
+    'preflight-ready'/'approval-required' with human_approved always
+    False; actually submitting to a broker is still a separate, explicit
+    call outside this pipeline.
+    """
+    return trade_risk_pipeline_service.advance_to_preflight(approval_request_id, request)
