@@ -34,7 +34,12 @@ from app.setup_submission.models import (
     SetupDecisionStatus,
     SetupSubmissionRequest,
 )
-from app.trade_risk_pipeline.models import LiveOrderPrepareRequest
+from app.trade_risk_pipeline.models import (
+    AdvanceToPreflightFailure,
+    AdvanceToPreflightRequest,
+    AdvanceToPreflightResult,
+    LiveOrderPrepareRequest,
+)
 
 from app.trade_risk_pipeline.models import RiskAssessmentRequest
 from app.trade_risk_pipeline.service import TradeRiskPipelineError, trade_risk_pipeline_service
@@ -753,3 +758,129 @@ def test_prepare_live_order_rejects_partial_quote_overrides() -> None:
             position_id,
             LiveOrderPrepareRequest(account_login=int(account.login), quote_bid=1.1, symbol_point=0.0001),
         )
+
+
+# -- advance_to_preflight: chains all four steps in one call -----------------
+
+
+def _live_order_overrides() -> dict:
+    """Everything prepare_live_order would otherwise need looked up from
+    mt5_bridge -- supplied explicitly so these tests do not depend on a
+    registered terminal, same as the rest of this file's convention."""
+    from app.trade_risk_pipeline.models import LiveOrderPrepareOverrides
+
+    return LiveOrderPrepareOverrides(
+        quote_bid=1.09995, quote_ask=1.10005, quote_age_seconds=1.0,
+        symbol_point=0.0001, min_volume=0.01, max_volume=100.0, volume_step=0.01,
+    )
+
+
+def test_advance_to_preflight_reaches_the_same_end_state_as_the_four_manual_calls() -> None:
+    approval_request_id = _submit_one_setup()
+    result = trade_risk_pipeline_service.advance_to_preflight(
+        approval_request_id,
+        AdvanceToPreflightRequest(
+            assessment=RiskAssessmentRequest(value_per_price_unit=10.0),
+            live_order=_live_order_overrides(),
+        ),
+    )
+    assert isinstance(result, AdvanceToPreflightResult)
+    assert result.risk_record.state == RiskState.RISK_APPROVED
+    assert result.position.state in {PositionState.PLANNED, PositionState.APPROVED}
+    assert result.supervision.workflow_id == result.position.id
+    # the property that matters most: exactly as far as a human calling the
+    # four steps by hand would ever get, and no further
+    assert result.live_order.request.human_approved is False
+    assert result.live_order.state != LiveOrderState.EXECUTED
+    assert result.live_order.broker_order_id is None
+
+
+def test_advance_to_preflight_derives_the_account_login_automatically() -> None:
+    """The whole point: nobody has to look up and pass the login back in."""
+    approval_request_id = _submit_one_setup()
+    setup = setup_submission_service.get_approval(approval_request_id)
+    account = account_registry_service.get_account(setup.account_id)
+
+    result = trade_risk_pipeline_service.advance_to_preflight(
+        approval_request_id,
+        AdvanceToPreflightRequest(
+            assessment=RiskAssessmentRequest(value_per_price_unit=10.0),
+            live_order=_live_order_overrides(),
+        ),
+    )
+    assert isinstance(result, AdvanceToPreflightResult)
+    assert result.live_order.request.account_login == int(account.login)
+
+
+def test_advance_to_preflight_refuses_an_undecided_setup_at_the_first_step() -> None:
+    """Same gate as calling assess() directly -- advancing does not create a
+    second path around the approval requirement."""
+    _register_account()
+    report = setup_submission_service.submit(SetupSubmissionRequest(snapshot=_snapshot()))
+    approval_request_id = report.submitted_setups[0].approval_request_id  # never decided
+
+    result = trade_risk_pipeline_service.advance_to_preflight(approval_request_id)
+    assert isinstance(result, AdvanceToPreflightFailure)
+    assert result.failed_at == "assess"
+    assert "not approved" in result.error
+    assert result.risk_record is None and result.position is None
+
+
+def test_advance_to_preflight_partial_failure_keeps_what_already_succeeded() -> None:
+    """A failure at prepare_live_order (e.g. a bad override) must not hide
+    that risk sizing, position tracking, and supervision genuinely happened
+    -- those records are real, not rolled back."""
+    approval_request_id = _submit_one_setup()
+    from app.trade_risk_pipeline.models import LiveOrderPrepareOverrides
+
+    result = trade_risk_pipeline_service.advance_to_preflight(
+        approval_request_id,
+        AdvanceToPreflightRequest(
+            assessment=RiskAssessmentRequest(value_per_price_unit=10.0),
+            # partial quote override -- prepare_live_order's own "all or
+            # nothing" validation should reject this and stop the chain here
+            live_order=LiveOrderPrepareOverrides(quote_bid=1.1, symbol_point=0.0001),
+        ),
+    )
+    assert isinstance(result, AdvanceToPreflightFailure)
+    assert result.failed_at == "prepare_live_order"
+    assert "all supplied or all omitted" in result.error
+    assert result.risk_record is not None
+    assert result.position is not None
+    assert result.supervision is not None
+    # and the position really is there, independent of the chain's own report
+    assert position_management_service.get(result.risk_record.workspace_id, result.position.id) is not None
+
+
+def test_advance_to_preflight_via_the_real_api_route() -> None:
+    from fastapi.testclient import TestClient
+    from app.main import app
+
+    client = TestClient(app)
+    approval_request_id = _submit_one_setup()
+
+    body = {
+        "assessment": {"value_per_price_unit": 10.0},
+        "live_order": _live_order_overrides().model_dump(),
+    }
+    resp = client.post(f"/v1/trade-risk-pipeline/advance-to-preflight/{approval_request_id}", json=body)
+    assert resp.status_code == 200
+    payload = resp.json()
+    assert "live_order" in payload and payload["live_order"]["request"]["human_approved"] is False
+
+
+def test_advance_to_preflight_api_reports_partial_failure_with_200() -> None:
+    """A partial failure is informative content, not an HTTP error --
+    matches /telegram-approvals/notify-pending's sent/failed convention."""
+    from fastapi.testclient import TestClient
+    from app.main import app
+
+    client = TestClient(app)
+    _register_account()
+    report = setup_submission_service.submit(SetupSubmissionRequest(snapshot=_snapshot()))
+    approval_request_id = report.submitted_setups[0].approval_request_id  # undecided
+
+    resp = client.post(f"/v1/trade-risk-pipeline/advance-to-preflight/{approval_request_id}", json={})
+    assert resp.status_code == 200
+    payload = resp.json()
+    assert payload["failed_at"] == "assess"
