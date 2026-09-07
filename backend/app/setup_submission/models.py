@@ -8,11 +8,26 @@ pair that produced a trading setup) and the aggregate submission report.
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from enum import StrEnum
 from uuid import UUID, uuid4
 
 from pydantic import BaseModel, Field, model_validator
 
 from app.strategies.models import MarketSnapshot, TakeProfit, TradeSide
+
+
+class SetupDecisionStatus(StrEnum):
+    """Whether a human has actually looked at this setup.
+
+    ``get_approval()`` used to return a SubmittedSetup with no notion of this
+    at all -- any id present in the dict came back regardless of whether
+    anyone had ever seen it, which meant "approval_request_id" was a name,
+    not an enforced property. trade_risk_pipeline.assess() now refuses
+    anything not explicitly ``approved`` -- see decide() below."""
+
+    pending = "pending"
+    approved = "approved"
+    rejected = "rejected"
 
 
 class SetupSubmissionRequest(BaseModel):
@@ -67,6 +82,26 @@ class SubmittedSetup(BaseModel):
     reasoning: str = Field(default="", max_length=500)
     approval_request_id: UUID = Field(default_factory=uuid4)
     submitted_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    decision: SetupDecisionStatus = SetupDecisionStatus.pending
+    decided_by: str | None = Field(default=None, max_length=120)
+    decided_at: datetime | None = None
+    decision_note: str = Field(default="", max_length=500)
+
+
+class SetupDecisionRequest(BaseModel):
+    """Payload for POST /pending/{id}/decision. One-shot: a setup already
+    decided (approved or rejected) refuses a second decision rather than
+    silently overwriting who decided what."""
+
+    decision: SetupDecisionStatus
+    decided_by: str = Field(min_length=1, max_length=120)
+    note: str = Field(default="", max_length=500)
+
+    @model_validator(mode="after")
+    def _decision_must_be_final(self) -> "SetupDecisionRequest":
+        if self.decision == SetupDecisionStatus.pending:
+            raise ValueError("decision must be 'approved' or 'rejected', not 'pending'")
+        return self
 
 
 class SetupSubmissionReport(BaseModel):

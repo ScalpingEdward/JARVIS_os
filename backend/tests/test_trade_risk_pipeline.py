@@ -29,7 +29,11 @@ from app.strategies.models import (
     OrderBlockType,
     StructureLevel,
 )
-from app.setup_submission.models import SetupSubmissionRequest
+from app.setup_submission.models import (
+    SetupDecisionRequest,
+    SetupDecisionStatus,
+    SetupSubmissionRequest,
+)
 from app.trade_risk_pipeline.models import LiveOrderPrepareRequest
 
 from app.trade_risk_pipeline.models import RiskAssessmentRequest
@@ -94,7 +98,74 @@ def _submit_one_setup() -> UUID:
     account_id = _register_account()
     report = setup_submission_service.submit(SetupSubmissionRequest(snapshot=_snapshot()))
     assert report.total_submitted >= 1
+    approval_request_id = report.submitted_setups[0].approval_request_id
+    # These tests exercise assess()'s own logic, not the approval gate itself
+    # (see test_setup_submission.py and the dedicated gate tests below) --
+    # so the setup is approved here rather than in every call site.
+    setup_submission_service.decide(
+        approval_request_id,
+        SetupDecisionRequest(decision=SetupDecisionStatus.approved, decided_by="test-operator"),
+    )
+    return approval_request_id
+
+
+def _submit_one_setup_undecided() -> UUID:
+    """Same as _submit_one_setup() but leaves the decision pending -- for the
+    gate tests below, which need an unapproved setup to test against."""
+    _register_account()
+    report = setup_submission_service.submit(SetupSubmissionRequest(snapshot=_snapshot()))
+    assert report.total_submitted >= 1
     return report.submitted_setups[0].approval_request_id
+
+
+# -- the approval gate itself -------------------------------------------------
+# This is the property the whole chain depends on: assess() is the real entry
+# point everything downstream (open_position, start_supervision,
+# prepare_live_order) is reached through, so gating here once is the single
+# enforcement point -- see trade_risk_pipeline/service.py's class docstring.
+
+
+def test_assess_refuses_a_pending_undecided_setup() -> None:
+    approval_request_id = _submit_one_setup_undecided()
+    with pytest.raises(TradeRiskPipelineError, match="pending, not approved"):
+        trade_risk_pipeline_service.assess(approval_request_id)
+
+
+def test_assess_refuses_a_rejected_setup() -> None:
+    approval_request_id = _submit_one_setup_undecided()
+    setup_submission_service.decide(
+        approval_request_id,
+        SetupDecisionRequest(decision=SetupDecisionStatus.rejected, decided_by="brano"),
+    )
+    with pytest.raises(TradeRiskPipelineError, match="rejected, not approved"):
+        trade_risk_pipeline_service.assess(approval_request_id)
+
+
+def test_assess_succeeds_once_approved() -> None:
+    approval_request_id = _submit_one_setup_undecided()
+    setup_submission_service.decide(
+        approval_request_id,
+        SetupDecisionRequest(decision=SetupDecisionStatus.approved, decided_by="brano"),
+    )
+    record = trade_risk_pipeline_service.assess(
+        approval_request_id, RiskAssessmentRequest(value_per_price_unit=10.0)
+    )
+    assert record is not None
+
+
+def test_no_position_can_be_opened_from_an_unapproved_setup() -> None:
+    """The gate holds transitively: since open_position() requires an
+    already risk-approved record, and no such record can exist without
+    assess() having already refused an unapproved setup, nothing downstream
+    can be reached either."""
+    approval_request_id = _submit_one_setup_undecided()
+    with pytest.raises(TradeRiskPipelineError):
+        trade_risk_pipeline_service.assess(approval_request_id)
+    # no risk record was ever created for this approval_request_id
+    with pytest.raises(TradeRiskPipelineError):
+        trade_risk_pipeline_service.open_position(
+            workspace_id=str(uuid4()), risk_record_id=str(approval_request_id),
+        )
 
 
 def test_assess_unknown_approval_request_fails_closed() -> None:
