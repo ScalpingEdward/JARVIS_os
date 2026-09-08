@@ -88,3 +88,16 @@ def test_resume_when_already_running_is_a_safe_no_op():
     # the second call must not spawn a competing task or change the interval
     # of the one already running
     assert resp.json()["interval_seconds"] == 5
+
+
+def test_audit_endpoint_lists_notable_events():
+    resp = client.post("/v1/position-monitor/tick")
+    resp2 = client.get("/v1/position-monitor/audit")
+    assert resp2.status_code == 200
+    assert isinstance(resp2.json(), list)
+
+
+def test_audit_endpoint_respects_limit():
+    resp = client.get("/v1/position-monitor/audit", params={"limit": 1})
+    assert resp.status_code == 200
+    assert len(resp.json()) <= 1
