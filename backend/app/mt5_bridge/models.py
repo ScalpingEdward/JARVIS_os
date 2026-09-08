@@ -142,6 +142,17 @@ class MT5SnapshotIngest(BaseModel):
     candles: list[MT5Candle] = Field(default_factory=list)
     journal: list[MT5JournalEntry] = Field(default_factory=list)
     symbols: list[MT5SymbolSpec] = Field(default_factory=list)
+    #: Monotonically increasing per-terminal counter, incremented by the
+    #: pusher on every push cycle (see bridge/mt5_pusher.py). Lets the
+    #: backend distinguish "still getting regular pushes" (MT5ConnectionState,
+    #: already tracked via heartbeats) from "getting them *without missing a
+    #: cycle in between*" -- a push arriving on time after one was dropped
+    #: still looks "connected", but the gap is real and worth knowing about
+    #: for anything (like trailing-stop) that cares about continuity, not
+    #: just current liveness. Optional and defaults to None so an
+    #: older/unmodified pusher script does not fail validation; without it,
+    #: gap detection simply cannot report anything either way.
+    sequence: int | None = Field(default=None, ge=0)
 
 
 class MT5TerminalData(BaseModel):
@@ -154,6 +165,13 @@ class MT5TerminalData(BaseModel):
     candles: list[MT5Candle] = Field(default_factory=list)
     journal: list[MT5JournalEntry] = Field(default_factory=list)
     symbols: list[MT5SymbolSpec] = Field(default_factory=list)
+    #: The most recent sequence number this terminal has pushed, and
+    #: whether it was exactly one more than the one before it. True with
+    #: last_sequence=None means "no gap has ever been detected" (including
+    #: "no sequence tracking is available yet"), not "continuity has been
+    #: positively confirmed" -- see ingest()'s own handling.
+    last_sequence: int | None = None
+    sequence_contiguous: bool = True
 
 
 class MT5BridgeStatus(BaseModel):

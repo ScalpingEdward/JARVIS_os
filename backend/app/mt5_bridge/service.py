@@ -64,6 +64,15 @@ class MT5BridgeService:
             for spec in payload.symbols:
                 by_symbol[spec.symbol] = spec
             data.symbols = list(by_symbol.values())
+        if payload.sequence is not None:
+            # A gap is a real signal (a dropped push, a pusher restart that
+            # skipped ahead) worth keeping even after the next push arrives
+            # on schedule -- "contiguous" reflects only whether *this*
+            # push continued cleanly from the last one, not history overall.
+            data.sequence_contiguous = (
+                data.last_sequence is None or payload.sequence == data.last_sequence + 1
+            )
+            data.last_sequence = payload.sequence
         data.terminal.last_heartbeat_at = datetime.now(timezone.utc)
         data.terminal.state = MT5ConnectionState.connected
         return deepcopy(data)

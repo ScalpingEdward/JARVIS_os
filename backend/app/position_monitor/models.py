@@ -16,13 +16,13 @@ class PositionAssessed(BaseModel):
     break_even_state: str | None = None
     trailing_stream_id: UUID | None = None
     trailing_state: str | None = None
-    #: True only on the tick where break_even_state first *became*
-    #: actionable (approval-required or risk-rejected) for this position --
-    #: a Telegram notification was sent exactly once for that transition.
-    #: Stays False on every later tick that still reports the same state,
-    #: so a position sitting at approval-required for an hour does not page
-    #: Brano every 10 seconds for it.
-    notified: bool = False
+    #: True only on the tick where the corresponding assessment first
+    #: *became* actionable for this position -- a Telegram notification was
+    #: sent exactly once for that transition. Stays False on every later
+    #: tick that still reports the same state, so a position sitting at
+    #: approval-required for an hour does not page Brano every 10 seconds.
+    break_even_notified: bool = False
+    trailing_notified: bool = False
 
 
 class PositionSkipped(BaseModel):
