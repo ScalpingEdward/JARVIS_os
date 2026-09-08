@@ -1,15 +1,21 @@
-"""The first test exercising the whole chain this session built, in one
-coherent run, rather than each module tested in isolation: a strategy
-signal becomes a setup, a human approves it over Telegram, that approval
-auto-advances through real risk sizing, a tracked position, and running
-supervision, and the resulting live order honestly reflects exactly how
-far automation alone can take it -- then, simulating what a real terminal
-and a human's own explicit review would eventually provide, the same
-order reaches the point a real broker submission is possible, and the
-kill switch is shown protecting exactly that point.
+"""The first test exercising the whole lifecycle this session built, in
+one coherent run, rather than each module tested in isolation: a
+strategy signal becomes a setup, a human approves it over Telegram, that
+approval auto-advances through real risk sizing, a tracked position, and
+running supervision, and the resulting live order honestly reflects
+exactly how far automation alone can take it -- then, simulating what a
+real terminal and a human's own explicit review would eventually
+provide, the same order reaches the point a real broker submission is
+possible, the kill switch is shown protecting exactly that point, a
+simulated broker fill is reported back, and -- entirely independently,
+the way the real system actually works -- the resulting real position
+(as mt5_pusher's own next push would report it) is picked up and
+assessed by position_monitor on its own next tick.
 
 Every individual step here already has its own dedicated test elsewhere;
-this file's only job is proving they chain together correctly.
+this file's only job is proving they chain together correctly, end to
+end, from a strategy's first signal through to a live position already
+being watched.
 """
 
 from __future__ import annotations
@@ -22,10 +28,16 @@ import pytest
 
 from app.accounts.models import AccountType, StrategyAssignmentCreate, TradingAccountCreate
 from app.accounts.service import account_registry_service
-from app.executive_mt5_live_order_executor.models import LiveOrderCreate, LiveOrderExecuteRequest, LiveOrderState
+from app.executive_mt5_live_order_executor.models import (
+    LiveOrderCreate,
+    LiveOrderExecuteRequest,
+    LiveOrderState,
+    RemoteExecutionReport,
+)
 from app.executive_mt5_live_order_executor.service import live_order_executor_service
 from app.mt5_bridge.models import (
     MT5AccountSnapshot,
+    MT5Position,
     MT5SnapshotIngest,
     MT5SymbolSpec,
     MT5TerminalRegister,
@@ -33,6 +45,7 @@ from app.mt5_bridge.models import (
 )
 from app.mt5_bridge.service import mt5_bridge_service
 from app.notification_hub.telegram_delivery import TelegramDeliveryClient, TelegramDeliveryConfig
+from app.position_monitor.service import PositionMonitorService
 from app.setup_submission.models import SetupSubmissionRequest
 from app.setup_submission.service import setup_submission_service
 from app.strategies.models import FairValueGap, HTFBias, MarketSnapshot, OrderBlock, OrderBlockType
@@ -80,7 +93,7 @@ def _telegram_card_capture():
     return client, captured
 
 
-def test_setup_to_preflight_the_full_automated_chain_in_one_run():
+def test_signal_to_post_execution_monitoring_the_full_lifecycle_in_one_run():
     # -- a real account, real strategy assignment ---------------------------
     account = account_registry_service.register_account(TradingAccountCreate(
         label="PUPrime Demo", account_type=AccountType.demo, broker="PUPrime",
@@ -172,6 +185,44 @@ def test_setup_to_preflight_the_full_automated_chain_in_one_run():
 
     live_order_executor_service.resume()
     assert [o.id for o in live_order_executor_service.pending_execution(str(account.id))] == [live_order.id]
+
+    # -- 7. simulating the real Windows agent's report after it actually ----
+    # -- called order_send() -- AURON's own order record reflects it --------
+    reported = live_order_executor_service.report_execution(
+        live_order.id, str(account.id),
+        RemoteExecutionReport(broker_retcode=10009, broker_order_id=555001, broker_deal_id=555002,
+                              filled_volume=0.10, broker_comment="Request executed"),
+    )
+    # A real order_id/deal_id means reconciliation against the account's
+    # own position snapshot is still needed -- not EXECUTED outright; this
+    # is the correct, honest state, not a bug (see _classify_broker_result).
+    assert reported.state == LiveOrderState.RECONCILIATION_REQUIRED
+
+    # -- 8. the broker's own confirmation that a position now actually -----
+    # -- exists arrives separately, the way it really does: mt5_pusher's ---
+    # -- own next push cycle reporting the account's real, current --------
+    # -- positions -- independent of AURON's own order record above --------
+    mt5_bridge_service.ingest(terminal.id, MT5SnapshotIngest(
+        account=MT5AccountSnapshot(balance=100_000, equity=100_000, margin=500, free_margin=99_500),
+        positions=[MT5Position(
+            ticket=555001, symbol="XAUUSD", side="buy", volume=0.10,
+            open_price=2400.10, current_price=2400.30, stop_loss=2395.00,
+            opened_at=datetime.now(timezone.utc),
+        )],
+        ticks=[MT5Tick(symbol="XAUUSD", bid=2400.25, ask=2400.35)],
+        symbols=[MT5SymbolSpec(
+            symbol="XAUUSD", point=0.01, digits=2, volume_min=0.01, volume_max=50.0,
+            volume_step=0.01, trade_contract_size=100, trade_tick_size=0.01, trade_tick_value=1.0,
+        )],
+    ))
+
+    # -- 9. position_monitor, entirely independent of anything above, -------
+    # -- picks up this now-real position on its own next tick ---------------
+    monitor = PositionMonitorService(bridge_service=mt5_bridge_service, accounts_service=account_registry_service)
+    result = monitor.tick()
+    assert any(a.position_ticket == 555001 for a in result.assessed)
+    row = next(a for a in result.assessed if a.position_ticket == 555001)
+    assert row.trailing_state is not None  # a real assessment was actually produced, not skipped
 
 
 def test_a_rejected_setup_never_advances_past_the_gate():
