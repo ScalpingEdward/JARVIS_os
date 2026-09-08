@@ -23,10 +23,18 @@ from fastapi import APIRouter, HTTPException, Request, status
 
 from app.setup_submission.models import SetupSubmissionRequest
 
-from .models import NotifyPendingResult, SubmitAndNotifyResult
+from .models import NotifyPendingResult, SubmitAndNotifyResult, TelegramApprovalStatus
 from .service import TelegramApprovalError, telegram_approval_service
 
 router = APIRouter(prefix="/v1/telegram-approvals", tags=["telegram-approvals"])
+
+
+@router.get("/status", response_model=TelegramApprovalStatus)
+def telegram_approval_status() -> TelegramApprovalStatus:
+    """Capability health: what's configured and whether the bot is
+    actually reachable right now. Read-only, no side effects -- safe to
+    poll from a dashboard or a health check."""
+    return telegram_approval_service.status()
 
 
 @router.post("/notify/{approval_request_id}")

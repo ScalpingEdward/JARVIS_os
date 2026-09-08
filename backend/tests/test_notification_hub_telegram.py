@@ -271,3 +271,66 @@ def test_delivery_uses_the_real_email_client_for_the_email_channel():
     assert sent == [("Post ready", "A hero post is waiting for review.")]
     email_attempt = next(a for a in record.attempts if a.channel == DeliveryChannel.email)
     assert email_attempt.state == DeliveryState.delivered
+
+
+# -- get_me(): reachability check, no message sent ---------------------------
+
+
+def test_get_me_fails_closed_without_a_bot_token():
+    client = TelegramDeliveryClient(config=TelegramDeliveryConfig(bot_token=None, chat_id="999"))
+    with pytest.raises(TelegramDeliveryError, match="TELEGRAM_BOT_TOKEN is not set"):
+        client.get_me()
+
+
+def test_get_me_returns_the_bot_info_on_success():
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.path.endswith("/getMe")
+        return httpx.Response(200, json={"ok": True, "result": {"id": 1, "username": "auron_bot"}})
+
+    client = TelegramDeliveryClient(
+        config=TelegramDeliveryConfig(bot_token="123:ABC", chat_id="999"),
+        client=httpx.Client(transport=httpx.MockTransport(handler)),
+    )
+    info = client.get_me()
+    assert info["username"] == "auron_bot"
+
+
+def test_get_me_never_sends_a_message():
+    """The whole point: a health check must have zero side effects."""
+    calls = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(str(request.url))
+        return httpx.Response(200, json={"ok": True, "result": {"id": 1}})
+
+    client = TelegramDeliveryClient(
+        config=TelegramDeliveryConfig(bot_token="123:ABC", chat_id="999"),
+        client=httpx.Client(transport=httpx.MockTransport(handler)),
+    )
+    client.get_me()
+    assert len(calls) == 1
+    assert "sendMessage" not in calls[0]
+
+
+def test_get_me_fails_closed_on_a_rejected_token():
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(401, json={"ok": False, "error_code": 401, "description": "Unauthorized"})
+
+    client = TelegramDeliveryClient(
+        config=TelegramDeliveryConfig(bot_token="wrong-token", chat_id="999"),
+        client=httpx.Client(transport=httpx.MockTransport(handler)),
+    )
+    with pytest.raises(TelegramDeliveryError, match="401"):
+        client.get_me()
+
+
+def test_get_me_fails_closed_when_telegram_is_unreachable():
+    def handler(request: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectError("connection refused")
+
+    client = TelegramDeliveryClient(
+        config=TelegramDeliveryConfig(bot_token="123:ABC", chat_id="999"),
+        client=httpx.Client(transport=httpx.MockTransport(handler)),
+    )
+    with pytest.raises(TelegramDeliveryError, match="Could not reach"):
+        client.get_me()
