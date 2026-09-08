@@ -8,6 +8,8 @@ from .agent_adapters.api import router as agent_adapters_router
 from .strategies.api import router as strategies_router
 from .setup_submission.api import router as setup_submission_router
 from .telegram_approvals.api import router as telegram_approvals_router
+from .position_monitor.api import router as position_monitor_router
+from .position_monitor.service import position_monitor_service
 from .strategy_orchestrator.api import router as strategy_orchestrator_router
 from .api.routes.auron_demo1_approval_handoff_v21_260 import router as auron_demo1_approval_handoff_v21_260_router
 from .api.routes.auron_demo1_approval_resolution_v21_261 import router as auron_demo1_approval_resolution_v21_261_router
@@ -192,14 +194,36 @@ from .phoenix.v21_62_global_macro_economic_regime.router import router as v21_62
 from .phoenix.v21_63_alternative_data_intelligence_governance.router import router as v21_63_alternative_data_intelligence_governance_router
 from .phoenix.v21_64_news_sentiment_intelligence_governance.router import router as v21_64_news_sentiment_intelligence_governance_router
 
+import os
+from contextlib import asynccontextmanager
+
 settings = get_settings()
-app = FastAPI(title=settings.app_name, version=settings.version)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Off by default, deliberately -- not just as a feature flag, but because
+    # dozens of test files instantiate TestClient(app) directly, and this
+    # backend's test suite must stay exactly as inert as it is today unless
+    # a deployment explicitly opts in. Same reasoning as
+    # TELEGRAM_AUTO_ADVANCE defaulting off: a background, side-effecting
+    # capability should never silently activate itself in an environment
+    # that never asked for it.
+    if os.getenv("POSITION_MONITOR_ENABLED", "false").lower() in ("1", "true", "yes"):
+        interval = float(os.getenv("POSITION_MONITOR_INTERVAL_SECONDS", "10"))
+        position_monitor_service.start(interval)
+    yield
+    await position_monitor_service.stop()
+
+
+app = FastAPI(title=settings.app_name, version=settings.version, lifespan=lifespan)
 app.include_router(account_state_sync_router)
 app.include_router(accounts_router)
 app.include_router(agent_adapters_router)
 app.include_router(strategies_router)
 app.include_router(setup_submission_router)
 app.include_router(telegram_approvals_router)
+app.include_router(position_monitor_router)
 app.include_router(strategy_orchestrator_router)
 app.include_router(phoenix_demo1_router)
 app.include_router(phoenix_demo1_runtime_readiness_router)
