@@ -584,3 +584,89 @@ def test_a_telegram_delivery_failure_does_not_raise():
 
     notified = monitor._notify_if_newly_actionable(position, "approval-required")  # must not raise
     assert notified is True  # the attempt counts, even though delivery failed
+
+
+# -- audit trail: notifications sent/failed, and tick failures -------------
+
+
+def test_a_notification_is_recorded(tmp_path):
+    monitor, accounts, bridge, break_even, fake = _rig_with_fake_telegram(tmp_path)
+    terminal = _register_terminal(bridge)
+    _push_position(bridge, terminal.id)
+    position = bridge.list()[0].positions[0]
+
+    monitor._notify_if_newly_actionable(position, "approval-required")
+    records = monitor.audit_records()
+    assert records[0].kind == "notification"
+    assert "approval-required" in records[0].detail
+    assert records[0].position_ticket == position.ticket
+
+
+def test_a_failed_notification_is_recorded_as_such():
+    from app.notification_hub.telegram_delivery import TelegramDeliveryError
+
+    fake = FakeTelegram(raises=TelegramDeliveryError("no bot token configured"))
+    monitor = PositionMonitorService(telegram_client=fake, clock=lambda: NOW)
+    from app.mt5_bridge.models import MT5Position
+    from datetime import datetime, timezone as tz
+
+    position = MT5Position(ticket=1, symbol="EURUSD", side="buy", volume=0.1,
+                           open_price=1.1, current_price=1.11, stop_loss=1.09,
+                           opened_at=datetime.now(tz.utc))
+    monitor._notify_if_newly_actionable(position, "approval-required")
+    records = monitor.audit_records()
+    assert records[0].kind == "notification"
+    assert "FAILED" in records[0].detail
+
+
+def test_a_tick_failure_is_recorded_not_only_logged(rig):
+    import asyncio
+
+    monitor, accounts, bridge, *_ = rig
+    monitor.tick = lambda: (_ for _ in ()).throw(RuntimeError("boom"))
+
+    async def run():
+        monitor.start(interval_seconds=0.01)
+        for _ in range(200):
+            if monitor.audit_records():
+                break
+            await asyncio.sleep(0.01)
+        await monitor.stop()
+
+    asyncio.run(run())
+    records = monitor.audit_records()
+    assert records[0].kind == "tick_failure"
+    assert "boom" in records[0].detail
+
+
+def test_audit_records_are_most_recent_first(tmp_path):
+    monitor, accounts, bridge, break_even, fake = _rig_with_fake_telegram(tmp_path)
+    terminal = _register_terminal(bridge)
+    bridge.ingest(terminal.id, MT5SnapshotIngest(
+        account=MT5AccountSnapshot(balance=100_000, equity=100_000, margin=0, free_margin=100_000),
+        positions=[
+            MT5Position(ticket=1, symbol="EURUSD", side="buy", volume=0.1,
+                       open_price=1.10000, current_price=1.10500, stop_loss=1.09900, opened_at=NOW),
+            MT5Position(ticket=2, symbol="EURUSD", side="buy", volume=0.1,
+                       open_price=1.10000, current_price=1.10500, stop_loss=1.09900, opened_at=NOW),
+        ],
+        ticks=[MT5Tick(symbol="EURUSD", bid=1.10495, ask=1.10505, captured_at=NOW)],
+        symbols=[MT5SymbolSpec(symbol="EURUSD", point=0.00001, digits=5, volume_min=0.01,
+                               volume_max=50.0, volume_step=0.01, trade_contract_size=100_000,
+                               trade_tick_size=0.00001, trade_tick_value=1.0)],
+    ))
+    positions = {p.ticket: p for p in bridge.list()[0].positions}
+
+    monitor._notify_if_newly_actionable(positions[1], "approval-required")
+    monitor._notify_if_newly_actionable(positions[2], "approval-required")
+    records = monitor.audit_records()
+    assert records[0].position_ticket == 2
+    assert records[1].position_ticket == 1
+
+
+def test_audit_store_is_bounded(rig):
+    monitor, *_ = rig
+    for i in range(monitor.MAX_AUDIT_RECORDS + 10):
+        monitor._record("tick_failure", f"n{i}")
+    assert len(monitor._audit) == monitor.MAX_AUDIT_RECORDS
+    assert monitor._audit[-1].detail == f"n{monitor.MAX_AUDIT_RECORDS + 9}"

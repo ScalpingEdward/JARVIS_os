@@ -13,7 +13,7 @@ from pydantic import BaseModel, Field
 
 from fastapi import APIRouter
 
-from .models import MonitorStatus, MonitorTickResult
+from .models import MonitorAuditRecord, MonitorStatus, MonitorTickResult
 from .service import position_monitor_service
 
 router = APIRouter(prefix="/v1/position-monitor", tags=["position-monitor"])
@@ -36,6 +36,13 @@ def status() -> MonitorStatus:
 def tick() -> MonitorTickResult:
     """Run one assessment pass right now, synchronously."""
     return position_monitor_service.tick()
+
+
+@router.get("/audit", response_model=list[MonitorAuditRecord])
+def audit(limit: int = 50) -> list[MonitorAuditRecord]:
+    """Notifications actually sent (and any that failed to send), plus any
+    tick that raised -- not every routine tick. Most recent first."""
+    return position_monitor_service.audit_records(limit)
 
 
 @router.post("/pause", response_model=MonitorStatus)

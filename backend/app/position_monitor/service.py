@@ -38,7 +38,7 @@ from app.mt5_bridge.models import MT5ConnectionState, MT5Position, MT5SymbolSpec
 from app.mt5_bridge.service import MT5BridgeService, mt5_bridge_service
 from app.notification_hub.telegram_delivery import TelegramDeliveryClient, TelegramDeliveryError
 
-from .models import MonitorStatus, MonitorTickResult, PositionAssessed, PositionSkipped
+from .models import MonitorAuditRecord, MonitorStatus, MonitorTickResult, PositionAssessed, PositionSkipped
 
 log = logging.getLogger(__name__)
 
@@ -64,6 +64,8 @@ ACTOR_ID = "position-monitor"
 
 
 class PositionMonitorService:
+    MAX_AUDIT_RECORDS = 500
+
     def __init__(
         self,
         break_even_service: ExecutiveMT5BreakEvenScaleOutService | None = None,
@@ -80,6 +82,13 @@ class PositionMonitorService:
         self._telegram = telegram_client or TelegramDeliveryClient()
         self._clock = clock
         self._status = MonitorStatus(enabled=False, interval_seconds=DEFAULT_INTERVAL_SECONDS)
+        #: Same bounding reasoning as telegram_approvals' own audit trail --
+        #: a recent-activity log, not a permanent archive. Every
+        #: notification already has a durable trace through the Telegram
+        #: message itself once TELEGRAM_BOT_TOKEN is configured; this exists
+        #: for the case nobody was watching the phone at the time, or the
+        #: notification attempt itself failed.
+        self._audit: list[MonitorAuditRecord] = []
         self._task: asyncio.Task | None = None
         # Per-ticket state, both keyed by MT5 position ticket (unique and
         # never reused for a new trade) rather than by the ever-changing
@@ -102,6 +111,17 @@ class PositionMonitorService:
 
     def status(self) -> MonitorStatus:
         return self._status
+
+    def _record(self, kind: str, detail: str = "", position_ticket: int | None = None) -> None:
+        self._audit.append(MonitorAuditRecord(kind=kind, detail=detail[:500], position_ticket=position_ticket))
+        if len(self._audit) > self.MAX_AUDIT_RECORDS:
+            self._audit = self._audit[-self.MAX_AUDIT_RECORDS:]
+
+    def audit_records(self, limit: int = 50) -> list[MonitorAuditRecord]:
+        """Most recent first -- notifications actually sent, and any tick
+        that raised. Not every routine tick; see MonitorAuditRecord's own
+        docstring for why."""
+        return list(reversed(self._audit[-limit:]))
 
     # ------------------------------------------------------------------ tick
 
@@ -276,8 +296,10 @@ class PositionMonitorService:
         )
         try:
             self._telegram.send(title, message)
-        except TelegramDeliveryError:
+            self._record("notification", f"{kind}: {state}", position.ticket)
+        except TelegramDeliveryError as exc:
             log.exception("position_monitor: could not notify about ticket %s (%s)", position.ticket, kind)
+            self._record("notification", f"{kind}: {state} -- delivery FAILED: {exc}", position.ticket)
         return True
 
     # --------------------------------------------------------- trailing stop
@@ -391,8 +413,9 @@ class PositionMonitorService:
             while True:
                 try:
                     self.tick()
-                except Exception:
+                except Exception as exc:
                     log.exception("position_monitor: tick failed")
+                    self._record("tick_failure", str(exc))
                 await asyncio.sleep(interval_seconds)
         except asyncio.CancelledError:
             self._status.enabled = False

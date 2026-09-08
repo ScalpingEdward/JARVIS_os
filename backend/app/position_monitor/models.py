@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from pydantic import BaseModel, Field
 
@@ -51,3 +51,19 @@ class MonitorStatus(BaseModel):
     last_tick_assessed: int = 0
     last_tick_skipped: int = 0
     ticks_run: int = 0
+
+
+class MonitorAuditRecord(BaseModel):
+    """A notable event, not every routine tick -- ticks run every 10s by
+    default, so logging all of them would grow far faster than
+    telegram_approvals' own audit trail for comparatively little value.
+    Two kinds worth keeping: a notification actually sent (the outcome an
+    operator would want to trace back later), and a tick that raised (the
+    one thing this module currently only ever logs to stderr and nowhere
+    else -- see PositionMonitorService.run_forever's own except clause)."""
+
+    id: UUID = Field(default_factory=uuid4)
+    kind: str  # "notification" | "tick_failure"
+    detail: str = ""
+    position_ticket: int | None = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
