@@ -210,7 +210,7 @@ async def lifespan(app: FastAPI):
     # capability should never silently activate itself in an environment
     # that never asked for it.
     if os.getenv("POSITION_MONITOR_ENABLED", "false").lower() in ("1", "true", "yes"):
-        interval = float(os.getenv("POSITION_MONITOR_INTERVAL_SECONDS", "30"))
+        interval = float(os.getenv("POSITION_MONITOR_INTERVAL_SECONDS", "10"))
         position_monitor_service.start(interval)
     yield
     await position_monitor_service.stop()

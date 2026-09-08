@@ -41,7 +41,16 @@ from .models import MonitorStatus, MonitorTickResult, PositionAssessed, Position
 
 log = logging.getLogger(__name__)
 
-DEFAULT_INTERVAL_SECONDS = 30.0
+#: mt5_pusher.py defaults to pushing fresh data every 5 seconds (see
+#: bridge/mt5_pusher.py's own --interval default) -- that is the real floor
+#: on how fresh anything here can ever be, regardless of how often this
+#: loop checks. 10s checks twice per pusher cycle, so a proposal is never
+#: more than about one pusher-cycle behind real market movement. Checking
+#: much faster than the source pushes would not surface fresher data --
+#: it would only create more assessment records for the same snapshot
+#: (these executive_mt5_* modules keep every record with no eviction; see
+#: the "Offen" note in this session's documentation).
+DEFAULT_INTERVAL_SECONDS = 10.0
 ACTOR_ID = "position-monitor"
 
 
