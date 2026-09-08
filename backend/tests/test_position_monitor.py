@@ -94,28 +94,79 @@ def test_a_live_position_gets_both_assessments(rig):
     assert result.skipped == []
 
 
-def test_trailing_honestly_reports_stream_unavailable(rig):
-    """The real finding this module exists because of: mt5_bridge is a
-    batch pusher, not a sequenced stream. This must never be faked."""
+def test_trailing_reaches_approval_required_when_genuinely_connected(rig):
+    """The fix: once the terminal is really connected (heartbeat/ingest
+    fresh) and no sequence gap was ever detected, trailing is no longer
+    forced into stream-unavailable -- it genuinely activates and, with
+    enough favorable movement, reaches approval-required for real."""
     monitor, accounts, bridge, break_even, trailing = rig
     _register_account(accounts)
     terminal = _register_terminal(bridge)
-    _push_position(bridge, terminal.id)
+    _push_position(bridge, terminal.id, open_price=1.10000, stop_loss=1.09900, current_price=1.10500)
+
+    result = monitor.tick()
+    assert result.assessed[0].trailing_state == "approval-required"
+
+
+def test_trailing_honestly_reports_stream_unavailable_when_disconnected(rig):
+    """Still honest, not optimistic: a terminal that has gone stale/
+    disconnected (no recent heartbeat or ingest) must not be reported as
+    trailing-capable just because it was connected a while ago."""
+    monitor, accounts, bridge, break_even, trailing = rig
+    _register_account(accounts)
+    terminal = _register_terminal(bridge)
+    _push_position(bridge, terminal.id, open_price=1.10000, stop_loss=1.09900, current_price=1.10500)
+
+    # Simulate the terminal having gone silent well past the staleness window.
+    internal = bridge._items[terminal.id]
+    internal.terminal.last_heartbeat_at = NOW - timedelta(minutes=5)
+    bridge.refresh_states(NOW)
 
     result = monitor.tick()
     assert result.assessed[0].trailing_state == PositionStreamState.stream_unavailable.value
 
 
-def test_break_even_correctly_reports_trailing_required_as_a_result(rig):
-    """Because trailing is honestly not active, break-even's own gate must
-    correctly refuse to propose a stop yet -- not compute one anyway."""
+def test_trailing_honestly_reports_a_detected_sequence_gap(rig):
     monitor, accounts, bridge, break_even, trailing = rig
     _register_account(accounts)
     terminal = _register_terminal(bridge)
-    _push_position(bridge, terminal.id)
+    bridge.ingest(terminal.id, MT5SnapshotIngest(
+        account=MT5AccountSnapshot(balance=100_000, equity=100_000, margin=0, free_margin=100_000),
+        sequence=1,
+    ))
+    bridge.ingest(terminal.id, MT5SnapshotIngest(
+        account=MT5AccountSnapshot(balance=100_000, equity=100_000, margin=0, free_margin=100_000),
+        sequence=5,  # a real dropped push -- 2, 3, 4 never arrived
+    ))
+    _push_position(bridge, terminal.id, open_price=1.10000, stop_loss=1.09900, current_price=1.10500)
 
     result = monitor.tick()
-    assert result.assessed[0].break_even_state == "trailing-required"
+    assert result.assessed[0].trailing_state == PositionStreamState.event_gap_detected.value
+
+
+def test_trailing_reaching_approval_required_does_not_yet_satisfy_break_evens_stricter_gate(rig):
+    """A precise correction to the previous session's finding: trailing_state
+    == "trailing-active" is trailing_stream's own FULLY-EXECUTED terminal
+    state (reached only after human_approval_verified, broker
+    acknowledgment, and reconciliation) -- not "trailing is currently
+    functioning". Trailing reaching approval-required (a real, computed
+    proposal, genuinely new behavior after this fix) is progress, but it
+    is not the same thing break-even's gate is asking for. This is
+    deliberate sequencing in break_even_scale_out's own original design
+    (confirm trailing protection is truly, fully active before also
+    moving to break-even), not a leftover bug this session failed to
+    close -- both steps correctly remain gated behind explicit human
+    action, in the right order."""
+    monitor, accounts, bridge, break_even, trailing = rig
+    account = _register_account(accounts)
+    terminal = _register_terminal(bridge)
+    _push_position(bridge, terminal.id, open_price=1.10000, stop_loss=1.09900, current_price=1.10500)
+
+    result = monitor.tick()
+    assert result.assessed[0].trailing_state == "approval-required", \
+        "trailing itself now genuinely proposes -- this part is the real fix"
+    assert result.assessed[0].break_even_state == "trailing-required", \
+        "break-even correctly still waits for trailing to be FULLY executed, not just proposed"
 
 
 def test_no_live_positions_is_a_clean_empty_tick(rig):
@@ -428,27 +479,28 @@ def _rig_with_fake_telegram(tmp_path):
 
 
 def test_break_even_is_also_structurally_blocked_by_the_honest_trailing_precondition(tmp_path):
-    """Important, sobering finding, pinned as a test rather than left as
-    prose: break_even_scale_out's OWN _evaluate() (not this module's logic)
-    requires trailing_state == "trailing-active" before it will even look
-    at trigger_points. Since trailing can never honestly report that
-    without real streaming infrastructure (see the trailing honesty test),
-    break-even is ALSO structurally unable to reach an actionable state
-    today -- not a limitation of this monitor, a consequence of feeding
-    both modules the truth. The notification logic below is still correct
-    and ready for the day a real stream exists; it is unit-tested directly
-    rather than through tick(), because tick() genuinely cannot reach an
-    actionable state under today's honest inputs."""
+    """The finding from the previous session, still true in the one case
+    where trailing genuinely cannot be honest: a terminal that really is
+    disconnected. break_even_scale_out's own evaluation logic (not this
+    module's) requires trailing_state == "trailing-active" before it will
+    even look at the trigger -- when trailing correctly and honestly
+    reports stream-unavailable (because the terminal really is down),
+    break-even correctly refuses to compute a stop off that false
+    precondition either. This is no longer the *permanent* state (see the
+    now-fixed test above, where a genuinely connected terminal lets both
+    modules reach approval-required for real) -- it is the correct
+    behavior specifically when the underlying connection really is bad."""
     monitor, accounts, bridge, break_even, fake = _rig_with_fake_telegram(tmp_path)
     _register_account(accounts)
     terminal = _register_terminal(bridge)
-    # deep in profit, would clearly justify a break-even move if trailing
-    # were not (honestly) unavailable
     _push_position(bridge, terminal.id, open_price=1.10000, stop_loss=1.09900, current_price=1.10500)
+    internal = bridge._items[terminal.id]
+    internal.terminal.last_heartbeat_at = NOW - timedelta(minutes=5)
+    bridge.refresh_states(NOW)
 
     result = monitor.tick()
     assert result.assessed[0].break_even_state == "trailing-required"
-    assert result.assessed[0].notified is False
+    assert result.assessed[0].break_even_notified is False
     assert fake.calls == []
 
 

@@ -34,7 +34,7 @@ from app.executive_mt5_position_stream_trailing_stop.service import (
     ExecutiveMT5PositionStreamTrailingStopService,
     executive_mt5_position_stream_trailing_stop_service,
 )
-from app.mt5_bridge.models import MT5Position, MT5SymbolSpec, MT5Tick, MT5TerminalData
+from app.mt5_bridge.models import MT5ConnectionState, MT5Position, MT5SymbolSpec, MT5Tick, MT5TerminalData
 from app.mt5_bridge.service import MT5BridgeService, mt5_bridge_service
 from app.notification_hub.telegram_delivery import TelegramDeliveryClient, TelegramDeliveryError
 
@@ -42,11 +42,13 @@ from .models import MonitorStatus, MonitorTickResult, PositionAssessed, Position
 
 log = logging.getLogger(__name__)
 
-#: break_even_scale_out states worth waking a human up for: the trigger was
-#: reached and a stop was actually computed. Every other state (still
-#: waiting, blocked, or a later lifecycle stage this monitor's own
-#: human_approved=False payload can never reach) is not.
+#: Actionable end states worth waking a human up for: the trigger was
+#: reached and a real stop was computed. Every other state (still waiting,
+#: blocked, or a later lifecycle stage this monitor's own
+#: human_approved=False/human_approval_verified=False payload can never
+#: reach) is not.
 ACTIONABLE_BREAK_EVEN_STATES = frozenset({"approval-required", "risk-rejected"})
+ACTIONABLE_TRAILING_STATES = frozenset({"approval-required", "blocked"})
 
 #: mt5_pusher.py defaults to pushing fresh data every 5 seconds (see
 #: bridge/mt5_pusher.py's own --interval default) -- that is the real floor
@@ -96,7 +98,7 @@ class PositionMonitorService:
         # state (typically approval-required, sitting there until he taps
         # something) does not send a fresh Telegram message every tick.
         self._original_stop_loss: dict[int, float] = {}
-        self._last_notified_state: dict[int, str] = {}
+        self._last_notified_state: dict[tuple[int, str], str] = {}
 
     def status(self) -> MonitorStatus:
         return self._status
@@ -153,12 +155,12 @@ class PositionMonitorService:
                     # Trailing is assessed first because break_even's own
                     # gate requires trailing_state == "trailing-active" as a
                     # precondition -- feeding it the *real* trailing read
-                    # (see _assess_trailing's own honesty note: this is
-                    # "stream-unavailable" today, never a fabricated
-                    # "trailing-active") means break-even correctly and
-                    # honestly reports TRAILING_REQUIRED for now rather than
-                    # computing a proposed stop off a false precondition.
-                    tr = self._assess_trailing(account, risk_clear, position, spec, tick, now)
+                    # means break-even correctly computes off of it rather
+                    # than a false precondition.
+                    tr = self._assess_trailing(
+                        account, risk_clear, position, spec, tick, now, terminal_data,
+                        original_stop_loss=original_stop,
+                    )
                     result.trailing_stream_id = tr.id
                     result.trailing_state = tr.state.value
 
@@ -168,11 +170,19 @@ class PositionMonitorService:
                     )
                     result.break_even_assessment_id = be.id
                     result.break_even_state = be.state.value
-                    result.notified = self._notify_if_newly_actionable(position, be.state.value)
+                    result.break_even_notified = self._notify_if_newly_actionable(
+                        position, be.state.value, kind="break_even")
+                    result.trailing_notified = self._notify_if_newly_actionable(
+                        position, tr.state.value, kind="trailing")
                 else:
-                    tr = self._assess_trailing(account, risk_clear, position, spec, tick, now)
+                    tr = self._assess_trailing(
+                        account, risk_clear, position, spec, tick, now, terminal_data,
+                        original_stop_loss=None,
+                    )
                     result.trailing_stream_id = tr.id
                     result.trailing_state = tr.state.value
+                    result.trailing_notified = self._notify_if_newly_actionable(
+                        position, tr.state.value, kind="trailing")
                     skipped.append(PositionSkipped(
                         account_login=login, position_ticket=position.ticket, symbol=position.symbol,
                         reason="position has no stop-loss set -- no 1R distance to trigger break-even from",
@@ -244,18 +254,21 @@ class PositionMonitorService:
         )
         return max(0.0, favorable / risk)
 
-    def _notify_if_newly_actionable(self, position: MT5Position, state: str) -> bool:
+    def _notify_if_newly_actionable(self, position: MT5Position, state: str, kind: str = "break_even") -> bool:
         """Sends exactly one Telegram message per transition INTO an
         actionable state -- never a repeat for a state that was already
-        the last thing reported for this ticket. Trailing has no
-        actionable state yet (see _assess_trailing's honesty note), so
-        this only ever watches break-even.
+        the last thing reported for this ticket and this kind. kind
+        distinguishes break-even from trailing so the two do not share a
+        tracking slot and mask each other's transitions.
         """
-        previous = self._last_notified_state.get(position.ticket)
-        if state not in ACTIONABLE_BREAK_EVEN_STATES or state == previous:
+        actionable = ACTIONABLE_BREAK_EVEN_STATES if kind == "break_even" else ACTIONABLE_TRAILING_STATES
+        key = (position.ticket, kind)
+        previous = self._last_notified_state.get(key)
+        if state not in actionable or state == previous:
             return False
-        self._last_notified_state[position.ticket] = state
-        title = "Break-even bereit" if state == "approval-required" else "Break-even blockiert"
+        self._last_notified_state[key] = state
+        label = "Break-even" if kind == "break_even" else "Trailing-Stop"
+        title = f"{label} bereit" if state == "approval-required" else f"{label} blockiert"
         message = (
             f"Ticket {position.ticket} ({position.symbol}): {state}. "
             f"Aktueller Kurs {position.current_price}, ursprünglicher SL "
@@ -264,7 +277,7 @@ class PositionMonitorService:
         try:
             self._telegram.send(title, message)
         except TelegramDeliveryError:
-            log.exception("position_monitor: could not notify about ticket %s", position.ticket)
+            log.exception("position_monitor: could not notify about ticket %s (%s)", position.ticket, kind)
         return True
 
     # --------------------------------------------------------- trailing stop
@@ -272,30 +285,75 @@ class PositionMonitorService:
     def _assess_trailing(
         self, account: TradingAccountRecord, risk_clear: bool,
         position: MT5Position, spec: MT5SymbolSpec, tick: MT5Tick, now: datetime,
+        terminal_data: MT5TerminalData, original_stop_loss: float | None,
     ):
         side = "buy" if position.side.lower() in ("buy", "long") else "sell"
+        current_price = tick.bid if side == "sell" else tick.ask
+
+        # Honest, not optimistic, and now real rather than always False:
+        # "connected" is the same MT5ConnectionState this terminal already
+        # exposes everywhere else (driven by heartbeat/ingest freshness,
+        # refreshed on every self._bridge.list() call), and
+        # "sequence_contiguous" is the real gap-detection mt5_bridge now
+        # tracks per push (see MT5SnapshotIngest.sequence / MT5BridgeService
+        # .ingest()). A pusher that has never sent a sequence number at all
+        # reports sequence_contiguous=True with no gap ever detected --
+        # honest in the "no evidence of a gap" sense, not a claim of
+        # verified continuity; see mt5_bridge's own test suite for that
+        # exact distinction.
+        stream_connected = terminal_data.terminal.state == MT5ConnectionState.connected
+        sequence_contiguous = terminal_data.sequence_contiguous
+
+        activation_distance_points = 0
+        trailing_distance_points = 0
+        proposed_stop_loss: float | None = None
+        trailing_enabled = False
+        if original_stop_loss is not None:
+            # Same 1R convention as break-even's own trigger, and the same
+            # reasoning for reusing it here: no per-account/per-strategy
+            # trailing policy exists anywhere in this codebase (checked
+            # activation_distance_points/trailing_distance_points the same
+            # way trigger_points/break_even_offset_points were checked).
+            # Trailing activates once price has moved 1R in favor, and
+            # trails behind by that same 1R distance -- a common, named,
+            # defensible convention ("trail by your own initial risk"),
+            # not an invented number. If a real policy layer is ever built
+            # per account or strategy, this is the one place to start
+            # reading it from instead.
+            one_r_points = abs(position.open_price - original_stop_loss) / spec.point
+            activation_distance_points = int(round(one_r_points))
+            trailing_distance_points = int(round(one_r_points))
+            trailing_distance_price = trailing_distance_points * spec.point
+            proposed_stop_loss = (
+                current_price - trailing_distance_price if side == "buy"
+                else current_price + trailing_distance_price
+            )
+            trailing_enabled = True
+
         observation = PositionStreamObservation(
             lifecycle_state="lifecycle-complete",
-            # Honest, not optimistic: mt5_bridge is a periodic batch pusher,
-            # not a sequenced event stream (checked: no such concept exists
-            # in app/mt5_bridge/models.py or bridge/mt5_pusher.py). Reporting
-            # stream_connected=True here would be a lie this module would
-            # then act on. Reporting it honestly as False means this
-            # assessment correctly, safely lands in "stream unavailable"
-            # rather than "trailing active" -- the day a real streaming
-            # transport exists, this is the one line that changes.
-            stream_connected=False,
-            sequence_contiguous=False,
+            stream_connected=stream_connected,
+            sequence_contiguous=sequence_contiguous,
             snapshot_age_seconds=max(0, int((now - tick.captured_at).total_seconds())),
             position_exists=True,
             symbol=position.symbol,
             side=side,
-            current_price=tick.bid if side == "sell" else tick.ask,
+            current_price=current_price,
             entry_price=position.open_price,
             current_stop_loss=position.stop_loss,
             current_take_profit=position.take_profit,
-            trailing_enabled=False,
+            trailing_enabled=trailing_enabled,
+            activation_distance_points=activation_distance_points,
+            trailing_distance_points=trailing_distance_points,
             point_size=spec.point,
+            proposed_stop_loss=proposed_stop_loss,
+            # mt5_bridge does not report the broker's stop/freeze level
+            # (checked: no such field on MT5SymbolSpec); 0 here means
+            # "unknown", not "confirmed zero" -- the same honest limitation
+            # already documented for break-even's stop_level_points.
+            stop_level_points=0,
+            freeze_level_points=0,
+            human_approval_verified=False,  # always -- a human reviews via execute()
         )
         payload = PositionStreamCreate(
             workspace_id=str(account.id),

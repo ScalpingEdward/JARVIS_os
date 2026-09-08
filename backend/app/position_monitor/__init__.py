@@ -19,17 +19,24 @@ executive_mt5_position_stream_trailing_stop.assess() -- both of which only
 already gated behind human review exactly like everywhere else, are
 completely unchanged.
 
-An important, honest limitation, found while wiring the Telegram
-notification for an actionable break-even state (see service.py's
-_notify_if_newly_actionable): break_even_scale_out's own evaluation logic
-(not this module's) requires trailing_state == "trailing-active" as a
-precondition before it will even look at whether the 1R trigger has been
-reached. Since trailing can never honestly report itself as active without
-real streaming infrastructure, break-even is -- today -- ALSO structurally
-unable to reach an actionable state, by that module's own original design,
-not by any choice made here. This monitor still produces real, honest,
-continuously-fresh assessment records; they will correctly show
-"trailing-required" indefinitely until a real streaming transport exists.
-The notification logic itself is unit-tested directly and is ready to
-fire the day that changes.
+Trailing genuinely activates and computes a real proposed stop once the
+underlying mt5_bridge connection actually is healthy: connected (the same
+MT5ConnectionState this terminal already exposes, driven by heartbeat/
+ingest freshness) and free of a detected sequence gap (see
+MT5SnapshotIngest.sequence -- a per-cycle counter the pusher now sends,
+letting the backend tell "still getting pushes" apart from "getting them
+without a dropped cycle in between"). When the terminal really is stale
+or disconnected, or a gap really was detected, trailing still correctly
+and honestly reports why, rather than fabricating health it does not have.
+
+A precise correction to an earlier version of this note: break-even's own
+gate checks for trailing_state == "trailing-active", which is trailing's
+own FULLY-EXECUTED terminal state (reached only after human approval,
+broker acknowledgment, and reconciliation) -- not "trailing is currently
+functioning". Trailing reaching approval-required (a real, computed
+proposal) is genuine progress and is not the same thing. Break-even
+correctly continues to wait for trailing to be fully, humanly executed
+first, in both directions -- this is deliberate sequencing in
+break_even_scale_out's own original design, not a remaining gap this
+session left unclosed.
 """

@@ -256,12 +256,24 @@ def main() -> None:
         print(f"Reusing existing terminal: {state.terminal_id}")
 
     print(f"Pushing every {args.interval}s for symbols: {', '.join(symbols)}. Ctrl+C to stop.")
+    # Incremented once per loop iteration, before the push attempt -- not
+    # only on success. A push that fails and is skipped this cycle still
+    # consumes a sequence number, so the backend correctly sees a gap
+    # between the last delivered sequence and the next one that succeeds,
+    # rather than the two silently looking contiguous. Deliberately not
+    # persisted across restarts: a fresh start is a genuine discontinuity
+    # (nothing is known about what happened while the pusher was down), and
+    # the backend's own gap check already handles that correctly with no
+    # special-casing needed here.
+    sequence = 0
     try:
         while True:
             start = time.monotonic()
+            sequence += 1
             try:
                 client.heartbeat(state.terminal_id, bridge_version="1.0.0", latency_ms=0)
                 snapshot = collect_snapshot(symbols, args.deal_history_days)
+                snapshot["sequence"] = sequence
                 client.ingest(state.terminal_id, snapshot)
             except requests.RequestException as exc:
                 print(f"[warn] push failed, will retry next cycle: {exc}", file=sys.stderr)
