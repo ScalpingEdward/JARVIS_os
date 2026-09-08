@@ -467,3 +467,111 @@ def test_api_decide_rejects_pending_as_target_state() -> None:
         json={"decision": "pending", "decided_by": "brano"},
     )
     assert resp.status_code == 422
+
+
+# -- the real bug: get_pending_approvals() must exclude decided setups -----
+
+
+def test_get_pending_approvals_excludes_decided_setups(
+    service: SetupSubmissionService, registry: AccountRegistryService
+) -> None:
+    """Regression: this used to return every setup ever submitted
+    regardless of decision -- the name and docstring promised "pending",
+    the implementation delivered the full history."""
+    _register_account(registry, strategies=["scalping_3tp", "ict_silver_bullet"])
+    report = service.submit(SetupSubmissionRequest(snapshot=_both_setups_snapshot()))
+    assert len(report.submitted_setups) == 2
+
+    approved_id = report.submitted_setups[0].approval_request_id
+    service.decide(approved_id, SetupDecisionRequest(decision=SetupDecisionStatus.approved, decided_by="brano"))
+
+    pending = service.get_pending_approvals()
+    assert len(pending) == 1
+    assert pending[0].approval_request_id != approved_id
+
+
+def test_get_all_still_returns_the_full_history(
+    service: SetupSubmissionService, registry: AccountRegistryService
+) -> None:
+    _register_account(registry, strategies=["scalping_3tp", "ict_silver_bullet"])
+    report = service.submit(SetupSubmissionRequest(snapshot=_both_setups_snapshot()))
+    approved_id = report.submitted_setups[0].approval_request_id
+    service.decide(approved_id, SetupDecisionRequest(decision=SetupDecisionStatus.approved, decided_by="brano"))
+
+    assert len(service.get_all()) == 2
+
+
+def test_api_pending_endpoint_excludes_decided_setups() -> None:
+    _register_account(account_registry_service, strategies=["scalping_3tp", "ict_silver_bullet"])
+    body = {"snapshot": _both_setups_snapshot().model_dump(mode="json")}
+    submit_resp = client.post("/v1/setup-submission/submit", json=body)
+    setups = submit_resp.json()["submitted_setups"]
+    assert len(setups) == 2
+
+    client.post(
+        f"/v1/setup-submission/pending/{setups[0]['approval_request_id']}/decision",
+        json={"decision": "approved", "decided_by": "brano"},
+    )
+    resp = client.get("/v1/setup-submission/pending")
+    ids = {s["approval_request_id"] for s in resp.json()}
+    assert setups[0]["approval_request_id"] not in ids
+    assert setups[1]["approval_request_id"] in ids
+
+
+def test_api_all_endpoint_includes_decided_setups() -> None:
+    _register_account(account_registry_service, strategies=["scalping_3tp", "ict_silver_bullet"])
+    body = {"snapshot": _both_setups_snapshot().model_dump(mode="json")}
+    submit_resp = client.post("/v1/setup-submission/submit", json=body)
+    setups = submit_resp.json()["submitted_setups"]
+
+    client.post(
+        f"/v1/setup-submission/pending/{setups[0]['approval_request_id']}/decision",
+        json={"decision": "approved", "decided_by": "brano"},
+    )
+    resp = client.get("/v1/setup-submission/all")
+    ids = {s["approval_request_id"] for s in resp.json()}
+    assert {setups[0]["approval_request_id"], setups[1]["approval_request_id"]} <= ids
+
+
+# -- status(): capability health for the approval gate ----------------------
+
+
+def test_status_reports_zero_when_nothing_submitted(service: SetupSubmissionService) -> None:
+    status = service.status()
+    assert status.total_ever_submitted == 0
+    assert status.pending == 0 and status.approved == 0 and status.rejected == 0
+    assert status.oldest_pending_at is None
+
+
+def test_status_counts_by_decision(
+    service: SetupSubmissionService, registry: AccountRegistryService
+) -> None:
+    _register_account(registry, strategies=["scalping_3tp", "ict_silver_bullet"])
+    report = service.submit(SetupSubmissionRequest(snapshot=_both_setups_snapshot()))
+    approved_id, rejected_candidate = (
+        report.submitted_setups[0].approval_request_id,
+        report.submitted_setups[1].approval_request_id,
+    )
+    service.decide(approved_id, SetupDecisionRequest(decision=SetupDecisionStatus.approved, decided_by="brano"))
+
+    status = service.status()
+    assert status.total_ever_submitted == 2
+    assert status.approved == 1
+    assert status.pending == 1
+    assert status.rejected == 0
+
+
+def test_status_reports_the_oldest_pending_submission_time(
+    service: SetupSubmissionService, registry: AccountRegistryService
+) -> None:
+    _register_account(registry, strategies=["scalping_3tp"])
+    report = service.submit(SetupSubmissionRequest(snapshot=_both_setups_snapshot()))
+    status = service.status()
+    assert status.oldest_pending_at == report.submitted_setups[0].submitted_at
+
+
+def test_api_status_endpoint() -> None:
+    resp = client.get("/v1/setup-submission/status")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert "total_ever_submitted" in body and "pending" in body

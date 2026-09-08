@@ -113,3 +113,19 @@ class SetupSubmissionReport(BaseModel):
     total_submitted: int = Field(ge=0)
     submitted_setups: list[SubmittedSetup] = Field(default_factory=list)
     skipped_reason: str | None = Field(default=None, max_length=300)
+
+
+class SetupSubmissionStatus(BaseModel):
+    """Capability health for the approval gate itself -- everything
+    trade_risk_pipeline.assess() (and the whole chain past it) depends on
+    a setup having already cleared. total_ever_submitted counts every
+    SubmittedSetup this process has ever created, decided or not --
+    intentionally never pruned, since this record IS the durable "what
+    was decided and by whom" history the rest of this build treats as
+    authoritative (see decide()'s own one-shot discipline)."""
+
+    total_ever_submitted: int
+    pending: int
+    approved: int
+    rejected: int
+    oldest_pending_at: datetime | None = None

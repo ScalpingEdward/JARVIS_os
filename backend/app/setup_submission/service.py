@@ -29,6 +29,7 @@ from .models import (
     SetupDecisionStatus,
     SetupSubmissionRequest,
     SetupSubmissionReport,
+    SetupSubmissionStatus,
     SubmittedSetup,
 )
 
@@ -126,8 +127,41 @@ class SetupSubmissionService:
     # -- pending approvals ----------------------------------------------------
 
     def get_pending_approvals(self) -> list[SubmittedSetup]:
-        """Return all pending (in-memory) approval requests, newest last."""
+        """Return only the setups still awaiting a decision, oldest first.
+
+        Previously returned everything ever submitted regardless of
+        decision -- the name and docstring promised "pending", the
+        implementation delivered the full history. Harmless where the only
+        caller already re-filtered client-side (telegram_approvals.
+        notify_pending()), but GET /v1/setup-submission/pending returned
+        this directly to the API with no such compensation: an operator
+        checking "what still needs my attention" would have seen approved
+        and rejected setups mixed in with no way to tell them apart at a
+        glance. Use get_all() below for the full, undecided-and-decided
+        history this used to silently return.
+        """
+        pending = [s for s in self._approvals.values() if s.decision == SetupDecisionStatus.pending]
+        return sorted(pending, key=lambda s: s.submitted_at)
+
+    def get_all(self) -> list[SubmittedSetup]:
+        """Every setup ever submitted, decided or not -- the full history
+        get_pending_approvals() used to silently return under a misleading
+        name. Oldest first, same ordering convention."""
         return sorted(self._approvals.values(), key=lambda s: s.submitted_at)
+
+    def status(self) -> SetupSubmissionStatus:
+        """Capability health for the approval gate: how many setups are
+        sitting in each decision state right now, and how long the oldest
+        undecided one has been waiting."""
+        all_setups = self.get_all()
+        pending = [s for s in all_setups if s.decision == SetupDecisionStatus.pending]
+        return SetupSubmissionStatus(
+            total_ever_submitted=len(all_setups),
+            pending=len(pending),
+            approved=sum(1 for s in all_setups if s.decision == SetupDecisionStatus.approved),
+            rejected=sum(1 for s in all_setups if s.decision == SetupDecisionStatus.rejected),
+            oldest_pending_at=min((s.submitted_at for s in pending), default=None),
+        )
 
     def get_approval(self, approval_request_id: UUID) -> SubmittedSetup | None:
         """Return a single pending approval request, or None if unknown."""
