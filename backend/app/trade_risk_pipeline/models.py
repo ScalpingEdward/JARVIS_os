@@ -8,6 +8,7 @@ from app.modules.dynamic_risk_engine.models import DynamicRiskRecord
 from app.modules.execution_supervisor.models import SupervisionRecord
 from app.modules.position_management_brain.models import PositionRecord
 from app.executive_mt5_live_order_executor.models import LiveOrderRecord
+from app.setup_submission.models import SetupSubmissionStatus
 
 
 class RiskAssessmentRequest(BaseModel):
@@ -181,3 +182,26 @@ class AdvanceToPreflightFailure(BaseModel):
     risk_record: DynamicRiskRecord | None = None
     position: PositionRecord | None = None
     supervision: SupervisionRecord | None = None
+
+
+class TradeRiskPipelineStatus(BaseModel):
+    """Capability health across the whole chain, not just this module's
+    own layer -- setup_submission (the approval gate everything here
+    depends on) plus the three record-keeping services assess(),
+    open_position(), and start_supervision() delegate to. Each of the
+    three already had its own status() method (module/version/record
+    count/safety_boundary), just never exposed through a route of its
+    own; this is that, aggregated in the one place an operator would
+    actually want to look.
+
+    executive_mt5_live_order_executor's own status is deliberately not
+    included here -- unlike the other three, it is scoped per
+    workspace_id (there is no single "the executor" to summarize
+    globally), and already has its own route at
+    GET /v1/executive-mt5-live-order-executor/status?workspace_id=...
+    """
+
+    setup_submission: SetupSubmissionStatus
+    dynamic_risk_engine: dict
+    position_management: dict
+    execution_supervisor: dict

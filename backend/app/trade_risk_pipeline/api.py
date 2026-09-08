@@ -16,10 +16,22 @@ from .models import (
     LiveOrderPrepareRequest,
     RiskAssessmentRequest,
     SupervisionStartRequest,
+    TradeRiskPipelineStatus,
 )
 from .service import TradeRiskPipelineError, trade_risk_pipeline_service
 
 router = APIRouter(prefix="/v1/trade-risk-pipeline", tags=["trade-risk-pipeline"])
+
+
+@router.get("/status", response_model=TradeRiskPipelineStatus)
+def trade_risk_pipeline_status() -> TradeRiskPipelineStatus:
+    """Capability health across the whole chain: setup_submission (the
+    approval gate) plus the three record-keeping services this module
+    delegates to. Named to avoid shadowing `from fastapi import status`
+    should this file ever need it -- the exact collision hit and fixed
+    for telegram_approvals and setup_submission's own status endpoints.
+    """
+    return trade_risk_pipeline_service.status()
 
 
 @router.post("/assess/{approval_request_id}", response_model=DynamicRiskRecord)

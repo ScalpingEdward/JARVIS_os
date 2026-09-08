@@ -34,6 +34,7 @@ from .models import (
     LiveOrderPrepareRequest,
     RiskAssessmentRequest,
     SupervisionStartRequest,
+    TradeRiskPipelineStatus,
 )
 
 _SUPERVISABLE_POSITION_STATES = {
@@ -123,6 +124,18 @@ class TradeRiskPipelineService:
     DynamicRiskRecord (risk-approved, human-review-required, or blocked)
     that a later, still-gated step would need before any execution.
     """
+
+    def status(self) -> TradeRiskPipelineStatus:
+        """Capability health across the whole chain -- see
+        TradeRiskPipelineStatus's own docstring for why
+        executive_mt5_live_order_executor's status is not included here.
+        """
+        return TradeRiskPipelineStatus(
+            setup_submission=setup_submission_service.status(),
+            dynamic_risk_engine=dynamic_risk_service.status(),
+            position_management=position_management_service.status(),
+            execution_supervisor=execution_supervisor_service.status(),
+        )
 
     def _get_risk_record(self, workspace_id: str, risk_record_id: str) -> DynamicRiskRecord:
         try:

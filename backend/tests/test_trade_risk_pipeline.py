@@ -884,3 +884,38 @@ def test_advance_to_preflight_api_reports_partial_failure_with_200() -> None:
     assert resp.status_code == 200
     payload = resp.json()
     assert payload["failed_at"] == "assess"
+
+
+# -- status(): capability health across the whole chain ----------------------
+
+
+def test_status_aggregates_all_four_sources() -> None:
+    status = trade_risk_pipeline_service.status()
+    assert status.setup_submission.total_ever_submitted >= 0
+    assert status.dynamic_risk_engine["module"] == "dynamic-risk-engine"
+    assert status.position_management["module"] == "position-management-brain"
+    assert status.execution_supervisor["module"] == "execution-supervisor"
+
+
+def test_status_reflects_real_activity() -> None:
+    """Not a static/frozen response -- it must actually reflect state
+    that changed via the pipeline itself."""
+    before = trade_risk_pipeline_service.status()
+    approval_request_id = _submit_one_setup()
+    trade_risk_pipeline_service.assess(approval_request_id, RiskAssessmentRequest(value_per_price_unit=10.0))
+    after = trade_risk_pipeline_service.status()
+
+    assert after.setup_submission.approved == before.setup_submission.approved + 1
+    assert after.dynamic_risk_engine["records"] == before.dynamic_risk_engine["records"] + 1
+
+
+def test_status_endpoint_through_the_real_api_route() -> None:
+    from fastapi.testclient import TestClient
+    from app.main import app
+
+    client = TestClient(app)
+    resp = client.get("/v1/trade-risk-pipeline/status")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert "setup_submission" in body and "dynamic_risk_engine" in body
+    assert "pending" in body["setup_submission"]
