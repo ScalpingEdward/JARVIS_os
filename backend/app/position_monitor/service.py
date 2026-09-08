@@ -381,8 +381,12 @@ class PositionMonitorService:
 
     async def run_forever(self, interval_seconds: float = DEFAULT_INTERVAL_SECONDS) -> None:
         """Ticks on a timer until cancelled. One bad tick must not kill the
-        loop -- same task-isolation principle as the trading worker."""
-        self._status = MonitorStatus(enabled=True, interval_seconds=interval_seconds)
+        loop -- same task-isolation principle as the trading worker.
+
+        Does not set self._status itself on entry -- start() already did,
+        synchronously, before this coroutine got a chance to run at all
+        (see start()'s own note on why that matters).
+        """
         try:
             while True:
                 try:
@@ -397,6 +401,13 @@ class PositionMonitorService:
     def start(self, interval_seconds: float = DEFAULT_INTERVAL_SECONDS) -> None:
         if self._task is not None and not self._task.done():
             return
+        # Set synchronously, here, rather than as run_forever's first line:
+        # asyncio.create_task() only *schedules* the coroutine -- it does
+        # not run any of its body before this function returns. A caller
+        # that reads status() immediately after start() (exactly what the
+        # /resume endpoint does) would otherwise still see the old,
+        # stale enabled=False for at least one event-loop iteration.
+        self._status = MonitorStatus(enabled=True, interval_seconds=interval_seconds)
         self._task = asyncio.create_task(self.run_forever(interval_seconds))
 
     async def stop(self) -> None:
