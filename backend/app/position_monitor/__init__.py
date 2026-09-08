@@ -18,4 +18,18 @@ executive_mt5_position_stream_trailing_stop.assess() -- both of which only
 *propose* what should happen next. Their own separate execute() steps,
 already gated behind human review exactly like everywhere else, are
 completely unchanged.
+
+An important, honest limitation, found while wiring the Telegram
+notification for an actionable break-even state (see service.py's
+_notify_if_newly_actionable): break_even_scale_out's own evaluation logic
+(not this module's) requires trailing_state == "trailing-active" as a
+precondition before it will even look at whether the 1R trigger has been
+reached. Since trailing can never honestly report itself as active without
+real streaming infrastructure, break-even is -- today -- ALSO structurally
+unable to reach an actionable state, by that module's own original design,
+not by any choice made here. This monitor still produces real, honest,
+continuously-fresh assessment records; they will correctly show
+"trailing-required" indefinitely until a real streaming transport exists.
+The notification logic itself is unit-tested directly and is ready to
+fire the day that changes.
 """

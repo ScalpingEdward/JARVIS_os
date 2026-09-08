@@ -347,3 +347,175 @@ def test_starting_twice_does_not_spawn_a_second_task(rig):
         await monitor.stop()
 
     asyncio.run(run())
+
+
+# -- the original-stop baseline: pinned once, never recomputed from a --
+# -- possibly-already-moved current stop --------------------------------
+
+
+def test_trigger_points_stays_pinned_after_the_stop_is_moved(rig):
+    """The whole point of the fix: once a stop moves (a real break-even
+    execution, or by hand), 1R must not shrink toward zero on the next
+    tick just because the current stop is now much closer to price."""
+    monitor, accounts, bridge, break_even, trailing = rig
+    account = _register_account(accounts)
+    terminal = _register_terminal(bridge)
+    _push_position(bridge, terminal.id, open_price=1.10000, stop_loss=1.09900)  # 100pt risk
+
+    first = monitor.tick()
+    first_record = break_even.get(first.assessed[0].break_even_assessment_id, str(account.id))
+    assert first_record.trigger_points == pytest.approx(100.0)
+
+    # Simulate the broker reporting the stop already moved to break-even.
+    _push_position(bridge, terminal.id, open_price=1.10000, stop_loss=1.10005, current_price=1.10350)
+
+    second = monitor.tick()
+    second_record = break_even.get(second.assessed[0].break_even_assessment_id, str(account.id))
+    assert second_record.trigger_points == pytest.approx(100.0), \
+        "must still use the ORIGINAL 100pt risk, not the now-tiny distance to the moved stop"
+
+
+def test_two_different_tickets_get_independent_baselines(rig):
+    monitor, accounts, bridge, break_even, trailing = rig
+    account = _register_account(accounts)
+    terminal = _register_terminal(bridge)
+    bridge.ingest(terminal.id, MT5SnapshotIngest(
+        account=MT5AccountSnapshot(balance=100_000, equity=100_000, margin=0, free_margin=100_000),
+        positions=[
+            MT5Position(ticket=1, symbol="EURUSD", side="buy", volume=0.1,
+                       open_price=1.10000, current_price=1.10200, stop_loss=1.09900, opened_at=NOW),
+            MT5Position(ticket=2, symbol="EURUSD", side="buy", volume=0.1,
+                       open_price=1.10000, current_price=1.10200, stop_loss=1.09950, opened_at=NOW),
+        ],
+        ticks=[MT5Tick(symbol="EURUSD", bid=1.10195, ask=1.10205, captured_at=NOW)],
+        symbols=[MT5SymbolSpec(symbol="EURUSD", point=0.00001, digits=5, volume_min=0.01,
+                               volume_max=50.0, volume_step=0.01, trade_contract_size=100_000,
+                               trade_tick_size=0.00001, trade_tick_value=1.0)],
+    ))
+    result = monitor.tick()
+    by_ticket = {a.position_ticket: a for a in result.assessed}
+    rec1 = break_even.get(by_ticket[1].break_even_assessment_id, str(account.id))
+    rec2 = break_even.get(by_ticket[2].break_even_assessment_id, str(account.id))
+    assert rec1.trigger_points == pytest.approx(100.0)
+    assert rec2.trigger_points == pytest.approx(50.0)
+
+
+# -- notification: exactly once per transition into an actionable state ----
+
+
+class FakeTelegram:
+    def __init__(self, raises=None):
+        self.calls: list[tuple[str, str]] = []
+        self._raises = raises
+
+    def send(self, title, message):
+        self.calls.append((title, message))
+        if self._raises:
+            raise self._raises
+
+
+def _rig_with_fake_telegram(tmp_path):
+    fake = FakeTelegram()
+    accounts = AccountRegistryService(db_path=tmp_path / "accounts.db")
+    bridge = MT5BridgeService()
+    break_even = ExecutiveMT5BreakEvenScaleOutService()
+    trailing = ExecutiveMT5PositionStreamTrailingStopService()
+    monitor = PositionMonitorService(
+        break_even_service=break_even, trailing_service=trailing, bridge_service=bridge,
+        accounts_service=accounts, telegram_client=fake, clock=lambda: NOW,
+    )
+    return monitor, accounts, bridge, break_even, fake
+
+
+def test_break_even_is_also_structurally_blocked_by_the_honest_trailing_precondition(tmp_path):
+    """Important, sobering finding, pinned as a test rather than left as
+    prose: break_even_scale_out's OWN _evaluate() (not this module's logic)
+    requires trailing_state == "trailing-active" before it will even look
+    at trigger_points. Since trailing can never honestly report that
+    without real streaming infrastructure (see the trailing honesty test),
+    break-even is ALSO structurally unable to reach an actionable state
+    today -- not a limitation of this monitor, a consequence of feeding
+    both modules the truth. The notification logic below is still correct
+    and ready for the day a real stream exists; it is unit-tested directly
+    rather than through tick(), because tick() genuinely cannot reach an
+    actionable state under today's honest inputs."""
+    monitor, accounts, bridge, break_even, fake = _rig_with_fake_telegram(tmp_path)
+    _register_account(accounts)
+    terminal = _register_terminal(bridge)
+    # deep in profit, would clearly justify a break-even move if trailing
+    # were not (honestly) unavailable
+    _push_position(bridge, terminal.id, open_price=1.10000, stop_loss=1.09900, current_price=1.10500)
+
+    result = monitor.tick()
+    assert result.assessed[0].break_even_state == "trailing-required"
+    assert result.assessed[0].notified is False
+    assert fake.calls == []
+
+
+def test_notifies_once_when_break_even_becomes_actionable(tmp_path):
+    """Unit-tests the notification logic directly, since tick() cannot
+    reach an actionable break-even state under today's honest trailing
+    precondition (see the test above) -- this proves the logic itself is
+    correct and ready for when it can."""
+    monitor, accounts, bridge, break_even, fake = _rig_with_fake_telegram(tmp_path)
+    terminal = _register_terminal(bridge)
+    _push_position(bridge, terminal.id)
+    position = bridge.list()[0].positions[0]
+
+    notified = monitor._notify_if_newly_actionable(position, "approval-required")
+    assert notified is True
+    assert len(fake.calls) == 1
+    assert "approval-required" in fake.calls[0][1]
+    assert str(position.ticket) in fake.calls[0][1]
+
+
+def test_does_not_notify_again_for_the_same_ongoing_state(tmp_path):
+    monitor, accounts, bridge, break_even, fake = _rig_with_fake_telegram(tmp_path)
+    terminal = _register_terminal(bridge)
+    _push_position(bridge, terminal.id)
+    position = bridge.list()[0].positions[0]
+
+    first = monitor._notify_if_newly_actionable(position, "approval-required")
+    second = monitor._notify_if_newly_actionable(position, "approval-required")
+    assert first is True and second is False
+    assert len(fake.calls) == 1, "must not page again for a state that has not changed"
+
+
+def test_does_not_notify_for_a_non_actionable_state(tmp_path):
+    monitor, accounts, bridge, break_even, fake = _rig_with_fake_telegram(tmp_path)
+    terminal = _register_terminal(bridge)
+    _push_position(bridge, terminal.id)
+    position = bridge.list()[0].positions[0]
+
+    assert monitor._notify_if_newly_actionable(position, "trigger-not-reached") is False
+    assert monitor._notify_if_newly_actionable(position, "trailing-required") is False
+    assert fake.calls == []
+
+
+def test_notifies_again_after_a_different_actionable_state(tmp_path):
+    """risk-rejected and approval-required are both actionable but
+    distinct -- transitioning between them should still notify."""
+    monitor, accounts, bridge, break_even, fake = _rig_with_fake_telegram(tmp_path)
+    terminal = _register_terminal(bridge)
+    _push_position(bridge, terminal.id)
+    position = bridge.list()[0].positions[0]
+
+    first = monitor._notify_if_newly_actionable(position, "risk-rejected")
+    second = monitor._notify_if_newly_actionable(position, "approval-required")
+    assert first is True and second is True
+    assert len(fake.calls) == 2
+
+
+def test_a_telegram_delivery_failure_does_not_raise():
+    from app.notification_hub.telegram_delivery import TelegramDeliveryError
+    from app.mt5_bridge.models import MT5Position
+    from datetime import datetime, timezone
+
+    fake = FakeTelegram(raises=TelegramDeliveryError("no bot token configured"))
+    monitor = PositionMonitorService(telegram_client=fake, clock=lambda: NOW)
+    position = MT5Position(ticket=1, symbol="EURUSD", side="buy", volume=0.1,
+                           open_price=1.1, current_price=1.11, stop_loss=1.09,
+                           opened_at=datetime.now(timezone.utc))
+
+    notified = monitor._notify_if_newly_actionable(position, "approval-required")  # must not raise
+    assert notified is True  # the attempt counts, even though delivery failed

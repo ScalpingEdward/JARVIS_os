@@ -36,10 +36,17 @@ from app.executive_mt5_position_stream_trailing_stop.service import (
 )
 from app.mt5_bridge.models import MT5Position, MT5SymbolSpec, MT5Tick, MT5TerminalData
 from app.mt5_bridge.service import MT5BridgeService, mt5_bridge_service
+from app.notification_hub.telegram_delivery import TelegramDeliveryClient, TelegramDeliveryError
 
 from .models import MonitorStatus, MonitorTickResult, PositionAssessed, PositionSkipped
 
 log = logging.getLogger(__name__)
+
+#: break_even_scale_out states worth waking a human up for: the trigger was
+#: reached and a stop was actually computed. Every other state (still
+#: waiting, blocked, or a later lifecycle stage this monitor's own
+#: human_approved=False payload can never reach) is not.
+ACTIONABLE_BREAK_EVEN_STATES = frozenset({"approval-required", "risk-rejected"})
 
 #: mt5_pusher.py defaults to pushing fresh data every 5 seconds (see
 #: bridge/mt5_pusher.py's own --interval default) -- that is the real floor
@@ -61,15 +68,35 @@ class PositionMonitorService:
         trailing_service: ExecutiveMT5PositionStreamTrailingStopService | None = None,
         bridge_service: MT5BridgeService | None = None,
         accounts_service: AccountRegistryService | None = None,
+        telegram_client: TelegramDeliveryClient | None = None,
         clock=lambda: datetime.now(timezone.utc),
     ) -> None:
         self._break_even = break_even_service or executive_mt5_break_even_scale_out_service
         self._trailing = trailing_service or executive_mt5_position_stream_trailing_stop_service
         self._bridge = bridge_service or mt5_bridge_service
         self._accounts = accounts_service or account_registry_service
+        self._telegram = telegram_client or TelegramDeliveryClient()
         self._clock = clock
         self._status = MonitorStatus(enabled=False, interval_seconds=DEFAULT_INTERVAL_SECONDS)
         self._task: asyncio.Task | None = None
+        # Per-ticket state, both keyed by MT5 position ticket (unique and
+        # never reused for a new trade) rather than by the ever-changing
+        # assessment id a fresh record gets each tick:
+        #
+        # _original_stop_loss: the FIRST stop-loss ever observed for this
+        # ticket, pinned forever after. trigger_points must be measured
+        # against the position's real original risk, not whatever the
+        # current stop happens to be -- if a stop is ever moved (by a real
+        # break-even execution, or by hand), recomputing "1R" from the new,
+        # moved stop would shrink the reference distance toward zero and
+        # make the trigger fire again on essentially no further movement.
+        #
+        # _last_notified_state: the actionable break-even state Brano was
+        # last actually paged about for this ticket, so the *same* ongoing
+        # state (typically approval-required, sitting there until he taps
+        # something) does not send a fresh Telegram message every tick.
+        self._original_stop_loss: dict[int, float] = {}
+        self._last_notified_state: dict[int, str] = {}
 
     def status(self) -> MonitorStatus:
         return self._status
@@ -114,11 +141,15 @@ class PositionMonitorService:
                     ))
                     continue
 
+                if position.stop_loss is not None and position.ticket not in self._original_stop_loss:
+                    self._original_stop_loss[position.ticket] = position.stop_loss
+
                 result = PositionAssessed(
                     workspace_id=str(account.id), position_ticket=position.ticket, symbol=position.symbol,
                 )
 
-                if position.stop_loss is not None:
+                original_stop = self._original_stop_loss.get(position.ticket)
+                if original_stop is not None:
                     # Trailing is assessed first because break_even's own
                     # gate requires trailing_state == "trailing-active" as a
                     # precondition -- feeding it the *real* trailing read
@@ -132,10 +163,12 @@ class PositionMonitorService:
                     result.trailing_state = tr.state.value
 
                     be = self._assess_break_even(
-                        account, risk_clear, position, spec, tick, now, trailing_state=tr.state.value,
+                        account, risk_clear, position, spec, tick, now,
+                        trailing_state=tr.state.value, original_stop_loss=original_stop,
                     )
                     result.break_even_assessment_id = be.id
                     result.break_even_state = be.state.value
+                    result.notified = self._notify_if_newly_actionable(position, be.state.value)
                 else:
                     tr = self._assess_trailing(account, risk_clear, position, spec, tick, now)
                     result.trailing_stream_id = tr.id
@@ -158,16 +191,17 @@ class PositionMonitorService:
     def _assess_break_even(
         self, account: TradingAccountRecord, risk_clear: bool,
         position: MT5Position, spec: MT5SymbolSpec, tick: MT5Tick, now: datetime,
-        trailing_state: str,
+        trailing_state: str, original_stop_loss: float,
     ):
         side = "buy" if position.side.lower() in ("buy", "long") else "sell"
-        # 1R: the position's own original risk distance, in points. This is
-        # the standard "move to break-even once price has moved as far in
-        # your favor as your stop is away" convention -- not a guess, and
-        # not something this codebase defines anywhere else per-account or
-        # per-strategy yet (checked: no trigger_points/break_even_offset_points
-        # config exists anywhere). If one is ever added, read it here instead.
-        trigger_points = abs(position.open_price - position.stop_loss) / spec.point
+        # 1R: the position's ORIGINAL risk distance, pinned the first time
+        # this monitor ever saw this ticket (see __init__'s
+        # _original_stop_loss note) -- not position.stop_loss directly,
+        # which may already have been moved by a real break-even execution
+        # or by hand. Measuring 1R against an already-moved stop would
+        # shrink the reference distance toward zero and make the trigger
+        # fire again on essentially no further favorable movement.
+        trigger_points = abs(position.open_price - original_stop_loss) / spec.point
         spread_points = abs(tick.ask - tick.bid) / spec.point
 
         payload = BreakEvenAssessmentCreate(
@@ -189,7 +223,7 @@ class PositionMonitorService:
             volume_step=spec.volume_step,
             minimum_remaining_volume=spec.volume_min,
             minimum_rr=0.0,  # RR was already the entry strategy's own gate; not re-gated here
-            observed_rr=self._observed_rr(position, side),
+            observed_rr=self._observed_rr(position, side, original_stop_loss),
             stop_level_points=0.0,  # mt5_bridge does not report the broker's stop_level; not invented
             freeze_level_points=0.0,
             risk_approved=risk_clear,
@@ -200,8 +234,8 @@ class PositionMonitorService:
         return self._break_even.create(payload, actor_id=ACTOR_ID)
 
     @staticmethod
-    def _observed_rr(position: MT5Position, side: str) -> float:
-        risk = abs(position.open_price - position.stop_loss)
+    def _observed_rr(position: MT5Position, side: str, original_stop_loss: float) -> float:
+        risk = abs(position.open_price - original_stop_loss)
         if risk <= 0:
             return 0.0
         favorable = (
@@ -209,6 +243,29 @@ class PositionMonitorService:
             else (position.open_price - position.current_price)
         )
         return max(0.0, favorable / risk)
+
+    def _notify_if_newly_actionable(self, position: MT5Position, state: str) -> bool:
+        """Sends exactly one Telegram message per transition INTO an
+        actionable state -- never a repeat for a state that was already
+        the last thing reported for this ticket. Trailing has no
+        actionable state yet (see _assess_trailing's honesty note), so
+        this only ever watches break-even.
+        """
+        previous = self._last_notified_state.get(position.ticket)
+        if state not in ACTIONABLE_BREAK_EVEN_STATES or state == previous:
+            return False
+        self._last_notified_state[position.ticket] = state
+        title = "Break-even bereit" if state == "approval-required" else "Break-even blockiert"
+        message = (
+            f"Ticket {position.ticket} ({position.symbol}): {state}. "
+            f"Aktueller Kurs {position.current_price}, ursprünglicher SL "
+            f"{self._original_stop_loss.get(position.ticket)}."
+        )
+        try:
+            self._telegram.send(title, message)
+        except TelegramDeliveryError:
+            log.exception("position_monitor: could not notify about ticket %s", position.ticket)
+        return True
 
     # --------------------------------------------------------- trailing stop
 
