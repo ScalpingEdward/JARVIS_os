@@ -227,3 +227,110 @@ def test_report_execution_unknown_record_fails_closed():
         assert False, "should have raised"
     except KeyError:
         assert True
+
+
+# -- pause/resume: the single most consequential kill switch here ------------
+
+
+def test_pause_hides_a_preflight_ready_order_from_the_remote_agent():
+    """pending_execution() is exactly what bridge/mt5_execution_agent.py
+    (the real, Windows-side script that calls order_send()) polls."""
+    service = LiveOrderExecutorService()  # no native adapter -- the real deployment shape
+    ready = service.create(payload())
+    service.execute(ready.id, "ws-a", LiveOrderExecuteRequest(actor_id="approver"))
+    assert [r.id for r in service.pending_execution("ws-a")] == [ready.id]
+
+    service.pause()
+    assert service.pending_execution("ws-a") == []
+
+
+def test_resume_makes_it_visible_again_without_re_deciding_anything():
+    """The record itself is untouched by pausing -- it was already
+    correctly PREFLIGHT_READY and stays that way; only visibility to the
+    remote agent changes."""
+    service = LiveOrderExecutorService()
+    ready = service.create(payload())
+    service.execute(ready.id, "ws-a", LiveOrderExecuteRequest(actor_id="approver"))
+
+    service.pause()
+    assert service.pending_execution("ws-a") == []
+    service.resume()
+    pending = service.pending_execution("ws-a")
+    assert [r.id for r in pending] == [ready.id]
+    assert pending[0].state == LiveOrderState.PREFLIGHT_READY
+
+
+def test_pause_also_refuses_the_direct_native_execute_path():
+    """Defense in depth: pending_execution() already hides this from the
+    remote agent, but a direct execute() call (the native-adapter path)
+    must be refused too, not just hidden from a different caller."""
+    service = LiveOrderExecutorService(FakeExecutor())
+    record = service.create(payload())
+    service.pause()
+
+    updated = service.execute(record.id, "ws-a", LiveOrderExecuteRequest(actor_id="approver"))
+    assert updated.state == LiveOrderState.PREFLIGHT_READY
+    assert updated.broker_order_id is None
+    assert "paused" in updated.detail.lower()
+
+
+def test_cancelling_still_works_while_paused():
+    """A kill switch must not block the one action that reduces risk --
+    only the action that could add a real broker order."""
+    service = LiveOrderExecutorService()
+    record = service.create(payload())
+    service.pause()
+
+    updated = service.execute(record.id, "ws-a", LiveOrderExecuteRequest(actor_id="operator", action="cancel"))
+    assert updated.state == LiveOrderState.CANCELLED
+
+
+def test_status_reflects_paused_state():
+    service = LiveOrderExecutorService()
+    assert service.status("ws-a").paused is False
+    service.pause()
+    assert service.status("ws-a").paused is True
+    service.resume()
+    assert service.status("ws-a").paused is False
+
+
+def test_pause_and_resume_are_idempotent():
+    service = LiveOrderExecutorService()
+    service.pause()
+    service.pause()  # must not raise or toggle back
+    assert service.is_paused() is True
+    service.resume()
+    service.resume()
+    assert service.is_paused() is False
+
+
+def test_pause_is_global_not_per_workspace():
+    """No workspace-scoped bypass -- pausing stops the whole executor."""
+    service = LiveOrderExecutorService()
+    a = service.create(payload(workspace_id="ws-a"))
+    b = service.create(payload(workspace_id="ws-b", source_key="source-2"))
+    service.execute(a.id, "ws-a", LiveOrderExecuteRequest(actor_id="approver"))
+    service.execute(b.id, "ws-b", LiveOrderExecuteRequest(actor_id="approver"))
+
+    service.pause()
+    assert service.pending_execution("ws-a") == []
+    assert service.pending_execution("ws-b") == []
+
+
+# -- API level ----------------------------------------------------------------
+
+
+def test_pause_resume_through_the_real_api_route():
+    from fastapi.testclient import TestClient
+    from app.main import app
+    from app.executive_mt5_live_order_executor.service import live_order_executor_service
+
+    client = TestClient(app)
+    try:
+        resp = client.post("/v1/executive-mt5-live-order-executor/pause", params={"workspace_id": "ws-a"})
+        assert resp.status_code == 200 and resp.json()["paused"] is True
+
+        resp = client.post("/v1/executive-mt5-live-order-executor/resume", params={"workspace_id": "ws-a"})
+        assert resp.status_code == 200 and resp.json()["paused"] is False
+    finally:
+        live_order_executor_service.resume()  # never leave the shared singleton paused for later tests

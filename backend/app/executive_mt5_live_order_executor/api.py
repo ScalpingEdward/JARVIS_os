@@ -20,6 +20,24 @@ def module_status(workspace_id: str = Query(min_length=1, max_length=100)) -> Li
     return live_order_executor_service.status(workspace_id)
 
 
+@router.post("/pause", response_model=LiveOrderStatus)
+def pause(workspace_id: str = Query(min_length=1, max_length=100)) -> LiveOrderStatus:
+    """The single most consequential kill switch in this codebase: while
+    paused, GET /orders/pending-execution -- the exact endpoint the real
+    Windows-side execution agent polls -- returns nothing, regardless of
+    what is actually ready, and execute()'s own direct path refuses too.
+    Global, not per-workspace, even though the response is shaped by
+    workspace_id like every other status call here."""
+    live_order_executor_service.pause()
+    return live_order_executor_service.status(workspace_id)
+
+
+@router.post("/resume", response_model=LiveOrderStatus)
+def resume(workspace_id: str = Query(min_length=1, max_length=100)) -> LiveOrderStatus:
+    live_order_executor_service.resume()
+    return live_order_executor_service.status(workspace_id)
+
+
 @router.post("/orders", response_model=LiveOrderRecord, status_code=status.HTTP_201_CREATED)
 def create_order(payload: LiveOrderCreate) -> LiveOrderRecord:
     try:

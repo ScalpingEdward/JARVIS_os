@@ -106,6 +106,11 @@ class LiveOrderStatus(BaseModel):
     total_records: int
     executed_records: int
     blocked_records: int
+    #: See LiveOrderExecutorService's own note on __init__ -- while True,
+    #: pending_execution() returns nothing to the remote agent regardless
+    #: of what is actually preflight-ready, and execute()'s own direct
+    #: path refuses too.
+    paused: bool = False
 
 
 class RemoteExecutionReport(BaseModel):

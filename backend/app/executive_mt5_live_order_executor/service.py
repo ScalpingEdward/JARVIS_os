@@ -20,6 +20,26 @@ class LiveOrderExecutorService:
         self._records: dict[UUID, LiveOrderRecord] = {}
         self._source_keys: set[tuple[str, str]] = set()
         self._audit: list[LiveOrderAudit] = []
+        #: The single most consequential kill switch in this codebase.
+        #: bridge/mt5_execution_agent.py -- the real, Windows-side script
+        #: that actually calls order_send() against a live broker --
+        #: polls pending_execution() for what to submit next. Pausing here
+        #: means that call returns an empty list regardless of what is
+        #: actually ready: the agent sees nothing, submits nothing, full
+        #: stop, without touching the agent script or restarting anything.
+        #: execute() also checks this directly (see below), covering the
+        #: rarer case of AURON running somewhere with real native MT5
+        #: access instead of the remote-agent path this deployment uses.
+        self._paused: bool = False
+
+    def pause(self) -> None:
+        self._paused = True
+
+    def resume(self) -> None:
+        self._paused = False
+
+    def is_paused(self) -> bool:
+        return self._paused
 
     def _audit_event(self, record: LiveOrderRecord, actor_id: str, action: str) -> None:
         self._audit.append(LiveOrderAudit(record_id=record.id, workspace_id=record.workspace_id, actor_id=actor_id, action=action, state=record.state, detail=record.detail))
@@ -89,6 +109,14 @@ class LiveOrderExecutorService:
         record.state, record.detail = state, detail
         if state != LiveOrderState.PREFLIGHT_READY:
             return self._save(record, request.actor_id, "re-evaluated")
+        if self._paused:
+            # Defense in depth: pending_execution() already hides this
+            # record from the remote agent while paused, but a direct
+            # execute() call (the native-adapter path, unreachable in this
+            # deployment's Linux container but not in every deployment)
+            # must be refused too, not just hidden from a different caller.
+            record.detail = "Execution is paused -- not submitted."
+            return self._save(record, request.actor_id, "paused")
         executor = self._executor
         if executor is None:
             try:
@@ -151,7 +179,13 @@ class LiveOrderExecutorService:
         """Orders that already passed every deterministic + human-approval
         check and are waiting for a remote execution agent to actually
         submit them. Nothing in this list has been decided by the agent --
-        every decision already happened before a record can reach here."""
+        every decision already happened before a record can reach here.
+
+        Returns nothing at all while paused, regardless of what is
+        actually preflight-ready -- see the _paused note on __init__.
+        """
+        if self._paused:
+            return []
         return [r for r in self.list_records(workspace_id) if r.state == LiveOrderState.PREFLIGHT_READY]
 
     def report_execution(self, record_id: UUID, workspace_id: str, report: RemoteExecutionReport) -> LiveOrderRecord:
@@ -192,7 +226,13 @@ class LiveOrderExecutorService:
 
     def status(self, workspace_id: str) -> LiveOrderStatus:
         items = self.list_records(workspace_id)
-        return LiveOrderStatus(workspace_id=workspace_id, total_records=len(items), executed_records=sum(item.state in {LiveOrderState.EXECUTED, LiveOrderState.RECONCILIATION_REQUIRED, LiveOrderState.PARTIAL_FILL} for item in items), blocked_records=sum(item.state in {LiveOrderState.BLOCKED, LiveOrderState.RISK_REJECTED, LiveOrderState.BROKER_REJECTED} for item in items))
+        return LiveOrderStatus(
+            workspace_id=workspace_id,
+            total_records=len(items),
+            executed_records=sum(item.state in {LiveOrderState.EXECUTED, LiveOrderState.RECONCILIATION_REQUIRED, LiveOrderState.PARTIAL_FILL} for item in items),
+            blocked_records=sum(item.state in {LiveOrderState.BLOCKED, LiveOrderState.RISK_REJECTED, LiveOrderState.BROKER_REJECTED} for item in items),
+            paused=self._paused,
+        )
 
 
 live_order_executor_service = LiveOrderExecutorService()
