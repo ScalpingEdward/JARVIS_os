@@ -589,3 +589,112 @@ def test_status_reflects_auto_advance_setting():
         client=tg_client,
     )
     assert svc.status().auto_advance is True
+
+
+# -- audit trail: every notify and every decision, most recent first ---------
+
+
+def test_notify_success_is_recorded():
+    _register_account(account_registry_service)
+    report = setup_submission_service.submit(SetupSubmissionRequest(snapshot=_snapshot()))
+    approval_id = report.submitted_setups[0].approval_request_id
+    svc, _ = _service()
+
+    svc.notify(approval_id)
+    records = svc.audit_records()
+    assert records[0].action == "notify"
+    assert records[0].success is True
+    assert records[0].approval_request_id == approval_id
+
+
+def test_notify_failure_is_recorded():
+    _register_account(account_registry_service)
+    report = setup_submission_service.submit(SetupSubmissionRequest(snapshot=_snapshot()))
+    approval_id = report.submitted_setups[0].approval_request_id
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(400, text="Bad Request")
+
+    tg_client = TelegramDeliveryClient(
+        config=TelegramDeliveryConfig(bot_token="123:ABC", chat_id=CHAT_ID),
+        client=httpx.Client(transport=httpx.MockTransport(handler)),
+    )
+    svc = TelegramApprovalService(
+        config=TelegramApprovalConfig(callback_secret=SECRET, allowed_chat_id=CHAT_ID), client=tg_client,
+    )
+    with pytest.raises(TelegramApprovalError):
+        svc.notify(approval_id)
+    records = svc.audit_records()
+    assert records[0].action == "notify" and records[0].success is False
+
+
+def test_a_decision_is_recorded_with_the_deciding_user():
+    _register_account(account_registry_service)
+    report = setup_submission_service.submit(SetupSubmissionRequest(snapshot=_snapshot()))
+    approval_id = report.submitted_setups[0].approval_request_id
+    svc, _ = _service()
+
+    svc.handle_update(_callback_update(make_token(SECRET, approval_id, APPROVE), username="brano"))
+    records = svc.audit_records()
+    assert records[0].action == "decision"
+    assert records[0].success is True
+    assert records[0].actor == "brano"
+    assert records[0].approval_request_id == approval_id
+
+
+def test_an_unauthorized_chat_attempt_is_recorded():
+    _register_account(account_registry_service)
+    report = setup_submission_service.submit(SetupSubmissionRequest(snapshot=_snapshot()))
+    approval_id = report.submitted_setups[0].approval_request_id
+    svc, _ = _service()
+
+    try:
+        svc.handle_update(_callback_update(make_token(SECRET, approval_id, APPROVE), chat_id="999999"))
+    except TelegramApprovalError:
+        pass
+    records = svc.audit_records()
+    assert records[0].action == "unauthorized_chat" and records[0].success is False
+
+
+def test_a_forged_token_attempt_is_recorded():
+    _register_account(account_registry_service)
+    report = setup_submission_service.submit(SetupSubmissionRequest(snapshot=_snapshot()))
+    approval_id = report.submitted_setups[0].approval_request_id
+    svc, _ = _service()
+
+    forged = make_token("wrong-secret", approval_id, APPROVE)
+    try:
+        svc.handle_update(_callback_update(forged))
+    except TelegramApprovalError:
+        pass
+    records = svc.audit_records()
+    assert records[0].action == "invalid_token" and records[0].success is False
+
+
+def test_audit_records_are_most_recent_first():
+    _register_account(account_registry_service)
+    report = setup_submission_service.submit(SetupSubmissionRequest(snapshot=_snapshot()))
+    approval_id = report.submitted_setups[0].approval_request_id
+    svc, _ = _service()
+
+    svc.notify(approval_id)
+    svc.handle_update(_callback_update(make_token(SECRET, approval_id, APPROVE)))
+    records = svc.audit_records()
+    assert records[0].action == "decision"  # the later event
+    assert records[1].action == "notify"
+
+
+def test_audit_records_respect_the_limit():
+    svc, _ = _service()
+    for i in range(5):
+        svc._record("notify", True, f"n{i}")
+    assert len(svc.audit_records(limit=2)) == 2
+
+
+def test_audit_store_is_bounded():
+    svc, _ = _service()
+    for i in range(svc.MAX_AUDIT_RECORDS + 10):
+        svc._record("notify", True, f"n{i}")
+    assert len(svc._audit) == svc.MAX_AUDIT_RECORDS
+    # the oldest entries were dropped, not the newest
+    assert svc._audit[-1].detail == f"n{svc.MAX_AUDIT_RECORDS + 9}"

@@ -193,3 +193,21 @@ def test_status_endpoint_reports_configured_bot():
     assert body["allowed_chat_configured"] is True
     assert body["bot_reachable"] is True
     assert body["bot_username"] == "auron_bot"
+
+
+def test_audit_endpoint_lists_recent_activity():
+    approval_id = _submit_one()
+    client.post(f"/v1/telegram-approvals/notify/{approval_id}")
+    resp = client.get("/v1/telegram-approvals/audit")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert len(body) >= 1
+    assert body[0]["action"] == "notify"
+
+
+def test_audit_endpoint_respects_limit():
+    for _ in range(3):
+        approval_id = _submit_one()
+        client.post(f"/v1/telegram-approvals/notify/{approval_id}")
+    resp = client.get("/v1/telegram-approvals/audit", params={"limit": 1})
+    assert len(resp.json()) == 1

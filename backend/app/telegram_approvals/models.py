@@ -2,10 +2,11 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from typing import Any
-from uuid import UUID
+from uuid import UUID, uuid4
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.setup_submission.models import SetupSubmissionReport
 
@@ -79,3 +80,21 @@ class TelegramApprovalStatus(BaseModel):
     bot_reachable: bool | None = None
     bot_username: str | None = None
     error: str | None = None
+
+
+class TelegramAuditRecord(BaseModel):
+    """One thing this module did or refused, kept for later review -- same
+    shape as the AuditRecord already used across the executive_mt5_*
+    modules (workspace_id/record_id/action/actor_id/created_at), adapted
+    to this module's own domain: notify()/notify_pending() sending cards,
+    and handle_update() processing (or refusing) a tap."""
+
+    id: UUID = Field(default_factory=uuid4)
+    approval_request_id: UUID | None = None
+    action: str  # "notify" | "decision" | "unauthorized_chat" | "invalid_token"
+    success: bool
+    detail: str = ""
+    #: Telegram username or user id for an inbound event (a tap); unset
+    #: for an outbound notify(), which has no "who" to attribute to.
+    actor: str | None = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
