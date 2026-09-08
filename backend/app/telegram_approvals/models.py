@@ -65,3 +65,17 @@ class NotifyPendingResult(BaseModel):
 class SubmitAndNotifyResult(BaseModel):
     report: SetupSubmissionReport
     notified: NotifyPendingResult
+
+
+class TelegramApprovalStatus(BaseModel):
+    """Capability health, not just "are the env vars set" -- bot_reachable
+    is a real getMe() call, so a bot token that is present but wrong (a
+    typo, a revoked token) shows up here rather than only failing the
+    first time someone actually taps a button."""
+
+    callback_secret_configured: bool
+    allowed_chat_configured: bool
+    auto_advance: bool
+    bot_reachable: bool | None = None
+    bot_username: str | None = None
+    error: str | None = None

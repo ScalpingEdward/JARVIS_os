@@ -516,3 +516,76 @@ def _service_multi():
         config=TelegramApprovalConfig(callback_secret=SECRET, allowed_chat_id=CHAT_ID), client=tg_client,
     )
     return svc, handler
+
+
+# -- status(): capability health, real reachability check --------------------
+
+
+def test_status_reports_missing_configuration():
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"ok": True, "result": {"id": 1, "username": "auron_bot"}})
+
+    tg_client = TelegramDeliveryClient(
+        config=TelegramDeliveryConfig(bot_token=None, chat_id=None),
+        client=httpx.Client(transport=httpx.MockTransport(handler)),
+    )
+    svc = TelegramApprovalService(
+        config=TelegramApprovalConfig(callback_secret=None, allowed_chat_id=None), client=tg_client,
+    )
+    status = svc.status()
+    assert status.callback_secret_configured is False
+    assert status.allowed_chat_configured is False
+    assert status.bot_reachable is False
+    assert "TELEGRAM_BOT_TOKEN" in status.error
+
+
+def test_status_reports_a_reachable_bot():
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"ok": True, "result": {"id": 1, "username": "auron_bot"}})
+
+    tg_client = TelegramDeliveryClient(
+        config=TelegramDeliveryConfig(bot_token="123:ABC", chat_id=CHAT_ID),
+        client=httpx.Client(transport=httpx.MockTransport(handler)),
+    )
+    svc = TelegramApprovalService(
+        config=TelegramApprovalConfig(callback_secret=SECRET, allowed_chat_id=CHAT_ID), client=tg_client,
+    )
+    status = svc.status()
+    assert status.callback_secret_configured is True
+    assert status.allowed_chat_configured is True
+    assert status.bot_reachable is True
+    assert status.bot_username == "auron_bot"
+    assert status.error is None
+
+
+def test_status_never_sends_a_message():
+    calls = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(str(request.url))
+        return httpx.Response(200, json={"ok": True, "result": {"id": 1}})
+
+    tg_client = TelegramDeliveryClient(
+        config=TelegramDeliveryConfig(bot_token="123:ABC", chat_id=CHAT_ID),
+        client=httpx.Client(transport=httpx.MockTransport(handler)),
+    )
+    svc = TelegramApprovalService(
+        config=TelegramApprovalConfig(callback_secret=SECRET, allowed_chat_id=CHAT_ID), client=tg_client,
+    )
+    svc.status()
+    assert all("sendMessage" not in c for c in calls)
+
+
+def test_status_reflects_auto_advance_setting():
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"ok": True, "result": {"id": 1, "username": "auron_bot"}})
+
+    tg_client = TelegramDeliveryClient(
+        config=TelegramDeliveryConfig(bot_token="123:ABC", chat_id=CHAT_ID),
+        client=httpx.Client(transport=httpx.MockTransport(handler)),
+    )
+    svc = TelegramApprovalService(
+        config=TelegramApprovalConfig(callback_secret=SECRET, allowed_chat_id=CHAT_ID, auto_advance=True),
+        client=tg_client,
+    )
+    assert svc.status().auto_advance is True

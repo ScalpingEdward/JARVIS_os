@@ -36,6 +36,35 @@ class TelegramDeliveryClient:
     def send(self, title: str, message: str) -> None:
         self._post_message(f"*{title}*\n{message}" if title else message)
 
+    def get_me(self) -> dict:
+        """Confirms the bot token is actually valid and Telegram is
+        reachable, without sending anything to anyone -- Telegram's own
+        getMe endpoint exists exactly for this. Raises the same
+        TelegramDeliveryError as every other failure mode here: missing
+        token, unreachable API, or a rejected token all fail closed rather
+        than the caller having to distinguish "not configured" from
+        "configured wrong" from "Telegram is down" itself.
+        """
+        if not self.config.bot_token:
+            raise TelegramDeliveryError("TELEGRAM_BOT_TOKEN is not set")
+        client, should_close = (self._client, False) if self._client else (httpx.Client(), True)
+        try:
+            response = client.get(
+                f"https://api.telegram.org/bot{self.config.bot_token}/getMe",
+                timeout=self.config.timeout_seconds,
+            )
+            if response.status_code >= 400:
+                raise TelegramDeliveryError(f"Telegram API returned {response.status_code}: {response.text[:500]}")
+            data = response.json()
+            if not data.get("ok"):
+                raise TelegramDeliveryError(f"Telegram API reported failure: {data}")
+            return data.get("result", {})
+        except httpx.HTTPError as exc:
+            raise TelegramDeliveryError(f"Could not reach the Telegram API: {exc}") from exc
+        finally:
+            if should_close:
+                client.close()
+
     def send_with_keyboard(self, text: str, keyboard: list[list[dict]]) -> int:
         """Same delivery as send(), plus an inline keyboard, returning the
         sent message's id. Kept as a separate method rather than adding an

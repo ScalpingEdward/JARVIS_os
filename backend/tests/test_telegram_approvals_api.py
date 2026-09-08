@@ -68,6 +68,8 @@ def _configured_service(monkeypatch):
     import httpx
 
     def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("/getMe"):
+            return httpx.Response(200, json={"ok": True, "result": {"id": 1, "username": "auron_bot"}})
         return httpx.Response(200, json={"ok": True, "result": {"message_id": 1}})
 
     from app.notification_hub.telegram_delivery import TelegramDeliveryClient, TelegramDeliveryConfig
@@ -181,3 +183,13 @@ def test_submit_and_notify_endpoint_with_no_matching_setups():
     payload = resp.json()
     assert payload["report"]["total_submitted"] == 0
     assert payload["notified"]["sent"] == []
+
+
+def test_status_endpoint_reports_configured_bot():
+    resp = client.get("/v1/telegram-approvals/status")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["callback_secret_configured"] is True
+    assert body["allowed_chat_configured"] is True
+    assert body["bot_reachable"] is True
+    assert body["bot_username"] == "auron_bot"

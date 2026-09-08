@@ -32,6 +32,7 @@ from .models import (
     NotifyPendingResult,
     SubmitAndNotifyResult,
     TelegramApprovalConfig,
+    TelegramApprovalStatus,
     TelegramWebhookUpdate,
 )
 
@@ -65,6 +66,32 @@ class TelegramApprovalService:
     ) -> None:
         self.config = config or TelegramApprovalConfig()
         self._client = client or TelegramDeliveryClient()
+
+    def status(self) -> TelegramApprovalStatus:
+        """Capability health: what's configured, and whether the bot is
+        actually reachable right now -- not sent to Telegram, never a
+        side effect, safe to poll as often as wanted.
+        """
+        callback_secret_configured = bool(self.config.callback_secret)
+        allowed_chat_configured = bool(self.config.allowed_chat_id)
+        bot_reachable: bool | None = None
+        bot_username: str | None = None
+        error: str | None = None
+        try:
+            info = self._client.get_me()
+            bot_reachable = True
+            bot_username = info.get("username")
+        except TelegramDeliveryError as exc:
+            bot_reachable = False
+            error = str(exc)
+        return TelegramApprovalStatus(
+            callback_secret_configured=callback_secret_configured,
+            allowed_chat_configured=allowed_chat_configured,
+            auto_advance=self.config.auto_advance,
+            bot_reachable=bot_reachable,
+            bot_username=bot_username,
+            error=error,
+        )
 
     # ------------------------------------------------------------- outbound
 
