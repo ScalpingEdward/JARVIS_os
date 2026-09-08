@@ -33,6 +33,7 @@ from .models import (
     SubmitAndNotifyResult,
     TelegramApprovalConfig,
     TelegramApprovalStatus,
+    TelegramAuditRecord,
     TelegramWebhookUpdate,
 )
 
@@ -59,6 +60,14 @@ def _format_card(setup: SubmittedSetup) -> str:
 
 
 class TelegramApprovalService:
+    #: Bounded so a long-running process cannot grow this without limit --
+    #: same reasoning as everywhere else in this session that a record
+    #: keeps accumulating forever (see position_monitor's own "Offen" note).
+    #: The oldest records drop first; this is a recent-activity log, not a
+    #: permanent archive -- setup_submission's own records remain the
+    #: durable source of truth for what was actually decided.
+    MAX_AUDIT_RECORDS = 500
+
     def __init__(
         self,
         config: TelegramApprovalConfig | None = None,
@@ -66,6 +75,22 @@ class TelegramApprovalService:
     ) -> None:
         self.config = config or TelegramApprovalConfig()
         self._client = client or TelegramDeliveryClient()
+        self._audit: list[TelegramAuditRecord] = []
+
+    def _record(
+        self, action: str, success: bool, detail: str = "",
+        approval_request_id: UUID | None = None, actor: str | None = None,
+    ) -> None:
+        self._audit.append(TelegramAuditRecord(
+            approval_request_id=approval_request_id, action=action,
+            success=success, detail=detail[:500], actor=actor,
+        ))
+        if len(self._audit) > self.MAX_AUDIT_RECORDS:
+            self._audit = self._audit[-self.MAX_AUDIT_RECORDS:]
+
+    def audit_records(self, limit: int = 50) -> list[TelegramAuditRecord]:
+        """Most recent first -- what actually happened, for later review."""
+        return list(reversed(self._audit[-limit:]))
 
     def status(self) -> TelegramApprovalStatus:
         """Capability health: what's configured, and whether the bot is
@@ -115,9 +140,12 @@ class TelegramApprovalService:
              "callback_data": tokens.make_token(self.config.callback_secret, approval_request_id, tokens.REJECT)},
         ]]
         try:
-            return self._client.send_with_keyboard(_format_card(setup), keyboard)
+            message_id = self._client.send_with_keyboard(_format_card(setup), keyboard)
         except TelegramDeliveryError as exc:
+            self._record("notify", False, str(exc), approval_request_id)
             raise TelegramApprovalError(f"could not deliver the approval card: {exc}") from exc
+        self._record("notify", True, f"message_id={message_id}", approval_request_id)
+        return message_id
 
     def notify_pending(self) -> NotifyPendingResult:
         """Send a card for every still-undecided pending setup.
@@ -180,21 +208,25 @@ class TelegramApprovalService:
 
         cq = update.callback_query
         chat_id = str(((cq.get("message") or {}).get("chat") or {}).get("id", ""))
+        who_raw = ((cq.get("from") or {}).get("username")
+                  or str((cq.get("from") or {}).get("id", "unknown")))
         if not self.config.allowed_chat_id or chat_id != self.config.allowed_chat_id:
             log.warning("telegram_approvals: rejected callback from unauthorized chat %r", chat_id)
+            self._record("unauthorized_chat", False, f"chat={chat_id!r}", actor=who_raw)
             raise TelegramApprovalError(f"chat {chat_id!r} is not authorized to decide setups")
 
         if not self.config.callback_secret:
+            self._record("invalid_token", False, "TELEGRAM_CALLBACK_SECRET is not set", actor=who_raw)
             raise TelegramApprovalError("TELEGRAM_CALLBACK_SECRET is not set -- cannot verify the tap")
 
         raw_token = cq.get("data", "")
         try:
             approval_request_id, action = tokens.verify_token(self.config.callback_secret, raw_token)
         except tokens.TokenError as exc:
+            self._record("invalid_token", False, str(exc), actor=who_raw)
             raise TelegramApprovalError(f"invalid callback token: {exc}") from exc
 
-        who = ((cq.get("from") or {}).get("username")
-               or str((cq.get("from") or {}).get("id", "unknown")))
+        who = who_raw
         decision = SetupDecisionStatus.approved if action == tokens.APPROVE else SetupDecisionStatus.rejected
 
         try:
@@ -203,7 +235,10 @@ class TelegramApprovalService:
                 SetupDecisionRequest(decision=decision, decided_by=who),
             )
         except SetupSubmissionError as exc:
+            self._record("decision", False, str(exc), approval_request_id, actor=who)
             raise TelegramApprovalError(str(exc)) from exc
+
+        self._record("decision", True, decision.value, approval_request_id, actor=who)
 
         if decision == SetupDecisionStatus.approved and self.config.auto_advance:
             self._advance_and_report(approval_request_id)

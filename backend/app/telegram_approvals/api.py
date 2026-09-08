@@ -23,7 +23,7 @@ from fastapi import APIRouter, HTTPException, Request, status
 
 from app.setup_submission.models import SetupSubmissionRequest
 
-from .models import NotifyPendingResult, SubmitAndNotifyResult, TelegramApprovalStatus
+from .models import NotifyPendingResult, SubmitAndNotifyResult, TelegramApprovalStatus, TelegramAuditRecord
 from .service import TelegramApprovalError, telegram_approval_service
 
 router = APIRouter(prefix="/v1/telegram-approvals", tags=["telegram-approvals"])
@@ -35,6 +35,17 @@ def telegram_approval_status() -> TelegramApprovalStatus:
     actually reachable right now. Read-only, no side effects -- safe to
     poll from a dashboard or a health check."""
     return telegram_approval_service.status()
+
+
+@router.get("/audit", response_model=list[TelegramAuditRecord])
+def audit(limit: int = 50) -> list[TelegramAuditRecord]:
+    """What this module actually did or refused, most recent first --
+    every notify() attempt and every webhook decision (or refusal:
+    unauthorized chat, invalid token), kept in memory up to
+    TelegramApprovalService.MAX_AUDIT_RECORDS. setup_submission's own
+    records remain the durable source of truth for what was decided;
+    this is the "why/how did that decision get here" trail."""
+    return telegram_approval_service.audit_records(limit)
 
 
 @router.post("/notify/{approval_request_id}")

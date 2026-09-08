@@ -350,7 +350,10 @@ def test_start_and_stop_the_background_loop(rig):
 
     async def run():
         monitor.start(interval_seconds=0.01)
-        await asyncio.sleep(0.05)  # a few ticks
+        for _ in range(200):
+            if monitor.status().ticks_run >= 1:
+                break
+            await asyncio.sleep(0.01)
         await monitor.stop()
 
     asyncio.run(run())
@@ -378,7 +381,17 @@ def test_a_failing_tick_does_not_kill_the_loop(rig):
 
     async def run():
         monitor.start(interval_seconds=0.01)
-        await asyncio.sleep(0.05)
+        # Poll for the condition rather than sleeping a single fixed,
+        # short duration -- a flat 0.05s sleep flaked under real load (this
+        # test running alongside ~2700 others): 0.01s ticks plus real
+        # scheduling overhead do not reliably fit two full cycles into
+        # 50ms on a loaded system. Polling finishes as soon as the
+        # condition is actually met (fast in the common case) while still
+        # tolerating a slow system, up to a generous 2s ceiling.
+        for _ in range(200):
+            if calls["n"] >= 2:
+                break
+            await asyncio.sleep(0.01)
         await monitor.stop()
 
     asyncio.run(run())
