@@ -3,7 +3,9 @@
 Endpoints
 ---------
 POST /v1/setup-submission/submit                    -> SetupSubmissionReport
-GET  /v1/setup-submission/pending                    -> list[SubmittedSetup]
+GET  /v1/setup-submission/pending                    -> list[SubmittedSetup] (undecided only)
+GET  /v1/setup-submission/all                        -> list[SubmittedSetup] (full history)
+GET  /v1/setup-submission/status                     -> SetupSubmissionStatus
 GET  /v1/setup-submission/pending/{id}               -> SubmittedSetup (404 if unknown)
 POST /v1/setup-submission/pending/{id}/decision      -> SubmittedSetup
 
@@ -23,6 +25,7 @@ from .models import (
     SetupDecisionRequest,
     SetupSubmissionReport,
     SetupSubmissionRequest,
+    SetupSubmissionStatus,
     SubmittedSetup,
 )
 from .service import SetupSubmissionError, setup_submission_service
@@ -38,8 +41,27 @@ def submit_setups(request: SetupSubmissionRequest) -> SetupSubmissionReport:
 
 @router.get("/pending", response_model=list[SubmittedSetup])
 def list_pending() -> list[SubmittedSetup]:
-    """Return all pending approval requests."""
+    """Return only the setups still awaiting a decision.
+
+    Used to return every setup ever submitted regardless of decision --
+    fixed; see SetupSubmissionService.get_pending_approvals()'s own note.
+    """
     return setup_submission_service.get_pending_approvals()
+
+
+@router.get("/all", response_model=list[SubmittedSetup])
+def list_all() -> list[SubmittedSetup]:
+    """Every setup ever submitted, decided or not -- the full history
+    /pending used to silently return under a misleading name."""
+    return setup_submission_service.get_all()
+
+
+@router.get("/status", response_model=SetupSubmissionStatus)
+def setup_submission_status() -> SetupSubmissionStatus:
+    """Capability health for the approval gate itself: how many setups
+    are pending/approved/rejected right now, and how long the oldest
+    undecided one has been waiting."""
+    return setup_submission_service.status()
 
 
 @router.get("/pending/{approval_request_id}", response_model=SubmittedSetup)
