@@ -42,6 +42,9 @@ def execution_agent_module(monkeypatch):
     fake_mt5.initialize = lambda: True
     fake_mt5.shutdown = lambda: None
     fake_mt5.last_error = lambda: (0, "no error")
+    #: Matches _order()'s own default account_login (20481337) -- a test
+    #: that wants to exercise the mismatch path overrides this directly.
+    fake_mt5.account_info = lambda: SimpleNamespace(login=20481337)
 
     monkeypatch.setitem(sys.modules, "MetaTrader5", fake_mt5)
     monkeypatch.syspath_prepend(str(BRIDGE_DIR))
@@ -66,6 +69,7 @@ def _order(**overrides) -> dict:
         "max_deviation_points": 30,
         "magic": 0,
         "comment": "AURON",
+        "account_login": 20481337,
     }
     request.update(overrides)
     return {"id": "test-record-id", "request": request}
@@ -227,3 +231,89 @@ def test_execute_one_never_raises_even_on_unexpected_error(execution_agent_modul
     report = agent.execute_one(_order())  # must not raise
     validated = RemoteExecutionReport(**report)
     assert "terminal disconnected" in validated.broker_comment
+
+
+# -- the fix: the actually-logged-in account is verified, for real -----------
+
+
+def test_execute_one_refuses_when_the_wrong_account_is_logged_in(execution_agent_module, monkeypatch):
+    """The core finding: nothing previously checked whether the terminal
+    was actually logged into the account an order was authorized for."""
+    agent, fake_mt5 = execution_agent_module
+    monkeypatch.setattr(fake_mt5, "account_info", lambda: SimpleNamespace(login=99999999))  # wrong account
+
+    def _should_not_be_called(request):
+        raise AssertionError("order_send must never be called when the wrong account is logged in")
+
+    monkeypatch.setattr(fake_mt5, "order_send", _should_not_be_called)
+    monkeypatch.setattr(fake_mt5, "order_check", lambda request: (_ for _ in ()).throw(
+        AssertionError("order_check must never be called either -- refuse before touching the broker at all")
+    ))
+
+    report = agent.execute_one(_order())  # order expects login 20481337
+    validated = RemoteExecutionReport(**report)  # must still be a valid report shape
+    assert validated.filled_volume == 0
+    assert validated.broker_retcode is None
+    assert validated.broker_order_id is None
+    assert "wrong account" in report["broker_comment"].lower()
+
+
+def test_execute_one_proceeds_normally_when_the_account_matches(execution_agent_module):
+    """The default fixture's account_info() (login 20481337) matches
+    _order()'s own default account_login -- confirms the check does not
+    block the legitimate, correct case."""
+    agent, _ = execution_agent_module
+    report = agent.execute_one(_order())
+    validated = RemoteExecutionReport(**report)
+    assert validated.broker_order_id == 555  # order_send really was called
+
+
+def test_execute_one_skips_the_check_when_an_order_has_no_account_login_at_all(execution_agent_module, monkeypatch):
+    """Backward compatibility for a payload shape that predates this
+    field -- the real, current backend always includes it, but this must
+    not crash on an order that somehow doesn't."""
+    agent, fake_mt5 = execution_agent_module
+    monkeypatch.setattr(fake_mt5, "account_info", lambda: SimpleNamespace(login=99999999))
+    order = _order()
+    del order["request"]["account_login"]
+    report = agent.execute_one(order)  # must not raise or refuse
+    validated = RemoteExecutionReport(**report)
+    assert validated.broker_order_id == 555
+
+
+def test_execute_one_refuses_when_no_terminal_is_logged_in_at_all(execution_agent_module, monkeypatch):
+    agent, fake_mt5 = execution_agent_module
+    monkeypatch.setattr(fake_mt5, "account_info", lambda: None)
+    report = agent.execute_one(_order())
+    assert report["filled_volume"] == 0
+    assert "account_info" in report["broker_comment"] or "logged in" in report["broker_comment"].lower()
+
+
+def test_verify_logged_in_account_raises_on_mismatch(execution_agent_module, monkeypatch):
+    agent, fake_mt5 = execution_agent_module
+    monkeypatch.setattr(fake_mt5, "account_info", lambda: SimpleNamespace(login=111))
+    with pytest.raises(agent.AccountMismatchError, match="111"):
+        agent.verify_logged_in_account(222)
+
+
+def test_verify_logged_in_account_passes_silently_on_a_match(execution_agent_module):
+    agent, _ = execution_agent_module
+    agent.verify_logged_in_account(20481337)  # must not raise
+
+
+def test_main_refuses_to_start_the_polling_loop_on_an_account_mismatch(execution_agent_module, monkeypatch):
+    """The startup check -- refuses before ever entering the loop, not
+    just before the first order."""
+    agent, fake_mt5 = execution_agent_module
+    monkeypatch.setattr(fake_mt5, "account_info", lambda: SimpleNamespace(login=99999999))
+    monkeypatch.setattr(
+        sys, "argv",
+        ["mt5_execution_agent.py", "--backend-url", "http://x", "--workspace-id", "ws",
+         "--expected-mt5-login", "20481337", "--i-understand-this-places-real-orders"],
+    )
+    shutdown_calls = []
+    monkeypatch.setattr(fake_mt5, "shutdown", lambda: shutdown_calls.append(True))
+    with pytest.raises(SystemExit) as exc_info:
+        agent.main()
+    assert exc_info.value.code == 1
+    assert shutdown_calls == [True], "must still shut down the terminal connection cleanly on refusal"
