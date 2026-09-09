@@ -595,3 +595,35 @@ def test_api_status_endpoint() -> None:
     assert resp.status_code == 200
     body = resp.json()
     assert "total_ever_submitted" in body and "pending" in body
+
+
+# -- the fix: data survives a restart, not just an in-process reset() -------
+
+
+def test_data_survives_a_fresh_service_instance_simulating_a_restart(
+    registry: AccountRegistryService,
+) -> None:
+    """The actual fix for finding #3: previously, a submitted-but-undecided
+    setup lived only in a process-memory dict -- a fresh SetupSubmissionService
+    instance (a real restart on a real deployment) would see nothing.
+    Persisted via SQLAlchemy/SessionLocal now (same infrastructure
+    orchestrator.service already uses), so a genuinely new instance sees
+    exactly what the previous one wrote."""
+    setup_submission_service.reset()
+    first_instance = SetupSubmissionService(account_registry=registry)
+    _register_account(registry, strategies=["scalping_3tp"])
+    report = first_instance.submit(SetupSubmissionRequest(snapshot=_both_setups_snapshot()))
+    approval_id = report.submitted_setups[0].approval_request_id
+    first_instance.decide(
+        approval_id, SetupDecisionRequest(decision=SetupDecisionStatus.approved, decided_by="brano"),
+    )
+
+    # A brand new instance -- nothing shared except the real database file.
+    second_instance = SetupSubmissionService(account_registry=registry)
+    restored = second_instance.get_approval(approval_id)
+    assert restored is not None
+    assert restored.decision == SetupDecisionStatus.approved
+    assert restored.decided_by == "brano"
+    assert second_instance.status().approved == 1
+
+    setup_submission_service.reset()  # leave the shared db clean for later tests
