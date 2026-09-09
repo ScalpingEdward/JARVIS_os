@@ -33,6 +33,15 @@ class AccountProposal(BaseModel):
     requester_id: str
     fields: ProposedAccountFields
     missing_fields: list[str] = Field(default_factory=list)
+    #: Best-effort, real web research on the named strategy (current
+    #: practitioner guidance, not fabricated) -- None whenever research
+    #: could not run (no TAVILY_API_KEY, no strategy named, a network
+    #: failure) rather than ever being a placeholder or invented summary.
+    #: Purely informational: nothing about strategy parameters is
+    #: auto-tuned from this -- every strategy's actual thresholds stay
+    #: the same fixed, already-researched constants regardless of what
+    #: this search turns up for a specific account.
+    strategy_research_summary: str | None = None
     confirmed: bool = False
     registered_account_id: UUID | None = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))

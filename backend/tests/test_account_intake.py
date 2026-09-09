@@ -223,3 +223,89 @@ def test_status_endpoint():
     resp = client.get("/v1/account-intake/status")
     assert resp.status_code == 200
     assert "api_key_configured" in resp.json()
+
+
+# -- strategy research: best-effort, never blocks the proposal --------------
+
+
+class _FakeResearcher:
+    def __init__(self, answer: str | None = None, raises: bool = False):
+        self._answer = answer
+        self._raises = raises
+        self.queries: list[str] = []
+
+    def search(self, query: str, *, max_results: int | None = None):
+        from app.instagram_content.web_research import WebResearchError, WebResearchResponse
+
+        self.queries.append(query)
+        if self._raises:
+            raise WebResearchError("no TAVILY_API_KEY configured")
+        return WebResearchResponse(query=query, results=[], answer=self._answer)
+
+
+def test_propose_includes_real_research_when_a_known_strategy_is_named():
+    researcher = _FakeResearcher(answer="VWAP pullback entries work best with a confirmed HTF trend.")
+    svc = _service_with_fake_extraction({
+        "label": "X", "broker": "PUPrime", "login": "1", "server": "S",
+        "account_type": "demo", "strategy_id": "vwap_pullback",
+    })
+    svc._researcher = researcher
+    proposal = svc.propose("new account, vwap", "brano")
+    assert proposal.strategy_research_summary == "VWAP pullback entries work best with a confirmed HTF trend."
+    assert "VWAP" in researcher.queries[0] or "vwap" in researcher.queries[0].lower()
+
+
+def test_propose_has_no_research_summary_without_a_strategy():
+    researcher = _FakeResearcher(answer="should never be called")
+    svc = _service_with_fake_extraction({
+        "label": "X", "broker": "PUPrime", "login": "1", "server": "S", "account_type": "demo",
+    })
+    svc._researcher = researcher
+    proposal = svc.propose("new account, no strategy mentioned", "brano")
+    assert proposal.strategy_research_summary is None
+    assert researcher.queries == []
+
+
+def test_propose_has_no_research_summary_for_an_unrecognized_strategy_id():
+    researcher = _FakeResearcher(answer="should never be called")
+    svc = _service_with_fake_extraction({
+        "label": "X", "broker": "PUPrime", "login": "1", "server": "S",
+        "account_type": "demo", "strategy_id": "not-a-real-strategy",
+    })
+    svc._researcher = researcher
+    proposal = svc.propose("new account", "brano")
+    assert proposal.strategy_research_summary is None
+    assert researcher.queries == []
+
+
+def test_research_failure_does_not_break_the_proposal():
+    """A dead Tavily key or a network error must never take down account
+    registration -- research is a nice-to-have, not a dependency."""
+    researcher = _FakeResearcher(raises=True)
+    svc = _service_with_fake_extraction({
+        "label": "X", "broker": "PUPrime", "login": "1", "server": "S",
+        "account_type": "demo", "strategy_id": "vwap_pullback",
+    })
+    svc._researcher = researcher
+    proposal = svc.propose("new account, vwap", "brano")  # must not raise
+    assert proposal.strategy_research_summary is None
+    assert proposal.fields.broker == "PUPrime"  # the actual proposal still works
+
+
+def test_research_falls_back_to_the_first_result_when_tavily_has_no_synthesized_answer():
+    from app.instagram_content.web_research import WebResearchResponse, WebResearchResult
+
+    class _ResultOnlyResearcher:
+        def search(self, query, *, max_results=None):
+            return WebResearchResponse(
+                query=query, answer=None,
+                results=[WebResearchResult(title="T", url="https://x.test", content="Trade the VWAP retest.")],
+            )
+
+    svc = _service_with_fake_extraction({
+        "label": "X", "broker": "PUPrime", "login": "1", "server": "S",
+        "account_type": "demo", "strategy_id": "vwap_pullback",
+    })
+    svc._researcher = _ResultOnlyResearcher()
+    proposal = svc.propose("new account, vwap", "brano")
+    assert proposal.strategy_research_summary == "Trade the VWAP retest."

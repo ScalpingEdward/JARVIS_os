@@ -161,6 +161,8 @@ class MobileControlService:
             f"Type: {fields.account_type}",
             f"Strategy: {fields.strategy_id or '(none)'}",
         ]
+        if result.strategy_research_summary:
+            lines.append(f"\nResearch: {result.strategy_research_summary}")
         if result.missing_fields:
             lines.append(f"\nMissing: {', '.join(result.missing_fields)} -- resend with these included.")
         else:
