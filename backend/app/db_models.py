@@ -51,3 +51,25 @@ class WorkerRunRow(Base):
     result: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class SubmittedSetupRow(Base):
+    """Backs setup_submission.SetupSubmissionService -- the actual
+    approval gate everything downstream depends on. Found unpersisted by
+    an external test pass (finding #3): every pending/approved/rejected
+    setup lived only in a process-memory dict, silently gone on any
+    restart.
+
+    Columns are indexed for exactly the queries SetupSubmissionService
+    itself makes (status(), get_pending_approvals(), get_all()); `data`
+    holds the complete, real SubmittedSetup Pydantic model as JSON, so a
+    read never has to reassemble it from scattered columns -- the indexed
+    columns exist for filtering/ordering, not as the source of truth.
+    """
+
+    __tablename__ = "submitted_setups"
+    approval_request_id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    account_id: Mapped[str] = mapped_column(String(36), index=True)
+    decision: Mapped[str] = mapped_column(String(20), index=True)
+    submitted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    data: Mapped[str] = mapped_column(Text)

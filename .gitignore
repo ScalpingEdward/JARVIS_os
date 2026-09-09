@@ -219,3 +219,11 @@ __marimo__/
 
 # Trading accounts registry runtime DB
 backend/data/accounts.db
+# Main app runtime DB (orchestrator, setup_submission, and other
+# SQLAlchemy-backed services) -- was tracked by mistake; runtime data,
+# not source, same reasoning as accounts.db above. Found while fixing
+# the "state disappears on restart" issue (external test pass finding
+# #3): this file being tracked meant a fresh clone/deployment silently
+# got whatever stale snapshot was last committed instead of real,
+# current data, and every commit touching it added pure binary noise.
+backend/jarvis.db

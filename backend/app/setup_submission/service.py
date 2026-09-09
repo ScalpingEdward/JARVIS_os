@@ -18,6 +18,8 @@ from uuid import UUID, uuid4
 
 from app.accounts.models import AccountStatus
 from app.accounts.service import AccountRegistryService, account_registry_service
+from app.db import SessionLocal
+from app.db_models import SubmittedSetupRow
 from app.strategies.service import (
     StrategyService,
     StrategyServiceError,
@@ -43,7 +45,14 @@ class SetupSubmissionService:
 
     Dependencies (the account registry and strategy service) are injectable so
     tests can supply isolated instances; production uses the shared singletons.
-    Pending approval requests are held in memory, keyed by approval_request_id.
+
+    Persisted via the same SQLAlchemy/SessionLocal infrastructure
+    orchestrator.service already uses (see app/db.py, app/db_models.py) --
+    previously an in-memory dict, silently emptied on every restart; found
+    by an external test pass (finding #3). A fresh session is opened per
+    call, matching orchestrator's own pattern, since this service is a
+    module-level singleton used far outside any single FastAPI request
+    (telegram_approvals, trade_risk_pipeline, tests all call it directly).
     """
 
     def __init__(
@@ -53,7 +62,20 @@ class SetupSubmissionService:
     ) -> None:
         self._accounts = account_registry or account_registry_service
         self._strategies = strategies or strategy_service
-        self._approvals: dict[UUID, SubmittedSetup] = {}
+
+    @staticmethod
+    def _to_row(setup: SubmittedSetup) -> SubmittedSetupRow:
+        return SubmittedSetupRow(
+            approval_request_id=str(setup.approval_request_id),
+            account_id=str(setup.account_id),
+            decision=setup.decision.value,
+            submitted_at=setup.submitted_at,
+            data=setup.model_dump_json(),
+        )
+
+    @staticmethod
+    def _from_row(row: SubmittedSetupRow) -> SubmittedSetup:
+        return SubmittedSetup.model_validate_json(row.data)
 
     # -- submission -----------------------------------------------------------
 
@@ -106,8 +128,13 @@ class SetupSubmissionService:
                     reasoning=setup.reasoning,
                     approval_request_id=uuid4(),
                 )
-                self._approvals[submitted_setup.approval_request_id] = submitted_setup
                 submitted.append(submitted_setup)
+
+        if submitted:
+            with SessionLocal() as session:
+                for submitted_setup in submitted:
+                    session.merge(self._to_row(submitted_setup))
+                session.commit()
 
         skipped_reason: str | None = None
         if total_accounts_evaluated == 0:
@@ -140,14 +167,22 @@ class SetupSubmissionService:
         glance. Use get_all() below for the full, undecided-and-decided
         history this used to silently return.
         """
-        pending = [s for s in self._approvals.values() if s.decision == SetupDecisionStatus.pending]
-        return sorted(pending, key=lambda s: s.submitted_at)
+        with SessionLocal() as session:
+            rows = (
+                session.query(SubmittedSetupRow)
+                .filter(SubmittedSetupRow.decision == SetupDecisionStatus.pending.value)
+                .order_by(SubmittedSetupRow.submitted_at)
+                .all()
+            )
+        return [self._from_row(r) for r in rows]
 
     def get_all(self) -> list[SubmittedSetup]:
         """Every setup ever submitted, decided or not -- the full history
         get_pending_approvals() used to silently return under a misleading
         name. Oldest first, same ordering convention."""
-        return sorted(self._approvals.values(), key=lambda s: s.submitted_at)
+        with SessionLocal() as session:
+            rows = session.query(SubmittedSetupRow).order_by(SubmittedSetupRow.submitted_at).all()
+        return [self._from_row(r) for r in rows]
 
     def status(self) -> SetupSubmissionStatus:
         """Capability health for the approval gate: how many setups are
@@ -165,7 +200,9 @@ class SetupSubmissionService:
 
     def get_approval(self, approval_request_id: UUID) -> SubmittedSetup | None:
         """Return a single pending approval request, or None if unknown."""
-        return self._approvals.get(approval_request_id)
+        with SessionLocal() as session:
+            row = session.get(SubmittedSetupRow, str(approval_request_id))
+        return self._from_row(row) if row else None
 
     def decide(self, approval_request_id: UUID, request: SetupDecisionRequest) -> SubmittedSetup:
         """Record a human's approve/reject decision. One-shot, fail-closed.
@@ -178,26 +215,32 @@ class SetupSubmissionService:
         one-shot discipline the rest of this codebase already uses (moderation
         decisions, research proposals, platform-strategy apply).
         """
-        setup = self._approvals.get(approval_request_id)
-        if setup is None:
-            raise SetupSubmissionError(f"unknown approval_request_id {approval_request_id}")
-        if setup.decision != SetupDecisionStatus.pending:
-            raise SetupSubmissionError(
-                f"approval_request_id {approval_request_id} was already "
-                f"{setup.decision.value} by {setup.decided_by} -- decisions are one-shot"
-            )
-        decided = setup.model_copy(update={
-            "decision": request.decision,
-            "decided_by": request.decided_by,
-            "decided_at": datetime.now(timezone.utc),
-            "decision_note": request.note,
-        })
-        self._approvals[approval_request_id] = decided
+        with SessionLocal() as session:
+            row = session.get(SubmittedSetupRow, str(approval_request_id))
+            if row is None:
+                raise SetupSubmissionError(f"unknown approval_request_id {approval_request_id}")
+            setup = self._from_row(row)
+            if setup.decision != SetupDecisionStatus.pending:
+                raise SetupSubmissionError(
+                    f"approval_request_id {approval_request_id} was already "
+                    f"{setup.decision.value} by {setup.decided_by} -- decisions are one-shot"
+                )
+            decided = setup.model_copy(update={
+                "decision": request.decision,
+                "decided_by": request.decided_by,
+                "decided_at": datetime.now(timezone.utc),
+                "decision_note": request.note,
+            })
+            row.decision = decided.decision.value
+            row.data = decided.model_dump_json()
+            session.commit()
         return decided
 
     def reset(self) -> None:
         """Clear all pending approval requests. Intended for tests/local resets."""
-        self._approvals.clear()
+        with SessionLocal() as session:
+            session.query(SubmittedSetupRow).delete()
+            session.commit()
 
 
 setup_submission_service = SetupSubmissionService()
