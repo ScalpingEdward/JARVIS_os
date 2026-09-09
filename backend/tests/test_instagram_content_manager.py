@@ -359,3 +359,99 @@ def test_posting_schedule_endpoint():
 
     invalid = api_client.get("/v1/instagram/posting-schedule/9")
     assert invalid.status_code == 422
+
+
+# -- the fix: publish() atomically claims, closing the real race -------------
+
+
+def test_two_concurrent_publish_calls_only_one_reaches_the_real_publisher():
+    """The actual finding this session fixed: publish() only set status
+    AFTER the real n8n call returned, so two genuinely concurrent calls
+    for the same candidate could both pass the approved check and both
+    reach the real publisher. Uses a slow fake publisher and real threads
+    to make the race window actually observable, not just plausible."""
+    import threading
+    import time
+
+    call_count = {"n": 0}
+    call_lock = threading.Lock()
+
+    def slow_handler(request: httpx.Request) -> httpx.Response:
+        with call_lock:
+            call_count["n"] += 1
+        time.sleep(0.05)  # widen the window a real network call would have
+        return httpx.Response(200, json={"media_id": "17895695668004550"})
+
+    service = _service_with_mock_publisher(slow_handler)
+    created = service.propose(ContentCandidateCreate(**_candidate_payload()))
+    service.decide(created.id, ContentDecision(approved=True, reason="Looks great"))
+
+    results = []
+    results_lock = threading.Lock()
+    barrier = threading.Barrier(10)
+
+    def worker():
+        barrier.wait()
+        try:
+            service.publish(created.id)
+            with results_lock:
+                results.append("ok")
+        except InstagramContentError as exc:
+            with results_lock:
+                results.append(str(exc))
+
+    threads = [threading.Thread(target=worker) for _ in range(10)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+
+    assert call_count["n"] == 1, f"the real publisher must be called exactly once, was called {call_count['n']} times"
+    assert results.count("ok") == 1
+    assert sum("already being published" in r for r in results) == 9
+
+
+def test_publish_sets_the_intermediate_publishing_state_before_the_network_call():
+    """Directly observable proof of the claim, not just its consequence:
+    a slow publisher leaves enough time to see status == publishing
+    before it resolves to posted."""
+    import threading
+    import time
+
+    release = threading.Event()
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        release.wait(timeout=2)
+        return httpx.Response(200, json={"media_id": "17895695668004550"})
+
+    service = _service_with_mock_publisher(handler)
+    created = service.propose(ContentCandidateCreate(**_candidate_payload()))
+    service.decide(created.id, ContentDecision(approved=True, reason="Looks great"))
+
+    t = threading.Thread(target=service.publish, args=(created.id,))
+    t.start()
+    time.sleep(0.05)  # give publish() time to claim before the handler is released
+    assert service.get(created.id).status == ContentStatus.publishing
+    release.set()
+    t.join()
+    assert service.get(created.id).status == ContentStatus.posted
+
+
+def test_a_failed_publish_still_correctly_reaches_post_failed_from_publishing():
+    def failing_handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(500, text="n8n is down")
+
+    service = _service_with_mock_publisher(failing_handler)
+    created = service.propose(ContentCandidateCreate(**_candidate_payload()))
+    service.decide(created.id, ContentDecision(approved=True, reason="Looks great"))
+
+    with pytest.raises(InstagramContentError):
+        service.publish(created.id)
+    assert service.get(created.id).status == ContentStatus.post_failed
+
+
+def test_publishing_a_never_approved_candidate_still_gives_the_original_message():
+    service = InstagramContentService()
+    created = service.propose(ContentCandidateCreate(**_candidate_payload()))
+    with pytest.raises(InstagramContentError, match="must be explicitly approved first"):
+        service.publish(created.id)

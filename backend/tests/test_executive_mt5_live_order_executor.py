@@ -1,5 +1,7 @@
 from types import SimpleNamespace
 
+import pytest
+
 from app.executive_mt5_live_order_executor.models import LiveOrderCreate, LiveOrderExecuteRequest, LiveOrderState
 from app.executive_mt5_live_order_executor.service import LiveOrderExecutorService
 
@@ -176,6 +178,7 @@ def test_report_execution_applies_the_same_classification_as_the_native_path():
     service = LiveOrderExecutorService()
     record = service.create(payload())
     service.execute(record.id, "ws-a", LiveOrderExecuteRequest(actor_id="approver"))
+    service.pending_execution("ws-a")  # the real claim step -- PREFLIGHT_READY -> SUBMISSION_PENDING
 
     reported = service.report_execution(
         record.id,
@@ -196,6 +199,7 @@ def test_report_execution_classifies_a_broker_rejection():
     service = LiveOrderExecutorService()
     record = service.create(payload())
     service.execute(record.id, "ws-a", LiveOrderExecuteRequest(actor_id="approver"))
+    service.pending_execution("ws-a")  # the real claim step -- PREFLIGHT_READY -> SUBMISSION_PENDING
 
     reported = service.report_execution(
         record.id, "ws-a", RemoteExecutionReport(broker_retcode=10013, broker_comment="invalid request")
@@ -211,9 +215,24 @@ def test_report_execution_refuses_a_record_not_awaiting_execution():
 
     try:
         service.report_execution(record.id, "ws-a", RemoteExecutionReport(broker_retcode=10009))
-        assert False, "should have refused a non-preflight-ready record"
+        assert False, "should have refused a non-submission-pending record"
     except ValueError as exc:
-        assert "not awaiting execution" in str(exc)
+        assert "not awaiting a report" in str(exc)
+
+
+def test_report_execution_refuses_a_record_that_was_never_claimed_via_pending_execution():
+    """The precise fix for the race: report_execution() must not accept a
+    still-PREFLIGHT_READY record directly -- only one that pending_execution()
+    itself already claimed. Skipping the claim step entirely (calling
+    report_execution() straight after execute()) must be refused."""
+    from app.executive_mt5_live_order_executor.models import RemoteExecutionReport
+
+    service = LiveOrderExecutorService()
+    record = service.create(payload())
+    service.execute(record.id, "ws-a", LiveOrderExecuteRequest(actor_id="approver"))
+    # deliberately never calling pending_execution() here
+    with pytest.raises(ValueError, match="not awaiting a report"):
+        service.report_execution(record.id, "ws-a", RemoteExecutionReport(broker_retcode=10009))
 
 
 def test_report_execution_unknown_record_fails_closed():
@@ -246,8 +265,10 @@ def test_pause_hides_a_preflight_ready_order_from_the_remote_agent():
 
 def test_resume_makes_it_visible_again_without_re_deciding_anything():
     """The record itself is untouched by pausing -- it was already
-    correctly PREFLIGHT_READY and stays that way; only visibility to the
-    remote agent changes."""
+    correctly PREFLIGHT_READY when paused, and resuming does not re-decide
+    anything about it. It IS claimed (-> SUBMISSION_PENDING) the moment
+    pending_execution() actually hands it out, same as any other call to
+    that method -- see its own docstring for why that claim is atomic."""
     service = LiveOrderExecutorService()
     ready = service.create(payload())
     service.execute(ready.id, "ws-a", LiveOrderExecuteRequest(actor_id="approver"))
@@ -257,7 +278,7 @@ def test_resume_makes_it_visible_again_without_re_deciding_anything():
     service.resume()
     pending = service.pending_execution("ws-a")
     assert [r.id for r in pending] == [ready.id]
-    assert pending[0].state == LiveOrderState.PREFLIGHT_READY
+    assert pending[0].state == LiveOrderState.SUBMISSION_PENDING
 
 
 def test_pause_also_refuses_the_direct_native_execute_path():
@@ -334,3 +355,69 @@ def test_pause_resume_through_the_real_api_route():
         assert resp.status_code == 200 and resp.json()["paused"] is False
     finally:
         live_order_executor_service.resume()  # never leave the shared singleton paused for later tests
+
+
+# -- the fix: pending_execution() atomically claims, closing the real race --
+
+
+def test_pending_execution_never_hands_out_the_same_record_twice_under_real_concurrency():
+    """The actual finding this session fixed: pending_execution() used to
+    be a pure read, so a record stayed PREFLIGHT_READY from the moment it
+    was first handed out until report_execution() eventually completed --
+    a second, genuinely concurrent call in that window (real threads, not
+    just sequential calls) could get the same record. Runs many real
+    threads hammering the same service to make the race actually
+    observable if it exists, not just plausible in theory."""
+    import threading
+
+    service = LiveOrderExecutorService()
+    record = service.create(payload())
+    service.execute(record.id, "ws-a", LiveOrderExecuteRequest(actor_id="approver"))
+
+    seen: list[list] = []
+    lock = threading.Lock()
+    barrier = threading.Barrier(20)
+
+    def worker():
+        barrier.wait()  # maximize the chance every thread hits the call at the same instant
+        result = service.pending_execution("ws-a")
+        with lock:
+            seen.append(result)
+
+    threads = [threading.Thread(target=worker) for _ in range(20)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+
+    non_empty = [r for r in seen if r]
+    assert len(non_empty) == 1, f"expected exactly one thread to receive the record, got {len(non_empty)}"
+    assert non_empty[0][0].id == record.id
+
+
+def test_pending_execution_claims_the_record_before_returning_it():
+    service = LiveOrderExecutorService()
+    record = service.create(payload())
+    service.execute(record.id, "ws-a", LiveOrderExecuteRequest(actor_id="approver"))
+
+    pending = service.pending_execution("ws-a")
+    assert pending[0].state == LiveOrderState.SUBMISSION_PENDING
+    # and a second call, sequential this time, correctly sees nothing --
+    # the record is no longer PREFLIGHT_READY
+    assert service.pending_execution("ws-a") == []
+
+
+def test_a_record_stuck_in_submission_pending_is_never_automatically_re_offered():
+    """If the agent crashes after claiming but before report_execution()
+    ever arrives, the record must stay stuck -- deliberately -- rather
+    than being re-offered, which is exactly how a duplicate real order
+    would happen. A human has to reconcile it by hand."""
+    service = LiveOrderExecutorService()
+    record = service.create(payload())
+    service.execute(record.id, "ws-a", LiveOrderExecuteRequest(actor_id="approver"))
+    service.pending_execution("ws-a")  # claimed, "agent" now "crashes" -- no report ever comes
+
+    for _ in range(5):
+        assert service.pending_execution("ws-a") == []
+    stuck = service.get(record.id, "ws-a")
+    assert stuck.state == LiveOrderState.SUBMISSION_PENDING
