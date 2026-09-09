@@ -14,7 +14,16 @@ ANTHROPIC_API_VERSION = "2023-06-01"
 DEFAULT_BRAND_VOICE = (
     "Confident, understated, slightly mystical. Short sentences. No hype language, "
     "no emoji spam, no exclamation-point energy. The account's own philosophy is "
-    "'build in silence, let results speak.' Captions should feel earned, not performed."
+    "'build in silence, let results speak.' Captions should feel earned, not performed. "
+    "Niche: high-performance biohacking, disciplined training, and location-independent "
+    "trading, framed through an old-discipline lens (ritual, precision, patience) rather "
+    "than generic hustle-culture language. Never use words like 'grind', 'hustle', "
+    "'motivation Monday', or stacked exclamation points -- the account earns its energy "
+    "through restraint, not volume. The 'mystical' quality is atmosphere, not content: an "
+    "occasional mood or moment can carry it (a quiet frame, a loaded word choice), but "
+    "never a caption that explains, names, or leans on any specific practice. What that "
+    "atmosphere is actually drawn from stays private -- the account gestures at depth, it "
+    "never states it."
 )
 
 

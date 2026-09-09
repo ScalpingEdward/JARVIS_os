@@ -86,6 +86,18 @@ class MarketSnapshot(BaseModel):
         "other strategy ignores it. None means no opening-range data is available yet.",
     )
     opening_range_low: float | None = Field(default=None, gt=0)
+    vwap: float | None = Field(
+        default=None, gt=0,
+        description="Session Volume Weighted Average Price. Optional -- only vwap_pullback "
+        "strategy uses this; every other strategy ignores it. None means no VWAP has been "
+        "computed yet for this session.",
+    )
+    vwap_std_dev: float | None = Field(
+        default=None, gt=0,
+        description="One standard deviation of price around VWAP for this session, used for "
+        "the +1SD band take-profit target. Optional -- if unset, vwap_pullback falls back to "
+        "a fixed risk-reward multiple instead of a band-based target.",
+    )
     captured_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
