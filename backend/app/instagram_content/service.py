@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import threading
 from uuid import UUID
 
 from .caption_writer import AnthropicCaptionWriter, CaptionWriterError
@@ -37,6 +38,13 @@ class InstagramContentService:
         self._items: dict[UUID, ContentCandidate] = {}
         self._publisher = publisher or N8nInstagramPublisher()
         self._caption_writer = caption_writer or AnthropicCaptionWriter()
+        #: Protects the read-check-then-claim step in publish() -- see
+        #: that method's own docstring for the real, reproduced race this
+        #: closes: two concurrent publish() calls for the same candidate
+        #: could both see status == approved and both reach the real
+        #: n8n publisher, since status was only updated *after* the
+        #: network call returned.
+        self._publish_lock = threading.Lock()
 
     def reset(self) -> None:
         self._items.clear()
@@ -168,11 +176,35 @@ class InstagramContentService:
         return item
 
     def publish(self, candidate_id: UUID) -> ContentCandidate:
-        item = self.get(candidate_id)
-        if item.status != ContentStatus.approved:
-            raise InstagramContentError(
-                f"Cannot publish a candidate in status {item.status}; it must be explicitly approved first"
-            )
+        """The one real execution boundary in this whole module -- and, as
+        of this fix, a genuinely atomic one. Found by an external test
+        pass: two concurrent calls for the same candidate_id could both
+        pass the `status == approved` check and both reach the real n8n
+        publisher, since status was only set to `posted` *after* the
+        publish call returned -- there was no claim step in between. Real
+        network I/O (both here and in the caption writer / web research
+        clients elsewhere in this codebase) releases Python's GIL while
+        waiting, so two threads genuinely can interleave here, not just in
+        theory.
+
+        Fixed the same way the trading side's equivalent race was closed:
+        claim first, atomically, under a lock, before the slow network
+        call -- not after it. The lock only protects the tiny
+        check-and-claim step, not the real publish call itself, so
+        different candidates still publish fully concurrently.
+        """
+        with self._publish_lock:
+            item = self.get(candidate_id)
+            if item.status == ContentStatus.publishing:
+                raise InstagramContentError(
+                    "This candidate is already being published right now (a concurrent request got there first) "
+                    "-- wait for that one to finish rather than retrying immediately."
+                )
+            if item.status != ContentStatus.approved:
+                raise InstagramContentError(
+                    f"Cannot publish a candidate in status {item.status}; it must be explicitly approved first"
+                )
+            item.status = ContentStatus.publishing
 
         try:
             media_id = self._publisher.publish(

@@ -9,6 +9,14 @@ class ContentStatus(StrEnum):
     proposed = "proposed"
     moderation_rejected = "moderation_rejected"
     approved = "approved"
+    #: Claimed for publishing, real n8n call in flight -- see
+    #: InstagramContentService.publish()'s own docstring for why this
+    #: state exists: an external test pass reproduced two concurrent
+    #: publish requests both reaching the real publisher for the same
+    #: candidate, since the old code only set status AFTER the network
+    #: call returned, leaving a window where both requests still saw
+    #: "approved" and neither had claimed it yet.
+    publishing = "publishing"
     rejected = "rejected"
     posted = "posted"
     post_failed = "post_failed"

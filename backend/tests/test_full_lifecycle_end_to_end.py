@@ -171,20 +171,25 @@ def test_signal_to_post_execution_monitoring_the_full_lifecycle_in_one_run():
     )
     assert live_order.state == LiveOrderState.PREFLIGHT_READY
 
-    # -- 5. it is now exactly what the real Windows execution agent polls ---
-    pending = live_order_executor_service.pending_execution(str(account.id))
-    assert [o.id for o in pending] == [live_order.id]
-
-    # -- 6. the kill switch stops it, instantly, without touching anything --
-    # -- upstream -- setup_submission, risk, position, and supervision ------
-    # -- are all completely unaffected by pausing the executor --------------
+    # -- 5. the kill switch stops it before it is ever claimed, instantly, --
+    # -- without touching anything upstream -- setup_submission, risk, -----
+    # -- position, and supervision are all completely unaffected ------------
     live_order_executor_service.pause()
     assert live_order_executor_service.pending_execution(str(account.id)) == []
     assert setup_submission_service.status().approved == 1  # untouched
     assert trade_risk_pipeline_service.status().position_management["records"] >= 1  # untouched
 
+    # -- 6. resumed -- now it is exactly what the real Windows execution ----
+    # -- agent polls, and this single call ATOMICALLY claims it (see -------
+    # -- pending_execution()'s own fix for the real, reproduced race this ---
+    # -- session's external test pass found: calling this again would ------
+    # -- correctly no longer show the same order, since it is claimed) ------
     live_order_executor_service.resume()
-    assert [o.id for o in live_order_executor_service.pending_execution(str(account.id))] == [live_order.id]
+    pending = live_order_executor_service.pending_execution(str(account.id))
+    assert [o.id for o in pending] == [live_order.id]
+    assert pending[0].state == LiveOrderState.SUBMISSION_PENDING
+    assert live_order_executor_service.pending_execution(str(account.id)) == [], \
+        "a second call must not see the same order again -- it is already claimed"
 
     # -- 7. simulating the real Windows agent's report after it actually ----
     # -- called order_send() -- AURON's own order record reflects it --------

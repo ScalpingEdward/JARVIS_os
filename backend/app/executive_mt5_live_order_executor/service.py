@@ -1,3 +1,4 @@
+import threading
 from datetime import datetime, timezone
 from math import isclose
 from uuid import UUID
@@ -20,6 +21,19 @@ class LiveOrderExecutorService:
         self._records: dict[UUID, LiveOrderRecord] = {}
         self._source_keys: set[tuple[str, str]] = set()
         self._audit: list[LiveOrderAudit] = []
+        #: Protects the read-check-then-transition step in
+        #: pending_execution() -- an external test pass reproduced real,
+        #: repeated order execution: pending_execution() was a pure read,
+        #: so a record stayed PREFLIGHT_READY from the moment it was first
+        #: handed to a remote agent all the way until report_execution()
+        #: eventually completed. A second poll in that window (a slow
+        #: broker round-trip taking longer than the polling interval, a
+        #: second agent instance, or the agent crashing and restarting
+        #: with its own in-memory dedup state lost) would see the exact
+        #: same still-PREFLIGHT_READY record and hand it out again --
+        #: which is how a real, live account gets a genuine duplicate
+        #: order. See pending_execution()'s own docstring for the fix.
+        self._dispatch_lock = threading.Lock()
         #: The single most consequential kill switch in this codebase.
         #: bridge/mt5_execution_agent.py -- the real, Windows-side script
         #: that actually calls order_send() against a live broker --
@@ -177,24 +191,45 @@ class LiveOrderExecutorService:
 
     def pending_execution(self, workspace_id: str) -> list[LiveOrderRecord]:
         """Orders that already passed every deterministic + human-approval
-        check and are waiting for a remote execution agent to actually
-        submit them. Nothing in this list has been decided by the agent --
-        every decision already happened before a record can reach here.
+        check and are handed to a remote execution agent to actually
+        submit -- and, as of this call, ATOMICALLY claimed for that: each
+        record returned here is transitioned PREFLIGHT_READY ->
+        SUBMISSION_PENDING before this method returns, under a lock, so a
+        second call (a slow broker round-trip outlasting the polling
+        interval, a second agent instance, or an agent that crashed and
+        restarted mid-flight) can never see the same record again. Nothing
+        in this list has been decided by the agent -- every decision
+        already happened before a record could reach here.
 
         Returns nothing at all while paused, regardless of what is
         actually preflight-ready -- see the _paused note on __init__.
+
+        A record that never gets a report_execution() call after being
+        claimed here (the agent crashed mid-flight) stays SUBMISSION_PENDING
+        forever, on purpose -- it is deliberately NOT re-offered by a later
+        call. Nobody can tell from here alone whether the broker actually
+        received that order or not; automatically retrying is exactly the
+        duplicate-execution risk this fix closes. A human has to check the
+        real account and reconcile by hand.
         """
         if self._paused:
             return []
-        return [r for r in self.list_records(workspace_id) if r.state == LiveOrderState.PREFLIGHT_READY]
+        with self._dispatch_lock:
+            claimed = [r for r in self.list_records(workspace_id) if r.state == LiveOrderState.PREFLIGHT_READY]
+            for record in claimed:
+                record.state, record.detail = LiveOrderState.SUBMISSION_PENDING, "Claimed by a remote execution agent"
+                self._save(record, "system", "claimed-for-dispatch")
+            return claimed
 
     def report_execution(self, record_id: UUID, workspace_id: str, report: RemoteExecutionReport) -> LiveOrderRecord:
         record = self.get(record_id, workspace_id)
         if record is None:
             raise KeyError("live order record not found")
-        if record.state != LiveOrderState.PREFLIGHT_READY:
-            raise ValueError(f"record is {record.state.value}, not awaiting execution")
-        record.state, record.detail = LiveOrderState.SUBMISSION_PENDING, "Remote agent is submitting the order"
+        if record.state != LiveOrderState.SUBMISSION_PENDING:
+            raise ValueError(
+                f"record is {record.state.value}, not awaiting a report -- it must first be claimed via "
+                f"pending_execution() (which is also the only path that can put it into submission-pending)"
+            )
         record.broker_retcode = report.broker_retcode
         record.broker_order_id = report.broker_order_id
         record.broker_deal_id = report.broker_deal_id
