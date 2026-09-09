@@ -26,6 +26,7 @@ import httpx
 
 from app.accounts.models import AccountType, StrategyAssignmentCreate, TradingAccountCreate, TradingAccountRecord
 from app.accounts.service import AccountRegistryService, account_registry_service
+from app.instagram_content.web_research import TavilyWebResearcher, WebResearchError
 from app.strategies.service import STRATEGIES
 
 from .credential_guard import CREDENTIAL_REFUSAL_MESSAGE, contains_credential_language
@@ -76,10 +77,12 @@ class AccountIntakeService:
         config: AccountIntakeConfig | None = None,
         client: httpx.Client | None = None,
         accounts: AccountRegistryService | None = None,
+        researcher: TavilyWebResearcher | None = None,
     ) -> None:
         self.config = config or AccountIntakeConfig()
         self._client = client
         self._accounts = accounts or account_registry_service
+        self._researcher = researcher or TavilyWebResearcher()
         self._proposals: dict[UUID, AccountProposal] = {}
 
     def propose(self, text: str, requester_id: str) -> AccountProposal | AccountIntakeRefusal:
@@ -91,9 +94,31 @@ class AccountIntakeService:
 
         fields = self._extract(text)
         missing = [f for f in REQUIRED_FIELDS if not str(getattr(fields, f, "")).strip()]
-        proposal = AccountProposal(requester_id=requester_id, fields=fields, missing_fields=missing)
+        proposal = AccountProposal(
+            requester_id=requester_id, fields=fields, missing_fields=missing,
+            strategy_research_summary=self._research_strategy(fields.strategy_id),
+        )
         self._proposals[proposal.id] = proposal
         return proposal
+
+    def _research_strategy(self, strategy_id: str | None) -> str | None:
+        """Best-effort, real research on the named strategy -- never
+        blocks or fails the proposal itself. Returns None whenever
+        research genuinely could not run, never a fabricated summary."""
+        if not strategy_id or strategy_id not in STRATEGIES:
+            return None
+        strategy_name = STRATEGIES[strategy_id]["name"]
+        try:
+            response = self._researcher.search(
+                f"{strategy_name} trading strategy best practice settings 2026", max_results=3,
+            )
+        except WebResearchError:
+            return None
+        if response.answer:
+            return response.answer
+        if response.results:
+            return response.results[0].content[:600]
+        return None
 
     def get_proposal(self, proposal_id: UUID) -> AccountProposal | None:
         return self._proposals.get(proposal_id)
