@@ -22,10 +22,15 @@ class VoiceIntent(StrEnum):
 
 
 class VoiceSettings(BaseModel):
-    assistant_name: str = Field(default="PHOENIX", min_length=2, max_length=40)
-    wake_name: str = Field(default="phoenix", min_length=2, max_length=40)
-    owner_salutation: str = Field(default="MASTER Brano", min_length=2, max_length=80)
-    wake_reply: str = Field(default="Yes, MASTER Brano?", min_length=2, max_length=160)
+    #: Everything below is a real, live-configurable default -- change it
+    #: any time via PUT /v1/voice/settings, no code change needed. This
+    #: matters if this ever becomes public: wake_name and owner_salutation
+    #: are exactly the two things a different user (or a public launch)
+    #: would need to change first.
+    assistant_name: str = Field(default="AURON", min_length=2, max_length=40)
+    wake_name: str = Field(default="auron", min_length=2, max_length=40)
+    owner_salutation: str = Field(default="Master Brano", min_length=2, max_length=80)
+    wake_reply: str = Field(default="Yes, Master Brano?", min_length=2, max_length=160)
     language: str = Field(default="de-DE", min_length=2, max_length=20)
     speech_to_text_provider: str = Field(default="browser-web-speech", max_length=80)
     text_to_speech_provider: str = Field(default="browser-speech-synthesis", max_length=80)
