@@ -7,6 +7,7 @@ from .models import MarketSnapshot, StrategyResult
 from .open_range.strategy import evaluate as evaluate_open_range
 from .scalping_3tp.strategy import evaluate as evaluate_scalping_3tp
 from .smc.strategy import evaluate as evaluate_smc
+from .vwap_pullback.strategy import evaluate as evaluate_vwap_pullback
 
 # Registry of all available strategies
 STRATEGIES = {
@@ -42,6 +43,15 @@ STRATEGIES = {
             "single TP, min 1:2 RR"
         ),
         "evaluate": evaluate_open_range,
+    },
+    "vwap_pullback": {
+        "id": "vwap_pullback",
+        "name": "VWAP Pullback (Trend Continuation)",
+        "description": (
+            "Pullback to session VWAP within a confirmed HTF trend, +1SD VWAP-band "
+            "target when available, single TP, min 1:2 RR"
+        ),
+        "evaluate": evaluate_vwap_pullback,
     },
 }
 
