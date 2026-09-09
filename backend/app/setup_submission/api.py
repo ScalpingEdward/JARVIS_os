@@ -19,7 +19,9 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
+
+from app.security.operator_auth import require_operator_token
 
 from .models import (
     SetupDecisionRequest,
@@ -76,13 +78,20 @@ def get_pending(approval_request_id: UUID) -> SubmittedSetup:
     return setup
 
 
-@router.post("/pending/{approval_request_id}/decision", response_model=SubmittedSetup)
+@router.post("/pending/{approval_request_id}/decision", response_model=SubmittedSetup, dependencies=[Depends(require_operator_token)])
 def decide_pending(approval_request_id: UUID, request: SetupDecisionRequest) -> SubmittedSetup:
     """Record a human's approve/reject decision for a submitted setup.
 
     One-shot: deciding an already-decided setup returns 409, not a silent
     overwrite. This is the actual approval gate -- nothing downstream treats
     a setup as usable until it has been explicitly approved here.
+
+    Requires a real X-Auron-Operator-Token header -- a direct API call
+    used to be able to assert decided_by="brano" with nothing verifying
+    that claim; found by an external test pass, fixed here. The
+    Telegram approval path's own HMAC-signed callback token is
+    unaffected and unchanged -- this closes the *other* path into the
+    same action.
     """
     try:
         return setup_submission_service.decide(approval_request_id, request)

@@ -11,6 +11,16 @@ from app.main import app
 
 api_client = TestClient(app)
 
+#: The Instagram decision endpoint now requires a real operator token too
+#: (see app/security/operator_auth.py, same fix as setup_submission's).
+TEST_OPERATOR_TOKEN = "test-operator-token"
+OPERATOR_HEADERS = {"X-Auron-Operator-Token": TEST_OPERATOR_TOKEN}
+
+
+@pytest.fixture(autouse=True)
+def _operator_token(monkeypatch):
+    monkeypatch.setenv("AURON_OPERATOR_TOKEN", TEST_OPERATOR_TOKEN)
+
 
 def _image(ref="drive://file-123", score=0.9):
     return {"media_ref": ref, "media_type": "image", "aesthetic_score": score}
@@ -307,6 +317,7 @@ def test_api_flow_end_to_end():
     decided = api_client.post(
         f"/v1/instagram/candidates/{candidate_id}/decision",
         json={"approved": True, "reason": "Looks great"},
+        headers=OPERATOR_HEADERS,
     )
     assert decided.json()["status"] == "approved"
 
@@ -328,7 +339,7 @@ def test_history_search_via_the_api(monkeypatch):
         json=_candidate_payload(caption_draft="Desert mornings. #tradingmindset #discipline"),
     )
     candidate_id = created.json()["id"]
-    api_client.post(f"/v1/instagram/candidates/{candidate_id}/decision", json={"approved": True, "reason": "Good"})
+    api_client.post(f"/v1/instagram/candidates/{candidate_id}/decision", json={"approved": True, "reason": "Good"}, headers=OPERATOR_HEADERS)
     publish_response = api_client.post(f"/v1/instagram/candidates/{candidate_id}/publish")
     assert publish_response.status_code == 200
 

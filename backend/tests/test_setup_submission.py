@@ -35,6 +35,19 @@ from app.strategies.models import (
 
 client = TestClient(app)
 
+#: The setup-submission decision endpoint now requires a real operator
+#: token (see app/security/operator_auth.py) -- an external test pass
+#: found direct API calls could approve/reject with nothing verifying
+#: the caller. Every test in this file that calls that endpoint needs
+#: this configured and sent.
+TEST_OPERATOR_TOKEN = "test-operator-token"
+OPERATOR_HEADERS = {"X-Auron-Operator-Token": TEST_OPERATOR_TOKEN}
+
+
+@pytest.fixture(autouse=True)
+def _operator_token(monkeypatch):
+    monkeypatch.setenv("AURON_OPERATOR_TOKEN", TEST_OPERATOR_TOKEN)
+
 
 # -- snapshot builders -------------------------------------------------------
 
@@ -425,6 +438,7 @@ def test_api_decide_approve() -> None:
     resp = client.post(
         f"/v1/setup-submission/pending/{approval_id}/decision",
         json={"decision": "approved", "decided_by": "brano"},
+        headers=OPERATOR_HEADERS,
     )
     assert resp.status_code == 200
     assert resp.json()["decision"] == "approved"
@@ -435,6 +449,7 @@ def test_api_decide_unknown_id_returns_404() -> None:
     resp = client.post(
         f"/v1/setup-submission/pending/{uuid4()}/decision",
         json={"decision": "approved", "decided_by": "brano"},
+        headers=OPERATOR_HEADERS,
     )
     assert resp.status_code == 404
 
@@ -448,10 +463,12 @@ def test_api_decide_twice_returns_409() -> None:
     client.post(
         f"/v1/setup-submission/pending/{approval_id}/decision",
         json={"decision": "approved", "decided_by": "brano"},
+        headers=OPERATOR_HEADERS,
     )
     resp = client.post(
         f"/v1/setup-submission/pending/{approval_id}/decision",
         json={"decision": "rejected", "decided_by": "brano"},
+        headers=OPERATOR_HEADERS,
     )
     assert resp.status_code == 409
 
@@ -465,6 +482,7 @@ def test_api_decide_rejects_pending_as_target_state() -> None:
     resp = client.post(
         f"/v1/setup-submission/pending/{approval_id}/decision",
         json={"decision": "pending", "decided_by": "brano"},
+        headers=OPERATOR_HEADERS,
     )
     assert resp.status_code == 422
 
@@ -511,6 +529,7 @@ def test_api_pending_endpoint_excludes_decided_setups() -> None:
     client.post(
         f"/v1/setup-submission/pending/{setups[0]['approval_request_id']}/decision",
         json={"decision": "approved", "decided_by": "brano"},
+        headers=OPERATOR_HEADERS,
     )
     resp = client.get("/v1/setup-submission/pending")
     ids = {s["approval_request_id"] for s in resp.json()}
@@ -527,6 +546,7 @@ def test_api_all_endpoint_includes_decided_setups() -> None:
     client.post(
         f"/v1/setup-submission/pending/{setups[0]['approval_request_id']}/decision",
         json={"decision": "approved", "decided_by": "brano"},
+        headers=OPERATOR_HEADERS,
     )
     resp = client.get("/v1/setup-submission/all")
     ids = {s["approval_request_id"] for s in resp.json()}
