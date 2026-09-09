@@ -25,6 +25,16 @@ What it does, every cycle:
 Safety:
   - Requires --i-understand-this-places-real-orders on every run. There is
     no way to silence or skip this.
+  - Requires --expected-mt5-login on every run: the MT5 account number
+    that must actually be logged into this terminal. Refuses to even
+    enter the polling loop if the terminal is logged into a different
+    account, and re-verifies this fresh before every single order --
+    catching both "wrong account from the start" and "account switched
+    by hand partway through a run". Nothing checked this before; AURON's
+    own backend only validates that an order's account_login is inside
+    its own approved_account_logins list, a self-consistency check within
+    one request, never a check against which account is actually,
+    physically logged in.
   - Only ever acts on orders already in "preflight-ready" state for the
     workspace you point it at -- it cannot create, approve, or modify an
     order, only execute one AURON already fully authorized.
@@ -38,6 +48,7 @@ Usage:
     python mt5_execution_agent.py \\
         --backend-url http://localhost:8000 \\
         --workspace-id <your AURON account_id> \\
+        --expected-mt5-login <the MT5 account number logged into this terminal> \\
         --i-understand-this-places-real-orders \\
         --interval 5
 """
@@ -125,13 +136,55 @@ class AuronClient:
         response.raise_for_status()
 
 
+class AccountMismatchError(RuntimeError):
+    """Raised when the MT5 terminal actually logged in on this machine is
+    not the account an order was authorized for. Never caught silently --
+    see execute_one()'s own handling."""
+
+
+def verify_logged_in_account(expected_login: int) -> None:
+    """The check this whole fix exists for: is the MT5 terminal this
+    script is talking to *actually* logged into the account an order was
+    authorized for? Nothing before this fix ever asked -- AURON's own
+    backend validates that an order's account_login is in its own
+    approved_account_logins list, which is a self-consistency check
+    within a single request, not a check against reality. This is that
+    check against reality: mt5.account_info() reports whatever account
+    the terminal is *actually, currently* logged into, independent of
+    anything AURON believes.
+
+    Called both once at startup (verify_logged_in_account's caller in
+    main()) and fresh on every single order in execute_one() -- checking
+    only once at startup would miss the account being switched by hand
+    partway through a run.
+    """
+    info = mt5.account_info()
+    if info is None:
+        raise AccountMismatchError("mt5.account_info() returned nothing -- is a terminal actually logged in?")
+    if info.login != expected_login:
+        raise AccountMismatchError(
+            f"Terminal is logged into account {info.login}, but this order/run expected {expected_login}. "
+            f"Refusing -- log into the correct account before this can proceed."
+        )
+
+
 def execute_one(order: dict) -> dict:
     """Calls the real MT5 API for one already-fully-authorized order and
     returns a report dict AURON's report-execution endpoint expects.
     Never raises -- any failure becomes a failed-looking report instead,
-    so the caller always has something concrete to send back."""
+    so the caller always has something concrete to send back.
+
+    Re-verifies the actually-logged-in account against this specific
+    order's own account_login before doing anything else, every time --
+    see verify_logged_in_account's own docstring for why this cannot be
+    a one-time startup check alone.
+    """
     symbol = order["request"]["symbol"]
     try:
+        expected_login = order["request"].get("account_login")
+        if expected_login is not None:
+            verify_logged_in_account(expected_login)
+
         info = mt5.symbol_info(symbol)
         tick = mt5.symbol_info_tick(symbol)
         if info is None or tick is None:
@@ -158,6 +211,13 @@ def execute_one(order: dict) -> dict:
             "filled_volume": float(getattr(result, "volume", 0) or 0),
             "average_price": getattr(result, "price", None),
         }
+    except AccountMismatchError as exc:
+        # A distinct, loud path -- this is not "the broker rejected an
+        # order", it is "this script almost traded on the wrong account
+        # and refused". filled_volume=0, no broker_retcode/order_id/
+        # deal_id: nothing was ever sent to the broker.
+        print(f"[REFUSED -- WRONG ACCOUNT] {exc}", file=sys.stderr)
+        return {"broker_comment": f"REFUSED, wrong account logged in: {exc}", "filled_volume": 0}
     except Exception as exc:  # noqa: BLE001 -- report whatever happened, never crash the agent loop
         return {"broker_comment": f"execution agent error: {exc}", "filled_volume": 0}
 
@@ -187,6 +247,12 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--backend-url", required=True)
     parser.add_argument("--workspace-id", required=True, help="The AURON account_id to execute orders for.")
+    parser.add_argument(
+        "--expected-mt5-login", required=True, type=int,
+        help="The MT5 account number that MUST be logged into this terminal. Refuses to run at "
+        "all if the terminal is logged into a different account -- this is the fix for the "
+        "gap where nothing previously verified the actually-logged-in account before executing.",
+    )
     parser.add_argument("--interval", type=float, default=5.0)
     parser.add_argument(
         "--i-understand-this-places-real-orders",
@@ -198,6 +264,13 @@ def main() -> None:
 
     if not mt5.initialize():
         print(f"mt5.initialize() failed: {mt5.last_error()}", file=sys.stderr)
+        sys.exit(1)
+
+    try:
+        verify_logged_in_account(args.expected_mt5_login)
+    except AccountMismatchError as exc:
+        print(f"[REFUSED -- WRONG ACCOUNT] {exc}", file=sys.stderr)
+        mt5.shutdown()
         sys.exit(1)
 
     client = AuronClient(args.backend_url)
