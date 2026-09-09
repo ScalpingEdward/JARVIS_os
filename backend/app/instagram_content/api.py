@@ -3,8 +3,10 @@ from __future__ import annotations
 import os
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
+
+from app.security.operator_auth import require_operator_token
 
 from .media_pool_models import (
     ContentGapReport,
@@ -89,8 +91,12 @@ def get_candidate(candidate_id: UUID) -> ContentCandidate:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
-@router.post("/candidates/{candidate_id}/decision", response_model=ContentCandidate)
+@router.post("/candidates/{candidate_id}/decision", response_model=ContentCandidate, dependencies=[Depends(require_operator_token)])
 def decide(candidate_id: UUID, decision: ContentDecision) -> ContentCandidate:
+    """Requires a real X-Auron-Operator-Token header -- a direct API call
+    used to be able to approve or reject a post with nothing verifying
+    who actually made the call. Found by an external test pass, fixed
+    here."""
     try:
         return instagram_content_service.decide(candidate_id, decision)
     except InstagramContentError as exc:
