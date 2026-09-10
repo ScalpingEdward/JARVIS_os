@@ -292,3 +292,37 @@ class AutomationJobRow(Base):
     idempotency_key: Mapped[str] = mapped_column(String(200), index=True)
     state: Mapped[str] = mapped_column(String(40), index=True)
     data: Mapped[str] = mapped_column(Text)
+
+
+class InstagramMediaPoolItemRow(Base):
+    """media_ref is queried directly for ingest()'s duplicate check -- no
+    separate _refs_seen set needed, a real indexed column serves the same
+    purpose."""
+
+    __tablename__ = "instagram_media_pool_items"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    media_ref: Mapped[str] = mapped_column(String(2000), index=True)
+    data: Mapped[str] = mapped_column(Text)
+
+
+class InstagramCuratedDraftRow(Base):
+    __tablename__ = "instagram_curated_drafts"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    data: Mapped[str] = mapped_column(Text)
+
+
+class InstagramContentCandidateRow(Base):
+    """Backs instagram_content.InstagramContentService -- what an
+    external test pass called out by name: Instagram drafts, media pool
+    reservations, and 'the supposedly permanent' posting history all
+    lived only in process memory. The `status` column is what publish()'s
+    atomic claim (transitioning to ContentStatus.publishing before the
+    real n8n call) depends on being real and consistent, same reasoning
+    as the live order executor's own atomic claim earlier in this
+    series."""
+
+    __tablename__ = "instagram_content_candidates"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    status: Mapped[str] = mapped_column(String(30), index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    data: Mapped[str] = mapped_column(Text)

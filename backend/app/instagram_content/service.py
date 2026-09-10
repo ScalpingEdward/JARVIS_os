@@ -3,6 +3,11 @@ from __future__ import annotations
 import threading
 from uuid import UUID
 
+from sqlalchemy import update
+
+from app.db import SessionLocal
+from app.db_models import InstagramContentCandidateRow
+
 from .caption_writer import AnthropicCaptionWriter, CaptionWriterError
 from .edit_plan import build_edit_plan
 from .format_decision import decide_format
@@ -35,22 +40,22 @@ class InstagramContentService:
     def __init__(
         self, publisher: N8nInstagramPublisher | None = None, caption_writer: AnthropicCaptionWriter | None = None
     ) -> None:
-        self._items: dict[UUID, ContentCandidate] = {}
         self._publisher = publisher or N8nInstagramPublisher()
         self._caption_writer = caption_writer or AnthropicCaptionWriter()
-        #: Protects the read-check-then-claim step in publish() -- see
-        #: that method's own docstring for the real, reproduced race this
-        #: closes: two concurrent publish() calls for the same candidate
-        #: could both see status == approved and both reach the real
-        #: n8n publisher, since status was only updated *after* the
-        #: network call returned.
+        #: Still a real, useful fast-path lock for the common case (one
+        #: process, multiple threads) -- but the actual correctness
+        #: guarantee for the claim in publish() is now the database-level
+        #: atomic UPDATE ... WHERE status = 'approved' below, same pattern
+        #: as the live order executor's own claim earlier in this series.
         self._publish_lock = threading.Lock()
 
     def reset(self) -> None:
-        self._items.clear()
+        with SessionLocal() as session:
+            session.query(InstagramContentCandidateRow).delete()
+            session.commit()
 
     def propose(self, payload: ContentCandidateCreate) -> ContentCandidate:
-        recent_captions = [item.caption_draft.strip() for item in self._items.values()]
+        recent_captions = [item.caption_draft.strip() for item in self.list_all()]
         result = moderate(payload, recent_captions)
         hook_warnings = check_hook(payload.caption_draft)
 
@@ -79,7 +84,11 @@ class InstagramContentService:
             if hook_warnings:
                 item.audit_log.append("Hook warnings: " + "; ".join(hook_warnings))
 
-        self._items[item.id] = item
+        with SessionLocal() as session:
+            session.add(InstagramContentCandidateRow(
+                id=str(item.id), status=item.status.value, created_at=item.created_at, data=item.model_dump_json(),
+            ))
+            session.commit()
 
         if item.status == ContentStatus.proposed:
             self._notify_ready_for_review(item)
@@ -147,32 +156,43 @@ class InstagramContentService:
             pass
 
     def list_all(self, status: ContentStatus | None = None) -> list[ContentCandidate]:
-        items = list(self._items.values())
-        if status is not None:
-            items = [item for item in items if item.status == status]
+        with SessionLocal() as session:
+            query = session.query(InstagramContentCandidateRow)
+            if status is not None:
+                query = query.filter(InstagramContentCandidateRow.status == status.value)
+            rows = query.all()
+        items = [ContentCandidate.model_validate_json(r.data) for r in rows]
         return sorted(items, key=lambda item: item.created_at, reverse=True)
 
     def get(self, candidate_id: UUID) -> ContentCandidate:
-        item = self._items.get(candidate_id)
-        if item is None:
+        with SessionLocal() as session:
+            row = session.get(InstagramContentCandidateRow, str(candidate_id))
+        if row is None:
             raise InstagramContentError("Content candidate not found")
-        return item
+        return ContentCandidate.model_validate_json(row.data)
 
     def decide(self, candidate_id: UUID, decision: ContentDecision) -> ContentCandidate:
-        item = self.get(candidate_id)
-        if item.status not in (ContentStatus.proposed, ContentStatus.moderation_rejected):
-            raise InstagramContentError(f"Cannot decide on a candidate in status {item.status}")
+        with SessionLocal() as session:
+            row = session.get(InstagramContentCandidateRow, str(candidate_id))
+            if row is None:
+                raise InstagramContentError("Content candidate not found")
+            item = ContentCandidate.model_validate_json(row.data)
+            if item.status not in (ContentStatus.proposed, ContentStatus.moderation_rejected):
+                raise InstagramContentError(f"Cannot decide on a candidate in status {item.status}")
 
-        was_moderation_rejected = item.status == ContentStatus.moderation_rejected
+            was_moderation_rejected = item.status == ContentStatus.moderation_rejected
 
-        if decision.edited_caption is not None:
-            item.caption_draft = decision.edited_caption
+            if decision.edited_caption is not None:
+                item.caption_draft = decision.edited_caption
 
-        item.status = ContentStatus.approved if decision.approved else ContentStatus.rejected
-        item.decision_reason = decision.reason
-        item.audit_log.append(f"{'Approved' if decision.approved else 'Rejected'}: {decision.reason}")
-        if was_moderation_rejected and decision.approved:
-            item.audit_log.append("Human override: approved despite automated moderation rejection.")
+            item.status = ContentStatus.approved if decision.approved else ContentStatus.rejected
+            item.decision_reason = decision.reason
+            item.audit_log.append(f"{'Approved' if decision.approved else 'Rejected'}: {decision.reason}")
+            if was_moderation_rejected and decision.approved:
+                item.audit_log.append("Human override: approved despite automated moderation rejection.")
+            row.status = item.status.value
+            row.data = item.model_dump_json()
+            session.commit()
         return item
 
     def publish(self, candidate_id: UUID) -> ContentCandidate:
@@ -187,24 +207,47 @@ class InstagramContentService:
         waiting, so two threads genuinely can interleave here, not just in
         theory.
 
-        Fixed the same way the trading side's equivalent race was closed:
-        claim first, atomically, under a lock, before the slow network
-        call -- not after it. The lock only protects the tiny
-        check-and-claim step, not the real publish call itself, so
-        different candidates still publish fully concurrently.
+        The claim is now a genuine database-level atomic operation, same
+        pattern as the live order executor's own claim earlier in this
+        series: an UPDATE ... WHERE status = 'approved' whose WHERE clause
+        no longer matches (a concurrent caller already won it, even in a
+        different process) affects zero rows. The in-process lock stays
+        too, as a fast, cheap short-circuit for the common single-process
+        case, but the database is the actual source of truth for who won
+        the claim.
         """
         with self._publish_lock:
-            item = self.get(candidate_id)
-            if item.status == ContentStatus.publishing:
-                raise InstagramContentError(
-                    "This candidate is already being published right now (a concurrent request got there first) "
-                    "-- wait for that one to finish rather than retrying immediately."
+            with SessionLocal() as session:
+                result = session.execute(
+                    update(InstagramContentCandidateRow)
+                    .where(
+                        InstagramContentCandidateRow.id == str(candidate_id),
+                        InstagramContentCandidateRow.status == ContentStatus.approved.value,
+                    )
+                    .values(status=ContentStatus.publishing.value)
                 )
-            if item.status != ContentStatus.approved:
-                raise InstagramContentError(
-                    f"Cannot publish a candidate in status {item.status}; it must be explicitly approved first"
-                )
-            item.status = ContentStatus.publishing
+                if result.rowcount != 1:
+                    # Lost the claim (or never had it) -- read back the
+                    # current status only to give a specific, honest
+                    # error message; the claim decision itself was
+                    # already correctly made by the UPDATE above.
+                    row = session.get(InstagramContentCandidateRow, str(candidate_id))
+                    if row is None:
+                        raise InstagramContentError("Content candidate not found")
+                    current = ContentCandidate.model_validate_json(row.data)
+                    if current.status == ContentStatus.publishing:
+                        raise InstagramContentError(
+                            "This candidate is already being published right now (a concurrent request got "
+                            "there first) -- wait for that one to finish rather than retrying immediately."
+                        )
+                    raise InstagramContentError(
+                        f"Cannot publish a candidate in status {current.status}; it must be explicitly approved first"
+                    )
+                row = session.get(InstagramContentCandidateRow, str(candidate_id))
+                item = ContentCandidate.model_validate_json(row.data)
+                item.status = ContentStatus.publishing
+                row.data = item.model_dump_json()
+                session.commit()
 
         try:
             media_id = self._publisher.publish(
@@ -217,14 +260,24 @@ class InstagramContentService:
         except N8nInstagramPublisherError as exc:
             item.status = ContentStatus.post_failed
             item.audit_log.append(f"Publish failed: {exc}")
+            self._save_candidate(item)
             self._notify_publish_failed(item, exc)
             raise InstagramContentError(str(exc)) from exc
 
         item.status = ContentStatus.posted
         item.published_media_id = media_id
         item.audit_log.append(f"Published via n8n, media_id={media_id}")
+        self._save_candidate(item)
         self._record_post_in_knowledge_graph(item)
         return item
+
+    @staticmethod
+    def _save_candidate(item: ContentCandidate) -> None:
+        with SessionLocal() as session:
+            row = session.get(InstagramContentCandidateRow, str(item.id))
+            row.status = item.status.value
+            row.data = item.model_dump_json()
+            session.commit()
 
     def _record_post_in_knowledge_graph(self, item: ContentCandidate) -> None:
         """Every real, published post becomes a permanent, queryable node --

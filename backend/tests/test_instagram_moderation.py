@@ -10,6 +10,16 @@ from app.instagram_content.moderation import moderate
 from app.instagram_content.service import InstagramContentService
 
 
+@pytest.fixture(autouse=True)
+def _reset_shared_state():
+    """Storage is now real and shared rather than fresh-per-instance
+    in-memory -- see InstagramContentService's own docstring. Several
+    tests in this file reuse similar caption text, which moderate()'s
+    near-duplicate check would otherwise catch across tests."""
+    InstagramContentService().reset()
+    yield
+
+
 def _payload(aesthetic_score=0.9, image_source_ref="drive://file-1", **overrides):
     base = dict(
         media_items=[{"media_ref": image_source_ref, "media_type": "image", "aesthetic_score": aesthetic_score}],

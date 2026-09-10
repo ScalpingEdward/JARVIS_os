@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import pytest
 from fastapi.testclient import TestClient
 
 from app.instagram_content.curation import DEFAULT_LOW_WATER_MARK, analyze_gaps
@@ -9,6 +10,14 @@ from app.instagram_content.platform_strategy import platform_strategy_store
 from app.main import app
 
 api_client = TestClient(app)
+
+
+@pytest.fixture(autouse=True)
+def _reset_shared_state():
+    """Storage is now real and shared rather than fresh-per-instance
+    in-memory -- see MediaPoolService's own docstring."""
+    MediaPoolService().reset()
+    yield
 
 
 def _image(ref, theme="desert-gold", score=0.5, tags=None):

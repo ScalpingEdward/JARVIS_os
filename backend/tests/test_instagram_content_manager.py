@@ -20,6 +20,12 @@ OPERATOR_HEADERS = {"X-Auron-Operator-Token": TEST_OPERATOR_TOKEN}
 @pytest.fixture(autouse=True)
 def _operator_token(monkeypatch):
     monkeypatch.setenv("AURON_OPERATOR_TOKEN", TEST_OPERATOR_TOKEN)
+    # Storage is now real and shared rather than fresh-per-instance
+    # in-memory -- see InstagramContentService's own docstring. Several
+    # tests in this file reuse the same default caption/candidate
+    # payload, which moderate()'s near-duplicate check would otherwise
+    # catch across tests.
+    InstagramContentService().reset()
 
 
 def _image(ref="drive://file-123", score=0.9):
@@ -144,8 +150,13 @@ def test_publish_is_blocked_before_approval():
 def test_rejected_candidate_cannot_be_published():
     service = _service_with_mock_publisher(lambda request: httpx.Response(200, json={"media_id": "x"}))
     item = service.propose(ContentCandidateCreate(**_candidate_payload()))
-    service.decide(item.id, ContentDecision(approved=False, reason="Doesn't fit the feed grid"))
-    assert item.status == ContentStatus.rejected
+    # decide() now returns a freshly-deserialized copy (correct
+    # encapsulation, backed by real persistence -- see
+    # InstagramContentService's own docstring), not a live reference into
+    # shared state the old in-memory dict implementation accidentally
+    # allowed. Use its own return value, not the stale `item` reference.
+    decided = service.decide(item.id, ContentDecision(approved=False, reason="Doesn't fit the feed grid"))
+    assert decided.status == ContentStatus.rejected
     with pytest.raises(InstagramContentError):
         service.publish(item.id)
 
@@ -153,12 +164,12 @@ def test_rejected_candidate_cannot_be_published():
 def test_approval_can_edit_the_caption():
     service = _service_with_mock_publisher(lambda request: httpx.Response(200, json={"media_id": "x"}))
     item = service.propose(ContentCandidateCreate(**_candidate_payload()))
-    service.decide(
+    decided = service.decide(
         item.id,
         ContentDecision(approved=True, reason="Good pick", edited_caption="Quiet confidence. Nothing to prove."),
     )
-    assert item.caption_draft == "Quiet confidence. Nothing to prove."
-    assert item.status == ContentStatus.approved
+    assert decided.caption_draft == "Quiet confidence. Nothing to prove."
+    assert decided.status == ContentStatus.approved
 
 
 def test_publish_records_a_permanent_knowledge_graph_node():
@@ -455,3 +466,52 @@ def test_publishing_a_never_approved_candidate_still_gives_the_original_message(
     created = service.propose(ContentCandidateCreate(**_candidate_payload()))
     with pytest.raises(InstagramContentError, match="must be explicitly approved first"):
         service.publish(created.id)
+
+
+def test_candidates_survive_a_fresh_service_instance():
+    """The actual fix, and exactly what the external test pass named:
+    'den vermeintlich dauerhaften Postingverlauf' -- a genuinely fresh
+    service instance sees exactly what a previous one proposed, decided,
+    and published."""
+    service = _service_with_mock_publisher(lambda request: httpx.Response(200, json={"media_id": "restart-proof-id"}))
+    item = service.propose(ContentCandidateCreate(**_candidate_payload(caption_draft="Restart-proof caption.")))
+    service.decide(item.id, ContentDecision(approved=True, reason="Looks great"))
+    published = service.publish(item.id)
+    assert published.status == ContentStatus.posted
+
+    fresh = InstagramContentService()  # nothing shared but the real database
+    restored = fresh.get(item.id)
+    assert restored.status == ContentStatus.posted
+    assert restored.published_media_id == "restart-proof-id"
+
+
+def test_a_candidate_claimed_for_publishing_but_never_completed_stays_claimed_across_a_restart():
+    """The exact scenario the atomic claim exists for: the process
+    crashes right after claiming (status -> publishing) but before the
+    real n8n call ever returns. A restart must not see it as approved
+    again -- a human has to check whether the post actually went out."""
+    import threading
+
+    release = threading.Event()
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        release.wait(timeout=2)
+        return httpx.Response(200, json={"media_id": "x"})
+
+    service = _service_with_mock_publisher(handler)
+    item = service.propose(ContentCandidateCreate(**_candidate_payload()))
+    service.decide(item.id, ContentDecision(approved=True, reason="Looks great"))
+
+    t = threading.Thread(target=service.publish, args=(item.id,))
+    t.start()
+    import time
+    time.sleep(0.05)  # give publish() time to claim before the handler is released
+
+    fresh = InstagramContentService()  # simulates a "restart" mid-flight
+    stuck = fresh.get(item.id)
+    assert stuck.status == ContentStatus.publishing
+    with pytest.raises(InstagramContentError, match="already being published"):
+        fresh.publish(item.id)
+
+    release.set()
+    t.join()
