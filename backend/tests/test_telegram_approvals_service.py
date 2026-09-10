@@ -693,8 +693,22 @@ def test_audit_records_respect_the_limit():
 
 def test_audit_store_is_bounded():
     svc, _ = _service()
+    svc.reset()
     for i in range(svc.MAX_AUDIT_RECORDS + 10):
         svc._record("notify", True, f"n{i}")
-    assert len(svc._audit) == svc.MAX_AUDIT_RECORDS
-    # the oldest entries were dropped, not the newest
-    assert svc._audit[-1].detail == f"n{svc.MAX_AUDIT_RECORDS + 9}"
+    all_records = svc.audit_records(limit=svc.MAX_AUDIT_RECORDS + 100)
+    assert len(all_records) == svc.MAX_AUDIT_RECORDS
+    # the oldest entries were dropped, not the newest -- most recent first
+    assert all_records[0].detail == f"n{svc.MAX_AUDIT_RECORDS + 9}"
+
+
+def test_audit_records_survive_a_fresh_service_instance():
+    """The actual fix: a genuinely new instance (simulating a restart)
+    sees exactly what a previous one recorded."""
+    first, _ = _service()
+    first.reset()
+    first._record("notify", True, "restart-proof-entry")
+
+    second, _ = _service()  # nothing shared but the real database
+    records = second.audit_records(limit=10)
+    assert any(r.detail == "restart-proof-entry" for r in records)

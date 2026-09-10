@@ -14,6 +14,8 @@ from __future__ import annotations
 import logging
 from uuid import UUID
 
+from app.db import SessionLocal
+from app.db_models import TelegramAuditRow
 from app.notification_hub.telegram_delivery import TelegramDeliveryClient, TelegramDeliveryError
 from app.setup_submission.models import (
     SetupDecisionRequest,
@@ -75,22 +77,55 @@ class TelegramApprovalService:
     ) -> None:
         self.config = config or TelegramApprovalConfig()
         self._client = client or TelegramDeliveryClient()
-        self._audit: list[TelegramAuditRecord] = []
 
     def _record(
         self, action: str, success: bool, detail: str = "",
         approval_request_id: UUID | None = None, actor: str | None = None,
     ) -> None:
-        self._audit.append(TelegramAuditRecord(
+        event = TelegramAuditRecord(
             approval_request_id=approval_request_id, action=action,
             success=success, detail=detail[:500], actor=actor,
-        ))
-        if len(self._audit) > self.MAX_AUDIT_RECORDS:
-            self._audit = self._audit[-self.MAX_AUDIT_RECORDS:]
+        )
+        with SessionLocal() as session:
+            session.add(TelegramAuditRow(
+                id=str(event.id), created_at=event.created_at, data=event.model_dump_json(),
+            ))
+            session.flush()
+            # Trim to the bounded window the same way the old in-memory
+            # list trimmed itself -- a recent-activity log, not a
+            # permanent archive.
+            total = session.query(TelegramAuditRow).count()
+            if total > self.MAX_AUDIT_RECORDS:
+                excess = total - self.MAX_AUDIT_RECORDS
+                stale_ids = [
+                    r.id for r in
+                    session.query(TelegramAuditRow.id)
+                    .order_by(TelegramAuditRow.created_at)
+                    .limit(excess)
+                    .all()
+                ]
+                session.query(TelegramAuditRow).filter(TelegramAuditRow.id.in_(stale_ids)).delete(
+                    synchronize_session=False
+                )
+            session.commit()
 
     def audit_records(self, limit: int = 50) -> list[TelegramAuditRecord]:
         """Most recent first -- what actually happened, for later review."""
-        return list(reversed(self._audit[-limit:]))
+        with SessionLocal() as session:
+            rows = (
+                session.query(TelegramAuditRow)
+                .order_by(TelegramAuditRow.created_at.desc())
+                .limit(limit)
+                .all()
+            )
+        return [TelegramAuditRecord.model_validate_json(r.data) for r in rows]
+
+    def reset(self) -> None:
+        """Needed now that storage is real and shared rather than
+        fresh-per-instance in-memory."""
+        with SessionLocal() as session:
+            session.query(TelegramAuditRow).delete()
+            session.commit()
 
     def status(self) -> TelegramApprovalStatus:
         """Capability health: what's configured, and whether the bot is
