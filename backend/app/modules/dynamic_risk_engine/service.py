@@ -3,6 +3,9 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from secrets import token_urlsafe
 
+from app.db import SessionLocal
+from app.db_models import DynamicRiskAuditRow, DynamicRiskRecordRow, DynamicRiskUsedTokenRow
+
 from .models import (
     AuditEvent,
     DynamicRiskCreate,
@@ -19,108 +22,193 @@ class DynamicRiskError(RuntimeError):
 
 
 class DynamicRiskService:
-    """Calculates governed risk recommendations without placing or modifying trades."""
+    """Calculates governed risk recommendations without placing or modifying trades.
 
-    def __init__(self) -> None:
-        self._records: dict[str, DynamicRiskRecord] = {}
-        self._source_index: dict[tuple[str, str], str] = {}
-        self._audit: list[AuditEvent] = []
-        self._used_approval_tokens: set[str] = set()
-        self._used_receipts: set[str] = set()
+    Persisted via the same SQLAlchemy/SessionLocal infrastructure
+    orchestrator.service and setup_submission.service already use --
+    previously three in-memory structures (records, audit, and the
+    approval-token/receipt replay-protection sets), all silently emptied
+    on every restart. The replay-protection gap was not just a visibility
+    problem like the others: a restart right after a token was used, but
+    before this fix, would have forgotten it was ever spent, making the
+    same approval token replayable against a second, different risk
+    record.
+    """
 
     def status(self) -> dict[str, object]:
+        with SessionLocal() as session:
+            count = session.query(DynamicRiskRecordRow).count()
         return {
             "module": "dynamic-risk-engine",
             "version": "21.17",
             "status": "operational",
-            "records": len(self._records),
+            "records": count,
             "safety_boundary": "risk-recommendation-only-no-execution",
         }
 
+    def reset(self) -> None:
+        """Clear all records, audit events, and used replay-protection
+        tokens. Needed now that storage is a real, shared database rather
+        than a fresh-per-instance in-memory dict -- a new
+        DynamicRiskService() no longer implies empty state the way it
+        used to; tests that want a clean slate must call this."""
+        with SessionLocal() as session:
+            session.query(DynamicRiskRecordRow).delete()
+            session.query(DynamicRiskAuditRow).delete()
+            session.query(DynamicRiskUsedTokenRow).delete()
+            session.commit()
+
     def create(self, payload: DynamicRiskCreate, actor: str = "system") -> DynamicRiskRecord:
-        key = (payload.workspace_id, payload.source_key)
-        if key in self._source_index:
-            raise DynamicRiskError(f"duplicate source_key; existing record={self._source_index[key]}")
+        with SessionLocal() as session:
+            existing = (
+                session.query(DynamicRiskRecordRow)
+                .filter(
+                    DynamicRiskRecordRow.workspace_id == payload.workspace_id,
+                    DynamicRiskRecordRow.source_key == payload.source_key,
+                )
+                .first()
+            )
+            if existing is not None:
+                raise DynamicRiskError(f"duplicate source_key; existing record={existing.id}")
 
-        assessment = self._assess(payload)
-        if payload.risk_brain_hard_block:
-            assessment.blocking_reasons.append("Risk Brain hard block is authoritative.")
-            state = RiskState.BLOCKED
-        elif not payload.v21_16_approved or not payload.v21_16_evidence:
-            assessment.blocking_reasons.append("Approved PHOENIX v21.16 evidence is mandatory.")
-            state = RiskState.EVIDENCE_REQUIRED
-        elif assessment.blocking_reasons:
-            state = RiskState.BLOCKED
-        elif payload.active_news_risk or assessment.warnings:
-            state = RiskState.HUMAN_REVIEW_REQUIRED
-        else:
-            state = RiskState.RISK_APPROVED
+            assessment = self._assess(payload)
+            if payload.risk_brain_hard_block:
+                assessment.blocking_reasons.append("Risk Brain hard block is authoritative.")
+                state = RiskState.BLOCKED
+            elif not payload.v21_16_approved or not payload.v21_16_evidence:
+                assessment.blocking_reasons.append("Approved PHOENIX v21.16 evidence is mandatory.")
+                state = RiskState.EVIDENCE_REQUIRED
+            elif assessment.blocking_reasons:
+                state = RiskState.BLOCKED
+            elif payload.active_news_risk or assessment.warnings:
+                state = RiskState.HUMAN_REVIEW_REQUIRED
+            else:
+                state = RiskState.RISK_APPROVED
 
-        record = DynamicRiskRecord(
-            workspace_id=payload.workspace_id,
-            source_key=payload.source_key,
-            position_management_record_id=payload.position_management_record_id,
-            symbol=payload.symbol,
-            direction=payload.direction,
-            state=state,
-            assessment=assessment,
-        )
-        self._records[record.id] = record
-        self._source_index[key] = record.id
-        self._append_audit(record, actor, "create", None, state.value)
+            record = DynamicRiskRecord(
+                workspace_id=payload.workspace_id,
+                source_key=payload.source_key,
+                position_management_record_id=payload.position_management_record_id,
+                symbol=payload.symbol,
+                direction=payload.direction,
+                state=state,
+                assessment=assessment,
+            )
+            session.add(self._to_row(record))
+            session.add(self._audit_row(record, actor, "create", None, state.value))
+            session.commit()
         return record
 
     def list(self, workspace_id: str) -> list[DynamicRiskRecord]:
-        return [record for record in self._records.values() if record.workspace_id == workspace_id]
+        with SessionLocal() as session:
+            rows = session.query(DynamicRiskRecordRow).filter(
+                DynamicRiskRecordRow.workspace_id == workspace_id
+            ).all()
+        return [self._from_row(r) for r in rows]
 
     def get(self, workspace_id: str, record_id: str) -> DynamicRiskRecord:
-        record = self._records.get(record_id)
-        if not record or record.workspace_id != workspace_id:
+        with SessionLocal() as session:
+            row = session.get(DynamicRiskRecordRow, record_id)
+        if row is None or row.workspace_id != workspace_id:
             raise DynamicRiskError("record not found")
-        return record
+        return self._from_row(row)
 
     def execute(self, workspace_id: str, record_id: str, action: RiskAction) -> DynamicRiskRecord:
-        record = self.get(workspace_id, record_id)
-        before = record.state.value
+        with SessionLocal() as session:
+            row = session.get(DynamicRiskRecordRow, record_id)
+            if row is None or row.workspace_id != workspace_id:
+                raise DynamicRiskError("record not found")
+            record = self._from_row(row)
+            before = record.state.value
 
-        if action.command == RiskCommand.APPROVE:
-            if record.state not in {RiskState.RISK_APPROVED, RiskState.HUMAN_REVIEW_REQUIRED}:
-                raise DynamicRiskError("risk record is not approvable")
-            token = action.approval_token or token_urlsafe(24)
-            if token in self._used_approval_tokens:
-                raise DynamicRiskError("approval token replay detected")
-            self._used_approval_tokens.add(token)
-            record.approval_token = token
-            record.state = RiskState.APPROVED
-        elif action.command == RiskCommand.ISSUE:
-            if record.state != RiskState.APPROVED:
-                raise DynamicRiskError("only approved risk records can be issued")
-            if not action.downstream_receipt:
-                raise DynamicRiskError("downstream receipt is required")
-            if action.downstream_receipt in self._used_receipts:
-                raise DynamicRiskError("downstream receipt replay detected")
-            self._used_receipts.add(action.downstream_receipt)
-            record.downstream_receipt = action.downstream_receipt
-            record.state = RiskState.ISSUED_TO_EXPOSURE_MANAGER
-        elif action.command == RiskCommand.REJECT:
-            if record.state in {RiskState.ISSUED_TO_EXPOSURE_MANAGER, RiskState.ARCHIVED}:
-                raise DynamicRiskError("terminal risk record cannot be rejected")
-            record.state = RiskState.REJECTED
-        elif action.command == RiskCommand.INVALIDATE:
-            if record.state == RiskState.ARCHIVED:
-                raise DynamicRiskError("archived risk record cannot be invalidated")
-            record.state = RiskState.INVALIDATED
-        elif action.command == RiskCommand.ARCHIVE:
-            record.state = RiskState.ARCHIVED
+            if action.command == RiskCommand.APPROVE:
+                if record.state not in {RiskState.RISK_APPROVED, RiskState.HUMAN_REVIEW_REQUIRED}:
+                    raise DynamicRiskError("risk record is not approvable")
+                token = action.approval_token or token_urlsafe(24)
+                self._claim_token_or_raise(session, token, "approval_token")
+                record.approval_token = token
+                record.state = RiskState.APPROVED
+            elif action.command == RiskCommand.ISSUE:
+                if record.state != RiskState.APPROVED:
+                    raise DynamicRiskError("only approved risk records can be issued")
+                if not action.downstream_receipt:
+                    raise DynamicRiskError("downstream receipt is required")
+                self._claim_token_or_raise(session, action.downstream_receipt, "downstream_receipt")
+                record.downstream_receipt = action.downstream_receipt
+                record.state = RiskState.ISSUED_TO_EXPOSURE_MANAGER
+            elif action.command == RiskCommand.REJECT:
+                if record.state in {RiskState.ISSUED_TO_EXPOSURE_MANAGER, RiskState.ARCHIVED}:
+                    raise DynamicRiskError("terminal risk record cannot be rejected")
+                record.state = RiskState.REJECTED
+            elif action.command == RiskCommand.INVALIDATE:
+                if record.state == RiskState.ARCHIVED:
+                    raise DynamicRiskError("archived risk record cannot be invalidated")
+                record.state = RiskState.INVALIDATED
+            elif action.command == RiskCommand.ARCHIVE:
+                record.state = RiskState.ARCHIVED
 
-        if action.reason:
-            record.notes.append(action.reason)
-        record.updated_at = datetime.now(timezone.utc)
-        self._append_audit(record, action.actor, action.command.value, before, record.state.value)
+            if action.reason:
+                record.notes.append(action.reason)
+            record.updated_at = datetime.now(timezone.utc)
+
+            row.state = record.state.value
+            row.data = record.model_dump_json()
+            session.add(self._audit_row(record, action.actor, action.command.value, before, record.state.value))
+            session.commit()
         return record
 
     def audit(self, workspace_id: str) -> list[AuditEvent]:
-        return [event for event in self._audit if event.workspace_id == workspace_id]
+        with SessionLocal() as session:
+            rows = (
+                session.query(DynamicRiskAuditRow)
+                .filter(DynamicRiskAuditRow.workspace_id == workspace_id)
+                .order_by(DynamicRiskAuditRow.created_at)
+                .all()
+            )
+        return [AuditEvent.model_validate_json(r.data) for r in rows]
+
+    @staticmethod
+    def _claim_token_or_raise(session, token: str, kind: str) -> None:
+        """Atomically claims a token via the primary-key constraint itself
+        -- an INSERT that violates the PK is the replay detection, not a
+        separate check-then-insert (which would have its own race)."""
+        session.add(DynamicRiskUsedTokenRow(token=token, kind=kind))
+        try:
+            session.flush()
+        except Exception as exc:
+            session.rollback()
+            label = "approval token" if kind == "approval_token" else "downstream receipt"
+            raise DynamicRiskError(f"{label} replay detected") from exc
+
+    @staticmethod
+    def _to_row(record: DynamicRiskRecord) -> DynamicRiskRecordRow:
+        return DynamicRiskRecordRow(
+            id=record.id, workspace_id=record.workspace_id, source_key=record.source_key,
+            state=record.state.value, data=record.model_dump_json(),
+        )
+
+    @staticmethod
+    def _from_row(row: DynamicRiskRecordRow) -> DynamicRiskRecord:
+        return DynamicRiskRecord.model_validate_json(row.data)
+
+    @staticmethod
+    def _audit_row(record: DynamicRiskRecord, actor: str, action: str, from_state: str | None, to_state: str) -> DynamicRiskAuditRow:
+        event = AuditEvent(
+            workspace_id=record.workspace_id,
+            record_id=record.id,
+            action=action,
+            actor=actor,
+            from_state=from_state,
+            to_state=to_state,
+            details={
+                "risk_percent": record.assessment.recommended_risk_percent,
+                "risk_amount": record.assessment.recommended_risk_amount,
+            },
+        )
+        return DynamicRiskAuditRow(
+            id=event.id, workspace_id=event.workspace_id, created_at=event.created_at,
+            data=event.model_dump_json(),
+        )
 
     @staticmethod
     def _assess(payload: DynamicRiskCreate) -> RiskAssessment:
@@ -213,24 +301,3 @@ class DynamicRiskService:
             warnings=warnings,
             rationale=rationale,
         )
-
-    def _append_audit(
-        self,
-        record: DynamicRiskRecord,
-        actor: str,
-        action: str,
-        from_state: str | None,
-        to_state: str,
-    ) -> None:
-        self._audit.append(AuditEvent(
-            workspace_id=record.workspace_id,
-            record_id=record.id,
-            action=action,
-            actor=actor,
-            from_state=from_state,
-            to_state=to_state,
-            details={
-                "risk_percent": record.assessment.recommended_risk_percent,
-                "risk_amount": record.assessment.recommended_risk_amount,
-            },
-        ))

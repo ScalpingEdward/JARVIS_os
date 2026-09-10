@@ -73,3 +73,40 @@ class SubmittedSetupRow(Base):
     decision: Mapped[str] = mapped_column(String(20), index=True)
     submitted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
     data: Mapped[str] = mapped_column(Text)
+
+
+class DynamicRiskRecordRow(Base):
+    """Backs modules.dynamic_risk_engine.DynamicRiskService -- the risk
+    sizing step between an approved setup and a tracked position. Same
+    finding, same fix as SubmittedSetupRow: in-memory only, gone on
+    restart."""
+
+    __tablename__ = "dynamic_risk_records"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    workspace_id: Mapped[str] = mapped_column(String(100), index=True)
+    source_key: Mapped[str] = mapped_column(String(200), index=True)
+    state: Mapped[str] = mapped_column(String(40), index=True)
+    data: Mapped[str] = mapped_column(Text)
+
+
+class DynamicRiskAuditRow(Base):
+    __tablename__ = "dynamic_risk_audit"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    workspace_id: Mapped[str] = mapped_column(String(100), index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    data: Mapped[str] = mapped_column(Text)
+
+
+class DynamicRiskUsedTokenRow(Base):
+    """Replay protection for approval tokens and downstream receipts --
+    also previously in-memory only (two plain Python sets). A restart
+    right after a token was used, but before this table existed, would
+    have silently forgotten it was ever spent: the same approval token
+    could then be replayed to approve a second, different risk record.
+    Not a hypothetical -- the exact same "process memory only" gap as
+    everything else in this finding, just a security property rather
+    than a visibility one."""
+
+    __tablename__ = "dynamic_risk_used_tokens"
+    token: Mapped[str] = mapped_column(String(200), primary_key=True)
+    kind: Mapped[str] = mapped_column(String(20))  # "approval_token" | "downstream_receipt"

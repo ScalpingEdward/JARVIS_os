@@ -11,6 +11,18 @@ from app.modules.dynamic_risk_engine.models import (
 from app.modules.dynamic_risk_engine.service import DynamicRiskError, DynamicRiskService
 
 
+@pytest.fixture(autouse=True)
+def _reset_shared_state():
+    """Storage is now real and shared (see DynamicRiskService's own
+    docstring) rather than fresh-per-instance in-memory -- tests in this
+    file reuse fixed workspace_id/source_key values across each other on
+    purpose (to test duplicate-detection itself), so each test needs a
+    clean slate rather than relying on a brand new DynamicRiskService()
+    implying empty state the way it used to."""
+    DynamicRiskService().reset()
+    yield
+
+
 def payload(**overrides) -> DynamicRiskCreate:
     data = {
         "workspace_id": "desk-a",
@@ -141,3 +153,43 @@ def test_symbol_case_is_preserved_exactly() -> None:
     service = DynamicRiskService()
     record = service.create(payload(symbol="XAUUSD.s"))
     assert record.symbol == "XAUUSD.s"
+
+
+# -- the fix: real persistence, including replay protection across restart --
+
+
+def test_records_and_audit_survive_a_fresh_service_instance_simulating_a_restart() -> None:
+    first_instance = DynamicRiskService()
+    record = first_instance.create(payload())
+    first_instance.execute(
+        "desk-a", record.id, RiskAction(command=RiskCommand.APPROVE, actor="brano", approval_token="tok-1"),
+    )
+
+    second_instance = DynamicRiskService()  # nothing shared but the real database
+    restored = second_instance.get("desk-a", record.id)
+    assert restored.state == RiskState.APPROVED
+    assert restored.approval_token == "tok-1"
+    audit = second_instance.audit("desk-a")
+    assert any(event.action == "approve" for event in audit)
+
+
+def test_an_approval_token_cannot_be_replayed_after_a_simulated_restart() -> None:
+    """The narrower, real security property this fix closes: previously,
+    a restart right after a token was spent would have forgotten it was
+    ever used, since the replay-protection set was in-memory only -- the
+    same token could then be replayed against a different risk record."""
+    first_instance = DynamicRiskService()
+    first_record = first_instance.create(payload(source_key="first"))
+    first_instance.execute(
+        "desk-a", first_record.id,
+        RiskAction(command=RiskCommand.APPROVE, actor="brano", approval_token="tok-shared"),
+    )
+
+    # A brand new instance -- simulates the process having restarted.
+    second_instance = DynamicRiskService()
+    second_record = second_instance.create(payload(source_key="second"))
+    with pytest.raises(DynamicRiskError, match="approval token replay"):
+        second_instance.execute(
+            "desk-a", second_record.id,
+            RiskAction(command=RiskCommand.APPROVE, actor="brano", approval_token="tok-shared"),
+        )
