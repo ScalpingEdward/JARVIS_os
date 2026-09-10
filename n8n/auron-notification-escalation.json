@@ -1,0 +1,62 @@
+{
+  "name": "AURON - Notification Escalation (Every 30 min)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 30
+            }
+          ]
+        }
+      },
+      "id": "schedule-trigger-2",
+      "name": "Schedule: Every 30 min",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -600,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://auron-api:8000/v1/notification-hub/escalate-overdue",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "auron-escalate-1",
+      "name": "AURON: Escalate Overdue",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -380,
+        300
+      ],
+      "notes": "Re-sends anything that required acknowledgement (e.g. a failed publish), was delivered, and you still haven't acknowledged past escalation_minutes (default 10). Without this workflow, a missed alert just sits there silently."
+    }
+  ],
+  "connections": {
+    "Schedule: Every 30 min": {
+      "main": [
+        [
+          {
+            "node": "AURON: Escalate Overdue",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "instanceId": "auron-notification-escalation"
+  }
+}

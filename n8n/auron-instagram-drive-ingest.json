@@ -1,0 +1,265 @@
+{
+  "name": "AURON - Instagram Drive Ingest (Daily)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 24,
+              "triggerAtHour": 9
+            }
+          ]
+        }
+      },
+      "id": "schedule-trigger-1",
+      "name": "Schedule: Once Daily 09:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -1200,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "fileFolder",
+        "operation": "search",
+        "filter": {
+          "folderId": {
+            "__rl": true,
+            "mode": "list",
+            "value": "PASTE_YOUR_AURON_INSTAGRAM_POOL_FOLDER_ID_HERE"
+          }
+        },
+        "options": {}
+      },
+      "id": "drive-list-1",
+      "name": "Google Drive: List New Files",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        -980,
+        300
+      ],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "PASTE_YOUR_GOOGLE_DRIVE_CREDENTIAL_ID",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{$json.mimeType}}",
+              "rightValue": "image/",
+              "operator": {
+                "type": "string",
+                "operation": "startsWith"
+              }
+            }
+          ],
+          "combinator": "or"
+        }
+      },
+      "id": "filter-images-1",
+      "name": "Filter: Is Image or Video",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.2,
+      "position": [
+        -760,
+        300
+      ],
+      "notes": "Widen this filter to also allow mimeType startsWith 'video/' -- add a second OR condition in the UI: {{$json.mimeType}} startsWith video/"
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "operation": "download",
+        "fileId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{$json.id}}"
+        },
+        "options": {}
+      },
+      "id": "drive-download-1",
+      "name": "Google Drive: Download File",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        -540,
+        300
+      ],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "PASTE_YOUR_GOOGLE_DRIVE_CREDENTIAL_ID",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Base64-encode the downloaded binary for AURON's vision endpoint.\n// AURON never holds a Drive credential itself -- n8n fetches bytes,\n// AURON only ever sees the encoded image it's handed.\nconst binary = $input.item.binary.data;\nconst base64 = binary.data;\nconst mediaType = binary.mimeType || 'image/jpeg';\nconst isVideo = mediaType.startsWith('video/');\n\nreturn {\n  json: {\n    media_ref: $input.item.json.id,\n    media_type: isVideo ? 'video' : 'image',\n    image_base64: isVideo ? null : base64,\n    image_media_type: isVideo ? null : mediaType,\n    // A video's own frame extraction is a separate, optional step --\n    // see the README note below the workflow. Left null here on purpose\n    // rather than guessing a duration.\n    duration_seconds: null\n  }\n};"
+      },
+      "id": "prepare-payload-1",
+      "name": "Prepare AURON Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -320,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://auron-api:8000/v1/instagram/media-pool/analyze-and-ingest",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"items\": [ $json ] } }}",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "id": "auron-analyze-1",
+      "name": "AURON: Analyze + Ingest",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -100,
+        300
+      ],
+      "notes": "Replace 'auron-api' with your actual AURON api container name if different -- both containers must be on the shared 'jarvis_shared' Docker network (see docs/n8n-instagram-setup.md). Test with the real container hostname, not 'localhost'."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://auron-api:8000/v1/instagram/curate",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "id": "auron-curate-1",
+      "name": "AURON: Run Curation",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        140,
+        300
+      ],
+      "notes": "Runs once per schedule trigger, after every file in this batch has been ingested -- not once per file. n8n's default 'Run Once for All Items' setting on this node is correct; do not change it to 'Run Once for Each Item'."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://auron-api:8000/v1/notification-hub/process-due",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "auron-notify-due-1",
+      "name": "AURON: Deliver Due Notifications",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        380,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Schedule: Once Daily 09:00": {
+      "main": [
+        [
+          {
+            "node": "Google Drive: List New Files",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Drive: List New Files": {
+      "main": [
+        [
+          {
+            "node": "Filter: Is Image or Video",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter: Is Image or Video": {
+      "main": [
+        [
+          {
+            "node": "Google Drive: Download File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Drive: Download File": {
+      "main": [
+        [
+          {
+            "node": "Prepare AURON Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare AURON Payload": {
+      "main": [
+        [
+          {
+            "node": "AURON: Analyze + Ingest",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AURON: Analyze + Ingest": {
+      "main": [
+        [
+          {
+            "node": "AURON: Run Curation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AURON: Run Curation": {
+      "main": [
+        [
+          {
+            "node": "AURON: Deliver Due Notifications",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "instanceId": "auron-instagram-drive-ingest"
+  }
+}
