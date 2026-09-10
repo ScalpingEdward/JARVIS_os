@@ -21,6 +21,8 @@ from uuid import uuid4
 
 from app.accounts.models import TradingAccountRecord
 from app.accounts.service import AccountRegistryService, account_registry_service
+from app.db import SessionLocal
+from app.db_models import MonitorAuditRow, MonitorLastNotifiedStateRow, MonitorOriginalStopLossRow
 from app.executive_mt5_break_even_scale_out.models import BreakEvenAssessmentCreate
 from app.executive_mt5_break_even_scale_out.service import (
     ExecutiveMT5BreakEvenScaleOutService,
@@ -82,46 +84,78 @@ class PositionMonitorService:
         self._telegram = telegram_client or TelegramDeliveryClient()
         self._clock = clock
         self._status = MonitorStatus(enabled=False, interval_seconds=DEFAULT_INTERVAL_SECONDS)
-        #: Same bounding reasoning as telegram_approvals' own audit trail --
-        #: a recent-activity log, not a permanent archive. Every
-        #: notification already has a durable trace through the Telegram
-        #: message itself once TELEGRAM_BOT_TOKEN is configured; this exists
-        #: for the case nobody was watching the phone at the time, or the
-        #: notification attempt itself failed.
-        self._audit: list[MonitorAuditRecord] = []
         self._task: asyncio.Task | None = None
         # Per-ticket state, both keyed by MT5 position ticket (unique and
         # never reused for a new trade) rather than by the ever-changing
-        # assessment id a fresh record gets each tick:
-        #
-        # _original_stop_loss: the FIRST stop-loss ever observed for this
-        # ticket, pinned forever after. trigger_points must be measured
-        # against the position's real original risk, not whatever the
-        # current stop happens to be -- if a stop is ever moved (by a real
-        # break-even execution, or by hand), recomputing "1R" from the new,
-        # moved stop would shrink the reference distance toward zero and
-        # make the trigger fire again on essentially no further movement.
-        #
-        # _last_notified_state: the actionable break-even state Brano was
-        # last actually paged about for this ticket, so the *same* ongoing
-        # state (typically approval-required, sitting there until he taps
-        # something) does not send a fresh Telegram message every tick.
-        self._original_stop_loss: dict[int, float] = {}
-        self._last_notified_state: dict[tuple[int, str], str] = {}
+        # assessment id a fresh record gets each tick. Persisted via
+        # SessionLocal (see MonitorOriginalStopLossRow/
+        # MonitorLastNotifiedStateRow's own docstrings) -- previously two
+        # in-memory dicts, silently emptied on every restart. Losing
+        # _original_stop_loss specifically was a real correctness issue,
+        # not just a missing convenience: recomputing it from a
+        # since-moved stop would corrupt every future trigger-point
+        # calculation for that position.
 
     def status(self) -> MonitorStatus:
         return self._status
 
     def _record(self, kind: str, detail: str = "", position_ticket: int | None = None) -> None:
-        self._audit.append(MonitorAuditRecord(kind=kind, detail=detail[:500], position_ticket=position_ticket))
-        if len(self._audit) > self.MAX_AUDIT_RECORDS:
-            self._audit = self._audit[-self.MAX_AUDIT_RECORDS:]
+        event = MonitorAuditRecord(kind=kind, detail=detail[:500], position_ticket=position_ticket)
+        with SessionLocal() as session:
+            session.add(MonitorAuditRow(id=str(event.id), created_at=event.created_at, data=event.model_dump_json()))
+            session.flush()
+            total = session.query(MonitorAuditRow).count()
+            if total > self.MAX_AUDIT_RECORDS:
+                excess = total - self.MAX_AUDIT_RECORDS
+                stale_ids = [
+                    r.id for r in
+                    session.query(MonitorAuditRow.id).order_by(MonitorAuditRow.created_at).limit(excess).all()
+                ]
+                session.query(MonitorAuditRow).filter(MonitorAuditRow.id.in_(stale_ids)).delete(
+                    synchronize_session=False
+                )
+            session.commit()
 
     def audit_records(self, limit: int = 50) -> list[MonitorAuditRecord]:
         """Most recent first -- notifications actually sent, and any tick
         that raised. Not every routine tick; see MonitorAuditRecord's own
         docstring for why."""
-        return list(reversed(self._audit[-limit:]))
+        with SessionLocal() as session:
+            rows = session.query(MonitorAuditRow).order_by(MonitorAuditRow.created_at.desc()).limit(limit).all()
+        return [MonitorAuditRecord.model_validate_json(r.data) for r in rows]
+
+    @staticmethod
+    def _get_original_stop_loss(ticket: int) -> float | None:
+        with SessionLocal() as session:
+            row = session.get(MonitorOriginalStopLossRow, ticket)
+        return row.stop_loss if row else None
+
+    @staticmethod
+    def _set_original_stop_loss(ticket: int, stop_loss: float) -> None:
+        with SessionLocal() as session:
+            session.add(MonitorOriginalStopLossRow(ticket=ticket, stop_loss=stop_loss))
+            session.commit()
+
+    @staticmethod
+    def _get_last_notified_state(ticket: int, kind: str) -> str | None:
+        with SessionLocal() as session:
+            row = session.get(MonitorLastNotifiedStateRow, f"{ticket}:{kind}")
+        return row.state if row else None
+
+    @staticmethod
+    def _set_last_notified_state(ticket: int, kind: str, state: str) -> None:
+        with SessionLocal() as session:
+            session.merge(MonitorLastNotifiedStateRow(ticket_kind=f"{ticket}:{kind}", state=state))
+            session.commit()
+
+    def reset(self) -> None:
+        """Needed now that storage is real and shared rather than
+        fresh-per-instance in-memory."""
+        with SessionLocal() as session:
+            session.query(MonitorAuditRow).delete()
+            session.query(MonitorOriginalStopLossRow).delete()
+            session.query(MonitorLastNotifiedStateRow).delete()
+            session.commit()
 
     # ------------------------------------------------------------------ tick
 
@@ -163,14 +197,14 @@ class PositionMonitorService:
                     ))
                     continue
 
-                if position.stop_loss is not None and position.ticket not in self._original_stop_loss:
-                    self._original_stop_loss[position.ticket] = position.stop_loss
+                if position.stop_loss is not None and self._get_original_stop_loss(position.ticket) is None:
+                    self._set_original_stop_loss(position.ticket, position.stop_loss)
 
                 result = PositionAssessed(
                     workspace_id=str(account.id), position_ticket=position.ticket, symbol=position.symbol,
                 )
 
-                original_stop = self._original_stop_loss.get(position.ticket)
+                original_stop = self._get_original_stop_loss(position.ticket)
                 if original_stop is not None:
                     # Trailing is assessed first because break_even's own
                     # gate requires trailing_state == "trailing-active" as a
@@ -282,17 +316,16 @@ class PositionMonitorService:
         tracking slot and mask each other's transitions.
         """
         actionable = ACTIONABLE_BREAK_EVEN_STATES if kind == "break_even" else ACTIONABLE_TRAILING_STATES
-        key = (position.ticket, kind)
-        previous = self._last_notified_state.get(key)
+        previous = self._get_last_notified_state(position.ticket, kind)
         if state not in actionable or state == previous:
             return False
-        self._last_notified_state[key] = state
+        self._set_last_notified_state(position.ticket, kind, state)
         label = "Break-even" if kind == "break_even" else "Trailing-Stop"
         title = f"{label} bereit" if state == "approval-required" else f"{label} blockiert"
         message = (
             f"Ticket {position.ticket} ({position.symbol}): {state}. "
             f"Aktueller Kurs {position.current_price}, ursprünglicher SL "
-            f"{self._original_stop_loss.get(position.ticket)}."
+            f"{self._get_original_stop_loss(position.ticket)}."
         )
         try:
             self._telegram.send(title, message)

@@ -23,6 +23,17 @@ from app.mt5_bridge.models import (
 from app.mt5_bridge.service import MT5BridgeService
 from app.position_monitor.service import PositionMonitorService
 
+
+@pytest.fixture(autouse=True)
+def _reset_shared_state():
+    """Storage is now real and shared rather than fresh-per-instance
+    in-memory -- see PositionMonitorService's own docstring. Several
+    tests in this file reuse fixed ticket numbers across each other, so
+    each test needs a clean slate for the audit trail, the pinned
+    original-stop-loss table, and the last-notified-state table."""
+    PositionMonitorService().reset()
+    yield
+
 NOW = datetime(2026, 9, 7, 12, 0, tzinfo=timezone.utc)
 LOGIN = 555001
 
@@ -668,5 +679,45 @@ def test_audit_store_is_bounded(rig):
     monitor, *_ = rig
     for i in range(monitor.MAX_AUDIT_RECORDS + 10):
         monitor._record("tick_failure", f"n{i}")
-    assert len(monitor._audit) == monitor.MAX_AUDIT_RECORDS
-    assert monitor._audit[-1].detail == f"n{monitor.MAX_AUDIT_RECORDS + 9}"
+    all_records = monitor.audit_records(limit=monitor.MAX_AUDIT_RECORDS + 100)
+    assert len(all_records) == monitor.MAX_AUDIT_RECORDS
+    # most recent first -- the oldest entries were dropped, not the newest
+    assert all_records[0].detail == f"n{monitor.MAX_AUDIT_RECORDS + 9}"
+
+
+def test_pinned_original_stop_loss_survives_a_simulated_restart(rig):
+    """The real correctness issue this fix closes, not just a missing
+    convenience: a restart must not re-pin the baseline from whatever the
+    stop happens to be at that moment -- it must still see the TRUE
+    original, pinned by a previous, now-gone instance."""
+    _, accounts, bridge, break_even, trailing = rig
+    account = _register_account(accounts)
+    terminal = _register_terminal(bridge)
+    _push_position(bridge, terminal.id, open_price=1.10000, stop_loss=1.09900)  # 100pt risk
+
+    first_monitor = PositionMonitorService(
+        break_even_service=break_even, trailing_service=trailing, bridge_service=bridge, accounts_service=accounts,
+    )
+    first = first_monitor.tick()
+    assert break_even.get(first.assessed[0].break_even_assessment_id, str(account.id)).trigger_points == pytest.approx(100.0)
+
+    # Simulate the broker reporting the stop already moved, AND the
+    # process having restarted -- a brand new PositionMonitorService,
+    # nothing shared but the real database.
+    _push_position(bridge, terminal.id, open_price=1.10000, stop_loss=1.10005, current_price=1.10350)
+    second_monitor = PositionMonitorService(
+        break_even_service=break_even, trailing_service=trailing, bridge_service=bridge, accounts_service=accounts,
+    )
+    second = second_monitor.tick()
+    second_record = break_even.get(second.assessed[0].break_even_assessment_id, str(account.id))
+    assert second_record.trigger_points == pytest.approx(100.0), \
+        "a restart must still use the ORIGINAL 100pt risk, pinned by the previous instance"
+
+
+def test_audit_records_survive_a_fresh_service_instance(rig):
+    monitor, *_ = rig
+    monitor._record("tick_failure", "restart-proof-entry")
+
+    fresh = PositionMonitorService()  # nothing shared but the real database
+    records = fresh.audit_records(limit=10)
+    assert any(r.detail == "restart-proof-entry" for r in records)
