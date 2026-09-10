@@ -4,6 +4,17 @@ from app.modules.position_management_brain.models import ExitRule, PositionActio
 from app.modules.position_management_brain.service import PositionManagementError, PositionManagementService
 
 
+@pytest.fixture(autouse=True)
+def _reset_shared_state():
+    """Storage is now real and shared rather than fresh-per-instance
+    in-memory -- see PositionManagementService's own docstring. Tests in
+    this file reuse fixed workspace_id/source_key values across each
+    other on purpose (to test duplicate-detection itself), so each test
+    needs a clean slate."""
+    PositionManagementService().reset()
+    yield
+
+
 def payload(**overrides) -> PositionCreate:
     data = {
         "workspace_id": "desk-a",
@@ -104,3 +115,31 @@ def test_symbol_case_is_preserved_exactly() -> None:
     service = PositionManagementService()
     record = service.create(payload(source_key="lowercase-symbol", symbol="XAUUSD.s"))
     assert record.symbol == "XAUUSD.s"
+
+
+def test_records_payloads_and_audit_survive_a_fresh_service_instance() -> None:
+    """The actual fix: a genuinely new instance (simulating a restart)
+    sees exactly what a previous one wrote -- records, the original
+    creation payload (needed for APPLY_RULE's exit_rules lookup), and
+    the audit trail."""
+    first = PositionManagementService()
+    record = first.create(payload(exit_rules=[
+        ExitRule(key="be", kind="break-even", stop_price=2395.0, evidence_ref="market:be"),
+    ]))
+    first.execute("desk-a", record.id, PositionAction(command=PositionCommand.APPROVE, actor="brano"))
+    first.execute(
+        "desk-a", record.id,
+        PositionAction(command=PositionCommand.MARK_OPEN, actor="brano", downstream_receipt="r-1"),
+    )
+
+    second = PositionManagementService()  # nothing shared but the real database
+    restored = second.get("desk-a", record.id)
+    assert restored.state == PositionState.OPEN
+    # APPLY_RULE needs the original payload's exit_rules -- proves the
+    # payload itself, not just the record, survived
+    applied = second.execute(
+        "desk-a", record.id, PositionAction(command=PositionCommand.APPLY_RULE, actor="brano", rule_key="be"),
+    )
+    assert "be" in applied.active_rule_keys
+    audit = second.audit("desk-a")
+    assert any(e.action == "mark-open" for e in audit)

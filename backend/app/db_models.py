@@ -110,3 +110,38 @@ class DynamicRiskUsedTokenRow(Base):
     __tablename__ = "dynamic_risk_used_tokens"
     token: Mapped[str] = mapped_column(String(200), primary_key=True)
     kind: Mapped[str] = mapped_column(String(20))  # "approval_token" | "downstream_receipt"
+
+
+class PositionManagementRecordRow(Base):
+    __tablename__ = "position_management_records"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    workspace_id: Mapped[str] = mapped_column(String(100), index=True)
+    source_key: Mapped[str] = mapped_column(String(200), index=True)
+    state: Mapped[str] = mapped_column(String(40), index=True)
+    data: Mapped[str] = mapped_column(Text)
+
+
+class PositionManagementPayloadRow(Base):
+    """The original PositionCreate payload, keyed by the resulting
+    record's own id -- execute()'s APPLY_RULE command looks up
+    payload.exit_rules, a field that lives on the creation payload, not
+    the record itself. Previously a second in-memory dict alongside the
+    records one; same restart-loses-everything gap."""
+
+    __tablename__ = "position_management_payloads"
+    record_id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    data: Mapped[str] = mapped_column(Text)
+
+
+class PositionManagementAuditRow(Base):
+    __tablename__ = "position_management_audit"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    workspace_id: Mapped[str] = mapped_column(String(100), index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    data: Mapped[str] = mapped_column(Text)
+
+
+class PositionManagementUsedTokenRow(Base):
+    __tablename__ = "position_management_used_tokens"
+    token: Mapped[str] = mapped_column(String(200), primary_key=True)
+    kind: Mapped[str] = mapped_column(String(20))  # "approval_token" | "downstream_receipt"
