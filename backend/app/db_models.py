@@ -1,7 +1,7 @@
 from datetime import datetime
 from uuid import uuid4
 
-from sqlalchemy import DateTime, Integer, JSON, String, Text
+from sqlalchemy import DateTime, Float, Integer, JSON, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from .db import Base
@@ -145,3 +145,38 @@ class PositionManagementUsedTokenRow(Base):
     __tablename__ = "position_management_used_tokens"
     token: Mapped[str] = mapped_column(String(200), primary_key=True)
     kind: Mapped[str] = mapped_column(String(20))  # "approval_token" | "downstream_receipt"
+
+
+class SupervisionRecordRow(Base):
+    __tablename__ = "supervision_records"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    workspace_id: Mapped[str] = mapped_column(String(100), index=True)
+    source_key: Mapped[str] = mapped_column(String(200), index=True)
+    state: Mapped[str] = mapped_column(String(40), index=True)
+    data: Mapped[str] = mapped_column(Text)
+
+
+class SupervisionPolicyRow(Base):
+    """The three governed thresholds a record was created with -- needed
+    again every time REFRESH re-evaluates fresh telemetry. Previously a
+    third in-memory dict alongside records and audit."""
+
+    __tablename__ = "supervision_policies"
+    record_id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    stale_heartbeat_seconds: Mapped[int] = mapped_column(Integer)
+    minimum_quality_score: Mapped[float] = mapped_column(Float)
+    maximum_error_rate: Mapped[float] = mapped_column(Float)
+
+
+class SupervisionAuditRow(Base):
+    __tablename__ = "supervision_audit"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    workspace_id: Mapped[str] = mapped_column(String(100), index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    data: Mapped[str] = mapped_column(Text)
+
+
+class SupervisionUsedTokenRow(Base):
+    __tablename__ = "supervision_used_tokens"
+    token: Mapped[str] = mapped_column(String(200), primary_key=True)
+    kind: Mapped[str] = mapped_column(String(20))  # "intervention_token" | "downstream_receipt"
