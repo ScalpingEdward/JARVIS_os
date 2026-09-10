@@ -104,3 +104,29 @@ nötig, kein Page-ID-Umweg.
    24h alt und nicht abgelaufen ist; danach hilft nur der komplette Neustart
    ab Schritt 3.
 
+## 8. Dritter n8n-Workflow: der eigentliche Publish-Schritt
+
+`n8n/auron-instagram-publish-webhook.json` -- der Baustein, den AURON
+tatsächlich aufruft, wenn du einen Kandidaten freigibst
+(`publisher.py` -> `N8N_INSTAGRAM_WEBHOOK_URL`, Standard
+`http://n8n:5678/webhook/instagram-post`). In n8n importieren, dann zwei
+Umgebungsvariablen **im n8n-Container selbst** setzen (Settings ->
+Variables, oder in n8n's eigener `.env`) -- niemals in der Workflow-Datei,
+niemals hier im Chat:
+
+```
+AURON_IG_USER_ID=<die user_id aus Schritt 5/6 oben>
+AURON_IG_ACCESS_TOKEN=<der langlebige Token aus Schritt 6>
+```
+
+Wichtig: läuft über `graph.instagram.com`, nicht `graph.facebook.com` --
+mit dem falschen Host kommt ein "Invalid OAuth access token"-Fehler,
+obwohl der Token selbst korrekt ist.
+
+Deckt heute Abend bewusst nur **single_image** ab -- der einfachste,
+risikoärmste Fall, um die ganze Kette einmal echt zu beweisen. Carousel
+und Reel/Video brauchen zusätzliche Schritte (mehrere Container bzw. das
+Resumable-Upload-Protokoll) und sind im Workflow als klarer 422-Fehler
+markiert, nicht stillschweigend falsch behandelt.
+
+

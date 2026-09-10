@@ -1,0 +1,155 @@
+{
+  "name": "AURON - Instagram Publish (webhook)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "instagram-post",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-trigger-1",
+      "name": "Webhook: /instagram-post",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [-1400, 300],
+      "notes": "Must match N8N_INSTAGRAM_WEBHOOK_URL on the AURON side exactly -- default is http://n8n:5678/webhook/instagram-post, so this node's path must be 'instagram-post'. AURON calls this ONLY after a human has explicitly approved the candidate (see instagram_content/service.py publish()) -- nothing upstream of this webhook makes that decision."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+          "conditions": [
+            { "leftValue": "={{$json.body.post_format}}", "rightValue": "single_image", "operator": { "type": "string", "operation": "equals" } }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "filter-single-image-1",
+      "name": "Only single_image (for tonight)",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.2,
+      "position": [-1160, 300],
+      "notes": "Tonight's first live test deliberately covers single_image only -- the most common, simplest, lowest-risk case to prove the whole chain end to end. carousel and reel need a second container-per-item + parent-container step (carousel) or the resumable upload protocol (reel/video) -- real but separate additions, not yet wired here. A request with any other post_format falls through to 'Unsupported format -> error response' below rather than silently mishandling it."
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "operation": "share",
+        "fileId": { "__rl": true, "mode": "id", "value": "={{$json.body.media_items[0].media_ref}}" },
+        "permissionsUi": {
+          "permissionsValues": { "role": "reader", "type": "anyone" }
+        }
+      },
+      "id": "drive-make-public-1",
+      "name": "Google Drive: Make File Viewable by Link",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [-920, 300],
+      "notes": "Instagram's own media-container step cURLs the image itself -- it must be reachable at a public URL at the moment of the request, AURON never uploads bytes directly. Setting 'anyone with the link, reader' is the minimum needed; the file is NOT indexed or discoverable, only fetchable by anyone who has this exact URL, which only this workflow ever sees.",
+      "credentials": {
+        "googleDriveOAuth2Api": { "id": "PASTE_YOUR_GOOGLE_DRIVE_CREDENTIAL_ID", "name": "Google Drive account" }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build the direct-fetchable image URL from the Drive file id.\n// This format (not the normal drive.google.com/file/d/.../view share\n// link) is what a plain HTTP GET -- which is what Instagram's own\n// fetcher does -- can actually read as raw image bytes.\nconst fileId = $('Webhook: /instagram-post').item.json.body.media_items[0].media_ref;\nconst caption = $('Webhook: /instagram-post').item.json.body.caption;\nconst requestId = $('Webhook: /instagram-post').item.json.body.request_id;\n\nreturn {\n  json: {\n    image_url: `https://drive.google.com/uc?export=view&id=${fileId}`,\n    caption,\n    request_id: requestId,\n  }\n};"
+      },
+      "id": "build-public-url-1",
+      "name": "Build Public Image URL",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-680, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.instagram.com/v21.0/{{$env.AURON_IG_USER_ID}}/media",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "image_url", "value": "={{$json.image_url}}" },
+            { "name": "caption", "value": "={{$json.caption}}" },
+            { "name": "access_token", "value": "={{$env.AURON_IG_ACCESS_TOKEN}}" }
+          ]
+        },
+        "options": { "timeout": 30000 }
+      },
+      "id": "ig-create-container-1",
+      "name": "Instagram: Create Media Container",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-440, 300],
+      "notes": "AURON_IG_USER_ID and AURON_IG_ACCESS_TOKEN are set as ENVIRONMENT VARIABLES on the n8n container itself (n8n Settings -> Variables, or your docker-compose .env) -- NEVER hardcoded here, NEVER committed to this JSON file. The access token is the long-lived Instagram User token from the Business Login for Instagram flow (graph.instagram.com host -- NOT graph.facebook.com, which rejects this token type with 'Invalid OAuth access token')."
+    },
+    {
+      "parameters": { "amount": 8, "unit": "seconds" },
+      "id": "wait-for-processing-1",
+      "name": "Wait for Instagram to Process",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [-200, 300],
+      "notes": "A fixed wait is a reasonable v1 for a single image (usually processes in a few seconds) -- the more correct version polls GET /{container-id}?fields=status_code until it reports FINISHED rather than assuming. Worth upgrading before this handles video/reels, where processing can take much longer and a fixed wait would be unreliable."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.instagram.com/v21.0/{{$env.AURON_IG_USER_ID}}/media_publish",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "creation_id", "value": "={{$('Instagram: Create Media Container').item.json.id}}" },
+            { "name": "access_token", "value": "={{$env.AURON_IG_ACCESS_TOKEN}}" }
+          ]
+        },
+        "options": { "timeout": 30000 }
+      },
+      "id": "ig-publish-1",
+      "name": "Instagram: Publish Container",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [40, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"media_id\": $json.id } }}"
+      },
+      "id": "respond-success-1",
+      "name": "Respond: media_id",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [280, 300],
+      "notes": "AURON's publisher.py reads exactly this field -- 'media_id' -- from the response body. Anything else, or a non-2xx status, is treated as a failed publish (item.status becomes post_failed, a notification goes out) rather than silently assumed successful."
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseCode": 422,
+        "responseBody": "={{ { \"error\": \"post_format \" + $json.body.post_format + \" is not yet wired in this n8n workflow -- only single_image is live tonight.\" } }}"
+      },
+      "id": "respond-unsupported-1",
+      "name": "Unsupported format -> error response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [-1160, 520],
+      "notes": "A clear, honest 422 rather than a silent no-op or a misleading success -- AURON's own publisher.py treats any non-2xx as a real failure and notifies Brano, which is exactly the right behavior here rather than a post that looks approved but never actually went out."
+    }
+  ],
+  "connections": {
+    "Webhook: /instagram-post": { "main": [[{ "node": "Only single_image (for tonight)", "type": "main", "index": 0 }]] },
+    "Only single_image (for tonight)": {
+      "main": [
+        [{ "node": "Google Drive: Make File Viewable by Link", "type": "main", "index": 0 }],
+        [{ "node": "Unsupported format -> error response", "type": "main", "index": 0 }]
+      ]
+    },
+    "Google Drive: Make File Viewable by Link": { "main": [[{ "node": "Build Public Image URL", "type": "main", "index": 0 }]] },
+    "Build Public Image URL": { "main": [[{ "node": "Instagram: Create Media Container", "type": "main", "index": 0 }]] },
+    "Instagram: Create Media Container": { "main": [[{ "node": "Wait for Instagram to Process", "type": "main", "index": 0 }]] },
+    "Wait for Instagram to Process": { "main": [[{ "node": "Instagram: Publish Container", "type": "main", "index": 0 }]] },
+    "Instagram: Publish Container": { "main": [[{ "node": "Respond: media_id", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" },
+  "meta": { "instanceId": "auron-instagram-publish-webhook" }
+}
