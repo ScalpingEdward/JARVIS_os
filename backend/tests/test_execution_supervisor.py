@@ -12,6 +12,16 @@ from app.modules.execution_supervisor.models import (
 from app.modules.execution_supervisor.service import ExecutionSupervisorError, ExecutionSupervisorService
 
 
+@pytest.fixture(autouse=True)
+def _reset_shared_state():
+    """Storage is now real and shared rather than fresh-per-instance
+    in-memory -- see ExecutionSupervisorService's own docstring. Tests in
+    this file reuse fixed workspace_id/source_key values across each
+    other on purpose, so each test needs a clean slate."""
+    ExecutionSupervisorService().reset()
+    yield
+
+
 def stage(key: str = "build", **overrides) -> StageTelemetry:
     data = {
         "stage_key": key,
@@ -111,3 +121,29 @@ def test_completed_telemetry_finishes_record() -> None:
     record = service.create(payload(stages=[stage(status="completed", progress_percent=100)]))
     assert record.state == SupervisionState.COMPLETED
     assert record.completed_stages == 1
+
+
+def test_records_policy_and_audit_survive_a_fresh_service_instance() -> None:
+    """The actual fix: a genuinely new instance sees exactly what a
+    previous one created and evaluated, including the audit trail. The
+    policy thresholds (needed again for a later REFRESH) must have
+    survived too, not just the record."""
+    first = ExecutionSupervisorService()
+    record = first.create(payload(stages=[stage(error_rate=0.6)]))
+    assert record.state == SupervisionState.INCIDENT
+
+    second = ExecutionSupervisorService()  # nothing shared but the real database
+    restored = second.get("ws-1", record.id)
+    assert restored.state == SupervisionState.INCIDENT
+    assert len(restored.incidents) > 0
+
+    # REFRESH needs the original policy thresholds -- proves they, not
+    # just the record, survived
+    refreshed = second.execute(
+        "ws-1", record.id,
+        SupervisionAction(command=SupervisionCommand.REFRESH, actor="brano", stages=[stage(error_rate=0.0)]),
+    )
+    assert refreshed.state == SupervisionState.HEALTHY
+
+    audit = second.audit("ws-1")
+    assert any(e.action == "evaluate" for e in audit)
