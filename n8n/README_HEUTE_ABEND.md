@@ -68,34 +68,39 @@ Posten bleibt bei dir, über
 
 ## 7. Meta Graph API + professioneller Account -- der letzte Schritt zum echten Posten
 
-Das ist der einzige Teil, der ausserhalb von AURON und ausserhalb dieser
-Anleitung liegt -- er läuft komplett in n8n, nicht im AURON-Code, laut
-Konzept ("kein Meta-Credential lebt jemals in AURON").
+**Korrektur gegenüber der ursprünglichen Version dieser Anleitung:** Meta
+bietet inzwischen einen eigenen, leichteren Weg für genau diesen Fall --
+ein Business/Creator-Konto ohne verknüpfte Facebook-Seite. Keine Seite
+nötig, kein Page-ID-Umweg.
 
-Was dafür nötig ist, aus dem, was schon mal angefangen wurde (App "JARVIS
-INST" existiert bereits im Meta Developer Portal, aber die Instagram
-Business Account ID fehlte beim letzten Stand):
+1. developers.facebook.com -> App "JARVIS INST" -> Produkt "Instagram"
+   hinzufügen -> Variante **"API setup with Instagram login"** wählen
+   (nicht "with Facebook login").
+2. Dort unter "Business login settings": eine Redirect-URI eintragen
+   (z.B. `https://localhost/auron-callback`, muss nicht real erreichbar
+   sein). Instagram App ID + Instagram App Secret dort notieren -- andere
+   Werte als die normale Facebook App ID.
+3. Im Browser öffnen (echte App ID einsetzen):
+   `https://api.instagram.com/oauth/authorize?client_id=DEINE_IG_APP_ID&redirect_uri=https://localhost/auron-callback&scope=instagram_business_basic,instagram_business_content_publish,instagram_business_manage_comments&response_type=code`
+   Einloggen, bestätigen.
+4. Browser leitet weiter, auch wenn die Seite nicht existiert -- der Code
+   steht in der Adresszeile hinter `?code=`.
+5. Lokal im Terminal (App Secret nie in den Chat einfügen):
+   ```
+   curl -X POST https://api.instagram.com/oauth/access_token \
+     -F client_id=DEINE_IG_APP_ID -F client_secret=DEIN_IG_APP_SECRET \
+     -F grant_type=authorization_code \
+     -F redirect_uri=https://localhost/auron-callback -F code=DEIN_CODE
+   ```
+   Antwort enthält `access_token` und `user_id` -- die `user_id` IST
+   direkt die Instagram Business Account ID, kein Page-Lookup nötig.
+6. Auf einen langlebigen Token (60 Tage) umtauschen:
+   ```
+   curl -X GET "https://graph.instagram.com/access_token?grant_type=ig_exchange_token&client_secret=DEIN_IG_APP_SECRET&access_token=DEIN_KURZLEBIGER_TOKEN"
+   ```
+7. Langlebiger Token + user_id in den n8n-Node eintragen, der tatsächlich
+   postet. Vor Ablauf per `GET /refresh_access_token?grant_type=ig_refresh_token`
+   erneuerbar, ohne neu einzuloggen -- aber nur wenn der Token noch mindestens
+   24h alt und nicht abgelaufen ist; danach hilft nur der komplette Neustart
+   ab Schritt 3.
 
-1. Dein Instagram-Account muss ein **Business- oder Creator-Konto** sein
-   (nicht privat) und mit einer **Facebook-Seite** verknüpft sein -- ohne
-   Facebook-Seite gibt es keine Instagram Business Account ID.
-2. In der Meta Business Suite (business.facebook.com) prüfen, dass die
-   Facebook-Seite mit deinem Instagram-Account verbunden ist.
-3. Im Graph API Explorer (developers.facebook.com/tools/explorer), App
-   "JARVIS INST" auswählen, Token mit den Berechtigungen
-   `instagram_basic`, `instagram_content_publish`, `pages_show_list`
-   generieren.
-4. Abfrage `GET /me/accounts` liefert deine Facebook-Seiten-ID zurück.
-5. Abfrage `GET /{seiten-id}?fields=instagram_business_account` liefert
-   dann endlich die Instagram Business Account ID -- das, was letztes Mal
-   leer zurückkam, meist weil Schritt 1 oder 2 noch nicht stand.
-6. Diese ID + ein langlebiger Token gehören dann in den n8n-Node, der am
-   Ende tatsächlich an die Graph API postet (in
-   `docs/n8n-instagram-setup.md` als "posts as the right Instagram
-   object... via the Meta Graph API" beschrieben, dort aber noch nicht
-   als fertiger Node ausformuliert).
-
-Das ist heute wahrscheinlich der Teil, der am ehesten noch Zeit kostet --
-alles davor (Schritt 1-6 oben) kann heute Abend tatsächlich laufen und dir
-einen fertigen, freigegebenen Kandidaten zeigen, auch wenn der letzte
-Klick zum echten Posten noch nicht verdrahtet ist.
