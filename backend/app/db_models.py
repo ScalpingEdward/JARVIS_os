@@ -236,6 +236,22 @@ class TelegramAuditRow(Base):
     data: Mapped[str] = mapped_column(Text)
 
 
+class TelegramLiveExecutionAuditRow(Base):
+    """Backs telegram_live_execution.TelegramLiveExecutionService's own
+    recent-activity log -- deliberately a separate table from
+    telegram_audit, not a shared one: this trail only ever records events
+    that could plausibly have ended with a real order reaching a real
+    broker, and is worth being able to inspect on its own rather than
+    interleaved with the earlier setup-decision stage's own log.
+    live_order_executor's own audit remains the durable record of what
+    actually happened to the order itself."""
+
+    __tablename__ = "telegram_live_execution_audit"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    data: Mapped[str] = mapped_column(Text)
+
+
 class MonitorAuditRow(Base):
     """Same bounded-window pattern as TelegramAuditRow."""
 
