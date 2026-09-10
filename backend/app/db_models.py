@@ -180,3 +180,43 @@ class SupervisionUsedTokenRow(Base):
     __tablename__ = "supervision_used_tokens"
     token: Mapped[str] = mapped_column(String(200), primary_key=True)
     kind: Mapped[str] = mapped_column(String(20))  # "intervention_token" | "downstream_receipt"
+
+
+class LiveOrderRecordRow(Base):
+    """Backs executive_mt5_live_order_executor.LiveOrderExecutorService --
+    the module closest to real money in this codebase. The `state`
+    column is what pending_execution()'s atomic claim (an UPDATE ... WHERE
+    state = 'preflight-ready') actually depends on being real and
+    consistent -- see that method's own docstring for why this is a
+    database-level compare-and-swap, not just an in-process lock: correct
+    even if more than one backend process is ever running against the
+    same database, not only against a second thread in this one."""
+
+    __tablename__ = "live_order_records"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    workspace_id: Mapped[str] = mapped_column(String(100), index=True)
+    source_key: Mapped[str] = mapped_column(String(200), index=True)
+    state: Mapped[str] = mapped_column(String(40), index=True)
+    data: Mapped[str] = mapped_column(Text)
+
+
+class LiveOrderAuditRow(Base):
+    __tablename__ = "live_order_audit"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    workspace_id: Mapped[str] = mapped_column(String(100), index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    data: Mapped[str] = mapped_column(Text)
+
+
+class LiveOrderExecutorSettingsRow(Base):
+    """Single-row-per-key settings table. Exists for exactly one value
+    today: the kill switch's own paused flag. Deliberately persisted, not
+    left as a Python bool reset to False on every restart -- if Brano
+    paused live execution because something was wrong, a restart for any
+    unrelated reason (a crash, a deploy) must not silently resume it.
+    Fail closed applies to the kill switch itself, not just to what it
+    guards."""
+
+    __tablename__ = "live_order_executor_settings"
+    key: Mapped[str] = mapped_column(String(50), primary_key=True)
+    value: Mapped[str] = mapped_column(String(20))

@@ -6,6 +6,17 @@ from app.executive_mt5_live_order_executor.models import LiveOrderCreate, LiveOr
 from app.executive_mt5_live_order_executor.service import LiveOrderExecutorService
 
 
+@pytest.fixture(autouse=True)
+def _reset_shared_state():
+    """Storage is now real and shared rather than fresh-per-instance
+    in-memory -- see LiveOrderExecutorService's own docstring. Tests in
+    this file reuse fixed workspace_id/source_key values across each
+    other on purpose, so each test needs a clean slate. Also resets the
+    persisted pause flag -- most tests want to start unpaused."""
+    LiveOrderExecutorService().reset()
+    yield
+
+
 class FakeExecutor:
     def __init__(self, check_retcode=0, send_retcode=10009, volume=0.1):
         self.check_retcode = check_retcode
@@ -420,4 +431,52 @@ def test_a_record_stuck_in_submission_pending_is_never_automatically_re_offered(
     for _ in range(5):
         assert service.pending_execution("ws-a") == []
     stuck = service.get(record.id, "ws-a")
+    assert stuck.state == LiveOrderState.SUBMISSION_PENDING
+
+
+# -- the fix: records, audit, AND the kill switch itself survive a restart --
+
+
+def test_records_and_audit_survive_a_fresh_service_instance():
+    first = LiveOrderExecutorService()
+    record = first.create(payload())
+
+    second = LiveOrderExecutorService()  # nothing shared but the real database
+    restored = second.get(record.id, "ws-a")
+    assert restored is not None
+    assert restored.state == record.state
+    audit = second.audit_records("ws-a")
+    assert any(a.action == "created" for a in audit)
+
+
+def test_the_paused_kill_switch_survives_a_simulated_restart():
+    """The single most important property in this whole conversion: if
+    Brano paused live execution because something was wrong, a restart
+    for any unrelated reason (a crash, a deploy) must not silently resume
+    it. Fail closed applies to the kill switch itself."""
+    first = LiveOrderExecutorService()
+    first.pause()
+    assert first.is_paused() is True
+
+    second = LiveOrderExecutorService()  # simulates a fresh process after a restart
+    assert second.is_paused() is True, "a restart must never silently un-pause live execution"
+
+    second.resume()
+    third = LiveOrderExecutorService()
+    assert third.is_paused() is False
+
+
+def test_a_claimed_but_never_reported_order_stays_claimed_across_a_simulated_restart():
+    """The exact scenario the atomic claim exists for: the agent crashes
+    right after pending_execution() claims an order, before it ever calls
+    order_send(). A restart must not see the order as available again --
+    it is still SUBMISSION_PENDING, waiting for a human to reconcile."""
+    first = LiveOrderExecutorService()
+    record = first.create(payload())
+    claimed = first.pending_execution("ws-a")
+    assert [r.id for r in claimed] == [record.id]
+
+    second = LiveOrderExecutorService()  # the "agent crashed and restarted" instance
+    assert second.pending_execution("ws-a") == []
+    stuck = second.get(record.id, "ws-a")
     assert stuck.state == LiveOrderState.SUBMISSION_PENDING
