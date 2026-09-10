@@ -234,3 +234,39 @@ class TelegramAuditRow(Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
     data: Mapped[str] = mapped_column(Text)
+
+
+class MonitorAuditRow(Base):
+    """Same bounded-window pattern as TelegramAuditRow."""
+
+    __tablename__ = "monitor_audit"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    data: Mapped[str] = mapped_column(Text)
+
+
+class MonitorOriginalStopLossRow(Base):
+    """The FIRST stop-loss ever observed for an MT5 position ticket,
+    pinned forever after -- see PositionMonitorService's own docstring
+    for why this must never be re-derived from a since-moved stop. A
+    restart losing this and re-pinning from whatever the *current* stop
+    happens to be at that moment (already moved by a real break-even
+    execution or by hand) would silently corrupt every future trigger-
+    point calculation for that position -- a real correctness issue, not
+    just a missing convenience, which is why this one specifically
+    (unlike the other two structures in this module) got its own
+    dedicated table rather than being treated as a nice-to-have."""
+
+    __tablename__ = "monitor_original_stop_loss"
+    ticket: Mapped[int] = mapped_column(Integer, primary_key=True)
+    stop_loss: Mapped[float] = mapped_column(Float)
+
+
+class MonitorLastNotifiedStateRow(Base):
+    """Dedup so the same ongoing state does not re-page Brano every tick.
+    Composite key stored as a single string (f"{ticket}:{kind}") --
+    simpler than a real composite primary key for a table this small."""
+
+    __tablename__ = "monitor_last_notified_state"
+    ticket_kind: Mapped[str] = mapped_column(String(80), primary_key=True)
+    state: Mapped[str] = mapped_column(String(80))
