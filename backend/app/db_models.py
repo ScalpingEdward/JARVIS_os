@@ -220,3 +220,17 @@ class LiveOrderExecutorSettingsRow(Base):
     __tablename__ = "live_order_executor_settings"
     key: Mapped[str] = mapped_column(String(50), primary_key=True)
     value: Mapped[str] = mapped_column(String(20))
+
+
+class TelegramAuditRow(Base):
+    """Backs telegram_approvals.TelegramApprovalService's recent-activity
+    log -- a bounded window (MAX_AUDIT_RECORDS, trimmed here the same way
+    the old in-memory list trimmed itself), not a permanent archive;
+    setup_submission's own records remain the durable source of truth for
+    what was actually decided. Previously in-memory only, gone on
+    restart."""
+
+    __tablename__ = "telegram_audit"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    data: Mapped[str] = mapped_column(Text)
