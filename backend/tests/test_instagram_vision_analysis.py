@@ -11,6 +11,16 @@ from app.instagram_content.media_pool_service import MediaPoolService
 from app.instagram_content.vision_analysis import AnthropicVisionAnalyzer, VisionAnalysisConfig, VisionAnalysisError
 
 
+@pytest.fixture(autouse=True)
+def _reset_shared_state():
+    """Storage is now real and shared rather than fresh-per-instance
+    in-memory -- see MediaPoolService's own docstring. This file reuses
+    generic media_refs (img-0, img-1, ...) that could otherwise collide
+    with leftover data from other test files sharing the same database."""
+    MediaPoolService().reset()
+    yield
+
+
 def _vision_response(theme="desert-gold", tags=None, score=0.8, reasoning="Clean composition."):
     body = {"theme": theme, "tags": tags or ["gold", "desert"], "aesthetic_score": score, "reasoning": reasoning}
     return httpx.Response(200, json={"content": [{"type": "text", "text": json.dumps(body)}]})

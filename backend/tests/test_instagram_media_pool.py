@@ -11,6 +11,17 @@ from app.instagram_content.publisher import N8nInstagramPublisher
 from app.instagram_content.service import InstagramContentError, InstagramContentService
 
 
+@pytest.fixture(autouse=True)
+def _reset_shared_state():
+    """Storage is now real and shared rather than fresh-per-instance
+    in-memory -- see MediaPoolService's own docstring. Tests in this file
+    reuse fixed media_refs across each other, so each test needs a clean
+    slate."""
+    MediaPoolService().reset()
+    InstagramContentService().reset()
+    yield
+
+
 def _image_create(ref, theme="desert-gold", score=0.75):
     return MediaPoolItemCreate(media_ref=ref, media_type="image", theme=theme, aesthetic_score=score)
 
@@ -184,3 +195,24 @@ def test_finalize_unknown_draft_fails_closed():
     service = _service_with_mock_publisher(lambda r: httpx.Response(200, json={"media_id": "x"}))
     with pytest.raises(InstagramContentError, match="not found"):
         service.finalize_draft(uuid4(), FinalizeDraftRequest(caption_draft="Anything"))
+
+
+def test_pool_items_and_drafts_survive_a_fresh_service_instance():
+    """The actual fix, and exactly what the external test pass named:
+    'Instagram-Entwuerfe, Medienreservierungen' -- a genuinely fresh
+    service instance sees exactly what a previous one ingested and
+    curated, including which items are reserved in which draft."""
+    first = MediaPoolService()
+    first.ingest(MediaPoolIngestRequest(items=[_image_create(f"restart-{i}") for i in range(4)]))
+    drafts = first.run_curation()
+    assert len(drafts) >= 1
+    draft_id = drafts[0].id
+
+    second = MediaPoolService()  # nothing shared but the real database
+    restored_draft = second.get_draft(draft_id)
+    assert restored_draft.id == draft_id
+    # the reservation itself must have survived -- these items must not
+    # be available for a second curation run
+    available_refs = {item.media_ref for item in second.list_available()}
+    reserved_refs = {second.get(item_id).media_ref for item_id in restored_draft.media_item_ids}
+    assert available_refs.isdisjoint(reserved_refs)
