@@ -451,11 +451,23 @@ def test_prepare_live_order_rounds_volume_down_to_the_real_broker_step() -> None
     account where the exact theoretical size (e.g. 0.136925) was rejected
     outright by the executor's volume-step check. Must round DOWN (never
     up, which would exceed the approved risk) to the nearest valid step."""
-    from app.modules.position_management_brain.router import service as position_management_service
+    from app.db import SessionLocal
+    from app.db_models import PositionManagementRecordRow
+    from app.modules.position_management_brain.models import PositionRecord
 
     workspace_id, position_id = _open_a_position()
-    position = position_management_service.get(workspace_id, position_id)
-    position.position_size = 0.136925  # deliberately not a clean multiple of 0.01
+    # position_management_brain.get() now returns a freshly-deserialized
+    # copy each call (correct encapsulation, backed by real persistence --
+    # see that service's own docstring), not a live reference into shared
+    # state the way the old in-memory dict implementation accidentally
+    # allowed. Writing directly to the real stored row is the honest way
+    # to set up this specific, deliberately-fractional test value now.
+    with SessionLocal() as session:
+        row = session.get(PositionManagementRecordRow, position_id)
+        record = PositionRecord.model_validate_json(row.data)
+        record.position_size = 0.136925  # deliberately not a clean multiple of 0.01
+        row.data = record.model_dump_json()
+        session.commit()
 
     order = trade_risk_pipeline_service.prepare_live_order(
         workspace_id,
