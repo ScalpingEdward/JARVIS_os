@@ -270,3 +270,25 @@ class MonitorLastNotifiedStateRow(Base):
     __tablename__ = "monitor_last_notified_state"
     ticket_kind: Mapped[str] = mapped_column(String(80), primary_key=True)
     state: Mapped[str] = mapped_column(String(80))
+
+
+class AutomationConnectorRow(Base):
+    __tablename__ = "automation_connectors"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    workspace_id: Mapped[str] = mapped_column(String(100), index=True)
+    connector_key: Mapped[str] = mapped_column(String(100), index=True)
+    data: Mapped[str] = mapped_column(Text)
+
+
+class AutomationJobRow(Base):
+    """The idempotency_key column is what create_job()'s duplicate-
+    request check queries on directly -- no separate index table needed,
+    unlike this session's earlier _source_index-style in-memory dicts,
+    since a real indexed column serves the same purpose."""
+
+    __tablename__ = "automation_jobs"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    workspace_id: Mapped[str] = mapped_column(String(100), index=True)
+    idempotency_key: Mapped[str] = mapped_column(String(200), index=True)
+    state: Mapped[str] = mapped_column(String(40), index=True)
+    data: Mapped[str] = mapped_column(Text)

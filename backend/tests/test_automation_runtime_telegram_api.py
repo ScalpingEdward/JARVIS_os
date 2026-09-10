@@ -7,12 +7,21 @@ the equivalent Telegram routes elsewhere in this session got."""
 
 from __future__ import annotations
 
+import pytest
 from fastapi.testclient import TestClient
 
 import app.automation_runtime.api as automation_api
 from app.automation_runtime.models import ConnectorMutation, ConnectorType
 from app.automation_runtime.service import AutomationRuntimeService
 from app.main import app
+
+
+@pytest.fixture(autouse=True)
+def _reset_shared_state():
+    """Storage is now real and shared rather than fresh-per-instance
+    in-memory -- see AutomationRuntimeService's own docstring."""
+    AutomationRuntimeService().reset()
+    yield
 from tests.test_automation_runtime import (
     FakeTelegramClient,
     real_job_payload,

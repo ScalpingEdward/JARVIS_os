@@ -14,6 +14,16 @@ from app.automation_runtime.service import AutomationRuntimeService
 from app.notification_hub.telegram_delivery import TelegramDeliveryError
 
 
+@pytest.fixture(autouse=True)
+def _reset_shared_state():
+    """Storage is now real and shared rather than fresh-per-instance
+    in-memory -- see AutomationRuntimeService's own docstring. Tests in
+    this file reuse fixed connector_key/idempotency_key values across
+    each other, so each test needs a clean slate."""
+    AutomationRuntimeService().reset()
+    yield
+
+
 def connector_payload(**overrides) -> ConnectorRegister:
     values = {
         "workspace_id": "phoenix-main",
@@ -48,13 +58,18 @@ def job_payload(connector_id, **overrides) -> AutomationJobCreate:
 
 def active_connector(service: AutomationRuntimeService):
     connector = service.register_connector(connector_payload())
-    service.activate_connector(
+    # activate_connector() now returns a freshly-deserialized copy
+    # (correct encapsulation, backed by real persistence -- see
+    # AutomationRuntimeService's own docstring), not a live reference
+    # into shared state the old in-memory dict implementation
+    # accidentally allowed. Use its own return value, not the stale
+    # reference from register_connector() above.
+    return service.activate_connector(
         connector.id,
         "phoenix-main",
         "owner-1",
         ConnectorMutation(reason="approved"),
     )
-    return connector
 
 
 def test_connector_registration_activation_and_workspace_isolation() -> None:
@@ -285,3 +300,32 @@ def test_runtime_status_names_telegram_as_the_one_real_connector() -> None:
     status = service.status()
     assert status.real_execution_connector_types == ["telegram"]
     assert status.dry_run_only is False
+
+
+def test_connectors_and_jobs_survive_a_fresh_service_instance():
+    """The actual fix: a genuinely new instance (simulating a restart)
+    sees exactly what a previous one registered, activated, and queued --
+    including a job's idempotency key, still correctly deduplicating
+    across the restart."""
+    first = AutomationRuntimeService()
+    connector = first.activate_connector(
+        first.register_connector(connector_payload()).id, "phoenix-main", "owner-1",
+        ConnectorMutation(reason="approved"),
+    )
+    job = first.create_job(AutomationJobCreate(
+        workspace_id="phoenix-main", requester_id="brano", connector_id=connector.id,
+        action="preview_post", payload={}, idempotency_key="restart-proof-key",
+    ))
+
+    second = AutomationRuntimeService()  # nothing shared but the real database
+    restored_connector = second.get_connector(connector.id, "phoenix-main")
+    assert restored_connector.state.value == "active"
+    restored_job = second.get_job(job.id, "phoenix-main")
+    assert restored_job is not None
+
+    # idempotency must still work across the "restart"
+    duplicate = second.create_job(AutomationJobCreate(
+        workspace_id="phoenix-main", requester_id="brano", connector_id=connector.id,
+        action="preview_post", payload={}, idempotency_key="restart-proof-key",
+    ))
+    assert duplicate.id == job.id
