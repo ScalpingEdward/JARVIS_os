@@ -64,13 +64,13 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "=https://graph.instagram.com/v21.0/{{$env.AURON_IG_USER_ID}}/media",
+        "url": "=https://graph.instagram.com/v21.0/{{$vars.AURON_IG_USER_ID}}/media",
         "sendQuery": true,
         "queryParameters": {
           "parameters": [
             { "name": "image_url", "value": "={{$json.image_url}}" },
             { "name": "caption", "value": "={{$json.caption}}" },
-            { "name": "access_token", "value": "={{$env.AURON_IG_ACCESS_TOKEN}}" }
+            { "name": "access_token", "value": "={{$vars.AURON_IG_ACCESS_TOKEN}}" }
           ]
         },
         "options": { "timeout": 30000 }
@@ -80,7 +80,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [-440, 300],
-      "notes": "AURON_IG_USER_ID and AURON_IG_ACCESS_TOKEN are set as ENVIRONMENT VARIABLES on the n8n container itself (n8n Settings -> Variables, or your docker-compose .env) -- NEVER hardcoded here, NEVER committed to this JSON file. The access token is the long-lived Instagram User token from the Business Login for Instagram flow (graph.instagram.com host -- NOT graph.facebook.com, which rejects this token type with 'Invalid OAuth access token')."
+      "notes": "AURON_IG_USER_ID and AURON_IG_ACCESS_TOKEN are set via n8n's own built-in Variables screen (left sidebar -> Overview -> Variables tab, or Settings -> Variables depending on version) -- NOT Docker environment variables, so no container restart or docker-compose edit is needed to change them. NEVER hardcoded here, NEVER committed to this JSON file. The access token is the long-lived Instagram User token from the Business Login for Instagram flow (graph.instagram.com host -- NOT graph.facebook.com, which rejects this token type with 'Invalid OAuth access token')."
     },
     {
       "parameters": { "amount": 8, "unit": "seconds" },
@@ -94,12 +94,12 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "=https://graph.instagram.com/v21.0/{{$env.AURON_IG_USER_ID}}/media_publish",
+        "url": "=https://graph.instagram.com/v21.0/{{$vars.AURON_IG_USER_ID}}/media_publish",
         "sendQuery": true,
         "queryParameters": {
           "parameters": [
             { "name": "creation_id", "value": "={{$('Instagram: Create Media Container').item.json.id}}" },
-            { "name": "access_token", "value": "={{$env.AURON_IG_ACCESS_TOKEN}}" }
+            { "name": "access_token", "value": "={{$vars.AURON_IG_ACCESS_TOKEN}}" }
           ]
         },
         "options": { "timeout": 30000 }
