@@ -37,7 +37,7 @@ def curate(pool_items: list[MediaPoolItem], max_groups: int = 10) -> list[Curate
     unused = [item for item in pool_items if item.available]
     by_theme: dict[str, list[MediaPoolItem]] = defaultdict(list)
     for item in unused:
-        by_theme[item.theme].append(item)
+        by_theme[item.source_group or item.theme].append(item)
 
     groups: list[CuratedGroup] = []
 

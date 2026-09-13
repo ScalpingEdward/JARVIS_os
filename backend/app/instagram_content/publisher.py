@@ -23,7 +23,7 @@ class N8nInstagramPublisherConfig:
     """
 
     webhook_url: str = os.getenv("N8N_INSTAGRAM_WEBHOOK_URL", "http://n8n:5678/webhook/instagram-post")
-    timeout_seconds: float = 15.0
+    timeout_seconds: float = 120.0
 
 
 class N8nInstagramPublisher:

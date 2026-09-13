@@ -51,6 +51,7 @@ def analyze_and_ingest(
                 tags=analysis.tags,
                 aesthetic_score=analysis.aesthetic_score,
                 duration_seconds=item.duration_seconds,
+                source_group=item.source_group,
             )
         )
         results.append(

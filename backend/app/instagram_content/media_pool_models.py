@@ -23,6 +23,13 @@ class MediaPoolItemCreate(BaseModel):
         "Items only get grouped into the same carousel if their theme matches.",
     )
     tags: list[str] = Field(default_factory=list, max_length=20)
+    source_group: str | None = Field(
+        default=None,
+        max_length=200,
+        description="The Drive subfolder the file came from, e.g. 'tag 1'. When set, it takes "
+        "precedence over theme for carousel grouping: one folder is one shoot, so its items "
+        "belong together regardless of how finely the vision step labelled each theme.",
+    )
     aesthetic_score: float = Field(ge=0, le=1)
     duration_seconds: float | None = Field(default=None, gt=0)
     dominant_color_hex: str | None = Field(default=None, max_length=7)
@@ -140,6 +147,7 @@ class MediaAnalyzeAndIngestItem(BaseModel):
     image_media_type: str | None = Field(default=None, description="e.g. 'image/jpeg', required together with image_base64.")
     image_url: str | None = Field(default=None, description="Alternative to image_base64: an already-fetchable image URL.")
     duration_seconds: float | None = Field(default=None, gt=0, description="Required for video; ignored for image.")
+    source_group: str | None = Field(default=None, max_length=200, description="Drive subfolder name, e.g. 'tag 1'.")
 
 
 class MediaAnalyzeAndIngestRequest(BaseModel):
