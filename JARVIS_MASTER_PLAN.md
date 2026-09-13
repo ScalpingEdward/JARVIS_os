@@ -3,6 +3,23 @@
 Status: canonical project roadmap
 Repository: `ScalpingEdward/JARVIS_os`
 
+## Active handoff — 2026-09-13
+
+Owner's current priority is the Instagram stabilization handoff in
+`docs/SESSION_2026-09-13.md`, based on `e760fbc4`. The persistence correction
+is implemented on `fix/instagram-durable-storage`, pending review/merge:
+`DATABASE_URL` from Compose is now honored alongside `JARVIS_DATABASE_URL`.
+The real pool/draft/candidate services pass process-replacement regressions;
+the full backend suite passes (2,855 tests). Before recreating the owner's
+API container, preserve any legacy `/app/jarvis.db` data using
+`docs/instagram-persistence.md`. No live migration has been performed.
+
+Next after merge and deployment verification: explicit recovery for
+rejected and uncertain-publishing candidates. Current live n8n workflow
+exports are still absent from the repo; do not overwrite them with the
+older files under `n8n/`. See `tasks/instagram-persistence.md` for the
+bounded task and verification record.
+
 ## 1. Mission
 JARVIS is the master operating system. AURON is its controlled intelligence/orchestration layer. Vertical capabilities operate through one governed core, one Command Centre, shared identity/audit state, and explicit safety boundaries. Build sequence must be preserved.
 

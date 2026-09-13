@@ -21,6 +21,13 @@ Use the generated `https://<machine>.<tailnet>.ts.net` address on the phone. Do 
 ## Persistence
 PostgreSQL, application data, and logs use named Docker volumes. Rebuilding containers does not remove them. Never run `docker compose down -v` unless you intentionally want to delete all persistent data.
 
+The backend accepts `DATABASE_URL` from Compose and `JARVIS_DATABASE_URL`.
+The prefixed name wins when both environment variables are set. Earlier
+versions ignored `DATABASE_URL` and could write to `/app/jarvis.db` inside
+the API container instead of PostgreSQL. **Before recreating an existing
+container, follow [the preservation procedure](instagram-persistence.md).**
+Pointing at another database does not copy the old records automatically.
+
 ## Backup and restore
 Run `sh scripts/backup.sh`. Restore with `sh scripts/restore.sh backups/<timestamp>` while no workflows are mutating data. Copy backups to an encrypted second location.
 
