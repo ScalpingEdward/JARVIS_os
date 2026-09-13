@@ -1,5 +1,11 @@
 from __future__ import annotations
 
+import base64
+from datetime import datetime
+from io import BytesIO
+
+from PIL import Image
+
 from .media_pool_models import (
     MediaAnalyzeAndIngestItem,
     MediaAnalyzeAndIngestItemResult,
@@ -10,6 +16,32 @@ from .media_pool_models import (
 from .media_pool_service import MediaPoolService
 from .models import MediaType
 from .vision_analysis import AnthropicVisionAnalyzer, VisionAnalysisError
+
+_EXIF_IFD_EXIF = 0x8769
+_TAG_DATETIME_ORIGINAL = 0x9003
+_TAG_OFFSET_TIME_ORIGINAL = 0x9011
+
+
+def _read_captured_at(image_base64: str | None) -> datetime | None:
+    """Best-effort EXIF DateTimeOriginal extraction, with OffsetTimeOriginal
+    applied as the timezone when present. Returns None on any failure --
+    missing EXIF, corrupt image data, unexpected format -- ingest must never
+    fail just because a photo's capture time couldn't be read."""
+    if not image_base64:
+        return None
+    try:
+        image = Image.open(BytesIO(base64.b64decode(image_base64)))
+        exif_ifd = image.getexif().get_ifd(_EXIF_IFD_EXIF)
+        raw_datetime = exif_ifd.get(_TAG_DATETIME_ORIGINAL)
+        if not raw_datetime:
+            return None
+        naive = datetime.strptime(raw_datetime, "%Y:%m:%d %H:%M:%S")
+        raw_offset = exif_ifd.get(_TAG_OFFSET_TIME_ORIGINAL)
+        if raw_offset:
+            return naive.replace(tzinfo=datetime.strptime(raw_offset, "%z").tzinfo)
+        return naive
+    except Exception:
+        return None
 
 
 def analyze_and_ingest(
@@ -52,6 +84,7 @@ def analyze_and_ingest(
                 aesthetic_score=analysis.aesthetic_score,
                 duration_seconds=item.duration_seconds,
                 source_group=item.source_group,
+                captured_at=item.captured_at or _read_captured_at(item.image_base64),
             )
         )
         results.append(

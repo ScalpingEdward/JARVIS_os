@@ -55,9 +55,9 @@ def test_dashboard_reflects_media_pool_state():
     media_pool_service.ingest(
         MediaPoolIngestRequest(
             items=[
-                MediaPoolItemCreate(media_ref="a", media_type="image", theme="t", aesthetic_score=0.8),
-                MediaPoolItemCreate(media_ref="b", media_type="image", theme="t", aesthetic_score=0.8),
-                MediaPoolItemCreate(media_ref="c", media_type="image", theme="t", aesthetic_score=0.8),
+                MediaPoolItemCreate(media_ref="a", media_type="image", theme="t", aesthetic_score=0.6),
+                MediaPoolItemCreate(media_ref="b", media_type="image", theme="t", aesthetic_score=0.6),
+                MediaPoolItemCreate(media_ref="c", media_type="image", theme="t", aesthetic_score=0.6),
             ]
         )
     )

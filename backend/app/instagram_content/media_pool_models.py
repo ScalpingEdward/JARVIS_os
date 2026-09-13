@@ -30,6 +30,11 @@ class MediaPoolItemCreate(BaseModel):
         "precedence over theme for carousel grouping: one folder is one shoot, so its items "
         "belong together regardless of how finely the vision step labelled each theme.",
     )
+    captured_at: datetime | None = Field(
+        default=None,
+        description="EXIF capture timestamp (DateTimeOriginal). Used for chronological "
+        "grouping and sorting.",
+    )
     aesthetic_score: float = Field(ge=0, le=1)
     duration_seconds: float | None = Field(default=None, gt=0)
     dominant_color_hex: str | None = Field(default=None, max_length=7)
@@ -148,6 +153,11 @@ class MediaAnalyzeAndIngestItem(BaseModel):
     image_url: str | None = Field(default=None, description="Alternative to image_base64: an already-fetchable image URL.")
     duration_seconds: float | None = Field(default=None, gt=0, description="Required for video; ignored for image.")
     source_group: str | None = Field(default=None, max_length=200, description="Drive subfolder name, e.g. 'tag 1'.")
+    captured_at: datetime | None = Field(
+        default=None,
+        description="EXIF capture timestamp (DateTimeOriginal). Used for chronological "
+        "grouping and sorting.",
+    )
 
 
 class MediaAnalyzeAndIngestRequest(BaseModel):

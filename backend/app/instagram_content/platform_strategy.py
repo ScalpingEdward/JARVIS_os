@@ -17,7 +17,7 @@ class PlatformStrategy(BaseModel):
     optimal_hashtag_max: int = 5
     carousel_min_size: int = 3
     carousel_ideal_max_size: int = 10
-    elite_solo_threshold: float = 0.85
+    elite_solo_threshold: float = 0.75
     updated_at: datetime = Field(default_factory=lambda: datetime(2026, 8, 31, tzinfo=timezone.utc))
     reason: str = (
         "Initial values verified via web search 2026-08-31: Instagram enforces a hard 5-hashtag "

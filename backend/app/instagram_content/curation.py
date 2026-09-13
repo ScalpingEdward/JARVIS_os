@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from dataclasses import dataclass
+from datetime import datetime
 
 from .media_pool_models import ContentGapReport, MediaPoolItem, ThemeGap
 from .models import MediaType
@@ -24,6 +25,26 @@ class CuratedGroup:
     reasoning: str
 
 
+def _group_key(item: MediaPoolItem) -> str:
+    """captured_at's local date takes precedence -- a real shoot day beats
+    any label -- then source_group (one Drive folder = one shoot), then
+    theme as the last resort when neither is known."""
+    if item.captured_at is not None:
+        return item.captured_at.date().isoformat()
+    return item.source_group or item.theme
+
+
+def _order_group(items: list[MediaPoolItem]) -> list[MediaPoolItem]:
+    """Highest-score item leads as the hook; the rest follow chronologically
+    by captured_at (items without a captured_at sort last, in their
+    existing relative order) instead of by score."""
+    if not items:
+        return items
+    hook, rest = items[0], items[1:]
+    rest.sort(key=lambda i: (i.captured_at is None, i.captured_at or datetime.min))
+    return [hook, *rest]
+
+
 def curate(pool_items: list[MediaPoolItem], max_groups: int = 10) -> list[CuratedGroup]:
     """Groups unused pool items into post-worthy sets, respecting real
     account-curation logic: standout single images become hero posts,
@@ -37,7 +58,7 @@ def curate(pool_items: list[MediaPoolItem], max_groups: int = 10) -> list[Curate
     unused = [item for item in pool_items if item.available]
     by_theme: dict[str, list[MediaPoolItem]] = defaultdict(list)
     for item in unused:
-        by_theme[item.source_group or item.theme].append(item)
+        by_theme[_group_key(item)].append(item)
 
     groups: list[CuratedGroup] = []
 
@@ -75,7 +96,7 @@ def curate(pool_items: list[MediaPoolItem], max_groups: int = 10) -> list[Curate
                 groups.append(
                     CuratedGroup(
                         theme=theme,
-                        media_items=list(batch),
+                        media_items=_order_group(list(batch)),
                         reasoning=f"{len(batch)} same-theme images ('{theme}') batched into a full carousel.",
                     )
                 )
@@ -84,7 +105,7 @@ def curate(pool_items: list[MediaPoolItem], max_groups: int = 10) -> list[Curate
             groups.append(
                 CuratedGroup(
                     theme=theme,
-                    media_items=list(batch),
+                    media_items=_order_group(list(batch)),
                     reasoning=f"{len(batch)} same-theme images ('{theme}') -- enough for a real carousel set.",
                 )
             )

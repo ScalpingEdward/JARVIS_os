@@ -22,11 +22,11 @@ def _reset_shared_state():
     yield
 
 
-def _image_create(ref, theme="desert-gold", score=0.75):
+def _image_create(ref, theme="desert-gold", score=0.6):
     return MediaPoolItemCreate(media_ref=ref, media_type="image", theme=theme, aesthetic_score=score)
 
 
-def _video_create(ref, theme="desert-gold", score=0.75, duration=25.0):
+def _video_create(ref, theme="desert-gold", score=0.6, duration=25.0):
     return MediaPoolItemCreate(media_ref=ref, media_type="video", theme=theme, aesthetic_score=score, duration_seconds=duration)
 
 
@@ -71,6 +71,27 @@ def test_curate_gives_an_elite_image_its_own_hero_post():
 
     hero_groups = [g for g in groups if len(g.media_items) == 1 and g.media_items[0].media_ref == "hero"]
     assert len(hero_groups) == 1
+
+
+def test_curate_elite_solo_threshold_is_a_hard_boundary():
+    """Locks in the >= comparison in curation.py: a score exactly at the
+    threshold is elite (hero), a score just below it is not (carousel)."""
+    from app.instagram_content.media_pool_models import MediaPoolItem
+
+    just_below = MediaPoolItem(**_image_create("just-below", score=ELITE_SOLO_THRESHOLD - 0.01).model_dump())
+    at_threshold = MediaPoolItem(**_image_create("at-threshold", score=ELITE_SOLO_THRESHOLD).model_dump())
+    just_above = MediaPoolItem(**_image_create("just-above", score=ELITE_SOLO_THRESHOLD + 0.01).model_dump())
+    filler = [MediaPoolItem(**_image_create(f"filler-{i}", score=0.5).model_dump()) for i in range(2)]
+
+    groups = curate([just_below, at_threshold, just_above, *filler])
+
+    hero_refs = {g.media_items[0].media_ref for g in groups if len(g.media_items) == 1}
+    assert hero_refs == {"at-threshold", "just-above"}
+
+    carousel_groups = [g for g in groups if len(g.media_items) > 1]
+    assert len(carousel_groups) == 1
+    carousel_refs = {m.media_ref for m in carousel_groups[0].media_items}
+    assert carousel_refs == {"just-below", "filler-0", "filler-1"}
 
 
 def test_curate_always_puts_a_video_alone():
