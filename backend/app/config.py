@@ -1,5 +1,6 @@
 from functools import lru_cache
 
+from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -7,7 +8,12 @@ class Settings(BaseSettings):
     app_name: str = "JARVIS OS"
     environment: str = "development"
     version: str = "0.1.0"
-    database_url: str = "sqlite:///./jarvis.db"
+    # Compose supplies DATABASE_URL. Keep the prefixed spelling as an
+    # explicit override for existing native installs and test environments.
+    database_url: str = Field(
+        default="sqlite:///./jarvis.db",
+        validation_alias=AliasChoices("JARVIS_DATABASE_URL", "DATABASE_URL"),
+    )
 
     anthropic_enabled: bool = False
     anthropic_api_key: str | None = None
@@ -21,6 +27,7 @@ class Settings(BaseSettings):
         env_prefix="JARVIS_",
         env_file=".env",
         extra="ignore",
+        populate_by_name=True,
     )
 
 
