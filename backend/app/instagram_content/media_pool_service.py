@@ -178,5 +178,28 @@ class MediaPoolService:
             row.data = draft.model_dump_json()
             session.commit()
 
+    def release_items_used_by(self, candidate_id: UUID) -> int:
+        """Reverses mark_finalized() for a candidate that turned out to be a
+        dead end (e.g. a publish that failed for good) -- its media items
+        go back into the available pool instead of staying blocked forever
+        as 'used' with nothing left able to reclaim them. No indexed column
+        for used_in_candidate_id exists, so this scans like list_all()
+        does; fine at this table's scale."""
+        released = 0
+        with SessionLocal() as session:
+            rows = session.query(InstagramMediaPoolItemRow).all()
+            for row in rows:
+                item = MediaPoolItem.model_validate_json(row.data)
+                if item.used_in_candidate_id != candidate_id:
+                    continue
+                item.used = False
+                item.used_in_candidate_id = None
+                item.used_at = None
+                item.reserved_in_draft_id = None
+                row.data = item.model_dump_json()
+                released += 1
+            session.commit()
+        return released
+
 
 media_pool_service = MediaPoolService()

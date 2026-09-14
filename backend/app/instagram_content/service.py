@@ -16,7 +16,7 @@ from .media_pool_models import FinalizeDraftRequest
 from .media_pool_service import MediaPoolError, media_pool_service
 from .models import ContentCandidate, ContentCandidateCreate, ContentDecision, ContentStatus, MediaItem
 from .moderation import moderate
-from .publisher import N8nInstagramPublisher, N8nInstagramPublisherError
+from .publisher import N8nInstagramPublisher
 
 from app.knowledge_graph.models import NodeCreate, NodeKind
 from app.knowledge_graph.service import knowledge_graph_service
@@ -257,10 +257,16 @@ class InstagramContentService:
                 caption=item.caption_draft,
                 request_id=str(item.id),
             )
-        except N8nInstagramPublisherError as exc:
+        except Exception as exc:
+            # Deliberately broad: N8nInstagramPublisherError isn't the only
+            # way this can fail (a malformed n8n response, a bug in edit
+            # plan serialization, ...) -- anything left uncaught here would
+            # leave the atomic claim above stuck on 'publishing' forever,
+            # with its media items permanently marked used and no way back.
             item.status = ContentStatus.post_failed
-            item.audit_log.append(f"Publish failed: {exc}")
+            item.audit_log.append(f"Publish failed: {type(exc).__name__}: {exc}")
             self._save_candidate(item)
+            media_pool_service.release_items_used_by(item.id)
             self._notify_publish_failed(item, exc)
             raise InstagramContentError(str(exc)) from exc
 
