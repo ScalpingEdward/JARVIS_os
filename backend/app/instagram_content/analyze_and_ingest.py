@@ -57,8 +57,19 @@ def analyze_and_ingest(
     """
     results: list[MediaAnalyzeAndIngestItemResult] = []
     creates: list[MediaPoolItemCreate] = []
+    existing_media_refs = {existing.media_ref for existing in pool_service.list_all()}
 
     for item in items:
+        if item.media_ref in existing_media_refs:
+            results.append(
+                MediaAnalyzeAndIngestItemResult(
+                    media_ref=item.media_ref,
+                    success=True,
+                    reasoning="Already in the media pool -- skipped vision analysis.",
+                )
+            )
+            continue
+
         if item.media_type == MediaType.video and item.duration_seconds is None:
             results.append(
                 MediaAnalyzeAndIngestItemResult(
