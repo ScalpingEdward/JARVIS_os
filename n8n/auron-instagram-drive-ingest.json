@@ -1,5 +1,5 @@
 {
-  "id": "DbXFv3lB6JEfsKqE",
+  "id": "ZToOzqpU44DXWkGh",
   "name": "AURON - Instagram Drive Ingest v8",
   "active": true,
   "nodes": [
@@ -8,13 +8,13 @@
         "batchSize": 5,
         "options": {}
       },
-      "id": "0eec9648-1890-4e0e-be0e-d4ea7cb0d597",
+      "id": "05b9fb8b-fc38-402f-b4db-09a95bbac2d2",
       "name": "Loop Over Items v7",
       "type": "n8n-nodes-base.splitInBatches",
       "typeVersion": 3,
       "position": [
-        2896,
-        -1216
+        -1840,
+        176
       ],
       "notes": "Processes the folder in batches of 5. Keeps the Code node's base64 footprint small and, together with the batch-wide .all() lookup in 'Prepare AURON Payload1', avoids the paired-item tracing that made the task runner time out partway through a 223-file run."
     },
@@ -23,18 +23,19 @@
         "rule": {
           "interval": [
             {
-              "triggerAtHour": 9
+              "field": "minutes",
+              "minutesInterval": 20
             }
           ]
         }
       },
-      "id": "11566b1f-1100-4fc7-b0b8-22f272e920cf",
+      "id": "aa708d1e-1ff1-4924-a71c-7250c1794e4f",
       "name": "Schedule: Once Daily 09: v7",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
       "position": [
-        1872,
-        -1216
+        -2928,
+        176
       ]
     },
     {
@@ -56,13 +57,13 @@
           ]
         }
       },
-      "id": "e5f96aa0-8c55-472b-91a6-718fb01a551c",
+      "id": "067660a7-bc1f-464b-b55f-3b1f8c5bf807",
       "name": "Google Drive: List New Files v7",
       "type": "n8n-nodes-base.googleDrive",
       "typeVersion": 3,
       "position": [
-        2272,
-        -1216
+        -2512,
+        176
       ],
       "retryOnFail": true,
       "maxTries": 3,
@@ -84,13 +85,13 @@
         },
         "options": {}
       },
-      "id": "4f246c47-1827-4815-bb5a-c7918ab24cb8",
+      "id": "2f6cbed2-ba47-408b-9847-127f150c5181",
       "name": "Google Drive: Download File v7",
       "type": "n8n-nodes-base.googleDrive",
       "typeVersion": 3,
       "position": [
-        3104,
-        -1216
+        -1632,
+        176
       ],
       "retryOnFail": true,
       "maxTries": 3,
@@ -106,13 +107,13 @@
       "parameters": {
         "jsCode": "// Base64-encode the downloaded binaries for AURON's vision endpoint.\n// AURON never holds a Drive credential itself -- n8n fetches bytes,\n// AURON only ever sees the encoded image it's handed.\n//\n// Runs once for ALL items of the current batch on purpose: $('Loop Over\n// Items').all() returns just this batch's items, a plain array read. The\n// per-item form ($('Loop Over Items v7').item) makes n8n trace paired items\n// back through every previous batch, which gets slower each round and\n// eventually times the task runner out on a large folder.\n\n// Reads the real duration out of a video's own MP4 'mvhd' atom\n// (duration / timescale) by walking the box structure directly on the\n// raw bytes -- no ffmpeg/ffprobe binary required, which this n8n image\n// does not ship with. Returns null (never a guess) if the file isn't a\n// box-structured container this can parse -- AURON's own\n// analyze-and-ingest endpoint already rejects a video item with\n// duration_seconds=null with a clear error rather than silently\n// accepting a wrong or missing duration.\nfunction readMp4DurationSeconds(buffer) {\n  function walk(buf, start, end) {\n    let pos = start;\n    while (pos + 8 <= end) {\n      let size = buf.readUInt32BE(pos);\n      const type = buf.toString('ascii', pos + 4, pos + 8);\n      let headerSize = 8;\n      if (size === 1) {\n        if (pos + 16 > end) break;\n        const high = buf.readUInt32BE(pos + 8);\n        const low = buf.readUInt32BE(pos + 12);\n        size = high * 2 ** 32 + low;\n        headerSize = 16;\n      } else if (size === 0) {\n        size = end - pos;\n      }\n      if (size < headerSize || pos + size > end) break;\n\n      if (type === 'moov') {\n        const result = walk(buf, pos + headerSize, pos + size);\n        if (result !== null) return result;\n      } else if (type === 'mvhd') {\n        const body = pos + headerSize;\n        const version = buf.readUInt8(body);\n        if (version === 1) {\n          const timescale = buf.readUInt32BE(body + 20);\n          const durHigh = buf.readUInt32BE(body + 24);\n          const durLow = buf.readUInt32BE(body + 28);\n          if (timescale > 0) return (durHigh * 2 ** 32 + durLow) / timescale;\n        } else {\n          const timescale = buf.readUInt32BE(body + 12);\n          const duration = buf.readUInt32BE(body + 16);\n          if (timescale > 0) return duration / timescale;\n        }\n      }\n      pos += size;\n    }\n    return null;\n  }\n\n  try {\n    return walk(buffer, 0, buffer.length);\n  } catch {\n    return null;\n  }\n}\n\nconst driveItems = $('Loop Over Items v7').all();\n\nreturn $input.all().map((item, i) => {\n  const drive = driveItems[i].json;\n  const mediaType = drive.mimeType || 'image/jpeg';\n  const isVideo = mediaType.startsWith('video/');\n  const durationSeconds = isVideo\n    ? readMp4DurationSeconds(Buffer.from(item.json.image_b64, 'base64'))\n    : null;\n\n  return {\n    json: {\n      media_ref: drive.id,\n      media_type: isVideo ? 'video' : 'image',\n      image_base64: isVideo ? null : item.json.image_b64,\n      image_media_type: isVideo ? null : mediaType,\n      duration_seconds: durationSeconds\n    }\n  };\n});"
       },
-      "id": "4874be72-3b98-4ca6-9ec4-29f8b3c83585",
+      "id": "b0bc6c80-69aa-4f7d-9c2f-ced955668b5e",
       "name": "Prepare AURON Payload v7",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        3520,
-        -1216
+        -1216,
+        176
       ]
     },
     {
@@ -126,13 +127,13 @@
           "timeout": 60000
         }
       },
-      "id": "5d3858a1-2c77-45cd-bac5-060e15bceebe",
+      "id": "9ecdd03b-f92a-4bb1-9904-5b025199faa1",
       "name": "AURON: Analyze + Ingest v7",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        3744,
-        -1216
+        -992,
+        176
       ],
       "notes": "Replace 'auron-api' with your actual AURON api container name if different -- both containers must be on the shared 'jarvis_shared' Docker network (see docs/n8n-instagram-setup.md). Test with the real container hostname, not 'localhost'."
     },
@@ -144,13 +145,13 @@
           "timeout": 60000
         }
       },
-      "id": "42b87884-0080-4e58-9ef4-2fdaf6912a5c",
+      "id": "fb71d7d8-13f3-4863-a4cc-88e9d3090e1d",
       "name": "AURON: Run Curation v7",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        3984,
-        -1216
+        -752,
+        176
       ],
       "executeOnce": true,
       "notes": "Runs once per schedule trigger, after every file in this batch has been ingested -- not once per file. n8n's default 'Run Once for All Items' setting on this node is correct; do not change it to 'Run Once for Each Item'."
@@ -163,13 +164,13 @@
           "timeout": 30000
         }
       },
-      "id": "1fa0d60d-eeab-4320-a8f9-c6fbbe03bb91",
+      "id": "44402a65-fc23-4a3a-9d9f-4df1c74d8b62",
       "name": "AURON: Deliver Due Notifications v7",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        4224,
-        -1216
+        -512,
+        176
       ]
     },
     {
@@ -181,10 +182,10 @@
       "type": "n8n-nodes-base.extractFromFile",
       "typeVersion": 1.1,
       "position": [
-        3312,
-        -1216
+        -1424,
+        176
       ],
-      "id": "d54ff3fa-7953-4676-888b-2724335c5b88",
+      "id": "42a42f20-eca2-4fee-a504-a5ef63016464",
       "name": "Extract from File v7"
     },
     {
@@ -194,13 +195,13 @@
           "timeout": 60000
         }
       },
-      "id": "0f8ab0df-1a3c-41a4-9105-36713db42c4e",
+      "id": "244c5b19-9f54-4ec2-bd73-f02823f7d07e",
       "name": "AURON: Load Known Refs v7",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        2064,
-        -1216
+        -2720,
+        176
       ],
       "notes": "Laedt alle bereits ingesteten Eintraege. Deren media_ref ist die Drive-File-ID; 'Filter: Not Yet Ingested' wirft die bekannten Dateien raus, BEVOR sie heruntergeladen und base64-kodiert werden."
     },
@@ -208,24 +209,24 @@
       "parameters": {
         "jsCode": "// Dublettenpruefung VOR dem Download.\n// Die Backend-Pruefung in analyze_and_ingest spart nur die Vision-Analyse --\n// Drive-Download, Base64 und Payload liefen trotzdem jedes Mal komplett durch.\n// Hier fliegen bekannte Dateien raus, bevor sie irgendetwas kosten.\nconst pool = $('AURON: Load Known Refs v7').first().json;\nconst items = Array.isArray(pool) ? pool : (pool.items || []);\nconst known = new Set(items.map(i => i.media_ref).filter(Boolean));\n\nconst fresh = $input.all().filter(item => !known.has(item.json.id));\n\nconsole.log(`Pool kennt ${known.size} Dateien, ${$input.all().length} im Drive, ${fresh.length} neu.`);\n\nreturn fresh;"
       },
-      "id": "417c1413-b14a-4e4a-9d63-b94f93561194",
+      "id": "c5abbf32-1c9b-4551-9cdf-4de884c03919",
       "name": "Filter: Not Yet Ingested v7",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2704,
-        -1216
+        -2048,
+        176
       ]
     },
     {
       "parameters": {},
-      "id": "09371f5c-2968-4769-a5b4-14de037ddd95",
+      "id": "d4e39b71-02f9-4a80-93ff-0580412a301b",
       "name": "Done: Alle Batches durch v8",
       "type": "n8n-nodes-base.noOp",
       "typeVersion": 1,
       "position": [
-        4496,
-        -1200
+        -1632,
+        0
       ],
       "notes": "Platzhalter am done-Ausgang des Loops. Ohne ein echtes Ziel hier ist die erste Verbindungsgruppe leer, und n8n verwirft beim Import auch die Ziele des zweiten Ausgangs (loop)."
     }
@@ -364,7 +365,5 @@
     "executionOrder": "v1",
     "binaryMode": "separate"
   },
-  "meta": {
-    "templateCredsSetupCompleted": true
-  }
+  "meta": null
 }
