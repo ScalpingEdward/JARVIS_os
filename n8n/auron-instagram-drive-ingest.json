@@ -76,49 +76,6 @@
     },
     {
       "parameters": {
-        "conditions": {
-          "options": {
-            "caseSensitive": true,
-            "leftValue": "",
-            "typeValidation": "strict",
-            "version": 2
-          },
-          "conditions": [
-            {
-              "leftValue": "={{$json.mimeType}}",
-              "rightValue": "image/",
-              "operator": {
-                "type": "string",
-                "operation": "startsWith"
-              },
-              "id": "fbf0bf15-b913-4f55-951d-8846f7d0a26a"
-            },
-            {
-              "leftValue": "={{$json.mimeType}}",
-              "rightValue": "video/",
-              "operator": {
-                "type": "string",
-                "operation": "startsWith"
-              },
-              "id": "widen-video-01"
-            }
-          ],
-          "combinator": "and"
-        },
-        "options": {}
-      },
-      "id": "0c9f6db7-2506-40c6-96d3-75275a479654",
-      "name": "Filter: Is Image v7",
-      "type": "n8n-nodes-base.filter",
-      "typeVersion": 2.2,
-      "position": [
-        2496,
-        -1216
-      ],
-      "notes": "Bilder UND Videos. Der Reels-Pfad (media_type=REELS + Status-Polling in der Publish-Workflow, Dauer aus der Datei in 'Prepare AURON Payload v7') steht jetzt -- Videos werden nicht mehr weggefiltert."
-    },
-    {
-      "parameters": {
         "operation": "download",
         "fileId": {
           "__rl": true,
@@ -307,7 +264,7 @@
       "main": [
         [
           {
-            "node": "Filter: Is Image v7",
+            "node": "Filter: Not Yet Ingested v7",
             "type": "main",
             "index": 0
           }
@@ -396,17 +353,6 @@
         [
           {
             "node": "Loop Over Items v7",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Filter: Is Image v7": {
-      "main": [
-        [
-          {
-            "node": "Filter: Not Yet Ingested v7",
             "type": "main",
             "index": 0
           }
