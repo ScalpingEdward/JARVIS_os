@@ -66,6 +66,14 @@
                 "type": "string",
                 "operation": "startsWith"
               }
+            },
+            {
+              "leftValue": "={{$json.mimeType}}",
+              "rightValue": "video/",
+              "operator": {
+                "type": "string",
+                "operation": "startsWith"
+              }
             }
           ],
           "combinator": "or"
@@ -78,8 +86,7 @@
       "position": [
         -760,
         300
-      ],
-      "notes": "Widen this filter to also allow mimeType startsWith 'video/' -- add a second OR condition in the UI: {{$json.mimeType}} startsWith video/"
+      ]
     },
     {
       "parameters": {
@@ -109,7 +116,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Base64-encode the downloaded binary for AURON's vision endpoint.\n// AURON never holds a Drive credential itself -- n8n fetches bytes,\n// AURON only ever sees the encoded image it's handed.\nconst binary = $input.item.binary.data;\nconst base64 = binary.data;\nconst mediaType = binary.mimeType || 'image/jpeg';\nconst isVideo = mediaType.startsWith('video/');\n\nreturn {\n  json: {\n    media_ref: $input.item.json.id,\n    media_type: isVideo ? 'video' : 'image',\n    image_base64: isVideo ? null : base64,\n    image_media_type: isVideo ? null : mediaType,\n    // A video's own frame extraction is a separate, optional step --\n    // see the README note below the workflow. Left null here on purpose\n    // rather than guessing a duration.\n    duration_seconds: null\n  }\n};"
+        "jsCode": "// Base64-encode the downloaded binary for AURON's vision endpoint.\n// AURON never holds a Drive credential itself -- n8n fetches bytes,\n// AURON only ever sees the encoded image it's handed.\nconst binary = $input.item.binary.data;\nconst base64 = binary.data;\nconst mediaType = binary.mimeType || 'image/jpeg';\nconst isVideo = mediaType.startsWith('video/');\n\n// Reads the real duration out of the video's own MP4 'mvhd' atom\n// (duration / timescale) by walking the box structure directly on the\n// raw bytes -- no ffmpeg/ffprobe binary required, which the stock n8n\n// image does not ship with. Returns null (never a guess) if the file\n// isn't a box-structured container this can parse (e.g. some legacy\n// avi/mov variants) -- AURON's own analyze-and-ingest endpoint already\n// rejects a video item with duration_seconds=null with a clear error\n// rather than silently accepting a wrong or missing duration.\nfunction readMp4DurationSeconds(buffer) {\n  function walk(buf, start, end) {\n    let pos = start;\n    while (pos + 8 <= end) {\n      let size = buf.readUInt32BE(pos);\n      const type = buf.toString('ascii', pos + 4, pos + 8);\n      let headerSize = 8;\n      if (size === 1) {\n        if (pos + 16 > end) break;\n        const high = buf.readUInt32BE(pos + 8);\n        const low = buf.readUInt32BE(pos + 12);\n        size = high * 2 ** 32 + low;\n        headerSize = 16;\n      } else if (size === 0) {\n        size = end - pos;\n      }\n      if (size < headerSize || pos + size > end) break;\n\n      if (type === 'moov') {\n        const result = walk(buf, pos + headerSize, pos + size);\n        if (result !== null) return result;\n      } else if (type === 'mvhd') {\n        const body = pos + headerSize;\n        const version = buf.readUInt8(body);\n        if (version === 1) {\n          const timescale = buf.readUInt32BE(body + 20);\n          const durHigh = buf.readUInt32BE(body + 24);\n          const durLow = buf.readUInt32BE(body + 28);\n          if (timescale > 0) return (durHigh * 2 ** 32 + durLow) / timescale;\n        } else {\n          const timescale = buf.readUInt32BE(body + 12);\n          const duration = buf.readUInt32BE(body + 16);\n          if (timescale > 0) return duration / timescale;\n        }\n      }\n      pos += size;\n    }\n    return null;\n  }\n\n  try {\n    return walk(buffer, 0, buffer.length);\n  } catch {\n    return null;\n  }\n}\n\nlet durationSeconds = null;\nif (isVideo) {\n  durationSeconds = readMp4DurationSeconds(Buffer.from(base64, 'base64'));\n}\n\nreturn {\n  json: {\n    media_ref: $input.item.json.id,\n    media_type: isVideo ? 'video' : 'image',\n    image_base64: isVideo ? null : base64,\n    image_media_type: isVideo ? null : mediaType,\n    duration_seconds: durationSeconds\n  }\n};"
       },
       "id": "prepare-payload-1",
       "name": "Prepare AURON Payload",

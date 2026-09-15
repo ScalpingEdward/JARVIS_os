@@ -20,6 +20,166 @@
         "conditions": {
           "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
           "conditions": [
+            { "leftValue": "={{$json.body.post_format}}", "rightValue": "reel", "operator": { "type": "string", "operation": "equals" } }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "filter-is-reel-1",
+      "name": "Is Reel?",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.2,
+      "position": [-1160, 80],
+      "notes": "Checked before the single_image filter -- a reel request takes the kept output into the reel chain below; everything else (single_image, unsupported carousel) falls through (discarded output) into the existing single_image filter untouched."
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "operation": "share",
+        "fileId": { "__rl": true, "mode": "id", "value": "={{$json.body.media_items[0].media_ref}}" },
+        "permissionsUi": {
+          "permissionsValues": { "role": "reader", "type": "anyone" }
+        }
+      },
+      "id": "drive-make-public-reel-1",
+      "name": "Google Drive: Make Video Viewable by Link",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [-920, 80],
+      "notes": "Same reasoning as the image path's public-link step -- Instagram's own reel-container step fetches the video itself from a URL, AURON never uploads bytes. Note: Drive's uc?export=view link can serve an HTML 'can't scan this file for viruses' interstitial instead of raw bytes for very large files -- not handled here; if reel container creation starts failing with an HTML body instead of a real API error, that's the likely cause.",
+      "credentials": {
+        "googleDriveOAuth2Api": { "id": "PASTE_YOUR_GOOGLE_DRIVE_CREDENTIAL_ID", "name": "Google Drive account" }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build the direct-fetchable video URL from the Drive file id, same\n// trick as the image path's 'Build Public Image URL' node.\nconst fileId = $('Webhook: /instagram-post').item.json.body.media_items[0].media_ref;\nconst caption = $('Webhook: /instagram-post').item.json.body.caption;\nconst requestId = $('Webhook: /instagram-post').item.json.body.request_id;\n\nreturn {\n  json: {\n    video_url: `https://drive.google.com/uc?export=view&id=${fileId}`,\n    caption,\n    request_id: requestId,\n  }\n};"
+      },
+      "id": "build-public-video-url-1",
+      "name": "Build Public Video URL",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-680, 80]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.instagram.com/v21.0/{{$vars.AURON_IG_USER_ID}}/media",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "media_type", "value": "REELS" },
+            { "name": "video_url", "value": "={{$json.video_url}}" },
+            { "name": "caption", "value": "={{$json.caption}}" },
+            { "name": "access_token", "value": "={{$vars.AURON_IG_ACCESS_TOKEN}}" }
+          ]
+        },
+        "options": { "timeout": 30000 }
+      },
+      "id": "ig-create-reel-container-1",
+      "name": "Instagram: Create Reel Media Container",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-440, 80],
+      "notes": "media_type=REELS tells Instagram this container is a Reel, not a feed video -- Instagram fetches the video itself from video_url by reference, same as the image path. A reel container takes materially longer to process than an image one, which is why this path polls status_code below instead of the fixed wait the single_image path still uses (separate, not touched here)."
+    },
+    {
+      "parameters": { "amount": 5, "unit": "seconds" },
+      "id": "wait-for-reel-processing-1",
+      "name": "Wait for Reel Processing",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [-200, 80],
+      "notes": "Loop target: re-entered on every 'not finished yet' pass below until status_code is FINISHED or the hard cap of 20 attempts is hit."
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://graph.instagram.com/v21.0/{{$('Instagram: Create Reel Media Container').item.json.id}}",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "fields", "value": "status_code" },
+            { "name": "access_token", "value": "={{$vars.AURON_IG_ACCESS_TOKEN}}" }
+          ]
+        },
+        "options": { "timeout": 30000 }
+      },
+      "id": "ig-get-reel-status-1",
+      "name": "Instagram: Get Reel Container Status",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [40, 80]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+          "conditions": [
+            { "leftValue": "={{$json.status_code}}", "rightValue": "FINISHED", "operator": { "type": "string", "operation": "equals" } }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "if-reel-finished-1",
+      "name": "Reel Container Finished?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [280, 80]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.instagram.com/v21.0/{{$vars.AURON_IG_USER_ID}}/media_publish",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "creation_id", "value": "={{$('Instagram: Create Reel Media Container').item.json.id}}" },
+            { "name": "access_token", "value": "={{$vars.AURON_IG_ACCESS_TOKEN}}" }
+          ]
+        },
+        "options": { "timeout": 30000 }
+      },
+      "id": "ig-publish-reel-1",
+      "name": "Instagram: Publish Reel Container",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [520, 20]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+          "conditions": [
+            { "leftValue": "={{$runIndex}}", "rightValue": 19, "operator": { "type": "number", "operation": "gte" } }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "if-reel-poll-timeout-1",
+      "name": "Reel Polling Exhausted?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [520, 140],
+      "notes": "$runIndex is THIS node's own execution count within the current run -- it increments every time the loop cycles back through 'Wait for Reel Processing' and reaches this node again. 0-indexed, so runIndex 19 is the 20th pass: 20 attempts x 5s wait = up to ~100s of polling before giving up with a clear timeout error instead of looping forever."
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseCode": 504,
+        "responseBody": "={{ { \"error\": \"Reel container did not reach FINISHED after 20 status checks (~100s) -- Instagram is still processing it or something went wrong. Not published.\" } }}"
+      },
+      "id": "respond-reel-timeout-1",
+      "name": "Respond: Reel Processing Timeout",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [760, 140]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+          "conditions": [
             { "leftValue": "={{$json.body.post_format}}", "rightValue": "single_image", "operator": { "type": "string", "operation": "equals" } }
           ],
           "combinator": "and"
@@ -30,7 +190,7 @@
       "type": "n8n-nodes-base.filter",
       "typeVersion": 2.2,
       "position": [-1160, 300],
-      "notes": "Tonight's first live test deliberately covers single_image only -- the most common, simplest, lowest-risk case to prove the whole chain end to end. carousel and reel need a second container-per-item + parent-container step (carousel) or the resumable upload protocol (reel/video) -- real but separate additions, not yet wired here. A request with any other post_format falls through to 'Unsupported format -> error response' below rather than silently mishandling it."
+      "notes": "reel requests never reach this node -- they're routed by 'Is Reel?' above before this filter runs. This filter now only distinguishes single_image from carousel (still unsupported): carousel needs a second container-per-item + parent-container step, a real but separate addition, not yet wired here. Anything that isn't single_image falls through to 'Unsupported format -> error response' below rather than silently mishandling it."
     },
     {
       "parameters": {
@@ -137,7 +297,13 @@
     }
   ],
   "connections": {
-    "Webhook: /instagram-post": { "main": [[{ "node": "Only single_image (for tonight)", "type": "main", "index": 0 }]] },
+    "Webhook: /instagram-post": { "main": [[{ "node": "Is Reel?", "type": "main", "index": 0 }]] },
+    "Is Reel?": {
+      "main": [
+        [{ "node": "Google Drive: Make Video Viewable by Link", "type": "main", "index": 0 }],
+        [{ "node": "Only single_image (for tonight)", "type": "main", "index": 0 }]
+      ]
+    },
     "Only single_image (for tonight)": {
       "main": [
         [{ "node": "Google Drive: Make File Viewable by Link", "type": "main", "index": 0 }],
@@ -148,7 +314,25 @@
     "Build Public Image URL": { "main": [[{ "node": "Instagram: Create Media Container", "type": "main", "index": 0 }]] },
     "Instagram: Create Media Container": { "main": [[{ "node": "Wait for Instagram to Process", "type": "main", "index": 0 }]] },
     "Wait for Instagram to Process": { "main": [[{ "node": "Instagram: Publish Container", "type": "main", "index": 0 }]] },
-    "Instagram: Publish Container": { "main": [[{ "node": "Respond: media_id", "type": "main", "index": 0 }]] }
+    "Instagram: Publish Container": { "main": [[{ "node": "Respond: media_id", "type": "main", "index": 0 }]] },
+    "Google Drive: Make Video Viewable by Link": { "main": [[{ "node": "Build Public Video URL", "type": "main", "index": 0 }]] },
+    "Build Public Video URL": { "main": [[{ "node": "Instagram: Create Reel Media Container", "type": "main", "index": 0 }]] },
+    "Instagram: Create Reel Media Container": { "main": [[{ "node": "Wait for Reel Processing", "type": "main", "index": 0 }]] },
+    "Wait for Reel Processing": { "main": [[{ "node": "Instagram: Get Reel Container Status", "type": "main", "index": 0 }]] },
+    "Instagram: Get Reel Container Status": { "main": [[{ "node": "Reel Container Finished?", "type": "main", "index": 0 }]] },
+    "Reel Container Finished?": {
+      "main": [
+        [{ "node": "Instagram: Publish Reel Container", "type": "main", "index": 0 }],
+        [{ "node": "Reel Polling Exhausted?", "type": "main", "index": 0 }]
+      ]
+    },
+    "Instagram: Publish Reel Container": { "main": [[{ "node": "Respond: media_id", "type": "main", "index": 0 }]] },
+    "Reel Polling Exhausted?": {
+      "main": [
+        [{ "node": "Respond: Reel Processing Timeout", "type": "main", "index": 0 }],
+        [{ "node": "Wait for Reel Processing", "type": "main", "index": 0 }]
+      ]
+    }
   },
   "settings": { "executionOrder": "v1" },
   "meta": { "instanceId": "auron-instagram-publish-webhook" }
