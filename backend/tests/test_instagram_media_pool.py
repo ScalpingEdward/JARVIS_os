@@ -1,14 +1,27 @@
 from __future__ import annotations
 
+import base64
+import json
+import os
+from io import BytesIO
+
 import httpx
 import pytest
+from PIL import Image
 
+from app.instagram_content.analyze_and_ingest import analyze_and_ingest
 from app.instagram_content.curation import CAROUSEL_IDEAL_MAX_SIZE, CAROUSEL_MIN_SIZE, ELITE_SOLO_THRESHOLD, curate
-from app.instagram_content.media_pool_models import FinalizeDraftRequest, MediaPoolIngestRequest, MediaPoolItemCreate
+from app.instagram_content.media_pool_models import (
+    FinalizeDraftRequest,
+    MediaAnalyzeAndIngestItem,
+    MediaPoolIngestRequest,
+    MediaPoolItemCreate,
+)
 from app.instagram_content.media_pool_service import MediaPoolError, MediaPoolService
 from app.instagram_content.models import ContentStatus, PostFormat
 from app.instagram_content.publisher import N8nInstagramPublisher
 from app.instagram_content.service import InstagramContentError, InstagramContentService
+from app.instagram_content.vision_analysis import AnthropicVisionAnalyzer, VisionAnalysisConfig
 
 
 @pytest.fixture(autouse=True)
@@ -237,3 +250,148 @@ def test_pool_items_and_drafts_survive_a_fresh_service_instance():
     available_refs = {item.media_ref for item in second.list_available()}
     reserved_refs = {second.get(item_id).media_ref for item_id in restored_draft.media_item_ids}
     assert available_refs.isdisjoint(reserved_refs)
+
+
+# -- analyze_and_ingest: oversized-image downscale ---------------------------
+
+
+def _oversized_jpeg_with_exif_base64(captured_at_str="2024:01:15 10:30:00"):
+    """A JPEG whose longest edge is well above the 2000px downscale
+    threshold, with real EXIF DateTimeOriginal so the test can check that
+    reading it still works after -- and only after -- reading it off the
+    original, pre-downscale bytes."""
+    width, height = 2600, 1800
+    image = Image.frombytes("RGB", (width, height), os.urandom(width * height * 3))
+
+    exif = Image.Exif()
+    exif.get_ifd(0x8769)[0x9003] = captured_at_str
+
+    buffer = BytesIO()
+    image.save(buffer, format="JPEG", quality=100, exif=exif)
+    raw = buffer.getvalue()
+    return base64.b64encode(raw).decode("ascii"), raw
+
+
+def test_oversized_image_is_downscaled_before_the_vision_call_and_exif_still_reads():
+    original_base64, original_raw = _oversized_jpeg_with_exif_base64()
+    assert max(Image.open(BytesIO(original_raw)).size) > 2000  # sanity: fixture is actually oversized
+
+    captured: dict = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        body = json.loads(request.content)
+        image_block = next(b for b in body["messages"][0]["content"] if b["type"] == "image")
+        captured["media_type"] = image_block["source"]["media_type"]
+        captured["data"] = image_block["source"]["data"]
+        return httpx.Response(
+            200,
+            json={
+                "content": [
+                    {
+                        "type": "text",
+                        "text": json.dumps(
+                            {"theme": "desert-gold", "tags": ["gold"], "aesthetic_score": 0.8, "reasoning": "ok"}
+                        ),
+                    }
+                ]
+            },
+        )
+
+    analyzer = AnthropicVisionAnalyzer(
+        config=VisionAnalysisConfig(api_key="test-key"), client=httpx.Client(transport=httpx.MockTransport(handler))
+    )
+    pool = MediaPoolService()
+    items = [
+        MediaAnalyzeAndIngestItem(
+            media_ref="oversized-1",
+            media_type="image",
+            image_base64=original_base64,
+            image_media_type="image/jpeg",
+        )
+    ]
+
+    response = analyze_and_ingest(items, analyzer, pool)
+
+    assert response.analyzed_and_ingested == 1
+    assert response.failed == 0
+
+    # the image actually sent to the API is the downscaled one, not the original
+    sent_raw = base64.b64decode(captured["data"])
+    assert captured["media_type"] == "image/jpeg"
+    assert max(Image.open(BytesIO(sent_raw)).size) <= 2000
+    assert len(sent_raw) < len(original_raw)
+
+    # captured_at must still come from the ORIGINAL image's EXIF
+    ingested_item = pool.list_available()[0]
+    assert ingested_item.captured_at is not None
+    assert ingested_item.captured_at.strftime("%Y:%m:%d %H:%M:%S") == "2024:01:15 10:30:00"
+
+
+# -- analyze_and_ingest: video items without a thumbnail ---------------------
+
+
+def _analyzer_that_must_not_be_called() -> AnthropicVisionAnalyzer:
+    def handler(request: httpx.Request) -> httpx.Response:
+        raise AssertionError("Claude Vision must not be called for a video with no thumbnail")
+
+    return AnthropicVisionAnalyzer(
+        config=VisionAnalysisConfig(api_key="test-key"), client=httpx.Client(transport=httpx.MockTransport(handler))
+    )
+
+
+def test_video_without_thumbnail_skips_vision_and_uses_placeholder_score():
+    pool = MediaPoolService()
+    items = [
+        MediaAnalyzeAndIngestItem(
+            media_ref="clip-1",
+            media_type="video",
+            duration_seconds=15.3,
+        )
+    ]
+
+    response = analyze_and_ingest(items, _analyzer_that_must_not_be_called(), pool)
+
+    assert response.failed == 0
+    assert response.analyzed_and_ingested == 1
+    ingested = pool.list_available()[0]
+    assert ingested.aesthetic_score == 0.6
+    assert ingested.tags == []
+    assert ingested.duration_seconds == 15.3
+
+
+def test_video_with_thumbnail_still_goes_through_real_vision_analysis():
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            json={
+                "content": [
+                    {
+                        "type": "text",
+                        "text": json.dumps(
+                            {"theme": "gym-clip", "tags": ["gym"], "aesthetic_score": 0.82, "reasoning": "ok"}
+                        ),
+                    }
+                ]
+            },
+        )
+
+    analyzer = AnthropicVisionAnalyzer(
+        config=VisionAnalysisConfig(api_key="test-key"), client=httpx.Client(transport=httpx.MockTransport(handler))
+    )
+    pool = MediaPoolService()
+    items = [
+        MediaAnalyzeAndIngestItem(
+            media_ref="clip-2",
+            media_type="video",
+            duration_seconds=20.0,
+            image_base64=base64.b64encode(b"fake-thumbnail-bytes").decode("ascii"),
+            image_media_type="image/jpeg",
+        )
+    ]
+
+    response = analyze_and_ingest(items, analyzer, pool)
+
+    assert response.failed == 0
+    ingested = pool.list_available()[0]
+    assert ingested.aesthetic_score == 0.82
+    assert ingested.theme == "gym-clip"
