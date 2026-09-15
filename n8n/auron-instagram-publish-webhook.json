@@ -1,6 +1,284 @@
 {
+  "id": "Tz0mk8nTsjtLY5Qt",
   "name": "AURON - Instagram Publish (webhook)",
+  "active": true,
   "nodes": [
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "route-carousel-01",
+              "leftValue": "={{$json.body.post_format}}",
+              "rightValue": "carousel",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "185fe6b1-9d61-48ae-8f5f-c9eae0eda014",
+      "name": "Route: is carousel?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        240,
+        -464
+      ],
+      "notes": "TRUE -> carousel branch (container per image + parent CAROUSEL container). FALSE -> falls through to the single_image check."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "route-single-01",
+              "leftValue": "={{$json.body.post_format}}",
+              "rightValue": "single_image",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "0f495cb2-13a4-43dd-8183-d55b3c3b0906",
+      "name": "Route: is single_image?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        464,
+        -352
+      ],
+      "notes": "TRUE -> the proven single-image path. FALSE -> honest error response (reel/video still not wired)."
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "body.media_items",
+        "options": {}
+      },
+      "id": "9b3e1de2-4151-4bc0-89f7-fb2c1957c6bd",
+      "name": "Split Out Media Items",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        464,
+        -592
+      ],
+      "notes": "Turns the single webhook item into one item per photo, so the Drive share and the per-image container calls run for every slide instead of only media_items[0]."
+    },
+    {
+      "parameters": {
+        "operation": "share",
+        "fileId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{$json.media_ref}}"
+        },
+        "permissionsUi": {
+          "permissionsValues": {
+            "role": "reader",
+            "type": "anyone"
+          }
+        },
+        "options": {}
+      },
+      "id": "79c4252e-e3de-4ae9-910a-a73079ad22f3",
+      "name": "Drive: Share Each Carousel File",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        704,
+        -592
+      ],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "sVwp500LT1RTHHDT",
+          "name": "Google Drive account"
+        }
+      },
+      "notes": "Runs once per slide. If even one file stays private, Instagram's fetcher fails on that slide and the whole carousel container is rejected."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.instagram.com/v21.0/27471261452547997/media",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "image_url",
+              "value": "=https://drive.google.com/uc?export=view&id={{ $('Split Out Media Items').item.json.media_ref }}"
+            },
+            {
+              "name": "is_carousel_item",
+              "value": "true"
+            },
+            {
+              "name": "access_token",
+              "value": "={{ $env.AURON_IG_ACCESS_TOKEN }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "5493e5aa-1be9-4708-bc4d-3d0048c244cd",
+      "name": "IG: Create Carousel Item Container",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        944,
+        -592
+      ],
+      "notes": "One container per slide, is_carousel_item=true. NO caption here -- the caption belongs on the parent CAROUSEL container only. Each response carries the container id we collect in the next step."
+    },
+    {
+      "parameters": {
+        "amount": 10
+      },
+      "id": "52ac7ae5-c69d-47b1-806f-dbd8a533c006",
+      "name": "Wait for Item Containers",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        1184,
+        -592
+      ],
+      "webhookId": "a1b2c3d4-0000-4000-8000-000000000001",
+      "notes": "Gives Instagram time to fetch and process every slide before the parent container references them. Same fixed-wait caveat as the single-image path -- polling status_code per container is the correct upgrade."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Collect one container id per slide and hand the parent step a single\n// comma-separated 'children' string, which is the shape the CAROUSEL\n// container endpoint expects.\nconst ids = $input.all()\n  .map(item => item.json.id)\n  .filter(id => id);\n\nconst body = $('Webhook: /instagram-post1').first().json.body;\n\nif (ids.length < 2) {\n  throw new Error(`Carousel needs at least 2 item containers, got ${ids.length}`);\n}\n\nreturn [{\n  json: {\n    children: ids.join(','),\n    child_count: ids.length,\n    caption: body.caption,\n    request_id: body.request_id,\n  }\n}];"
+      },
+      "id": "365d7139-a2d5-4a4b-a004-593062c065fd",
+      "name": "Collect Container IDs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1424,
+        -592
+      ],
+      "notes": "Runs once over all items. Throws rather than silently posting a partial carousel if some slides failed -- AURON treats the non-2xx as a real failed publish."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.instagram.com/v21.0/27471261452547997/media",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "media_type",
+              "value": "CAROUSEL"
+            },
+            {
+              "name": "children",
+              "value": "={{$json.children}}"
+            },
+            {
+              "name": "caption",
+              "value": "={{$json.caption}}"
+            },
+            {
+              "name": "access_token",
+              "value": "={{ $env.AURON_IG_ACCESS_TOKEN }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "5a15e6c9-acd9-4a7b-9c15-ed380b2c5f40",
+      "name": "IG: Create Carousel Container",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1664,
+        -592
+      ],
+      "notes": "The parent container. This is where the caption lives. Instagram allows 2-10 children."
+    },
+    {
+      "parameters": {},
+      "id": "27cc9f7e-3c8e-47f7-b15a-ba988aa6cab7",
+      "name": "Wait for Carousel Container",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        1904,
+        -592
+      ],
+      "webhookId": "a1b2c3d4-0000-4000-8000-000000000002"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.instagram.com/v21.0/27471261452547997/media_publish",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "creation_id",
+              "value": "={{$('IG: Create Carousel Container').item.json.id}}"
+            },
+            {
+              "name": "access_token",
+              "value": "={{ $env.AURON_IG_ACCESS_TOKEN }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "8f036827-c477-413f-a085-256f1d14f126",
+      "name": "IG: Publish Carousel",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2144,
+        -592
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"media_id\": $json.id } }}",
+        "options": {}
+      },
+      "id": "df5b7546-d6fe-4621-a4ad-19b25c83fef3",
+      "name": "Respond: carousel media_id",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        2384,
+        -592
+      ],
+      "notes": "Same contract as the single-image response -- publisher.py only ever reads 'media_id'."
+    },
     {
       "parameters": {
         "httpMethod": "POST",
@@ -8,332 +286,372 @@
         "responseMode": "responseNode",
         "options": {}
       },
-      "id": "webhook-trigger-1",
-      "name": "Webhook: /instagram-post",
+      "id": "c3e09aec-be33-47dc-a144-4aff4c69c088",
+      "name": "Webhook: /instagram-post1",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
-      "position": [-1400, 300],
-      "notes": "Must match N8N_INSTAGRAM_WEBHOOK_URL on the AURON side exactly -- default is http://n8n:5678/webhook/instagram-post, so this node's path must be 'instagram-post'. AURON calls this ONLY after a human has explicitly approved the candidate (see instagram_content/service.py publish()) -- nothing upstream of this webhook makes that decision."
+      "position": [
+        0,
+        -464
+      ],
+      "webhookId": "32fec922-555a-4dfe-baf6-4ca88dd61187",
+      "notes": "Must match N8N_INSTAGRAM_WEBHOOK_URL on the AURON side exactly. AURON calls this ONLY after a human has explicitly approved the candidate."
     },
     {
       "parameters": {
-        "conditions": {
-          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
-          "conditions": [
-            { "leftValue": "={{$json.body.post_format}}", "rightValue": "reel", "operator": { "type": "string", "operation": "equals" } }
-          ],
-          "combinator": "and"
-        }
-      },
-      "id": "filter-is-reel-1",
-      "name": "Is Reel?",
-      "type": "n8n-nodes-base.filter",
-      "typeVersion": 2.2,
-      "position": [-1160, 80],
-      "notes": "Checked before the single_image filter -- a reel request takes the kept output into the reel chain below; everything else (single_image, unsupported carousel) falls through (discarded output) into the existing single_image filter untouched."
-    },
-    {
-      "parameters": {
-        "resource": "file",
         "operation": "share",
-        "fileId": { "__rl": true, "mode": "id", "value": "={{$json.body.media_items[0].media_ref}}" },
+        "fileId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{$json.body.media_items[0].media_ref}}"
+        },
         "permissionsUi": {
-          "permissionsValues": { "role": "reader", "type": "anyone" }
-        }
+          "permissionsValues": {
+            "role": "reader",
+            "type": "anyone"
+          }
+        },
+        "options": {}
       },
-      "id": "drive-make-public-reel-1",
-      "name": "Google Drive: Make Video Viewable by Link",
+      "id": "35c7447e-21f1-41f9-bb70-7a2c83588959",
+      "name": "Google Drive: Make File Viewable by Link1",
       "type": "n8n-nodes-base.googleDrive",
       "typeVersion": 3,
-      "position": [-920, 80],
-      "notes": "Same reasoning as the image path's public-link step -- Instagram's own reel-container step fetches the video itself from a URL, AURON never uploads bytes. Note: Drive's uc?export=view link can serve an HTML 'can't scan this file for viruses' interstitial instead of raw bytes for very large files -- not handled here; if reel container creation starts failing with an HTML body instead of a real API error, that's the likely cause.",
+      "position": [
+        704,
+        -352
+      ],
       "credentials": {
-        "googleDriveOAuth2Api": { "id": "PASTE_YOUR_GOOGLE_DRIVE_CREDENTIAL_ID", "name": "Google Drive account" }
-      }
+        "googleDriveOAuth2Api": {
+          "id": "sVwp500LT1RTHHDT",
+          "name": "Google Drive account"
+        }
+      },
+      "notes": "Instagram fetches the image itself, so it must be publicly reachable at request time. 'anyone with the link, reader' is the minimum needed."
     },
     {
       "parameters": {
-        "jsCode": "// Build the direct-fetchable video URL from the Drive file id, same\n// trick as the image path's 'Build Public Image URL' node.\nconst fileId = $('Webhook: /instagram-post').item.json.body.media_items[0].media_ref;\nconst caption = $('Webhook: /instagram-post').item.json.body.caption;\nconst requestId = $('Webhook: /instagram-post').item.json.body.request_id;\n\nreturn {\n  json: {\n    video_url: `https://drive.google.com/uc?export=view&id=${fileId}`,\n    caption,\n    request_id: requestId,\n  }\n};"
+        "jsCode": "// Build the direct-fetchable image URL from the Drive file id.\n// This format (not the normal drive.google.com/file/d/.../view share\n// link) is what a plain HTTP GET -- which is what Instagram's own\n// fetcher does -- can actually read as raw image bytes.\nconst body = $('Webhook: /instagram-post1').first().json.body;\nconst fileId = body.media_items[0].media_ref;\n\nreturn {\n  json: {\n    image_url: `https://drive.google.com/uc?export=view&id=${fileId}`,\n    caption: body.caption,\n    request_id: body.request_id,\n  }\n};"
       },
-      "id": "build-public-video-url-1",
-      "name": "Build Public Video URL",
+      "id": "9630d5a7-f8fb-4531-b347-a13a55d5a4b8",
+      "name": "Build Public Image URL1",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [-680, 80]
+      "position": [
+        944,
+        -352
+      ]
     },
     {
       "parameters": {
         "method": "POST",
-        "url": "=https://graph.instagram.com/v21.0/{{$vars.AURON_IG_USER_ID}}/media",
+        "url": "=https://graph.instagram.com/v21.0/27471261452547997/media",
         "sendQuery": true,
         "queryParameters": {
           "parameters": [
-            { "name": "media_type", "value": "REELS" },
-            { "name": "video_url", "value": "={{$json.video_url}}" },
-            { "name": "caption", "value": "={{$json.caption}}" },
-            { "name": "access_token", "value": "={{$vars.AURON_IG_ACCESS_TOKEN}}" }
+            {
+              "name": "image_url",
+              "value": "={{$json.image_url}}"
+            },
+            {
+              "name": "caption",
+              "value": "={{$json.caption}}"
+            },
+            {
+              "name": "access_token",
+              "value": "={{ $env.AURON_IG_ACCESS_TOKEN }}"
+            }
           ]
         },
-        "options": { "timeout": 30000 }
+        "options": {
+          "timeout": 30000
+        }
       },
-      "id": "ig-create-reel-container-1",
-      "name": "Instagram: Create Reel Media Container",
+      "id": "42b377a9-df52-4e3a-8f58-416fcd8a91c5",
+      "name": "Instagram: Create Media Container1",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [-440, 80],
-      "notes": "media_type=REELS tells Instagram this container is a Reel, not a feed video -- Instagram fetches the video itself from video_url by reference, same as the image path. A reel container takes materially longer to process than an image one, which is why this path polls status_code below instead of the fixed wait the single_image path still uses (separate, not touched here)."
+      "position": [
+        1184,
+        -352
+      ],
+      "notes": "Token must be replaced before import. Long-lived Instagram User token from Business Login for Instagram (graph.instagram.com host, NOT graph.facebook.com)."
     },
     {
-      "parameters": { "amount": 5, "unit": "seconds" },
-      "id": "wait-for-reel-processing-1",
-      "name": "Wait for Reel Processing",
+      "parameters": {
+        "amount": 8
+      },
+      "id": "3799e30a-1c2b-4ae3-a197-5686d15b5778",
+      "name": "Wait for Instagram to Process1",
       "type": "n8n-nodes-base.wait",
       "typeVersion": 1.1,
-      "position": [-200, 80],
-      "notes": "Loop target: re-entered on every 'not finished yet' pass below until status_code is FINISHED or the hard cap of 20 attempts is hit."
-    },
-    {
-      "parameters": {
-        "method": "GET",
-        "url": "=https://graph.instagram.com/v21.0/{{$('Instagram: Create Reel Media Container').item.json.id}}",
-        "sendQuery": true,
-        "queryParameters": {
-          "parameters": [
-            { "name": "fields", "value": "status_code" },
-            { "name": "access_token", "value": "={{$vars.AURON_IG_ACCESS_TOKEN}}" }
-          ]
-        },
-        "options": { "timeout": 30000 }
-      },
-      "id": "ig-get-reel-status-1",
-      "name": "Instagram: Get Reel Container Status",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [40, 80]
-    },
-    {
-      "parameters": {
-        "conditions": {
-          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
-          "conditions": [
-            { "leftValue": "={{$json.status_code}}", "rightValue": "FINISHED", "operator": { "type": "string", "operation": "equals" } }
-          ],
-          "combinator": "and"
-        }
-      },
-      "id": "if-reel-finished-1",
-      "name": "Reel Container Finished?",
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2.2,
-      "position": [280, 80]
+      "position": [
+        1424,
+        -352
+      ],
+      "webhookId": "636fbef3-4371-4b91-80bd-feaeab8d05cc",
+      "notes": "Fixed wait is a reasonable v1 for a single image. The correct version polls GET /{container-id}?fields=status_code until FINISHED."
     },
     {
       "parameters": {
         "method": "POST",
-        "url": "=https://graph.instagram.com/v21.0/{{$vars.AURON_IG_USER_ID}}/media_publish",
+        "url": "=https://graph.instagram.com/v21.0/27471261452547997/media_publish",
         "sendQuery": true,
         "queryParameters": {
           "parameters": [
-            { "name": "creation_id", "value": "={{$('Instagram: Create Reel Media Container').item.json.id}}" },
-            { "name": "access_token", "value": "={{$vars.AURON_IG_ACCESS_TOKEN}}" }
+            {
+              "name": "creation_id",
+              "value": "={{$('Instagram: Create Media Container1').item.json.id}}"
+            },
+            {
+              "name": "access_token",
+              "value": "={{ $env.AURON_IG_ACCESS_TOKEN }}"
+            }
           ]
         },
-        "options": { "timeout": 30000 }
-      },
-      "id": "ig-publish-reel-1",
-      "name": "Instagram: Publish Reel Container",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [520, 20]
-    },
-    {
-      "parameters": {
-        "conditions": {
-          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
-          "conditions": [
-            { "leftValue": "={{$runIndex}}", "rightValue": 19, "operator": { "type": "number", "operation": "gte" } }
-          ],
-          "combinator": "and"
+        "options": {
+          "timeout": 30000
         }
       },
-      "id": "if-reel-poll-timeout-1",
-      "name": "Reel Polling Exhausted?",
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2.2,
-      "position": [520, 140],
-      "notes": "$runIndex is THIS node's own execution count within the current run -- it increments every time the loop cycles back through 'Wait for Reel Processing' and reaches this node again. 0-indexed, so runIndex 19 is the 20th pass: 20 attempts x 5s wait = up to ~100s of polling before giving up with a clear timeout error instead of looping forever."
+      "id": "7c84661b-39e6-41c3-a618-6ce2ac059db2",
+      "name": "Instagram: Publish Container1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1664,
+        -352
+      ]
     },
     {
       "parameters": {
         "respondWith": "json",
-        "responseCode": 504,
-        "responseBody": "={{ { \"error\": \"Reel container did not reach FINISHED after 20 status checks (~100s) -- Instagram is still processing it or something went wrong. Not published.\" } }}"
+        "responseBody": "={{ { \"media_id\": $json.id } }}",
+        "options": {}
       },
-      "id": "respond-reel-timeout-1",
-      "name": "Respond: Reel Processing Timeout",
+      "id": "dca83c4e-2bcf-4245-9037-66ee534893e4",
+      "name": "Respond: media_id1",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.4,
-      "position": [760, 140]
-    },
-    {
-      "parameters": {
-        "conditions": {
-          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
-          "conditions": [
-            { "leftValue": "={{$json.body.post_format}}", "rightValue": "single_image", "operator": { "type": "string", "operation": "equals" } }
-          ],
-          "combinator": "and"
-        }
-      },
-      "id": "filter-single-image-1",
-      "name": "Only single_image (for tonight)",
-      "type": "n8n-nodes-base.filter",
-      "typeVersion": 2.2,
-      "position": [-1160, 300],
-      "notes": "reel requests never reach this node -- they're routed by 'Is Reel?' above before this filter runs. This filter now only distinguishes single_image from carousel (still unsupported): carousel needs a second container-per-item + parent-container step, a real but separate addition, not yet wired here. Anything that isn't single_image falls through to 'Unsupported format -> error response' below rather than silently mishandling it."
-    },
-    {
-      "parameters": {
-        "resource": "file",
-        "operation": "share",
-        "fileId": { "__rl": true, "mode": "id", "value": "={{$json.body.media_items[0].media_ref}}" },
-        "permissionsUi": {
-          "permissionsValues": { "role": "reader", "type": "anyone" }
-        }
-      },
-      "id": "drive-make-public-1",
-      "name": "Google Drive: Make File Viewable by Link",
-      "type": "n8n-nodes-base.googleDrive",
-      "typeVersion": 3,
-      "position": [-920, 300],
-      "notes": "Instagram's own media-container step cURLs the image itself -- it must be reachable at a public URL at the moment of the request, AURON never uploads bytes directly. Setting 'anyone with the link, reader' is the minimum needed; the file is NOT indexed or discoverable, only fetchable by anyone who has this exact URL, which only this workflow ever sees.",
-      "credentials": {
-        "googleDriveOAuth2Api": { "id": "PASTE_YOUR_GOOGLE_DRIVE_CREDENTIAL_ID", "name": "Google Drive account" }
-      }
-    },
-    {
-      "parameters": {
-        "jsCode": "// Build the direct-fetchable image URL from the Drive file id.\n// This format (not the normal drive.google.com/file/d/.../view share\n// link) is what a plain HTTP GET -- which is what Instagram's own\n// fetcher does -- can actually read as raw image bytes.\nconst fileId = $('Webhook: /instagram-post').item.json.body.media_items[0].media_ref;\nconst caption = $('Webhook: /instagram-post').item.json.body.caption;\nconst requestId = $('Webhook: /instagram-post').item.json.body.request_id;\n\nreturn {\n  json: {\n    image_url: `https://drive.google.com/uc?export=view&id=${fileId}`,\n    caption,\n    request_id: requestId,\n  }\n};"
-      },
-      "id": "build-public-url-1",
-      "name": "Build Public Image URL",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [-680, 300]
-    },
-    {
-      "parameters": {
-        "method": "POST",
-        "url": "=https://graph.instagram.com/v21.0/{{$vars.AURON_IG_USER_ID}}/media",
-        "sendQuery": true,
-        "queryParameters": {
-          "parameters": [
-            { "name": "image_url", "value": "={{$json.image_url}}" },
-            { "name": "caption", "value": "={{$json.caption}}" },
-            { "name": "access_token", "value": "={{$vars.AURON_IG_ACCESS_TOKEN}}" }
-          ]
-        },
-        "options": { "timeout": 30000 }
-      },
-      "id": "ig-create-container-1",
-      "name": "Instagram: Create Media Container",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [-440, 300],
-      "notes": "AURON_IG_USER_ID and AURON_IG_ACCESS_TOKEN are set via n8n's own built-in Variables screen (left sidebar -> Overview -> Variables tab, or Settings -> Variables depending on version) -- NOT Docker environment variables, so no container restart or docker-compose edit is needed to change them. NEVER hardcoded here, NEVER committed to this JSON file. The access token is the long-lived Instagram User token from the Business Login for Instagram flow (graph.instagram.com host -- NOT graph.facebook.com, which rejects this token type with 'Invalid OAuth access token')."
-    },
-    {
-      "parameters": { "amount": 8, "unit": "seconds" },
-      "id": "wait-for-processing-1",
-      "name": "Wait for Instagram to Process",
-      "type": "n8n-nodes-base.wait",
-      "typeVersion": 1.1,
-      "position": [-200, 300],
-      "notes": "A fixed wait is a reasonable v1 for a single image (usually processes in a few seconds) -- the more correct version polls GET /{container-id}?fields=status_code until it reports FINISHED rather than assuming. Worth upgrading before this handles video/reels, where processing can take much longer and a fixed wait would be unreliable."
-    },
-    {
-      "parameters": {
-        "method": "POST",
-        "url": "=https://graph.instagram.com/v21.0/{{$vars.AURON_IG_USER_ID}}/media_publish",
-        "sendQuery": true,
-        "queryParameters": {
-          "parameters": [
-            { "name": "creation_id", "value": "={{$('Instagram: Create Media Container').item.json.id}}" },
-            { "name": "access_token", "value": "={{$vars.AURON_IG_ACCESS_TOKEN}}" }
-          ]
-        },
-        "options": { "timeout": 30000 }
-      },
-      "id": "ig-publish-1",
-      "name": "Instagram: Publish Container",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [40, 300]
+      "position": [
+        1904,
+        -352
+      ],
+      "notes": "AURON's publisher.py reads exactly this field -- 'media_id'. Anything else, or a non-2xx status, is treated as a failed publish."
     },
     {
       "parameters": {
         "respondWith": "json",
-        "responseBody": "={{ { \"media_id\": $json.id } }}"
+        "responseBody": "={{ { \"error\": \"post_format \" + $('Webhook: /instagram-post1').first().json.body.post_format + \" is not wired in this n8n workflow -- single_image and carousel are live.\" } }}",
+        "options": {}
       },
-      "id": "respond-success-1",
-      "name": "Respond: media_id",
+      "id": "48ecf5c2-c3ec-454e-a7e6-8c282c4f5645",
+      "name": "Unsupported format -> error response1",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.4,
-      "position": [280, 300],
-      "notes": "AURON's publisher.py reads exactly this field -- 'media_id' -- from the response body. Anything else, or a non-2xx status, is treated as a failed publish (item.status becomes post_failed, a notification goes out) rather than silently assumed successful."
-    },
-    {
-      "parameters": {
-        "respondWith": "json",
-        "responseCode": 422,
-        "responseBody": "={{ { \"error\": \"post_format \" + $json.body.post_format + \" is not yet wired in this n8n workflow -- only single_image is live tonight.\" } }}"
-      },
-      "id": "respond-unsupported-1",
-      "name": "Unsupported format -> error response",
-      "type": "n8n-nodes-base.respondToWebhook",
-      "typeVersion": 1.4,
-      "position": [-1160, 520],
-      "notes": "A clear, honest 422 rather than a silent no-op or a misleading success -- AURON's own publisher.py treats any non-2xx as a real failure and notifies Brano, which is exactly the right behavior here rather than a post that looks approved but never actually went out."
+      "position": [
+        704,
+        -80
+      ],
+      "notes": "A clear, honest failure rather than a silent no-op. AURON's publisher.py treats any non-2xx as a real failure and notifies Brano."
     }
   ],
   "connections": {
-    "Webhook: /instagram-post": { "main": [[{ "node": "Is Reel?", "type": "main", "index": 0 }]] },
-    "Is Reel?": {
+    "Route: is carousel?": {
       "main": [
-        [{ "node": "Google Drive: Make Video Viewable by Link", "type": "main", "index": 0 }],
-        [{ "node": "Only single_image (for tonight)", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Split Out Media Items",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Route: is single_image?",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
-    "Only single_image (for tonight)": {
+    "Route: is single_image?": {
       "main": [
-        [{ "node": "Google Drive: Make File Viewable by Link", "type": "main", "index": 0 }],
-        [{ "node": "Unsupported format -> error response", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Google Drive: Make File Viewable by Link1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Unsupported format -> error response1",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
-    "Google Drive: Make File Viewable by Link": { "main": [[{ "node": "Build Public Image URL", "type": "main", "index": 0 }]] },
-    "Build Public Image URL": { "main": [[{ "node": "Instagram: Create Media Container", "type": "main", "index": 0 }]] },
-    "Instagram: Create Media Container": { "main": [[{ "node": "Wait for Instagram to Process", "type": "main", "index": 0 }]] },
-    "Wait for Instagram to Process": { "main": [[{ "node": "Instagram: Publish Container", "type": "main", "index": 0 }]] },
-    "Instagram: Publish Container": { "main": [[{ "node": "Respond: media_id", "type": "main", "index": 0 }]] },
-    "Google Drive: Make Video Viewable by Link": { "main": [[{ "node": "Build Public Video URL", "type": "main", "index": 0 }]] },
-    "Build Public Video URL": { "main": [[{ "node": "Instagram: Create Reel Media Container", "type": "main", "index": 0 }]] },
-    "Instagram: Create Reel Media Container": { "main": [[{ "node": "Wait for Reel Processing", "type": "main", "index": 0 }]] },
-    "Wait for Reel Processing": { "main": [[{ "node": "Instagram: Get Reel Container Status", "type": "main", "index": 0 }]] },
-    "Instagram: Get Reel Container Status": { "main": [[{ "node": "Reel Container Finished?", "type": "main", "index": 0 }]] },
-    "Reel Container Finished?": {
+    "Split Out Media Items": {
       "main": [
-        [{ "node": "Instagram: Publish Reel Container", "type": "main", "index": 0 }],
-        [{ "node": "Reel Polling Exhausted?", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Drive: Share Each Carousel File",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
-    "Instagram: Publish Reel Container": { "main": [[{ "node": "Respond: media_id", "type": "main", "index": 0 }]] },
-    "Reel Polling Exhausted?": {
+    "Drive: Share Each Carousel File": {
       "main": [
-        [{ "node": "Respond: Reel Processing Timeout", "type": "main", "index": 0 }],
-        [{ "node": "Wait for Reel Processing", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "IG: Create Carousel Item Container",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IG: Create Carousel Item Container": {
+      "main": [
+        [
+          {
+            "node": "Wait for Item Containers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait for Item Containers": {
+      "main": [
+        [
+          {
+            "node": "Collect Container IDs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Collect Container IDs": {
+      "main": [
+        [
+          {
+            "node": "IG: Create Carousel Container",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IG: Create Carousel Container": {
+      "main": [
+        [
+          {
+            "node": "Wait for Carousel Container",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait for Carousel Container": {
+      "main": [
+        [
+          {
+            "node": "IG: Publish Carousel",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IG: Publish Carousel": {
+      "main": [
+        [
+          {
+            "node": "Respond: carousel media_id",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook: /instagram-post1": {
+      "main": [
+        [
+          {
+            "node": "Route: is carousel?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Drive: Make File Viewable by Link1": {
+      "main": [
+        [
+          {
+            "node": "Build Public Image URL1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Public Image URL1": {
+      "main": [
+        [
+          {
+            "node": "Instagram: Create Media Container1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Instagram: Create Media Container1": {
+      "main": [
+        [
+          {
+            "node": "Wait for Instagram to Process1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait for Instagram to Process1": {
+      "main": [
+        [
+          {
+            "node": "Instagram: Publish Container1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Instagram: Publish Container1": {
+      "main": [
+        [
+          {
+            "node": "Respond: media_id1",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     }
   },
-  "settings": { "executionOrder": "v1" },
-  "meta": { "instanceId": "auron-instagram-publish-webhook" }
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true
+  }
 }
