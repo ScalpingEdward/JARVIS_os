@@ -120,18 +120,23 @@ class IngestDirectoryFile(BaseModel):
     name: str
     size_bytes: int
     age_hours: float
-    stale: bool = Field(description="Older than the retention window, i.e. left behind by a failed run.")
+    stale: bool = Field(
+        description="Older than the retention window, i.e. the ingest-sweeper should already have "
+        "removed it. Evidence that the sweeper has stopped, not that an ingest failed."
+    )
 
 
 class IngestDirectoryStatus(BaseModel):
     """What is lying in the video handoff directory.
 
-    n8n deletes a file once AURON confirms that item ingested; anything left
-    is the residue of a run that failed. Reported on every ingest and
-    available on demand so a pile-up cannot build up unnoticed -- the point
-    is not that files are cleaned away, it is that they are never quietly
-    there. AURON only ever reads: `stale_files` names what has outlived the
-    window, and n8n is what removes it.
+    Removal is time-based and belongs to the ingest-sweeper sidecar alone:
+    n8n writes and never deletes, AURON reads and never deletes. A file
+    younger than the retention window is therefore unremarkable.
+
+    A file older than it is not. It means the sweeper has stopped, and this
+    report -- written on every ingest and available on demand -- is how that
+    becomes visible instead of quietly filling a disk. Monitoring of the
+    sweeper, by a container that has no way to delete anything itself.
     """
 
     file_count: int

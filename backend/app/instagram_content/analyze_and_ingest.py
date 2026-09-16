@@ -369,13 +369,13 @@ def analyze_and_ingest(
 
 
 def _report_ingest_directory() -> None:
-    """Says what is left lying in the handoff directory after every run.
+    """Says what is lying in the handoff directory after every run.
 
-    The sweep that removes residue runs in n8n, on its own schedule. Without
-    this the only signal would be that sweep, which is silent by nature -- a
-    pile-up would then be invisible right up until it mattered. Reporting
-    here means it is stated on every single ingest, whether or not anything
-    ever cleans it away.
+    Removal happens in the ingest-sweeper sidecar, on a timer, with no output
+    anyone reads. If that process dies, nothing about it is loud: files would
+    simply accumulate until a disk filled. Stating the directory's state on
+    every single ingest is what turns that into something visible, and it is
+    stated by a container that cannot delete and therefore cannot hide it.
     """
     status = ingest_directory_status()
     if not status.available:

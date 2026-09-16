@@ -147,12 +147,14 @@ def list_media_pool(available_only: bool = False):
 def ingest_directory() -> IngestDirectoryStatus:
     """What is lying in the video handoff directory right now.
 
-    n8n writes a downloaded video there, AURON reads it, and n8n deletes it
-    once AURON confirms that item ingested -- so anything still present is
-    residue from a run that failed. Read-only: this reports, it never
-    deletes. `stale_files` names what has outlived the retention window, so
-    n8n (the only writer) can sweep exactly that, from one definition of the
-    window rather than two that drift apart."""
+    n8n writes a downloaded video there and AURON reads it; neither ever
+    deletes. Removal is time-based and belongs to the ingest-sweeper sidecar,
+    so a file inside the retention window is perfectly normal.
+
+    `stale_files` lists what is past the window and should already be gone --
+    which means the sweeper has stopped. This endpoint watches that, from a
+    container mounted read-only and therefore incapable of covering it up by
+    cleaning."""
     return ingest_directory_status()
 
 

@@ -151,3 +151,64 @@ mehr. Deshalb im selben Durchgang `chown -R 1000:1000` auf das Volume.
 
 Offen geblieben: `n8nEventLog-1.log` und `-3.log` mit je ~21,5 MB. n8n rotiert
 diese Dateien nicht selbst weg.
+
+---
+
+# Video-Uebergabeverzeichnis und der ingest-sweeper (2026-09-16)
+
+Videos gehen nicht als Base64 an die API, sondern per Pfad: n8n legt die aus
+Drive geladene Datei unter `C:\JARVIS_Images\ingest` ab und schickt nur
+`video_path`. Die API liest sie dort und zieht die Frames per ffmpeg.
+
+## Wer darf was
+
+| Beteiligter | Mount | Rechte |
+|---|---|---|
+| n8n | `C:\JARVIS_Images` -> `/data/images` | schreiben, **nicht loeschen** |
+| api | `C:\JARVIS_Images\ingest` -> `/data/images/ingest` | **read-only**, nur lesen und melden |
+| ingest-sweeper | `C:\JARVIS_Images\ingest` -> `/ingest` | schreibend, **einziger Loescher** |
+
+Das ist bewusst so getrennt. Der Sweeper ist absichtlich das duemmste Stueck
+im Stack: kein Netzwerk (`network_mode: none`), keine API, keine Dateinamen
+von irgendwoher. Er bekommt keine Eingabe, ueber die sich etwas einschleusen
+liesse, und es gibt kein Muster, dessen spaetere Lockerung etwas aufreissen
+koennte. Er loescht in Intervallen alles, was aelter als die Frist ist:
+
+```sh
+find /ingest -type f -mmin +$minutes -delete
+```
+
+Verworfene Alternativen: n8n per `ExecuteCommand` loeschen zu lassen (der Node
+ruft `child_process.exec` auf, also eine Shell mit zusammengebautem String)
+oder per `NODE_FUNCTION_ALLOW_BUILTIN=fs` (gibt *jedem* Code-Node dauerhaft
+Dateizugriff). Beide geben n8n eine Loeschfaehigkeit, die es nicht braucht.
+
+## Was "stale" bedeutet -- nicht das Naheliegende
+
+Geloescht wird **rein zeitgesteuert**, nicht nach Erfolg. Eine Datei innerhalb
+der Frist ist also voellig normal und sagt nichts ueber den Ingest aus.
+
+Eine Datei **aelter** als die Frist bedeutet: **der Sweeper laeuft nicht.**
+`stale_files` ist damit eine Ueberwachung des Sweepers, keine Aufraeumliste --
+gemeldet von der API, die read-only gemountet ist und die Evidenz deshalb gar
+nicht durch Aufraeumen verschwinden lassen kann.
+
+Der Sweeper selbst ist naturgemaess still. Ohne diese Meldung waere das erste
+Anzeichen seines Ausfalls eine volle Platte. Deshalb steht der
+Verzeichniszustand bei **jedem** Ingest im Log (WARNING, sobald etwas die
+Frist ueberschreitet) und zusaetzlich auf Abruf unter
+`GET /v1/instagram/media-pool/ingest-dir`.
+
+## Frist
+
+`AURON_INGEST_RETENTION_HOURS`, Default **24**, einmal in der
+`docker-compose.yml` gesetzt und von api **und** Sweeper gelesen. Zwei
+getrennte Werte wuerden auseinanderlaufen: Die API wuerde Dateien melden, die
+der Sweeper noch gar nicht anfassen will, oder solche verschweigen, die er
+laengst geloescht hat. Intervall ueber `AURON_INGEST_SWEEP_INTERVAL_SECONDS`,
+Default 900 s.
+
+Dateien werden **nie wiederverwendet**. Eine liegengebliebene Datei ist der
+wahrscheinlichste Kandidat fuer einen abgebrochenen Download, deshalb laedt
+der naechste Lauf neu und ueberschreibt. Der Name bleibt deterministisch
+(`<drive_id>.<ext>`), es gibt aber keine "schon da?"-Pruefung.

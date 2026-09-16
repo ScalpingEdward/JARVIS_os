@@ -41,9 +41,11 @@ services:
       JARVIS_DATA_DIR: /data
       JARVIS_LOG_DIR: /logs
       JARVIS_INGEST_DIR: /data/images/ingest
-      # How long residue from a failed run may sit in the handoff directory
-      # before AURON reports it as stale. AURON only names it; n8n sweeps.
-      AURON_INGEST_RETENTION_HOURS: "72"
+      # One definition of the retention window, read by the api (which
+      # reports) and by ingest-sweeper (which deletes). Two separate values
+      # would drift and the api would flag files the sweeper has no intention
+      # of touching yet, or miss ones it already removed.
+      AURON_INGEST_RETENTION_HOURS: ${AURON_INGEST_RETENTION_HOURS:-24}
     depends_on:
       postgres:
         condition: service_healthy
@@ -138,6 +140,48 @@ services:
     # immer einen Netzwerk-Alias, den nur user-defined Netze zulassen.
     # Nach 'compose up' daher zusaetzlich:  docker network connect bridge n8n
     networks: [jarvis_shared]
+
+  # Deleting is nobody else's job. n8n writes into the handoff directory and
+  # never deletes; the api mounts it read-only and only reports. This is the
+  # one process allowed to remove anything, and it is deliberately the
+  # dumbest thing in the stack: no network, no API, no filenames from
+  # anywhere. It cannot be told what to delete -- there is no input to tell
+  # it with, so there is nothing to inject into and no pattern whose later
+  # loosening could widen what it touches.
+  ingest-sweeper:
+    image: alpine:3.22
+    restart: unless-stopped
+    network_mode: none
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    environment:
+      AURON_INGEST_RETENTION_HOURS: ${AURON_INGEST_RETENTION_HOURS:-24}
+      AURON_INGEST_SWEEP_INTERVAL_SECONDS: ${AURON_INGEST_SWEEP_INTERVAL_SECONDS:-900}
+    volumes:
+      - "C:/JARVIS_Images/ingest:/ingest"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    command:
+      - sh
+      - -c
+      - |
+        hours=$${AURON_INGEST_RETENTION_HOURS:-24}
+        interval=$${AURON_INGEST_SWEEP_INTERVAL_SECONDS:-900}
+        case "$$hours" in ''|*[!0-9]*) hours=24 ;; esac
+        case "$$interval" in ''|*[!0-9]*) interval=900 ;; esac
+        minutes=$$((hours * 60))
+        echo "ingest-sweeper: started, removing files older than $${hours}h every $${interval}s"
+        while true; do
+          removed=$$(find /ingest -type f -mmin +$$minutes -print -delete 2>/dev/null | wc -l)
+          echo "ingest-sweeper: swept $$removed file(s) older than $${hours}h"
+          sleep "$$interval"
+        done
 
 volumes:
   postgres_data:

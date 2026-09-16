@@ -20,14 +20,18 @@ _INGEST_ROOT_ENV = "JARVIS_INGEST_DIR"
 ALLOWED_VIDEO_SUFFIXES = frozenset({".mp4", ".mov", ".m4v"})
 
 
-#: How long a leftover file may sit here before it counts as residue. A file
-#: is only deleted once AURON confirms its item ingested, so anything still
-#: around is from a run that failed -- and a failed download can have left a
-#: truncated file behind. Nothing here is ever reused: the next run downloads
-#: and overwrites regardless, so the window bounds how long the residue is
-#: visible, not how long it is trusted.
+#: How long a handed-over file may sit here before the sweeper should have
+#: removed it. Deletion is purely time-based and belongs to the ingest-sweeper
+#: sidecar -- n8n writes and never deletes, AURON reads and never deletes.
+#: A file younger than this window is simply a recently handed-over file and
+#: means nothing is wrong. A file OLDER than it means the sweeper is not
+#: running: this window is what makes that observable.
+#:
+#: Nothing here is ever reused either way -- the next run downloads and
+#: overwrites, since a leftover is the likeliest candidate for a truncated
+#: download.
 _RETENTION_HOURS_ENV = "AURON_INGEST_RETENTION_HOURS"
-DEFAULT_RETENTION_HOURS = 72.0
+DEFAULT_RETENTION_HOURS = 24.0
 
 
 def retention_hours() -> float:
@@ -45,9 +49,14 @@ def ingest_directory_status(*, now: float | None = None) -> IngestDirectoryStatu
     """What is currently lying in the handoff directory.
 
     Read-only by design: this reports, it never deletes. AURON mounts the
-    directory read-only and n8n is the only writer, so cleaning up is n8n's
-    job -- `stale_files` tells it exactly what has outlived the window, from
-    a single definition of that window rather than two that drift.
+    directory read-only, n8n only writes, and the ingest-sweeper sidecar is
+    the only process that removes anything.
+
+    That separation is what gives `stale_files` its meaning. Files inside the
+    window are ordinary; anything past it should already be gone, so its
+    presence says the sweeper has stopped. This is monitoring of the sweeper,
+    reported by a container that cannot itself delete -- not a cleanup
+    function and not a list for anyone to act on.
     """
     window = retention_hours()
     reference = now if now is not None else time.time()
