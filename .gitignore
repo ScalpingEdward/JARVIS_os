@@ -227,3 +227,6 @@ backend/data/accounts.db
 # got whatever stale snapshot was last committed instead of real,
 # current data, and every commit touching it added pure binary noise.
 backend/jarvis.db
+
+# Docker secrets (postgres_password.txt u. a.) -- gehoeren nie ins Repo
+secrets/
