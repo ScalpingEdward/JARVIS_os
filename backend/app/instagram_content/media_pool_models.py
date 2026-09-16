@@ -3,8 +3,9 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from uuid import UUID, uuid4
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, computed_field, model_validator
 
+from .analysis_completeness import analysis_is_complete
 from .models import MediaType
 
 
@@ -68,6 +69,15 @@ class MediaPoolItem(MediaPoolItemCreate):
     def available(self) -> bool:
         return not self.used and self.reserved_in_draft_id is None
 
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def analysis_complete(self) -> bool:
+        """Whether this item carries a real analysis or only placeholders.
+        Exposed on /v1/instagram/media-pool so the n8n ingest workflow can
+        re-feed incomplete items without re-deriving the rule itself --
+        see analysis_completeness.py, the single definition."""
+        return analysis_is_complete(self)
+
 
 class MediaPoolIngestRequest(BaseModel):
     items: list[MediaPoolItemCreate] = Field(min_length=1, max_length=500)
@@ -101,6 +111,11 @@ class MediaPoolIngestResponse(BaseModel):
     ingested: int
     skipped_duplicates: int
     pool_size_unused: int
+    updated_incomplete: int = Field(
+        default=0,
+        description="Known media_refs whose placeholder analysis was replaced by a real one, "
+        "rather than being skipped as duplicates.",
+    )
 
 
 class MediaPoolList(BaseModel):

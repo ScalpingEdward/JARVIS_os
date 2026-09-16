@@ -6,6 +6,7 @@ from uuid import UUID
 from app.db import SessionLocal
 from app.db_models import InstagramCuratedDraftRow, InstagramMediaPoolItemRow
 
+from .analysis_completeness import analysis_is_complete
 from .curation import analyze_gaps, curate
 from .media_pool_models import (
     ContentGapReport,
@@ -13,6 +14,7 @@ from .media_pool_models import (
     MediaPoolIngestRequest,
     MediaPoolIngestResponse,
     MediaPoolItem,
+    MediaPoolItemCreate,
 )
 
 
@@ -40,9 +42,26 @@ class MediaPoolService:
             session.query(InstagramCuratedDraftRow).delete()
             session.commit()
 
+    #: Overwritten when a placeholder analysis is replaced by a real one.
+    #: Everything not listed here survives an update untouched -- identity
+    #: (id, media_ref), usage state (used, used_in_candidate_id, used_at),
+    #: the draft reservation, and the trim window, which comes from a
+    #: separate analysis step and must not be clobbered by a re-ingest.
+    _ANALYSIS_FIELDS = (
+        "theme",
+        "tags",
+        "aesthetic_score",
+        "captured_at",
+        "source_group",
+        "duration_seconds",
+        "dominant_color_hex",
+        "analyzed_at",
+    )
+
     def ingest(self, request: MediaPoolIngestRequest) -> MediaPoolIngestResponse:
         ingested = 0
         skipped = 0
+        updated = 0
         with SessionLocal() as session:
             for create in request.items:
                 exists = (
@@ -51,7 +70,15 @@ class MediaPoolService:
                     .first()
                 )
                 if exists is not None:
-                    skipped += 1
+                    existing = MediaPoolItem.model_validate_json(exists.data)
+                    if analysis_is_complete(existing) or not analysis_is_complete(create):
+                        # Either the stored analysis is real (nothing to gain by
+                        # overwriting it), or the incoming one is no better than
+                        # the placeholder already there.
+                        skipped += 1
+                        continue
+                    exists.data = self._with_analysis_from(existing, create).model_dump_json()
+                    updated += 1
                     continue
                 item = MediaPoolItem(**create.model_dump())
                 session.add(InstagramMediaPoolItemRow(
@@ -61,8 +88,21 @@ class MediaPoolService:
                 ingested += 1
             session.commit()
         return MediaPoolIngestResponse(
-            ingested=ingested, skipped_duplicates=skipped, pool_size_unused=len(self.list_available())
+            ingested=ingested,
+            skipped_duplicates=skipped,
+            pool_size_unused=len(self.list_available()),
+            updated_incomplete=updated,
         )
+
+    def _with_analysis_from(self, existing: MediaPoolItem, create: MediaPoolItemCreate) -> MediaPoolItem:
+        """Copies the freshly analyzed fields onto an existing item, leaving
+        its identity, usage state, draft reservation and trim window alone.
+        A re-analysis must be able to improve a placeholder entry without
+        ever detaching it from the draft that already reserved it."""
+        updated = existing.model_copy()
+        for field in self._ANALYSIS_FIELDS:
+            setattr(updated, field, getattr(create, field))
+        return updated
 
     def list_all(self) -> list[MediaPoolItem]:
         with SessionLocal() as session:

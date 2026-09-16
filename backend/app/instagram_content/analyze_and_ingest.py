@@ -6,6 +6,7 @@ from io import BytesIO
 
 from PIL import Image
 
+from .analysis_completeness import analysis_is_complete
 from .media_pool_models import (
     MediaAnalyzeAndIngestItem,
     MediaAnalyzeAndIngestItemResult,
@@ -102,15 +103,23 @@ def analyze_and_ingest(
     """
     results: list[MediaAnalyzeAndIngestItemResult] = []
     creates: list[MediaPoolItemCreate] = []
-    existing_media_refs = {existing.media_ref for existing in pool_service.list_all()}
+    # Only a *real* analysis blocks re-processing. An item that was ingested
+    # with placeholders (a video with no frame to look at, say) stays eligible,
+    # otherwise it would keep its empty analysis forever: the pre-filter in the
+    # n8n workflow would drop it as "known" on every run and nothing would ever
+    # revisit it. pool_service.ingest() then updates that row in place instead
+    # of inserting a duplicate.
+    analyzed_media_refs = {
+        existing.media_ref for existing in pool_service.list_all() if analysis_is_complete(existing)
+    }
 
     for item in items:
-        if item.media_ref in existing_media_refs:
+        if item.media_ref in analyzed_media_refs:
             results.append(
                 MediaAnalyzeAndIngestItemResult(
                     media_ref=item.media_ref,
                     success=True,
-                    reasoning="Already in the media pool -- skipped vision analysis.",
+                    reasoning="Already in the media pool with a real analysis -- skipped vision analysis.",
                 )
             )
             continue
