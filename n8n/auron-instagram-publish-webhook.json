@@ -522,7 +522,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Build the direct-fetchable video URL from the Drive file id, same\n// trick as 'Build Public Image URL1'.\nconst body = $('Webhook: /instagram-post1').first().json.body;\nconst fileId = body.media_items[0].media_ref;\n\nreturn {\n  json: {\n    video_url: `https://drive.google.com/uc?export=view&id=${fileId}`,\n    caption: body.caption,\n    request_id: body.request_id,\n  }\n};"
+        "jsCode": "// Build the direct-fetchable video URL from the Drive file id, same\n// trick as 'Build Public Image URL1'.\nconst body = $('Webhook: /instagram-post1').first().json.body;\nconst item = body.media_items[0];\nconst fileId = item.media_ref;\n\nconst out = {\n  video_url: `https://drive.google.com/uc?export=view&id=${fileId}`,\n  caption: body.caption,\n  request_id: body.request_id,\n};\n\n// thumb_offset selects the Reel cover frame, in milliseconds. Set ONLY when\n// AURON actually picked a cover: the Graph API defaults thumb_offset to 0,\n// which is the opening frame -- regularly black or blurred on phone footage,\n// and the exact thing the cover analysis exists to avoid. Sending a 0 or a\n// null would therefore be worse than sending nothing at all, so the key is\n// omitted entirely and the container node builds its query as JSON to make\n// that omission possible.\nconst cover = item.cover_timestamp_seconds;\nif (typeof cover === 'number' && cover > 0) {\n  out.thumb_offset = Math.round(cover * 1000);\n}\n\nreturn { json: out };"
       },
       "id": "b1e6a001-1111-4a11-8a11-111111111103",
       "name": "Build Public Video URL",
@@ -538,29 +538,11 @@
         "method": "POST",
         "url": "=https://graph.instagram.com/v21.0/27471261452547997/media",
         "sendQuery": true,
-        "queryParameters": {
-          "parameters": [
-            {
-              "name": "media_type",
-              "value": "REELS"
-            },
-            {
-              "name": "video_url",
-              "value": "={{$json.video_url}}"
-            },
-            {
-              "name": "caption",
-              "value": "={{$json.caption}}"
-            },
-            {
-              "name": "access_token",
-              "value": "={{ $env.AURON_IG_ACCESS_TOKEN }}"
-            }
-          ]
-        },
         "options": {
           "timeout": 30000
-        }
+        },
+        "specifyQuery": "json",
+        "jsonQuery": "={{ JSON.stringify(Object.assign({ media_type: 'REELS', video_url: $json.video_url, caption: $json.caption, access_token: $env.AURON_IG_ACCESS_TOKEN }, ($json.thumb_offset === undefined || $json.thumb_offset === null) ? {} : { thumb_offset: $json.thumb_offset })) }}"
       },
       "id": "b1e6a001-1111-4a11-8a11-111111111104",
       "name": "IG: Create Reel Container",
