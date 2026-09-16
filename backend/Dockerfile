@@ -6,6 +6,14 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
+# ffmpeg (and the ffprobe that ships with it) for reading a video's real
+# duration and sampling still frames out of it. Videos have no EXIF and no
+# thumbnail, so without this there is nothing for the vision step to look at
+# and every video lands in the pool as a placeholder.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ffmpeg \
+    && rm -rf /var/lib/apt/lists/*
+
 RUN addgroup --system jarvis && adduser --system --ingroup jarvis jarvis
 
 COPY requirements.txt ./requirements.txt

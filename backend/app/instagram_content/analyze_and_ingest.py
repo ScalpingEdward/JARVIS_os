@@ -9,6 +9,11 @@ from PIL import Image
 from .analysis_completeness import analysis_is_complete
 from .captured_at_resolution import resolve_captured_at
 from .ingest_paths import IngestPathError, resolve_ingest_path
+from .video_frame_extraction import (
+    VideoFrameExtractionError,
+    representative_frame,
+    sample_video,
+)
 from .media_pool_models import (
     MediaAnalyzeAndIngestItem,
     MediaAnalyzeAndIngestItemResult,
@@ -126,18 +131,73 @@ def analyze_and_ingest(
             )
             continue
 
+        resolved_video_path = None
         if item.video_path is not None:
             # Validated here, at the edge, rather than deep inside the frame
-            # extraction that will consume it next: a bad or out-of-bounds
-            # path fails this one item with a clear reason instead of
-            # surfacing as an ffmpeg error, and never reaches the filesystem.
+            # extraction that consumes it: a bad or out-of-bounds path fails
+            # this one item with a clear reason instead of surfacing as an
+            # ffmpeg error, and never reaches the filesystem.
             try:
-                resolve_ingest_path(item.video_path)
+                resolved_video_path = resolve_ingest_path(item.video_path)
             except IngestPathError as exc:
                 results.append(
                     MediaAnalyzeAndIngestItemResult(media_ref=item.media_ref, success=False, error=str(exc))
                 )
                 continue
+
+        if item.media_type == MediaType.video and resolved_video_path is not None:
+            # A real analysis for a video: sample frames out of the file and
+            # let the same vision analyzer that handles photos look at one.
+            # No duration_seconds check here -- ffprobe reads the real one
+            # from the file, and that value wins over anything the caller
+            # sent (a mismatch is logged, not silently reconciled).
+            try:
+                duration_seconds, frames = sample_video(
+                    resolved_video_path, claimed_duration_seconds=item.duration_seconds
+                )
+                frame = representative_frame(frames)
+                analysis = analyzer.analyze(
+                    image_base64=frame.image_base64, image_media_type=frame.image_media_type
+                )
+            except (VideoFrameExtractionError, VisionAnalysisError) as exc:
+                results.append(
+                    MediaAnalyzeAndIngestItemResult(media_ref=item.media_ref, success=False, error=str(exc))
+                )
+                continue
+
+            captured_at, captured_at_source = resolve_captured_at(
+                exif=item.captured_at,
+                video_creation_time=item.video_creation_time,
+                upload_time=item.upload_time,
+            )
+            creates.append(
+                MediaPoolItemCreate(
+                    media_ref=item.media_ref,
+                    media_type=item.media_type,
+                    theme=analysis.theme,
+                    tags=analysis.tags,
+                    aesthetic_score=analysis.aesthetic_score,
+                    duration_seconds=duration_seconds,
+                    source_group=item.source_group,
+                    captured_at=captured_at,
+                    captured_at_source=captured_at_source,
+                )
+            )
+            results.append(
+                MediaAnalyzeAndIngestItemResult(
+                    media_ref=item.media_ref,
+                    success=True,
+                    theme=analysis.theme,
+                    tags=analysis.tags,
+                    aesthetic_score=analysis.aesthetic_score,
+                    reasoning=(
+                        f"Analyzed {len(frames)} sampled frames "
+                        f"({frames[0].timestamp_seconds:.1f}s-{frames[-1].timestamp_seconds:.1f}s "
+                        f"of {duration_seconds:.2f}s). {analysis.reasoning}"
+                    ),
+                )
+            )
+            continue
 
         if item.media_type == MediaType.video and item.duration_seconds is None:
             results.append(
