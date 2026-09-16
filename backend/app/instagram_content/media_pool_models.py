@@ -187,6 +187,15 @@ class MediaAnalyzeAndIngestItem(BaseModel):
         description="EXIF capture timestamp, when the caller already knows it. Left unset, "
         "AURON reads it from the image's own EXIF.",
     )
+    video_path: str | None = Field(
+        default=None,
+        max_length=1000,
+        description="Path to the downloaded video inside AURON's read-only ingest directory, "
+        "relative to it ('1abc.mp4') or absolute within it. The caller (n8n) writes the file "
+        "there and passes the path instead of megabytes of base64. Validated against the ingest "
+        "root before anything is opened: traversal, symlinks leading out, non-files and "
+        "unexpected extensions are refused.",
+    )
     video_creation_time: datetime | None = Field(
         default=None,
         description="The video container's own creation_time (MP4 mvhd). Videos carry no EXIF, "

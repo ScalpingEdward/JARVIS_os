@@ -8,6 +8,7 @@ from PIL import Image
 
 from .analysis_completeness import analysis_is_complete
 from .captured_at_resolution import resolve_captured_at
+from .ingest_paths import IngestPathError, resolve_ingest_path
 from .media_pool_models import (
     MediaAnalyzeAndIngestItem,
     MediaAnalyzeAndIngestItemResult,
@@ -124,6 +125,19 @@ def analyze_and_ingest(
                 )
             )
             continue
+
+        if item.video_path is not None:
+            # Validated here, at the edge, rather than deep inside the frame
+            # extraction that will consume it next: a bad or out-of-bounds
+            # path fails this one item with a clear reason instead of
+            # surfacing as an ffmpeg error, and never reaches the filesystem.
+            try:
+                resolve_ingest_path(item.video_path)
+            except IngestPathError as exc:
+                results.append(
+                    MediaAnalyzeAndIngestItemResult(media_ref=item.media_ref, success=False, error=str(exc))
+                )
+                continue
 
         if item.media_type == MediaType.video and item.duration_seconds is None:
             results.append(

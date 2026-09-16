@@ -40,6 +40,7 @@ services:
       REDIS_URL: redis://redis:6379/0
       JARVIS_DATA_DIR: /data
       JARVIS_LOG_DIR: /logs
+      JARVIS_INGEST_DIR: /data/images/ingest
     depends_on:
       postgres:
         condition: service_healthy
@@ -48,6 +49,11 @@ services:
     volumes:
       - jarvis_data:/data
       - jarvis_logs:/logs
+      # n8n drops downloaded videos here and passes the path instead of ~26 MB
+      # of base64 per video. Read-only, and only the ingest subdirectory --
+      # n8n writes, AURON reads. Paths from a request are validated against
+      # this root before anything is opened (see ingest_paths.py).
+      - "C:/JARVIS_Images/ingest:/data/images/ingest:ro"
     ports:
       - "${JARVIS_BIND_ADDRESS:-127.0.0.1}:${JARVIS_PORT:-8000}:8000"
     healthcheck:
