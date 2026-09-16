@@ -94,11 +94,45 @@ services:
       - ALL
     networks: [jarvis_internal]
 
+  n8n:
+    image: n8nio/n8n:2.13.2
+    container_name: n8n
+    restart: unless-stopped
+    environment:
+      # Instagram Graph API (aus .env, nie im Repo)
+      AURON_IG_ACCESS_TOKEN: ${AURON_IG_ACCESS_TOKEN}
+      AURON_IG_USER_ID: ${AURON_IG_USER_ID}
+      # Baseline-Werte des urspruenglichen docker-run-Containers
+      N8N_RUNNERS_HEARTBEAT_INTERVAL: "120"
+      N8N_RUNNERS_MAX_OLD_SPACE_SIZE: "2048"
+      N8N_BLOCK_ENV_ACCESS_IN_NODE: "false"
+      # Neu: verhindert das erneute Zuwachsen der SQLite-DB
+      EXECUTIONS_DATA_SAVE_ON_SUCCESS: none
+      EXECUTIONS_DATA_SAVE_ON_ERROR: all
+      EXECUTIONS_DATA_SAVE_ON_PROGRESS: "false"
+      EXECUTIONS_DATA_SAVE_MANUAL_EXECUTIONS: "false"
+      EXECUTIONS_DATA_PRUNE: "true"
+      EXECUTIONS_DATA_MAX_AGE: "168"
+      EXECUTIONS_DATA_PRUNE_MAX_COUNT: "5000"
+      N8N_LOG_LEVEL: warn
+    volumes:
+      - n8n_data:/home/node/.n8n
+      - "C:/JARVIS_Images:/data/images"
+    ports:
+      - "5678:5678"
+    mem_limit: 3g
+    # Das Default-Netz 'bridge' laesst sich hier nicht eintragen: Compose setzt
+    # immer einen Netzwerk-Alias, den nur user-defined Netze zulassen.
+    # Nach 'compose up' daher zusaetzlich:  docker network connect bridge n8n
+    networks: [jarvis_shared]
+
 volumes:
   postgres_data:
   redis_data:
   jarvis_data:
   jarvis_logs:
+  n8n_data:
+    external: true
 
 networks:
   jarvis_internal:
