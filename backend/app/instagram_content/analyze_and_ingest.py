@@ -108,6 +108,37 @@ def _read_captured_at(image_base64: str | None) -> datetime | None:
         return None
 
 
+def _size_mismatch(video_path, expected_size_bytes: int | None) -> str | None:
+    """Compares the handed-over file against the size Drive itself reports.
+
+    A write that was cut short leaves a partial file, and nothing renames it
+    into place afterwards -- the ReadWriteFile node cannot. Detecting that
+    from the file's own contents does not work reliably: an MP4 written with
+    +faststart, which is what phones produce, keeps its moov atom at the
+    front, so ffprobe reads the full original duration off a half file and
+    reports it with total confidence. Frame extraction catches the blatant
+    cases, but measured against real truncations it only bites from roughly
+    5% missing; a file short by its last one to three percent passes with a
+    duration that is simply wrong.
+
+    So this compares two numbers instead of judging how broken something
+    looks. It runs before ffprobe is ever invoked.
+    """
+    if expected_size_bytes is None:
+        return None
+    try:
+        actual = video_path.stat().st_size
+    except OSError as exc:
+        return f"cannot stat {video_path.name}: {exc}"
+    if actual != expected_size_bytes:
+        return (
+            f"{video_path.name} is {actual} bytes but Drive reports {expected_size_bytes} "
+            f"({actual - expected_size_bytes:+d} on disk) -- the handover was incomplete, "
+            f"refusing to analyze a partial file"
+        )
+    return None
+
+
 def _trim_window(
     frames: list,
     duration_seconds: float,
@@ -223,6 +254,13 @@ def analyze_and_ingest(
             # No duration_seconds check here: ffprobe reads the real one out
             # of the file and that wins over whatever the caller sent (a
             # mismatch is logged, never silently reconciled).
+            mismatch = _size_mismatch(resolved_video_path, item.expected_size_bytes)
+            if mismatch is not None:
+                results.append(
+                    MediaAnalyzeAndIngestItemResult(media_ref=item.media_ref, success=False, error=mismatch)
+                )
+                continue
+
             try:
                 duration_seconds, frames = sample_video(
                     resolved_video_path, claimed_duration_seconds=item.duration_seconds

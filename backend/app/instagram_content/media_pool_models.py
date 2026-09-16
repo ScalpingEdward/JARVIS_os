@@ -251,6 +251,13 @@ class MediaAnalyzeAndIngestItem(BaseModel):
         "root before anything is opened: traversal, symlinks leading out, non-files and "
         "unexpected extensions are refused.",
     )
+    expected_size_bytes: int | None = Field(
+        default=None,
+        ge=1,
+        description="The file's size as Google Drive itself reports it. AURON compares it against "
+        "the bytes actually on disk before opening the file, so a write that was cut short is "
+        "caught by a fact rather than by guessing from how damaged the file looks.",
+    )
     video_creation_time: datetime | None = Field(
         default=None,
         description="The video container's own creation_time (MP4 mvhd). Videos carry no EXIF, "
