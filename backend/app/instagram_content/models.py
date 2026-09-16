@@ -44,6 +44,12 @@ class MediaItem(BaseModel):
         default=None, ge=0, description="Real, analyzed trim window (video only) -- never invented if absent."
     )
     recommended_trim_end_seconds: float | None = Field(default=None, gt=0)
+    cover_timestamp_seconds: float | None = Field(
+        default=None,
+        gt=0,
+        description="Video only: the frame to use as the Reel cover. n8n sends it to the Graph API "
+        "as thumb_offset in milliseconds; without it the cover defaults to frame 0.",
+    )
 
     @model_validator(mode="after")
     def _duration_matches_type(self) -> "MediaItem":

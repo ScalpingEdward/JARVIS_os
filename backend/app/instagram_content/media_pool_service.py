@@ -59,6 +59,7 @@ class MediaPoolService:
         "duration_seconds",
         "dominant_color_hex",
         "analyzed_at",
+        "cover_timestamp_seconds",
     )
 
     def backfill_captured_at_source(self) -> dict[str, int]:

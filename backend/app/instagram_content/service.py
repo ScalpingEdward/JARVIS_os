@@ -345,6 +345,7 @@ class InstagramContentService:
                 duration_seconds=pi.duration_seconds,
                 recommended_trim_start_seconds=pi.recommended_trim_start_seconds,
                 recommended_trim_end_seconds=pi.recommended_trim_end_seconds,
+                cover_timestamp_seconds=pi.cover_timestamp_seconds,
             )
             for pi in pool_items
         ]

@@ -243,6 +243,7 @@ def test_a_video_with_a_path_gets_a_real_analysis_and_ffprobes_duration(tmp_path
             return VisionAnalysisResult(
                 theme="gym-mirror-selfie", tags=["gym", "motion"],
                 aesthetic_score=0.74, reasoning="stub",
+                cover_timestamp_seconds=kwargs["frames"][1].timestamp_seconds,
             )
 
     ingest_root = tmp_path / "ingest"
@@ -282,8 +283,12 @@ def test_a_video_with_a_path_gets_a_real_analysis_and_ffprobes_duration(tmp_path
     assert stored.captured_at == uploaded
     assert stored.captured_at_source is CapturedAtSource.upload_time
     assert stored.analysis_complete is True, "no longer a placeholder"
+    assert stored.cover_timestamp_seconds == seen["frames"][1].timestamp_seconds
 
-    assert seen["image_media_type"] == "image/jpeg"
-    assert seen["image_base64"], "a real extracted frame reached the analyzer"
+    # Since the cover step, a video is analyzed from every sampled frame at
+    # once rather than one representative still.
+    assert seen["frames"], "the extracted frames reached the analyzer"
+    assert all(f.image_media_type == "image/jpeg" for f in seen["frames"])
+    assert len(seen["frames"]) == 3
     assert any("duration mismatch" in r.getMessage() for r in caplog.records)
     assert "sampled frames" in response.results[0].reasoning

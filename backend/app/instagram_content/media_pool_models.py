@@ -55,7 +55,28 @@ class MediaPoolItemCreate(BaseModel):
     )
     recommended_trim_end_seconds: float | None = Field(default=None, gt=0)
     trim_reasoning: str = Field(default="", max_length=1000)
+    cover_timestamp_seconds: float | None = Field(
+        default=None,
+        gt=0,
+        description="Video only: which frame becomes the Reel cover, sent to the Graph API as "
+        "thumb_offset (milliseconds). Never None for a video that went through frame extraction -- "
+        "the default thumb_offset is 0, i.e. the opening frame, which on phone footage is "
+        "regularly black or blurred.",
+    )
     analyzed_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+    @model_validator(mode="after")
+    def _cover_belongs_to_a_video_and_lands_inside_it(self) -> "MediaPoolItemCreate":
+        if self.cover_timestamp_seconds is None:
+            return self
+        if self.media_type != MediaType.video:
+            raise ValueError("cover_timestamp_seconds is only meaningful for video media items")
+        if self.duration_seconds is not None and self.cover_timestamp_seconds > self.duration_seconds:
+            raise ValueError(
+                f"cover_timestamp_seconds ({self.cover_timestamp_seconds}s) is past the end of the "
+                f"video ({self.duration_seconds}s)"
+            )
+        return self
 
     @model_validator(mode="after")
     def _captured_at_carries_its_source(self) -> "MediaPoolItemCreate":
