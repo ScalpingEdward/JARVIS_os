@@ -23,8 +23,9 @@
         "rule": {
           "interval": [
             {
-              "field": "minutes",
-              "minutesInterval": 20
+              "field": "days",
+              "triggerAtHour": 9,
+              "triggerAtMinute": 0
             }
           ]
         }
@@ -363,7 +364,8 @@
   },
   "settings": {
     "executionOrder": "v1",
-    "binaryMode": "separate"
+    "binaryMode": "separate",
+    "timezone": "Europe/Berlin"
   },
   "meta": null
 }

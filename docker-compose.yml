@@ -115,6 +115,10 @@ services:
       EXECUTIONS_DATA_MAX_AGE: "168"
       EXECUTIONS_DATA_PRUNE_MAX_COUNT: "5000"
       N8N_LOG_LEVEL: warn
+      # Ohne das faellt n8n auf America/New_York zurueck -- ein
+      # taeglicher 09:00-Trigger wuerde dann 15:00 Berliner Zeit feuern.
+      GENERIC_TIMEZONE: Europe/Berlin
+      TZ: Europe/Berlin
     volumes:
       - n8n_data:/home/node/.n8n
       - "C:/JARVIS_Images:/data/images"
