@@ -131,3 +131,23 @@ Die DB besteht zu 81 % aus freien Seiten (`freelist_count` 949.506 von
 `page_count` 1.179.745 = 3,89 GB) bei nur 38 Executions. Pruning aendert daran
 nichts, nur `VACUUM` gibt den Platz zurueck. Platz dafuer ist reichlich da
 (Docker-VM: 943 GB frei). Eigener Schritt, eigene Fehlersuche.
+
+## VACUUM durchgefuehrt (2026-09-16)
+Bei gestopptem Container, `PRAGMA wal_checkpoint(TRUNCATE); VACUUM;`:
+
+| | vorher | nachher |
+|---|---|---|
+| `database.sqlite` | 4.832.235.520 B (4,83 GB) | 943.198.208 B (943 MB) |
+| `database.sqlite-wal` | 378.187.192 B | 0 B |
+| Volume gesamt | 5,7 GB | 1,7 GB |
+
+3,89 GB freigegeben, exakt der vorhergesagte `freelist`-Betrag.
+`PRAGMA integrity_check` danach: ok. Workflows, Credentials und
+Aktivierungsstatus unveraendert.
+
+**Wichtig:** Laeuft VACUUM aus einem Root-Container, gehoeren neu angelegte
+Dateien danach `root`. n8n laeuft als `node` (uid 1000) und startet dann nicht
+mehr. Deshalb im selben Durchgang `chown -R 1000:1000` auf das Volume.
+
+Offen geblieben: `n8nEventLog-1.log` und `-3.log` mit je ~21,5 MB. n8n rotiert
+diese Dateien nicht selbst weg.
