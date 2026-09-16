@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import os
+import time
 from pathlib import Path
+
+from .media_pool_models import IngestDirectoryFile, IngestDirectoryStatus
 
 #: Where n8n drops a downloaded video for AURON to read. Mounted into the API
 #: container read-only, and only this subdirectory -- n8n writes, AURON reads.
@@ -15,6 +18,72 @@ _INGEST_ROOT_ENV = "JARVIS_INGEST_DIR"
 #: allowlist rather than a denylist: anything not named here is refused,
 #: so a new extension has to be a deliberate decision.
 ALLOWED_VIDEO_SUFFIXES = frozenset({".mp4", ".mov", ".m4v"})
+
+
+#: How long a leftover file may sit here before it counts as residue. A file
+#: is only deleted once AURON confirms its item ingested, so anything still
+#: around is from a run that failed -- and a failed download can have left a
+#: truncated file behind. Nothing here is ever reused: the next run downloads
+#: and overwrites regardless, so the window bounds how long the residue is
+#: visible, not how long it is trusted.
+_RETENTION_HOURS_ENV = "AURON_INGEST_RETENTION_HOURS"
+DEFAULT_RETENTION_HOURS = 72.0
+
+
+def retention_hours() -> float:
+    raw = os.environ.get(_RETENTION_HOURS_ENV)
+    if not raw:
+        return DEFAULT_RETENTION_HOURS
+    try:
+        value = float(raw)
+    except ValueError:
+        return DEFAULT_RETENTION_HOURS
+    return value if value > 0 else DEFAULT_RETENTION_HOURS
+
+
+def ingest_directory_status(*, now: float | None = None) -> IngestDirectoryStatus:
+    """What is currently lying in the handoff directory.
+
+    Read-only by design: this reports, it never deletes. AURON mounts the
+    directory read-only and n8n is the only writer, so cleaning up is n8n's
+    job -- `stale_files` tells it exactly what has outlived the window, from
+    a single definition of that window rather than two that drift.
+    """
+    window = retention_hours()
+    reference = now if now is not None else time.time()
+    root = ingest_root()
+
+    try:
+        entries = [entry for entry in root.iterdir() if entry.is_file()]
+    except OSError as exc:
+        return IngestDirectoryStatus(
+            file_count=0, total_bytes=0, retention_hours=window,
+            available=False, detail=f"{root} is not readable: {exc}",
+        )
+
+    files: list[IngestDirectoryFile] = []
+    total_bytes = 0
+    oldest: float | None = None
+    for entry in entries:
+        try:
+            stat = entry.stat()
+        except OSError:
+            continue  # vanished between listing and stat -- n8n owns this directory
+        age_hours = max(0.0, (reference - stat.st_mtime) / 3600)
+        total_bytes += stat.st_size
+        oldest = age_hours if oldest is None else max(oldest, age_hours)
+        files.append(IngestDirectoryFile(
+            name=entry.name, size_bytes=stat.st_size,
+            age_hours=round(age_hours, 3), stale=age_hours > window,
+        ))
+
+    return IngestDirectoryStatus(
+        file_count=len(files),
+        total_bytes=total_bytes,
+        oldest_age_hours=round(oldest, 3) if oldest is not None else None,
+        retention_hours=window,
+        stale_files=[f for f in files if f.stale],
+    )
 
 
 class IngestPathError(ValueError):

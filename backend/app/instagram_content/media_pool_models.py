@@ -114,6 +114,35 @@ class MediaPoolItem(MediaPoolItemCreate):
         return analysis_is_complete(self)
 
 
+class IngestDirectoryFile(BaseModel):
+    """One file sitting in the handoff directory right now."""
+
+    name: str
+    size_bytes: int
+    age_hours: float
+    stale: bool = Field(description="Older than the retention window, i.e. left behind by a failed run.")
+
+
+class IngestDirectoryStatus(BaseModel):
+    """What is lying in the video handoff directory.
+
+    n8n deletes a file once AURON confirms that item ingested; anything left
+    is the residue of a run that failed. Reported on every ingest and
+    available on demand so a pile-up cannot build up unnoticed -- the point
+    is not that files are cleaned away, it is that they are never quietly
+    there. AURON only ever reads: `stale_files` names what has outlived the
+    window, and n8n is what removes it.
+    """
+
+    file_count: int
+    total_bytes: int
+    oldest_age_hours: float | None = Field(default=None, description="None when the directory is empty.")
+    retention_hours: float
+    stale_files: list[IngestDirectoryFile] = Field(default_factory=list)
+    available: bool = Field(default=True, description="False when the directory is not mounted or unreadable.")
+    detail: str = ""
+
+
 class MediaPoolIngestRequest(BaseModel):
     items: list[MediaPoolItemCreate] = Field(min_length=1, max_length=500)
 

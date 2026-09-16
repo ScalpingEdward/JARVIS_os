@@ -8,8 +8,10 @@ from pydantic import BaseModel
 
 from app.security.operator_auth import require_operator_token
 
+from .ingest_paths import ingest_directory_status
 from .media_pool_models import (
     ContentGapReport,
+    IngestDirectoryStatus,
     CuratedDraft,
     CuratedDraftList,
     FinalizeDraftRequest,
@@ -139,6 +141,19 @@ def ingest_media(request: MediaPoolIngestRequest) -> MediaPoolIngestResponse:
 def list_media_pool(available_only: bool = False):
     items = media_pool_service.list_available() if available_only else media_pool_service.list_all()
     return MediaPoolList(items=items, count=len(items))
+
+
+@router.get("/media-pool/ingest-dir", response_model=IngestDirectoryStatus)
+def ingest_directory() -> IngestDirectoryStatus:
+    """What is lying in the video handoff directory right now.
+
+    n8n writes a downloaded video there, AURON reads it, and n8n deletes it
+    once AURON confirms that item ingested -- so anything still present is
+    residue from a run that failed. Read-only: this reports, it never
+    deletes. `stale_files` names what has outlived the retention window, so
+    n8n (the only writer) can sweep exactly that, from one definition of the
+    window rather than two that drift apart."""
+    return ingest_directory_status()
 
 
 @router.get("/media-pool/gaps", response_model=ContentGapReport)

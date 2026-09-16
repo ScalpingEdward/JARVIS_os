@@ -10,7 +10,7 @@ from PIL import Image
 
 from .analysis_completeness import analysis_is_complete
 from .captured_at_resolution import resolve_captured_at
-from .ingest_paths import IngestPathError, resolve_ingest_path
+from .ingest_paths import IngestPathError, ingest_directory_status, resolve_ingest_path
 from .media_pool_models import (
     MediaAnalyzeAndIngestItem,
     MediaAnalyzeAndIngestItemResult,
@@ -362,5 +362,35 @@ def analyze_and_ingest(
         ingest_response = pool_service.ingest(MediaPoolIngestRequest(items=creates))
         ingested = ingest_response.ingested
 
+    _report_ingest_directory()
+
     failed = sum(1 for r in results if not r.success)
     return MediaAnalyzeAndIngestResponse(results=results, analyzed_and_ingested=ingested, failed=failed)
+
+
+def _report_ingest_directory() -> None:
+    """Says what is left lying in the handoff directory after every run.
+
+    The sweep that removes residue runs in n8n, on its own schedule. Without
+    this the only signal would be that sweep, which is silent by nature -- a
+    pile-up would then be invisible right up until it mattered. Reporting
+    here means it is stated on every single ingest, whether or not anything
+    ever cleans it away.
+    """
+    status = ingest_directory_status()
+    if not status.available:
+        logger.warning("ingest directory unavailable: %s", status.detail)
+        return
+    if status.file_count == 0:
+        logger.info("ingest directory is empty")
+        return
+    log = logger.warning if status.stale_files else logger.info
+    log(
+        "ingest directory holds %d file(s), %.1f MB, oldest %.1fh; %d past the %.0fh retention window%s",
+        status.file_count,
+        status.total_bytes / 1_048_576,
+        status.oldest_age_hours or 0.0,
+        len(status.stale_files),
+        status.retention_hours,
+        f" ({', '.join(f.name for f in status.stale_files[:5])})" if status.stale_files else "",
+    )

@@ -41,6 +41,9 @@ services:
       JARVIS_DATA_DIR: /data
       JARVIS_LOG_DIR: /logs
       JARVIS_INGEST_DIR: /data/images/ingest
+      # How long residue from a failed run may sit in the handoff directory
+      # before AURON reports it as stale. AURON only names it; n8n sweeps.
+      AURON_INGEST_RETENTION_HOURS: "72"
     depends_on:
       postgres:
         condition: service_healthy
