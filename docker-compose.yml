@@ -117,6 +117,15 @@ services:
       N8N_RUNNERS_HEARTBEAT_INTERVAL: "120"
       N8N_RUNNERS_MAX_OLD_SPACE_SIZE: "2048"
       N8N_BLOCK_ENV_ACCESS_IN_NODE: "false"
+      # n8n restricts file access to ~/.n8n-files by DEFAULT -- the default is
+      # not empty, so the allowlist is always active. Without this the Write
+      # File node fails with "The file ... is not writable" for every path
+      # outside it, which is n8n's own security check and has nothing to do
+      # with mounts or filesystem permissions. Pointing it at the handoff
+      # directory swaps one narrow allowlist for another; it loosens nothing,
+      # and n8n may now write there and nowhere else. Do not remove: without
+      # it the drive-ingest workflow cannot hand a single video over.
+      N8N_RESTRICT_FILE_ACCESS_TO: /data/images/ingest
       # Neu: verhindert das erneute Zuwachsen der SQLite-DB
       EXECUTIONS_DATA_SAVE_ON_SUCCESS: none
       EXECUTIONS_DATA_SAVE_ON_ERROR: all

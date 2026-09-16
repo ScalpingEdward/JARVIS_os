@@ -212,3 +212,50 @@ Dateien werden **nie wiederverwendet**. Eine liegengebliebene Datei ist der
 wahrscheinlichste Kandidat fuer einen abgebrochenen Download, deshalb laedt
 der naechste Lauf neu und ueberschreibt. Der Name bleibt deterministisch
 (`<drive_id>.<ext>`), es gibt aber keine "schon da?"-Pruefung.
+
+## N8N_RESTRICT_FILE_ACCESS_TO -- nicht entfernen
+
+n8n beschraenkt Dateizugriff **standardmaessig** auf `~/.n8n-files`. Der Default
+ist *nicht* leer, die Allowlist ist also immer aktiv:
+
+```js
+// @n8n/config SecurityConfig
+this.restrictFileAccessTo = '~/.n8n-files';
+```
+
+```js
+// n8n-core file-system-helper-functions.js
+if (isFilePathBlocked(resolvedFilePath)) {
+  throw new NodeOperationError(node, `The file "${path}" is not writable.`);
+}
+```
+
+Ohne gesetzte Variable scheitert der Write-Node fuer **jeden** Pfad ausserhalb
+davon -- mit der irrefuehrenden Meldung `is not writable`, die nach einem
+Rechteproblem klingt. Es ist aber keines: Mount, UID und Verzeichnisrechte
+koennen voellig in Ordnung sein (`drwxrwxrwx`, uid 1000, `touch` funktioniert),
+und der Node scheitert trotzdem. Das Verzeichnis `~/.n8n-files` existiert in
+diesem Image nicht einmal.
+
+Deshalb steht in der `docker-compose.yml`:
+
+```yaml
+N8N_RESTRICT_FILE_ACCESS_TO: /data/images/ingest
+```
+
+Das ist **keine Lockerung**. Vorher war genau ein Verzeichnis erlaubt (eines,
+das nicht existiert), jetzt genau ein anderes -- das tatsaechlich benutzte.
+n8n darf damit dorthin schreiben und sonst nirgends, zusaetzlich zur Trennung
+ueber die Mounts. Gegen die echte Prueffunktion verifiziert:
+
+```
+erlaubt    /data/images/ingest/<datei>.mp4
+erlaubt    /data/images/ingest/unterordner/x.mp4
+BLOCKIERT  /data/images/anderswo.mp4
+BLOCKIERT  /home/node/.n8n/database.sqlite
+BLOCKIERT  /etc/passwd
+```
+
+Die Variable wirkt auf Lesen **und** Schreiben. Ein kuenftiger Workflow, der
+anderswo Dateien anfasst, wird ebenfalls blockiert -- dann gehoert der Pfad
+bewusst ergaenzt (semikolongetrennt), nicht die Variable entfernt.

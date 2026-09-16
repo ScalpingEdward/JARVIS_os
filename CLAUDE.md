@@ -21,6 +21,12 @@ Ziel der Instagram-Seite: Reichweite aufbauen fuer den Weg zum hauptberuflichen 
   nach docker restart n8n.
 - Das Repo ist die Wahrheit. Wenn Live-Workflows weiter sind als das Repo,
   erst Live-Stand ins Repo syncen, dann darauf aufbauen.
+- Faehigkeiten dort pruefen, wo sie im Betrieb gebraucht werden, nicht daneben.
+  Ein `touch` aus der Container-Shell belegt Dateisystemrechte -- nicht, dass
+  ein n8n-Node schreiben darf: n8n prueft zusaetzlich selbst gegen
+  N8N_RESTRICT_FILE_ACCESS_TO und scheitert mit "is not writable", obwohl
+  Mount, UID und Rechte stimmen. Gegen die echte Funktion, den echten Pfad und
+  die echte Schicht testen, sonst belegt der Test etwas anderes als die Aussage.
 
 ## Content-Strategie Instagram
 - Kernthema Trading traegt den Account (ca. die Haelfte der Posts).
