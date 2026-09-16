@@ -7,6 +7,7 @@ from io import BytesIO
 from PIL import Image
 
 from .analysis_completeness import analysis_is_complete
+from .captured_at_resolution import resolve_captured_at
 from .media_pool_models import (
     MediaAnalyzeAndIngestItem,
     MediaAnalyzeAndIngestItemResult,
@@ -133,7 +134,12 @@ def analyze_and_ingest(
             continue
 
         if item.media_type == MediaType.video and not item.image_base64 and not item.image_url:
-            theme = item.captured_at.date().isoformat() if item.captured_at else "video"
+            captured_at, captured_at_source = resolve_captured_at(
+                exif=item.captured_at,
+                video_creation_time=item.video_creation_time,
+                upload_time=item.upload_time,
+            )
+            theme = captured_at.date().isoformat() if captured_at else "video"
             creates.append(
                 MediaPoolItemCreate(
                     media_ref=item.media_ref,
@@ -143,7 +149,8 @@ def analyze_and_ingest(
                     aesthetic_score=_VIDEO_PLACEHOLDER_AESTHETIC_SCORE,
                     duration_seconds=item.duration_seconds,
                     source_group=item.source_group,
-                    captured_at=item.captured_at,
+                    captured_at=captured_at,
+                    captured_at_source=captured_at_source,
                 )
             )
             results.append(
@@ -170,6 +177,11 @@ def analyze_and_ingest(
             results.append(MediaAnalyzeAndIngestItemResult(media_ref=item.media_ref, success=False, error=str(exc)))
             continue
 
+        captured_at, captured_at_source = resolve_captured_at(
+            exif=item.captured_at or _read_captured_at(item.image_base64),
+            video_creation_time=item.video_creation_time,
+            upload_time=item.upload_time,
+        )
         creates.append(
             MediaPoolItemCreate(
                 media_ref=item.media_ref,
@@ -179,7 +191,8 @@ def analyze_and_ingest(
                 aesthetic_score=analysis.aesthetic_score,
                 duration_seconds=item.duration_seconds,
                 source_group=item.source_group,
-                captured_at=item.captured_at or _read_captured_at(item.image_base64),
+                captured_at=captured_at,
+                captured_at_source=captured_at_source,
             )
         )
         results.append(

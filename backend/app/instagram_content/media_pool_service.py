@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from datetime import datetime, timezone
 from uuid import UUID
 
@@ -7,6 +8,7 @@ from app.db import SessionLocal
 from app.db_models import InstagramCuratedDraftRow, InstagramMediaPoolItemRow
 
 from .analysis_completeness import analysis_is_complete
+from .captured_at_resolution import CapturedAtSource
 from .curation import analyze_gaps, curate
 from .media_pool_models import (
     ContentGapReport,
@@ -52,11 +54,53 @@ class MediaPoolService:
         "tags",
         "aesthetic_score",
         "captured_at",
+        "captured_at_source",
         "source_group",
         "duration_seconds",
         "dominant_color_hex",
         "analyzed_at",
     )
+
+    def backfill_captured_at_source(self) -> dict[str, int]:
+        """One-off migration for rows written before captured_at carried its
+        source. Operates on the raw stored JSON, deliberately: those rows no
+        longer validate (the model requires captured_at and
+        captured_at_source to be set or unset together), so they cannot be
+        loaded as models until this has run.
+
+        Rows are filled with 'exif' only where that is a fact rather than a
+        guess: before this field existed, the sole code path that ever set
+        captured_at on an image was _read_captured_at(), which reads EXIF
+        DateTimeOriginal out of the image bytes. No workflow has ever sent a
+        captured_at of its own. A video could not have reached that path, so
+        a video row carrying a timestamp would be unexplained -- those are
+        counted and reported, never guessed at.
+
+        Idempotent: rows that already carry a source are left alone.
+        """
+        filled = 0
+        already = 0
+        untouched_videos = 0
+        with SessionLocal() as session:
+            for row in session.query(InstagramMediaPoolItemRow).all():
+                data = json.loads(row.data)
+                if data.get("captured_at") is None:
+                    continue
+                if data.get("captured_at_source") is not None:
+                    already += 1
+                    continue
+                if data.get("media_type") != "image":
+                    untouched_videos += 1
+                    continue
+                data["captured_at_source"] = CapturedAtSource.exif.value
+                row.data = json.dumps(data)
+                filled += 1
+            session.commit()
+        return {
+            "filled_exif": filled,
+            "already_had_a_source": already,
+            "non_image_left_untouched": untouched_videos,
+        }
 
     def ingest(self, request: MediaPoolIngestRequest) -> MediaPoolIngestResponse:
         ingested = 0

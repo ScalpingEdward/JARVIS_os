@@ -6,6 +6,7 @@ from uuid import UUID, uuid4
 from pydantic import BaseModel, Field, computed_field, model_validator
 
 from .analysis_completeness import analysis_is_complete
+from .captured_at_resolution import CapturedAtSource
 from .models import MediaType
 
 
@@ -33,8 +34,15 @@ class MediaPoolItemCreate(BaseModel):
     )
     captured_at: datetime | None = Field(
         default=None,
-        description="EXIF capture timestamp (DateTimeOriginal). Used for chronological "
-        "grouping and sorting.",
+        description="When this was actually shot. Used for chronological grouping and sorting. "
+        "Always read together with captured_at_source -- a fallback value can be an upload "
+        "time rather than a capture time.",
+    )
+    captured_at_source: CapturedAtSource | None = Field(
+        default=None,
+        description="Which source captured_at came from: EXIF, the video container's own "
+        "creation_time, or -- weakest -- the Drive upload time. None exactly when captured_at "
+        "is None. Kept as its own field so an upload time can never masquerade as a capture time.",
     )
     aesthetic_score: float = Field(ge=0, le=1)
     duration_seconds: float | None = Field(default=None, gt=0)
@@ -48,6 +56,12 @@ class MediaPoolItemCreate(BaseModel):
     recommended_trim_end_seconds: float | None = Field(default=None, gt=0)
     trim_reasoning: str = Field(default="", max_length=1000)
     analyzed_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+    @model_validator(mode="after")
+    def _captured_at_carries_its_source(self) -> "MediaPoolItemCreate":
+        if (self.captured_at is None) != (self.captured_at_source is None):
+            raise ValueError("captured_at and captured_at_source must be set or unset together")
+        return self
 
     @model_validator(mode="after")
     def _duration_matches_type(self) -> "MediaPoolItemCreate":
@@ -170,8 +184,20 @@ class MediaAnalyzeAndIngestItem(BaseModel):
     source_group: str | None = Field(default=None, max_length=200, description="Drive subfolder name, e.g. 'tag 1'.")
     captured_at: datetime | None = Field(
         default=None,
-        description="EXIF capture timestamp (DateTimeOriginal). Used for chronological "
-        "grouping and sorting.",
+        description="EXIF capture timestamp, when the caller already knows it. Left unset, "
+        "AURON reads it from the image's own EXIF.",
+    )
+    video_creation_time: datetime | None = Field(
+        default=None,
+        description="The video container's own creation_time (MP4 mvhd). Videos carry no EXIF, "
+        "so this is the only source that describes when the recording was actually made. "
+        "A zeroed field decodes to 1904 and is rejected as implausible, not stored.",
+    )
+    upload_time: datetime | None = Field(
+        default=None,
+        description="Google Drive createdTime -- when the file arrived, not when it was shot. "
+        "Last-resort fallback; stored only with captured_at_source='upload_time' so it stays "
+        "distinguishable from a real capture time.",
     )
 
 

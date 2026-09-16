@@ -17,6 +17,7 @@ from app.instagram_content.analysis_completeness import (
     analysis_incompleteness_reasons,
     analysis_is_complete,
 )
+from app.instagram_content.captured_at_resolution import CapturedAtSource
 from app.instagram_content.media_pool_models import (
     MediaPoolIngestRequest,
     MediaPoolItem,
@@ -34,8 +35,12 @@ def _real_image(media_ref: str = "drive-image-1", **overrides) -> MediaPoolItemC
         tags=["desk", "charts"],
         aesthetic_score=0.71,
         captured_at=datetime(2026, 9, 14, 8, 30, tzinfo=timezone.utc),
+        captured_at_source=CapturedAtSource.exif,
     )
     payload.update(overrides)
+    if payload.get("captured_at") is None:
+        # the model refuses a source without a timestamp, and vice versa
+        payload["captured_at_source"] = None
     return MediaPoolItemCreate(**payload)
 
 
@@ -98,6 +103,7 @@ def test_a_video_with_a_real_analysis_is_complete():
         aesthetic_score=0.64,
         duration_seconds=12.0,
         captured_at=datetime(2026, 9, 15, 6, 0, tzinfo=timezone.utc),
+        captured_at_source=CapturedAtSource.video_metadata,
     )
     assert analysis_is_complete(analyzed_video) is True
 
@@ -132,6 +138,7 @@ def test_reingesting_an_incomplete_item_updates_it_instead_of_skipping_it():
         aesthetic_score=0.82,
         duration_seconds=9.305,
         captured_at=datetime(2026, 9, 15, 6, 0, tzinfo=timezone.utc),
+        captured_at_source=CapturedAtSource.video_metadata,
     )
     second = service.ingest(MediaPoolIngestRequest(items=[real]))
 
@@ -177,6 +184,7 @@ def test_an_update_preserves_identity_reservation_usage_and_the_trim_window():
         aesthetic_score=0.82,
         duration_seconds=9.305,
         captured_at=datetime(2026, 9, 15, 6, 0, tzinfo=timezone.utc),
+        captured_at_source=CapturedAtSource.video_metadata,
     )]))
 
     after = service.list_all()[0]
