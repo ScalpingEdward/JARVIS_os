@@ -54,7 +54,8 @@
           "fields": [
             "mimeType",
             "name",
-            "id"
+            "id",
+            "size"
           ]
         }
       },
@@ -106,7 +107,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Base64-encode the downloaded binaries for AURON's vision endpoint.\n// AURON never holds a Drive credential itself -- n8n fetches bytes,\n// AURON only ever sees the encoded image it's handed.\n//\n// Runs once for ALL items of the current batch on purpose: $('Loop Over\n// Items').all() returns just this batch's items, a plain array read. The\n// per-item form ($('Loop Over Items v7').item) makes n8n trace paired items\n// back through every previous batch, which gets slower each round and\n// eventually times the task runner out on a large folder.\n\n// Reads the real duration out of a video's own MP4 'mvhd' atom\n// (duration / timescale) by walking the box structure directly on the\n// raw bytes -- no ffmpeg/ffprobe binary required, which this n8n image\n// does not ship with. Returns null (never a guess) if the file isn't a\n// box-structured container this can parse -- AURON's own\n// analyze-and-ingest endpoint already rejects a video item with\n// duration_seconds=null with a clear error rather than silently\n// accepting a wrong or missing duration.\nfunction readMp4DurationSeconds(buffer) {\n  function walk(buf, start, end) {\n    let pos = start;\n    while (pos + 8 <= end) {\n      let size = buf.readUInt32BE(pos);\n      const type = buf.toString('ascii', pos + 4, pos + 8);\n      let headerSize = 8;\n      if (size === 1) {\n        if (pos + 16 > end) break;\n        const high = buf.readUInt32BE(pos + 8);\n        const low = buf.readUInt32BE(pos + 12);\n        size = high * 2 ** 32 + low;\n        headerSize = 16;\n      } else if (size === 0) {\n        size = end - pos;\n      }\n      if (size < headerSize || pos + size > end) break;\n\n      if (type === 'moov') {\n        const result = walk(buf, pos + headerSize, pos + size);\n        if (result !== null) return result;\n      } else if (type === 'mvhd') {\n        const body = pos + headerSize;\n        const version = buf.readUInt8(body);\n        if (version === 1) {\n          const timescale = buf.readUInt32BE(body + 20);\n          const durHigh = buf.readUInt32BE(body + 24);\n          const durLow = buf.readUInt32BE(body + 28);\n          if (timescale > 0) return (durHigh * 2 ** 32 + durLow) / timescale;\n        } else {\n          const timescale = buf.readUInt32BE(body + 12);\n          const duration = buf.readUInt32BE(body + 16);\n          if (timescale > 0) return duration / timescale;\n        }\n      }\n      pos += size;\n    }\n    return null;\n  }\n\n  try {\n    return walk(buffer, 0, buffer.length);\n  } catch {\n    return null;\n  }\n}\n\nconst driveItems = $('Loop Over Items v7').all();\n\nreturn $input.all().map((item, i) => {\n  const drive = driveItems[i].json;\n  const mediaType = drive.mimeType || 'image/jpeg';\n  const isVideo = mediaType.startsWith('video/');\n  const durationSeconds = isVideo\n    ? readMp4DurationSeconds(Buffer.from(item.json.image_b64, 'base64'))\n    : null;\n\n  return {\n    json: {\n      media_ref: drive.id,\n      media_type: isVideo ? 'video' : 'image',\n      image_base64: isVideo ? null : item.json.image_b64,\n      image_media_type: isVideo ? null : mediaType,\n      duration_seconds: durationSeconds\n    }\n  };\n});"
+        "jsCode": "// Base64-encode the downloaded binaries for AURON's vision endpoint.\n// AURON never holds a Drive credential itself -- n8n fetches bytes,\n// AURON only ever sees the encoded image it's handed.\n//\n// Runs once for ALL items of the current batch on purpose: $('Loop Over\n// Items').all() returns just this batch's items, a plain array read. The\n// per-item form ($('Loop Over Items v7').item) makes n8n trace paired items\n// back through every previous batch, which gets slower each round and\n// eventually times the task runner out on a large folder.\n\n// Reads the real duration out of a video's own MP4 'mvhd' atom\n// (duration / timescale) by walking the box structure directly on the\n// raw bytes -- no ffmpeg/ffprobe binary required, which this n8n image\n// does not ship with. Returns null (never a guess) if the file isn't a\n// box-structured container this can parse -- AURON's own\n// analyze-and-ingest endpoint already rejects a video item with\n// duration_seconds=null with a clear error rather than silently\n// accepting a wrong or missing duration.\nfunction readMp4DurationSeconds(buffer) {\n  function walk(buf, start, end) {\n    let pos = start;\n    while (pos + 8 <= end) {\n      let size = buf.readUInt32BE(pos);\n      const type = buf.toString('ascii', pos + 4, pos + 8);\n      let headerSize = 8;\n      if (size === 1) {\n        if (pos + 16 > end) break;\n        const high = buf.readUInt32BE(pos + 8);\n        const low = buf.readUInt32BE(pos + 12);\n        size = high * 2 ** 32 + low;\n        headerSize = 16;\n      } else if (size === 0) {\n        size = end - pos;\n      }\n      if (size < headerSize || pos + size > end) break;\n\n      if (type === 'moov') {\n        const result = walk(buf, pos + headerSize, pos + size);\n        if (result !== null) return result;\n      } else if (type === 'mvhd') {\n        const body = pos + headerSize;\n        const version = buf.readUInt8(body);\n        if (version === 1) {\n          const timescale = buf.readUInt32BE(body + 20);\n          const durHigh = buf.readUInt32BE(body + 24);\n          const durLow = buf.readUInt32BE(body + 28);\n          if (timescale > 0) return (durHigh * 2 ** 32 + durLow) / timescale;\n        } else {\n          const timescale = buf.readUInt32BE(body + 12);\n          const duration = buf.readUInt32BE(body + 16);\n          if (timescale > 0) return duration / timescale;\n        }\n      }\n      pos += size;\n    }\n    return null;\n  }\n\n  try {\n    return walk(buffer, 0, buffer.length);\n  } catch {\n    return null;\n  }\n}\n\nconst driveItems = $('Loop Over Items v7').all();\n\nreturn $input.all().map((item, i) => {\n  const drive = driveItems[i].json;\n  const mediaType = drive.mimeType || 'image/jpeg';\n  const isVideo = mediaType.startsWith('video/');\n\n  if (!isVideo) {\n    return {\n      json: {\n        media_ref: drive.id,\n        media_type: 'image',\n        image_base64: item.json.image_b64,\n        image_media_type: mediaType,\n        duration_seconds: null\n      }\n    };\n  }\n\n  // Videos gehen per Pfad, nicht als Base64: eine 19-MB-Datei waere ~26 MB\n  // JSON, und n8n haelt sie hier ohnehin schon komplett im Speicher. Die\n  // Datei liegt bereits im Uebergabeverzeichnis, AURON liest sie dort.\n  //\n  // expected_size_bytes ist die Groesse, die Drive selbst nennt. AURON\n  // vergleicht sie mit den Bytes auf der Platte, bevor es die Datei\n  // oeffnet -- ein abgebrochener Schreibvorgang faellt damit an einer Zahl\n  // auf und nicht daran, wie kaputt die Datei aussieht. Das ist noetig,\n  // weil ein +faststart-MP4 (was Handys schreiben) sein moov-Atom vorne\n  // hat: ffprobe liest daraus die volle Originaldauer, auch wenn die\n  // zweite Haelfte fehlt.\n  //\n  // duration_seconds kommt weiter aus dem mvhd-Parser oben. AURON nimmt\n  // ohnehin ffprobe als massgeblich und loggt die Abweichung -- der\n  // Parser bleibt vorerst drin, damit dieser Vergleich einmal moeglich\n  // ist. Danach fliegt er raus.\n  return {\n    json: {\n      media_ref: drive.id,\n      media_type: 'video',\n      image_base64: null,\n      image_media_type: null,\n      video_path: item.json.ingest_path,\n      expected_size_bytes: item.json.drive_size_bytes,\n      duration_seconds: readMp4DurationSeconds(Buffer.from(item.json.image_b64, 'base64'))\n    }\n  };\n});"
       },
       "id": "b0bc6c80-69aa-4f7d-9c2f-ced955668b5e",
       "name": "Prepare AURON Payload v7",
@@ -183,7 +184,7 @@
       "type": "n8n-nodes-base.extractFromFile",
       "typeVersion": 1.1,
       "position": [
-        -1424,
+        -1380,
         176
       ],
       "id": "42a42f20-eca2-4fee-a504-a5ef63016464",
@@ -230,6 +231,35 @@
         0
       ],
       "notes": "Platzhalter am done-Ausgang des Loops. Ohne ein echtes Ziel hier ist die erste Verbindungsgruppe leer, und n8n verwirft beim Import auch die Ziele des zweiten Ausgangs (loop)."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Zielpfad im Uebergabeverzeichnis, plus die Groesse, die Drive selbst nennt.\n//\n// Die Zuordnung Drive-Item <-> heruntergeladene Bytes laeuft ueber den Index,\n// genau wie in 'Prepare AURON Payload v7'. Die Kette bleibt deshalb linear:\n// ein Verzweigen und Wiederzusammenfuehren wuerde die Reihenfolge aendern und\n// damit media_ref an die falschen Bytes haengen (batchSize ist 5, nicht 1).\n//\n// Der Name ist deterministisch <drive_id>.<ext>. Der Write-Node oeffnet mit\n// O_TRUNC, ueberschreibt also immer -- eine liegengebliebene Datei ist der\n// wahrscheinlichste Kandidat fuer einen abgebrochenen Download und wird nie\n// wiederverwendet.\nconst drive = $('Loop Over Items v7').all();\n\nfunction extensionFor(mimeType) {\n  if (mimeType === 'video/quicktime') return 'mov';\n  if (mimeType === 'video/x-m4v') return 'm4v';\n  if (mimeType.startsWith('video/')) return 'mp4';\n  return (mimeType.split('/')[1] || 'bin').toLowerCase();\n}\n\nreturn $input.all().map((item, i) => {\n  const file = drive[i].json;\n  const mimeType = file.mimeType || '';\n  item.json.ingest_path = `/data/images/ingest/${file.id}.${extensionFor(mimeType)}`;\n  // Drive liefert size als String; null bleibt null, damit die API weiss,\n  // dass es keine Vergleichsgroesse gibt, statt eine 0 zu pruefen.\n  item.json.drive_size_bytes = file.size == null ? null : Number(file.size);\n  return item;\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1568,
+        176
+      ],
+      "id": "140e66f2-48d1-4bb1-a3b5-53c3c3a01300",
+      "name": "Compute Ingest Path v9"
+    },
+    {
+      "parameters": {
+        "operation": "write",
+        "fileName": "={{ $json.ingest_path }}",
+        "dataPropertyName": "data",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1.1,
+      "position": [
+        -1496,
+        176
+      ],
+      "id": "5a088369-5914-4b91-9d4b-f07042ccb7bf",
+      "name": "Write File To Ingest Dir v9"
     }
   ],
   "connections": {
@@ -277,7 +307,7 @@
       "main": [
         [
           {
-            "node": "Extract from File v7",
+            "node": "Compute Ingest Path v9",
             "type": "main",
             "index": 0
           }
@@ -355,6 +385,28 @@
         [
           {
             "node": "Loop Over Items v7",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compute Ingest Path v9": {
+      "main": [
+        [
+          {
+            "node": "Write File To Ingest Dir v9",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write File To Ingest Dir v9": {
+      "main": [
+        [
+          {
+            "node": "Extract from File v7",
             "type": "main",
             "index": 0
           }
