@@ -10,7 +10,7 @@ from app.db_models import InstagramContentCandidateRow
 
 from .caption_writer import AnthropicCaptionWriter, CaptionWriterError
 from .edit_plan import build_edit_plan
-from .format_decision import decide_format
+from .format_decision import decide_format, reel_duration_notes
 from .hook import check_hook
 from .media_pool_models import FinalizeDraftRequest
 from .media_pool_service import MediaPoolError, media_pool_service
@@ -72,6 +72,7 @@ class InstagramContentService:
         )
         item.moderation_warnings = list(result.warnings)
         item.hook_warnings = hook_warnings
+        item.edit_warnings = [note for media in payload.media_items for note in reel_duration_notes(media)]
 
         if not result.passed:
             item.status = ContentStatus.moderation_rejected
@@ -83,6 +84,8 @@ class InstagramContentService:
                 item.audit_log.append("Moderation warnings (still pending human review): " + "; ".join(result.warnings))
             if hook_warnings:
                 item.audit_log.append("Hook warnings: " + "; ".join(hook_warnings))
+            if item.edit_warnings:
+                item.audit_log.append("Edit warnings: " + "; ".join(item.edit_warnings))
 
         with SessionLocal() as session:
             session.add(InstagramContentCandidateRow(
@@ -111,6 +114,10 @@ class InstagramContentService:
                     message=(
                         f"{len(item.media_items)} media item(s), theme notes: {item.aesthetic_notes or 'none'}.\n"
                         f"Caption: {item.caption_draft[:200]}"
+                        # Reaches a phone, where the decision often actually
+                        # happens -- a length problem is worth knowing before
+                        # opening anything.
+                        + (f"\nHeads up: {' '.join(item.edit_warnings)}" if item.edit_warnings else "")
                     ),
                     priority=DeliveryPriority.normal,
                     domain="instagram",

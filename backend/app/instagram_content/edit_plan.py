@@ -1,7 +1,9 @@
 from __future__ import annotations
 
-from .format_decision import REEL_IDEAL_DURATION_SECONDS, REEL_MAX_DURATION_SECONDS, reel_duration_notes
+from .format_decision import reel_duration_notes
 from .models import EditInstruction, MediaItem, MediaType, PostFormat
+from .reel_targets import needs_trim as duration_needs_trim
+from .reel_targets import target_max_seconds, target_min_seconds
 
 # One consistent grade across the account is the actual "high-end look" --
 # a different filter per post reads as random, not curated. Named, not a
@@ -22,7 +24,12 @@ def build_edit_plan(media_items: list[MediaItem], post_format: PostFormat) -> li
     for item in media_items:
         if item.media_type == MediaType.video:
             notes = reel_duration_notes(item)
-            needs_trim = item.duration_seconds is not None and item.duration_seconds > REEL_MAX_DURATION_SECONDS
+            # Same yardstick the ingest step used when it decided whether to
+            # analyze a trim window at all. These were two different numbers
+            # once (30s there, 90s here), which meant a clip could have a
+            # real, analyzed window attached and still be marked as needing
+            # no trim.
+            needs_trim = item.duration_seconds is not None and duration_needs_trim(item.duration_seconds)
             has_real_trim = item.recommended_trim_start_seconds is not None and item.recommended_trim_end_seconds is not None
             if needs_trim and has_real_trim:
                 trim_notes = (
@@ -38,7 +45,7 @@ def build_edit_plan(media_items: list[MediaItem], post_format: PostFormat) -> li
                     media_ref=item.media_ref,
                     target_aspect_ratio=ASPECT_RATIO_REEL,
                     color_grade_preset=BRAND_COLOR_GRADE_PRESET,
-                    target_duration_seconds=REEL_IDEAL_DURATION_SECONDS,
+                    target_duration_seconds=(target_min_seconds(), target_max_seconds()),
                     trim_needed=needs_trim,
                     trim_start_seconds=item.recommended_trim_start_seconds if has_real_trim else None,
                     trim_end_seconds=item.recommended_trim_end_seconds if has_real_trim else None,

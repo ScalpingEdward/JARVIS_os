@@ -110,6 +110,12 @@ class ContentCandidate(BaseModel):
     decision_reason: str | None = None
     moderation_warnings: list[str] = Field(default_factory=list)
     hook_warnings: list[str] = Field(default_factory=list)
+    #: Things about the file itself that no step here will fix -- a Reel
+    #: longer than the account aims for, say. Carried next to the other two
+    #: warning lists rather than buried in edit_plan[].notes, because this
+    #: is the moment a human decides, and a warning nobody reads at the
+    #: decision point may as well not exist.
+    edit_warnings: list[str] = Field(default_factory=list)
     published_media_id: str | None = None
     audit_log: list[str] = Field(default_factory=list)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
