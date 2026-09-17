@@ -252,6 +252,20 @@ class TelegramLiveExecutionAuditRow(Base):
     data: Mapped[str] = mapped_column(Text)
 
 
+class TelegramInstagramAuditRow(Base):
+    """Backs telegram_instagram's recent-activity log. Its own table for the
+    same reason the module has its own signing secret: a tap here ends with
+    something publicly visible under Brano's name, and that trail is worth
+    reading on its own rather than interleaved with trading decisions.
+    instagram_content's own candidate records stay the durable source of
+    truth for what was decided."""
+
+    __tablename__ = "telegram_instagram_audit"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    data: Mapped[str] = mapped_column(Text)
+
+
 class MonitorAuditRow(Base):
     """Same bounded-window pattern as TelegramAuditRow."""
 

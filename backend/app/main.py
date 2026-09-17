@@ -9,6 +9,7 @@ from .strategies.api import router as strategies_router
 from .setup_submission.api import router as setup_submission_router
 from .telegram_approvals.api import router as telegram_approvals_router
 from .telegram_live_execution.api import router as telegram_live_execution_router
+from .telegram_instagram.api import router as telegram_instagram_router
 from .position_monitor.api import router as position_monitor_router
 from .account_intake.api import router as account_intake_router
 from .position_monitor.service import position_monitor_service
@@ -226,6 +227,7 @@ app.include_router(strategies_router)
 app.include_router(setup_submission_router)
 app.include_router(telegram_approvals_router)
 app.include_router(telegram_live_execution_router)
+app.include_router(telegram_instagram_router)
 app.include_router(position_monitor_router)
 app.include_router(account_intake_router)
 app.include_router(strategy_orchestrator_router)
