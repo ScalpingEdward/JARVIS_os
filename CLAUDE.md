@@ -27,6 +27,13 @@ Ziel der Instagram-Seite: Reichweite aufbauen fuer den Weg zum hauptberuflichen 
   N8N_RESTRICT_FILE_ACCESS_TO und scheitert mit "is not writable", obwohl
   Mount, UID und Rechte stimmen. Gegen die echte Funktion, den echten Pfad und
   die echte Schicht testen, sonst belegt der Test etwas anderes als die Aussage.
+- Ein Ausweichpfad, der fuer eine Uebergangszeit gedacht war, ueberlebt die
+  Uebergangszeit, weil er funktioniert. Er meldet Erfolg, wo etwas Unmoegliches
+  passiert ist. Wer einen Platzhalter- oder Fallback-Zweig einbaut, schreibt in
+  denselben Commit, wodurch er wieder verschwindet -- sonst wird er zum
+  Normalfall. Beispiele: Platzhalter-Analyse fuer Videos (elf Tage, 30 kaputte
+  Pool-Eintraege), Prefilter der "im Pool" mit "fertig analysiert" gleichsetzte,
+  abgeschnittene Datei die ffprobe mit voller Dauer passierte.
 
 ## Content-Strategie Instagram
 - Kernthema Trading traegt den Account (ca. die Haelfte der Posts).
