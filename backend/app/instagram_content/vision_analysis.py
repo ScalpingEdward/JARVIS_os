@@ -30,7 +30,7 @@ class VisionAnalysisConfig:
     api_key: str | None = field(default_factory=lambda: os.getenv("ANTHROPIC_API_KEY"))
     model: str = field(default_factory=lambda: os.getenv("AURON_VISION_MODEL", "claude-sonnet-5"))
     timeout_seconds: float = 30.0
-    max_tokens: int = 500
+    max_tokens: int = 1024
     aesthetic_criteria: str = DEFAULT_AESTHETIC_CRITERIA
 
 

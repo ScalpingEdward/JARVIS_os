@@ -65,20 +65,28 @@ def test_a_fully_analyzed_image_is_complete():
     assert analysis_is_complete(_real_image()) is True
 
 
-def test_the_placeholder_video_is_incomplete_for_all_three_reasons():
+def test_the_placeholder_video_is_incomplete_for_both_reasons():
     reasons = analysis_incompleteness_reasons(_placeholder_video())
-    assert len(reasons) == 3
+    assert len(reasons) == 2
     assert any("tags" in r for r in reasons)
-    assert any("captured_at" in r for r in reasons)
     assert any("placeholder" in r for r in reasons)
 
 
 def test_each_rule_fires_on_its_own():
     assert analysis_incompleteness_reasons(_real_image(tags=[])) == ["tags are empty"]
-    assert analysis_incompleteness_reasons(_real_image(captured_at=None)) == ["captured_at is missing"]
     assert analysis_incompleteness_reasons(_real_image(theme="unknown")) == [
         "theme is a placeholder ('unknown')"
     ]
+
+
+def test_a_real_analysis_without_captured_at_is_still_complete():
+    """The real-world case for a Drive-sourced video: frame extraction gives
+    it a real theme and tags, but the n8n workflow never supplies a
+    video_creation_time or upload_time, so captured_at stays None. That is
+    a missing-metadata gap, not evidence the analysis never happened -- it
+    must not block ingest() from persisting the real result, or
+    analyze_and_ingest() from ever considering it done."""
+    assert analysis_is_complete(_real_image(captured_at=None)) is True
 
 
 def test_theme_equal_to_the_media_type_is_a_placeholder_whatever_the_type():
@@ -198,6 +206,36 @@ def test_an_update_preserves_identity_reservation_usage_and_the_trim_window():
     assert after.recommended_trim_end_seconds == 8.0
     assert after.trim_reasoning == "best motion window"
     assert after.theme == "gym-mirror-selfie"
+
+
+def test_a_real_video_analysis_without_captured_at_still_overwrites_the_placeholder():
+    """The exact production bug: 30 Drive videos got a real, paid-for vision
+    analysis (real theme, real tags) but no captured_at, since the n8n
+    workflow never sends video_creation_time or upload_time for them.
+    ingest() must persist that result rather than treating it as "no
+    better than the placeholder" -- and the stored row must come back
+    analysis_complete, so the next run does not re-submit it for analysis
+    all over again."""
+    service = MediaPoolService()
+    service.reset()
+    service.ingest(MediaPoolIngestRequest(items=[_placeholder_video()]))
+
+    real_but_no_captured_at = MediaPoolItemCreate(
+        media_ref="drive-video-1",
+        media_type=MediaType.video,
+        theme="gym-mirror-selfie",
+        tags=["gym", "motion"],
+        aesthetic_score=0.82,
+        duration_seconds=9.305,
+        captured_at=None,
+    )
+    response = service.ingest(MediaPoolIngestRequest(items=[real_but_no_captured_at]))
+
+    assert (response.ingested, response.updated_incomplete, response.skipped_duplicates) == (0, 1, 0)
+    after = service.list_all()[0]
+    assert after.theme == "gym-mirror-selfie"
+    assert after.tags == ["gym", "motion"]
+    assert after.analysis_complete is True
 
 
 def test_a_complete_item_is_still_skipped_as_a_duplicate():
