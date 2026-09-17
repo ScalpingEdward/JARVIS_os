@@ -130,11 +130,14 @@ services:
       EXECUTIONS_DATA_SAVE_ON_SUCCESS: none
       EXECUTIONS_DATA_SAVE_ON_ERROR: all
       EXECUTIONS_DATA_SAVE_ON_PROGRESS: "false"
-      # TEMPORAER, nur fuer die 5a-Testlaeufe: ohne das zeichnet ein manueller
-      # Lauf keinerlei Node-Daten auf (execution_data = 2 Bytes), und genau der
-      # Lauf, den wir untersuchen wollen, ist der einzige ohne Spur.
-      # ZURUECK AUF "false" NACH 5b -- danach DB-Groesse pruefen.
-      EXECUTIONS_DATA_SAVE_MANUAL_EXECUTIONS: "true"
+      # Wieder "false" seit 5b durch ist -- das war die Bedingung, unter der
+      # es ueberhaupt eingeschaltet wurde. Ein manueller Lauf zeichnet damit
+      # keine Node-Daten mehr auf, und genau das haelt die SQLite-DB klein:
+      # base64 der Rohdateien landete sonst in jedem Execution-Datensatz.
+      # Diagnose bleibt trotzdem moeglich -- EXECUTIONS_DATA_SAVE_ON_ERROR
+      # steht auf "all", ein fehlgeschlagener Lauf hinterlaesst also weiter
+      # seine vollstaendige Spur. Nur erfolgreiche Laeufe schweigen.
+      EXECUTIONS_DATA_SAVE_MANUAL_EXECUTIONS: "false"
       EXECUTIONS_DATA_PRUNE: "true"
       EXECUTIONS_DATA_MAX_AGE: "168"
       EXECUTIONS_DATA_PRUNE_MAX_COUNT: "5000"
