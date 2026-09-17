@@ -339,8 +339,15 @@ def _analyzer_that_must_not_be_called() -> AnthropicVisionAnalyzer:
     )
 
 
-def test_video_without_thumbnail_skips_vision_and_uses_placeholder_score():
+def test_video_without_thumbnail_or_path_now_fails_instead_of_placeholding():
+    """Behaviour deliberately reversed. Writing a placeholder entry was a
+    stopgap for the time before frame extraction existed; it made an
+    unanalyzable video indistinguishable from an analyzed one, and hid a
+    whole run in which 29 videos arrived without their video_path and every
+    single one was reported as a success. See
+    test_instagram_video_without_anything_to_analyze.py."""
     pool = MediaPoolService()
+    pool.reset()
     items = [
         MediaAnalyzeAndIngestItem(
             media_ref="clip-1",
@@ -351,12 +358,10 @@ def test_video_without_thumbnail_skips_vision_and_uses_placeholder_score():
 
     response = analyze_and_ingest(items, _analyzer_that_must_not_be_called(), pool)
 
-    assert response.failed == 0
-    assert response.analyzed_and_ingested == 1
-    ingested = pool.list_available()[0]
-    assert ingested.aesthetic_score == 0.6
-    assert ingested.tags == []
-    assert ingested.duration_seconds == 15.3
+    assert response.failed == 1
+    assert response.analyzed_and_ingested == 0
+    assert "neither video_path nor an image" in response.results[0].error
+    assert pool.list_all() == []
 
 
 def test_video_with_thumbnail_still_goes_through_real_vision_analysis():

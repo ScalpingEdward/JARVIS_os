@@ -40,14 +40,6 @@ _EXIF_IFD_EXIF = 0x8769
 _TAG_DATETIME_ORIGINAL = 0x9003
 _TAG_OFFSET_TIME_ORIGINAL = 0x9011
 
-#: Only for a video that arrives without a video_path and without a thumbnail:
-#: there is then nothing for Claude to look at. A video handed over as a path
-#: goes through real frame extraction instead and never reaches this. curate()
-#: never gates videos on aesthetic_score -- they always become a standalone
-#: Reel regardless (see curation.py) -- so this placeholder only affects
-#: ranking within a single curate() call, never whether a video is proposed.
-_VIDEO_PLACEHOLDER_AESTHETIC_SCORE = 0.6
-
 _DOWNSCALE_THRESHOLD_BYTES = 4 * 1024 * 1024
 _MAX_EDGE_PX = 2000
 _JPEG_QUALITY = 85
@@ -323,34 +315,23 @@ def analyze_and_ingest(
             continue
 
         if item.media_type == MediaType.video and not item.image_base64 and not item.image_url:
-            captured_at, captured_at_source = resolve_captured_at(
-                exif=item.captured_at,
-                video_creation_time=item.video_creation_time,
-                upload_time=item.upload_time,
-            )
-            theme = captured_at.date().isoformat() if captured_at else "video"
-            creates.append(
-                MediaPoolItemCreate(
-                    media_ref=item.media_ref,
-                    media_type=item.media_type,
-                    theme=theme,
-                    tags=[],
-                    aesthetic_score=_VIDEO_PLACEHOLDER_AESTHETIC_SCORE,
-                    duration_seconds=item.duration_seconds,
-                    source_group=item.source_group,
-                    captured_at=captured_at,
-                    captured_at_source=captured_at_source,
-                )
-            )
+            # There is nothing here to analyze: no path to sample frames from
+            # and no thumbnail to look at. This used to write a placeholder
+            # entry and report success -- a stopgap for the time before frame
+            # extraction existed. That time is over, and the stopgap turned
+            # into the worst kind of failure: the first real run handed over
+            # 29 videos whose video_path had been silently dropped, and every
+            # one came back "success" with analyzed_and_ingested 0. Nothing
+            # was analyzed, nothing was reported, and the pool looked
+            # untouched for a reason nobody could see.
             results.append(
                 MediaAnalyzeAndIngestItemResult(
                     media_ref=item.media_ref,
-                    success=True,
-                    theme=theme,
-                    tags=[],
-                    aesthetic_score=_VIDEO_PLACEHOLDER_AESTHETIC_SCORE,
-                    reasoning="Video -- no vision analysis (no frame extraction yet), placeholder score used. "
-                    "curate() always treats videos as standalone Reels regardless of score.",
+                    success=False,
+                    error="video item has neither video_path nor an image to analyze -- "
+                    "nothing to derive a theme, tags or a score from. AURON will not write a "
+                    "placeholder entry: it would be indistinguishable from a real analysis "
+                    "that produced nothing.",
                 )
             )
             continue
