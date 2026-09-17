@@ -16,6 +16,7 @@ from pydantic import ValidationError
 from app.instagram_content.captured_at_resolution import (
     CapturedAtSource,
     is_plausible_capture_time,
+    parse_capture_time_from_filename,
     resolve_captured_at,
 )
 from app.instagram_content.media_pool_models import (
@@ -63,10 +64,111 @@ def test_none_is_not_plausible():
     assert is_plausible_capture_time(None, now=NOW) is False
 
 
+# -- a date written into the file name --------------------------------------
+
+
+@pytest.mark.parametrize(
+    "file_name,expected",
+    [
+        ("2026-03-05_1430_valencia.mp4", datetime(2026, 3, 5, 14, 30, tzinfo=timezone.utc)),
+        ("2026-03-05.mp4", datetime(2026, 3, 5, 0, 0, tzinfo=timezone.utc)),
+        ("20260305_143022.mov", datetime(2026, 3, 5, 14, 30, 22, tzinfo=timezone.utc)),
+        ("2026_03_05 gym.mp4", datetime(2026, 3, 5, 0, 0, tzinfo=timezone.utc)),
+        ("IMG_20260305_1430.jpg", datetime(2026, 3, 5, 14, 30, tzinfo=timezone.utc)),
+        ("VID-2026-03-05T14-30.mp4", datetime(2026, 3, 5, 14, 30, tzinfo=timezone.utc)),
+    ],
+)
+def test_a_date_at_the_start_of_the_name_is_read(file_name, expected):
+    assert parse_capture_time_from_filename(file_name) == expected
+
+
+@pytest.mark.parametrize(
+    "file_name",
+    [
+        "IMG_2922.mp4",                 # a camera counter, not a date
+        "clip_4k_2020.mp4",             # a number further along the name
+        "valencia_2026-03-05.mp4",      # not at the start: a coincidence, not a statement
+        "2026-13-45_broken.mp4",        # shaped like a date, isn't one
+        "202603051.mp4",                # more digits than a date has
+        "",
+        None,
+    ],
+)
+def test_anything_that_is_not_a_leading_date_is_ignored(file_name):
+    assert parse_capture_time_from_filename(file_name) is None
+
+
+def test_the_file_name_outranks_every_automatic_source():
+    """The Lightroom case, exactly: 30 clips shot on different days were all
+    re-exported in one afternoon, so every container claimed that afternoon.
+    A human-written name is the only source that survives that, so it wins."""
+    lightroom_export = datetime(2026, 3, 3, 12, 16, 32, tzinfo=timezone.utc)
+    value, source = resolve_captured_at(
+        file_name="2026-02-14_1830_gym.mp4",
+        exif=SHOT,
+        video_creation_time=lightroom_export,
+        upload_time=UPLOADED,
+        now=NOW,
+    )
+    assert (value, source) == (datetime(2026, 2, 14, 18, 30, tzinfo=timezone.utc), CapturedAtSource.filename)
+
+
+def test_an_undated_name_falls_through_instead_of_blocking_the_other_sources():
+    value, source = resolve_captured_at(file_name="IMG_2922.mp4", exif=SHOT, now=NOW)
+    assert (value, source) == (SHOT, CapturedAtSource.exif)
+
+
+def test_a_photo_never_has_its_name_read(monkeypatch):
+    """Images are excluded at the call site in analyze_and_ingest, not here:
+    a photo's EXIF is a fact, a file name is typed by hand, and a typo must
+    not outrank the shutter. resolve_captured_at stays general -- the caller
+    decides whether a name is even offered."""
+    import base64
+    import json as json_module
+
+    import httpx
+
+    from app.instagram_content.analyze_and_ingest import analyze_and_ingest
+    from app.instagram_content.media_pool_models import MediaAnalyzeAndIngestItem
+    from app.instagram_content.vision_analysis import AnthropicVisionAnalyzer, VisionAnalysisConfig
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"content": [{"type": "text", "text": json_module.dumps(
+            {"theme": "desert-gold", "tags": ["sand"], "aesthetic_score": 0.7, "reasoning": "ok"}
+        )}]})
+
+    analyzer = AnthropicVisionAnalyzer(
+        config=VisionAnalysisConfig(api_key="test-key"),
+        client=httpx.Client(transport=httpx.MockTransport(handler)),
+    )
+    pool = MediaPoolService()
+    pool.reset()
+
+    analyze_and_ingest([
+        MediaAnalyzeAndIngestItem(
+            media_ref="photo-with-dated-name",
+            media_type=MediaType.image,
+            file_name="2020-01-01_wrong.jpg",
+            image_base64=base64.b64encode(b"not-a-real-jpeg").decode("ascii"),
+            image_media_type="image/jpeg",
+        )
+    ], analyzer, pool)
+
+    stored = pool.list_all()[0]
+    assert stored.captured_at_source != CapturedAtSource.filename
+    assert stored.captured_at is None, "no EXIF in these bytes, and the name must not stand in for it"
+
+
+def test_a_name_dated_in_the_future_is_refused_like_any_other_source():
+    """A typo (2036 for 2026) must not sort an item years ahead of everything."""
+    value, source = resolve_captured_at(file_name="2036-03-05_gym.mp4", exif=SHOT, now=NOW)
+    assert (value, source) == (SHOT, CapturedAtSource.exif)
+
+
 # -- source selection -------------------------------------------------------
 
 
-def test_exif_wins_over_everything():
+def test_exif_wins_over_everything_automatic():
     value, source = resolve_captured_at(
         exif=SHOT, video_creation_time=datetime(2026, 9, 15, tzinfo=timezone.utc),
         upload_time=UPLOADED, now=NOW,

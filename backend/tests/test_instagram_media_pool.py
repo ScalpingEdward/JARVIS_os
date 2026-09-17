@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 import json
 import os
+from datetime import date
 from io import BytesIO
 
 import httpx
@@ -119,6 +120,44 @@ def test_curate_always_puts_a_video_alone():
     assert len(video_groups[0].media_items) == 1
 
 
+def test_curate_orders_groups_by_shoot_day_oldest_first_never_interleaving_days():
+    """Brano's actual requirement: if one day produces several posts (a
+    carousel, a reel, a single), they must all go out together before the
+    next day's content starts -- never interleaved by score across days."""
+    from datetime import datetime, timezone
+
+    from app.instagram_content.captured_at_resolution import CapturedAtSource
+    from app.instagram_content.media_pool_models import MediaPoolItem
+
+    def _dated(ref, day, score, media_type="image"):
+        payload = dict(
+            media_ref=ref, media_type=media_type, theme="desert-gold", aesthetic_score=score,
+            captured_at=datetime(*day, tzinfo=timezone.utc), captured_at_source=CapturedAtSource.exif,
+        )
+        if media_type == "video":
+            payload["duration_seconds"] = 20.0
+        return MediaPoolItem(**payload)
+
+    below_elite = ELITE_SOLO_THRESHOLD - 0.1
+    above_elite = ELITE_SOLO_THRESHOLD + 0.1
+
+    # Older day: a video (high score) and enough low-score images for exactly
+    # one carousel.
+    old_day = [
+        _dated("old-video", (2026, 9, 10), above_elite, media_type="video"),
+        *[_dated(f"old-img-{i}", (2026, 9, 10), below_elite) for i in range(CAROUSEL_MIN_SIZE)],
+    ]
+    # Newer day: a single elite image with a higher score than anything above.
+    new_day = [_dated("new-hero", (2026, 9, 12), above_elite + 0.001)]
+    # No captured_at at all -- must sort after every dated day regardless of score.
+    undated = [MediaPoolItem(**_image_create("undated-hero", score=above_elite + 0.001).model_dump())]
+
+    groups = curate([*new_day, *undated, *old_day])
+
+    days = [g.day for g in groups]
+    assert days == [date(2026, 9, 10), date(2026, 9, 10), date(2026, 9, 12), None]
+
+
 def test_curate_ignores_items_that_are_not_available():
     from app.instagram_content.media_pool_models import MediaPoolItem
     from uuid import uuid4
@@ -155,6 +194,36 @@ def test_run_curation_reserves_items_so_a_second_run_does_not_reuse_them():
 
     second_drafts = pool.run_curation()
     assert second_drafts == []  # nothing left to propose
+
+
+def test_pending_drafts_are_ordered_by_shoot_day_not_creation_time():
+    """The actual queue Brano works from (GET /curate/drafts, pending_only
+    default True): a draft from an older shoot day must come first, even if
+    a newer day's draft happened to be curated (created) earlier in real
+    time -- otherwise the two days' content would interleave in whatever
+    order the daily ingest run curated them."""
+    from datetime import datetime, timezone
+
+    from app.instagram_content.captured_at_resolution import CapturedAtSource
+
+    pool = MediaPoolService()
+    newer = MediaPoolItemCreate(
+        media_ref="newer-hero", media_type="image", theme="desert-gold",
+        aesthetic_score=ELITE_SOLO_THRESHOLD + 0.1,
+        captured_at=datetime(2026, 9, 12, tzinfo=timezone.utc), captured_at_source=CapturedAtSource.exif,
+    )
+    older = MediaPoolItemCreate(
+        media_ref="older-hero", media_type="image", theme="desert-gold",
+        aesthetic_score=ELITE_SOLO_THRESHOLD + 0.1,
+        captured_at=datetime(2026, 9, 10, tzinfo=timezone.utc), captured_at_source=CapturedAtSource.exif,
+    )
+    pool.ingest(MediaPoolIngestRequest(items=[newer]))
+    pool.run_curation()  # the newer day's draft is created first, in real time
+    pool.ingest(MediaPoolIngestRequest(items=[older]))
+    pool.run_curation()  # the older day's draft is created second
+
+    pending = pool.list_drafts(pending_only=True)
+    assert [d.theme for d in pending] == ["2026-09-10", "2026-09-12"]
 
 
 def test_discard_draft_returns_items_to_the_available_pool():
@@ -400,3 +469,101 @@ def test_video_with_thumbnail_still_goes_through_real_vision_analysis():
     ingested = pool.list_available()[0]
     assert ingested.aesthetic_score == 0.82
     assert ingested.theme == "gym-clip"
+
+
+def test_a_dated_file_name_carries_a_video_all_the_way_into_its_shoot_day_group():
+    """The whole chain in one test, because every link of it was broken at
+    some point: n8n sends the Drive file name -> the capture date is read
+    from it -> it is stored with source 'filename' -> curate() puts the
+    video in that day's bucket, ahead of a later day.
+
+    This is the only path left for a Lightroom-exported video: the
+    container's own creation_time holds the export moment, so two clips
+    shot weeks apart claim the same afternoon. Both videos below carry
+    exactly that broken timestamp -- only the names tell them apart.
+    """
+    from datetime import datetime, timezone
+
+    from app.instagram_content.captured_at_resolution import CapturedAtSource
+
+    lightroom_export = datetime(2026, 3, 3, 12, 16, 32, tzinfo=timezone.utc)
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"content": [{"type": "text", "text": json.dumps(
+            {"theme": "gym-clip", "tags": ["gym"], "aesthetic_score": 0.5, "reasoning": "ok"}
+        )}]})
+
+    analyzer = AnthropicVisionAnalyzer(
+        config=VisionAnalysisConfig(api_key="test-key"), client=httpx.Client(transport=httpx.MockTransport(handler))
+    )
+    pool = MediaPoolService()
+    pool.reset()
+
+    response = analyze_and_ingest([
+        MediaAnalyzeAndIngestItem(
+            media_ref="clip-later", media_type="video", duration_seconds=20.0,
+            file_name="2026-02-20_1900_gym.mp4", video_creation_time=lightroom_export,
+            image_base64=base64.b64encode(b"thumb").decode("ascii"), image_media_type="image/jpeg",
+        ),
+        MediaAnalyzeAndIngestItem(
+            media_ref="clip-earlier", media_type="video", duration_seconds=20.0,
+            file_name="2026-02-14_1830_valencia.mp4", video_creation_time=lightroom_export,
+            image_base64=base64.b64encode(b"thumb").decode("ascii"), image_media_type="image/jpeg",
+        ),
+    ], analyzer, pool)
+    assert response.failed == 0
+
+    stored = {i.media_ref: i for i in pool.list_all()}
+    assert stored["clip-earlier"].captured_at == datetime(2026, 2, 14, 18, 30, tzinfo=timezone.utc)
+    assert stored["clip-earlier"].captured_at_source == CapturedAtSource.filename
+    assert stored["clip-later"].captured_at == datetime(2026, 2, 20, 19, 0, tzinfo=timezone.utc)
+
+    groups = curate(pool.list_available())
+    assert [g.day for g in groups] == [date(2026, 2, 14), date(2026, 2, 20)], (
+        "the earlier shoot day must come first, and the two must not share a bucket"
+    )
+
+
+def test_backfill_gives_older_drafts_their_shoot_day_from_their_own_items():
+    """Drafts curated before content_day existed sort as "day unknown" and
+    land behind everything dated -- backwards, since they are the oldest in
+    the queue. The day is re-derived from their own media items, never
+    guessed at; a draft with no dated item honestly keeps None."""
+    from datetime import datetime, timezone
+
+    from app.db import SessionLocal
+    from app.db_models import InstagramCuratedDraftRow
+    from app.instagram_content.captured_at_resolution import CapturedAtSource
+    from app.instagram_content.media_pool_models import CuratedDraft
+
+    pool = MediaPoolService()
+    pool.reset()
+    pool.ingest(MediaPoolIngestRequest(items=[
+        MediaPoolItemCreate(
+            media_ref="dated", media_type="image", theme="desert-gold", aesthetic_score=0.5,
+            captured_at=datetime(2025, 10, 26, 9, 0, tzinfo=timezone.utc),
+            captured_at_source=CapturedAtSource.exif,
+        ),
+        MediaPoolItemCreate(media_ref="undated", media_type="image", theme="desert-gold", aesthetic_score=0.5),
+    ]))
+    by_ref = {i.media_ref: i for i in pool.list_all()}
+
+    # Two legacy drafts, written the way run_curation() used to: no content_day.
+    legacy = [
+        CuratedDraft(theme="2025-10-26", reasoning="legacy", media_item_ids=[by_ref["dated"].id]),
+        CuratedDraft(theme="desert-gold", reasoning="legacy", media_item_ids=[by_ref["undated"].id]),
+    ]
+    with SessionLocal() as session:
+        for draft in legacy:
+            session.add(InstagramCuratedDraftRow(id=str(draft.id), data=draft.model_dump_json()))
+        session.commit()
+
+    report = pool.backfill_content_day()
+    assert report["filled"] == 1
+    assert report["no_dated_items"] == 1
+
+    days = {d.theme: d.content_day for d in pool.list_drafts()}
+    assert days["2025-10-26"] == date(2025, 10, 26)
+    assert days["desert-gold"] is None, "no dated item means no day, not an invented one"
+
+    assert pool.backfill_content_day()["filled"] == 0, "must be idempotent"

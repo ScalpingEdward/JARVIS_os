@@ -24,6 +24,7 @@ from .models import MediaType
 from .reel_targets import needs_trim, target_max_seconds, target_min_seconds
 from .video_frame_extraction import (
     VideoFrameExtractionError,
+    probe_creation_time,
     representative_frame,
     sample_video,
 )
@@ -267,9 +268,16 @@ def analyze_and_ingest(
             trim = _trim_window(frames, duration_seconds, trim_analyzer, item.media_ref)
             cover_timestamp = _choose_cover_timestamp(analysis, trim, frames)
 
+            # Only a video's name is read for a date, and only as the top
+            # source. Photos carry real EXIF and need no help; letting a name
+            # override that would put a typo above a fact. A video has no EXIF
+            # at all, and its container timestamp is whatever the last tool to
+            # write the file felt like -- for those, the name is the only
+            # statement a human can make that survives an export.
             captured_at, captured_at_source = resolve_captured_at(
+                file_name=item.file_name,
                 exif=item.captured_at,
-                video_creation_time=item.video_creation_time,
+                video_creation_time=item.video_creation_time or probe_creation_time(resolved_video_path),
                 upload_time=item.upload_time,
             )
             creates.append(
@@ -348,6 +356,10 @@ def analyze_and_ingest(
             continue
 
         captured_at, captured_at_source = resolve_captured_at(
+            # Videos only -- see the same call in the path branch above. This
+            # branch serves both kinds: an image (real EXIF, name ignored) and
+            # a video handed over as a thumbnail rather than a path.
+            file_name=item.file_name if item.media_type == MediaType.video else None,
             exif=item.captured_at or _read_captured_at(item.image_base64),
             video_creation_time=item.video_creation_time,
             upload_time=item.upload_time,

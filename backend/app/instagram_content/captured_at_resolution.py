@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from datetime import datetime, timedelta, timezone
 from enum import Enum
 
@@ -15,6 +16,13 @@ class CapturedAtSource(str, Enum):
     same column with no way to tell them apart.
     """
 
+    #: A date deliberately put into the file name by a human. Outranks every
+    #: automatic source because it is the only one that survives an editing
+    #: tool: Lightroom's video export rewrites the container and stamps its
+    #: own export moment as the creation_time, so 30 clips shot on different
+    #: days all claimed the same afternoon. A person naming the file knows
+    #: what the machine no longer does.
+    filename = "filename"
     #: EXIF DateTimeOriginal, read from the image itself. When the shutter fired.
     exif = "exif"
     #: The video container's own creation_time (MP4 mvhd). When the recording
@@ -36,6 +44,56 @@ _EARLIEST_PLAUSIBLE = datetime(2000, 1, 1, tzinfo=timezone.utc)
 _FUTURE_TOLERANCE = timedelta(hours=24)
 
 
+#: A date at the start of the file name, optionally after a camera prefix
+#: (IMG_2026-03-05..., VID_20260305...), optionally followed by a time.
+#: Deliberately anchored to the start rather than searched anywhere in the
+#: name: "clip_4k_2020.mp4" must not be read as a date, and a number that
+#: happens to look like one further along the name is a coincidence, not a
+#: statement. Separators are optional and may be "-" or "_".
+_FILENAME_DATE = re.compile(
+    r"""^
+    (?:(?:IMG|VID|MOV|PXL|DSC)[_-])?      # optional camera prefix
+    (?P<year>\d{4})[-_]?(?P<month>\d{2})[-_]?(?P<day>\d{2})
+    (?:                                    # optional time
+        [_\-T]?
+        (?P<hour>\d{2})[-_:]?(?P<minute>\d{2})
+        (?:[-_:]?(?P<second>\d{2}))?
+    )?
+    (?![0-9])                              # the date must end here
+    """,
+    re.VERBOSE | re.IGNORECASE,
+)
+
+
+def parse_capture_time_from_filename(file_name: str | None) -> datetime | None:
+    """Reads a capture date a human deliberately wrote into a file name.
+
+    Exists because no automatic source survived contact with reality: an
+    editing tool's video export resets the container's creation_time, and
+    Drive only knows when the upload happened. Renaming the file is the one
+    way left to state, verifiably, when something was actually shot.
+
+    Returns None for anything that is not a date at the start of the name,
+    or is not a real calendar date -- never a guess. A name without a date
+    is simply a name.
+    """
+    if not file_name:
+        return None
+    match = _FILENAME_DATE.match(file_name.strip())
+    if match is None:
+        return None
+    parts = match.groupdict()
+    try:
+        return datetime(
+            int(parts["year"]), int(parts["month"]), int(parts["day"]),
+            int(parts["hour"] or 0), int(parts["minute"] or 0), int(parts["second"] or 0),
+            tzinfo=timezone.utc,
+        )
+    except ValueError:
+        # 2026-13-45 and friends: shaped like a date, isn't one.
+        return None
+
+
 def is_plausible_capture_time(value: datetime | None, *, now: datetime | None = None) -> bool:
     if value is None:
         return False
@@ -47,6 +105,7 @@ def is_plausible_capture_time(value: datetime | None, *, now: datetime | None = 
 
 def resolve_captured_at(
     *,
+    file_name: str | None = None,
     exif: datetime | None = None,
     video_creation_time: datetime | None = None,
     upload_time: datetime | None = None,
@@ -54,17 +113,21 @@ def resolve_captured_at(
 ) -> tuple[datetime | None, CapturedAtSource | None]:
     """Picks the best available capture time and says which source it is.
 
-    Order is by how close the source sits to the moment of recording: EXIF
-    and the container's own creation_time describe the recording itself,
-    the upload time only bounds it from above. Each candidate must survive
-    a plausibility check first -- a zeroed mvhd field decodes to 1904 and
-    would otherwise beat a perfectly good upload time.
+    A date in the file name wins, because it is the only source a human
+    put there on purpose and the only one an editing tool cannot silently
+    overwrite. After that the order is by how close the source sits to the
+    moment of recording: EXIF and the container's own creation_time
+    describe the recording itself, the upload time only bounds it from
+    above. Each candidate must survive a plausibility check first -- a
+    zeroed mvhd field decodes to 1904 and would otherwise beat a perfectly
+    good upload time.
 
     Returns (None, None) when nothing plausible is available. That is a
     real answer, not a failure: it keeps the item flagged as incompletely
     analyzed rather than inventing a timestamp.
     """
     for candidate, source in (
+        (parse_capture_time_from_filename(file_name), CapturedAtSource.filename),
         (exif, CapturedAtSource.exif),
         (video_creation_time, CapturedAtSource.video_metadata),
         (upload_time, CapturedAtSource.upload_time),

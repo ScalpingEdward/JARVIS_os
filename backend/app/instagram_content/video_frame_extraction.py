@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 import logging
 import subprocess
+from datetime import datetime, timezone
 from pathlib import Path
 
 from .media_pool_models import FrameSample
@@ -95,6 +96,42 @@ def probe_duration_seconds(video_path: Path) -> float:
     if duration <= 0:
         raise VideoFrameExtractionError(f"{video_path.name} reports a duration of {duration}s")
     return duration
+
+
+def probe_creation_time(video_path: Path) -> datetime | None:
+    """The container's own creation_time, read from the file itself.
+
+    Best-effort by design: a video without the tag, an unreadable file or a
+    value ffprobe cannot parse all return None. A missing capture time is a
+    normal state the pool handles; it must never fail an ingest.
+
+    Read here rather than in n8n because ffprobe is authoritative for
+    everything else about the file too, and one parser beats two that can
+    drift apart. Worth knowing what this value means: for a clip straight
+    off a phone it is the recording. For a clip an editing tool re-exported
+    it is the export -- the tool rewrites the container and stamps its own
+    moment. That is why a dated file name outranks it.
+    """
+    completed = _run(
+        [
+            FFPROBE_BINARY,
+            "-v", "error",
+            "-show_entries", "format_tags=creation_time",
+            "-of", "default=noprint_wrappers=1:nokey=1",
+            str(video_path),
+        ],
+        timeout=_PROBE_TIMEOUT_SECONDS,
+    )
+    if completed.returncode != 0:
+        return None
+    raw = completed.stdout.decode("utf-8", "replace").strip()
+    if not raw:
+        return None
+    try:
+        parsed = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
 
 
 def warn_on_duration_mismatch(video_path: Path, probed: float, claimed: float | None) -> bool:

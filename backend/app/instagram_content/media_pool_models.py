@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from uuid import UUID, uuid4
 
 from pydantic import BaseModel, Field, computed_field, model_validator
@@ -207,6 +207,10 @@ class CuratedDraft(BaseModel):
     finalized: bool = False
     finalized_candidate_id: UUID | None = None
     discarded: bool = False
+    #: The shoot day this draft's items belong to (from CuratedGroup.day),
+    #: or None when no item in the group had a real captured_at. Determines
+    #: posting order -- see MediaPoolService.list_drafts().
+    content_day: date | None = None
 
 
 class CuratedDraftList(BaseModel):
@@ -258,11 +262,23 @@ class MediaAnalyzeAndIngestItem(BaseModel):
         "the bytes actually on disk before opening the file, so a write that was cut short is "
         "caught by a fact rather than by guessing from how damaged the file looks.",
     )
+    file_name: str | None = Field(
+        default=None,
+        max_length=500,
+        description="The file's name in Drive. Read for VIDEO items only, and only for a capture "
+        "date deliberately put at the start of it (2026-03-05_1430.mp4). For a video it outranks "
+        "every other source, because an editing tool's export rewrites the container's own "
+        "creation_time but cannot touch the name. Ignored for images: those carry real EXIF, and "
+        "a mistyped name must not outrank a fact. A name without a date is ignored, never "
+        "guessed at.",
+    )
     video_creation_time: datetime | None = Field(
         default=None,
         description="The video container's own creation_time (MP4 mvhd). Videos carry no EXIF, "
         "so this is the only source that describes when the recording was actually made. "
-        "A zeroed field decodes to 1904 and is rejected as implausible, not stored.",
+        "A zeroed field decodes to 1904 and is rejected as implausible, not stored. "
+        "Unreliable after an editing tool re-exported the file -- it then holds the export "
+        "moment, which is why a dated file name outranks it.",
     )
     upload_time: datetime | None = Field(
         default=None,

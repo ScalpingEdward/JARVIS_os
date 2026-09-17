@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from uuid import UUID
 
 from app.db import SessionLocal
@@ -103,6 +103,45 @@ class MediaPoolService:
             "non_image_left_untouched": untouched_videos,
         }
 
+    def backfill_content_day(self) -> dict[str, int]:
+        """One-off migration for drafts created before content_day existed.
+
+        Without it every already-pending draft sorts as "day unknown" and
+        lands behind everything dated, which is exactly backwards: those are
+        the oldest drafts in the queue. The day is not guessed at -- it is
+        re-derived from the draft's own media items, the same source
+        curate() grouped them by in the first place.
+
+        A draft whose items carry no captured_at keeps content_day=None.
+        That is the honest answer, not a failure. Idempotent: a draft that
+        already has a day is left alone.
+        """
+        filled = 0
+        already = 0
+        no_date = 0
+        with SessionLocal() as session:
+            for row in session.query(InstagramCuratedDraftRow).all():
+                draft = CuratedDraft.model_validate_json(row.data)
+                if draft.content_day is not None:
+                    already += 1
+                    continue
+                days = []
+                for item_id in draft.media_item_ids:
+                    item_row = session.get(InstagramMediaPoolItemRow, str(item_id))
+                    if item_row is None:
+                        continue
+                    item = MediaPoolItem.model_validate_json(item_row.data)
+                    if item.captured_at is not None:
+                        days.append(item.captured_at.date())
+                if not days:
+                    no_date += 1
+                    continue
+                draft.content_day = min(days)
+                row.data = draft.model_dump_json()
+                filled += 1
+            session.commit()
+        return {"filled": filled, "already_had_a_day": already, "no_dated_items": no_date}
+
     def ingest(self, request: MediaPoolIngestRequest) -> MediaPoolIngestResponse:
         ingested = 0
         skipped = 0
@@ -196,6 +235,7 @@ class MediaPoolService:
                     theme=group.theme,
                     reasoning=group.reasoning,
                     media_item_ids=[item.id for item in group.media_items],
+                    content_day=group.day,
                 )
                 session.add(InstagramCuratedDraftRow(id=str(draft.id), data=draft.model_dump_json()))
                 for item in group.media_items:
@@ -209,9 +249,18 @@ class MediaPoolService:
         with SessionLocal() as session:
             rows = session.query(InstagramCuratedDraftRow).all()
         drafts = [CuratedDraft.model_validate_json(r.data) for r in rows]
-        if pending_only:
-            drafts = [d for d in drafts if not d.finalized and not d.discarded]
-        return sorted(drafts, key=lambda d: d.created_at, reverse=True)
+        if not pending_only:
+            return sorted(drafts, key=lambda d: d.created_at, reverse=True)
+        pending = [d for d in drafts if not d.finalized and not d.discarded]
+        # This is the actual work queue Brano decides from -- it must reflect
+        # posting order (oldest shoot day exhausted before the next begins),
+        # not creation time, or a later curation run could surface a newer
+        # day's draft ahead of an older day's still-pending one and content
+        # from two days would end up interleaved on the grid.
+        return sorted(
+            pending,
+            key=lambda d: (d.content_day is None, d.content_day or date.max, d.created_at),
+        )
 
     def get_draft(self, draft_id: UUID) -> CuratedDraft:
         with SessionLocal() as session:
