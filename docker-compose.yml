@@ -46,6 +46,8 @@ services:
       # would drift and the api would flag files the sweeper has no intention
       # of touching yet, or miss ones it already removed.
       AURON_INGEST_RETENTION_HOURS: ${AURON_INGEST_RETENTION_HOURS:-24}
+      JARVIS_PROCESSED_DIR: /data/images/processed
+      AURON_COLOR_LUT: ${AURON_COLOR_LUT:-/data/lut/INSTA.cube}
     depends_on:
       postgres:
         condition: service_healthy
@@ -59,6 +61,16 @@ services:
       # n8n writes, AURON reads. Paths from a request are validated against
       # this root before anything is opened (see ingest_paths.py).
       - "C:/JARVIS_Images/ingest:/data/images/ingest:ro"
+      # The other direction: AURON writes cut/cropped/graded files here and
+      # n8n picks them up to upload. Writable on purpose -- the ingest mount
+      # above stays read-only so a processing bug can never damage an
+      # original. Same host root, so n8n (which mounts all of
+      # C:/JARVIS_Images) sees both without another mount.
+      - "C:/JARVIS_Images/processed:/data/images/processed"
+      # Brano's own Lightroom look, measured out of a HALD image rather than
+      # rebuilt from its numbers -- see hald_to_cube.py. Read-only: this is a
+      # reference AURON applies, never edits.
+      - "C:/JARVIS_Images/lut:/data/lut:ro"
     ports:
       - "${JARVIS_BIND_ADDRESS:-127.0.0.1}:${JARVIS_PORT:-8000}:8000"
     healthcheck:
@@ -125,7 +137,12 @@ services:
       # directory swaps one narrow allowlist for another; it loosens nothing,
       # and n8n may now write there and nowhere else. Do not remove: without
       # it the drive-ingest workflow cannot hand a single video over.
-      N8N_RESTRICT_FILE_ACCESS_TO: /data/images/ingest
+      # Beide Richtungen: ingest (n8n schreibt Downloads) und processed
+      # (n8n liest, was AURON bearbeitet hat, und laedt es hoch). n8n
+      # prueft hiergegen zusaetzlich zu Mount und Dateirechten -- ohne
+      # den zweiten Pfad scheitert der Upload mit "is not writable",
+      # obwohl alles andere stimmt.
+      N8N_RESTRICT_FILE_ACCESS_TO: /data/images/ingest;/data/images/processed
       # Neu: verhindert das erneute Zuwachsen der SQLite-DB
       EXECUTIONS_DATA_SAVE_ON_SUCCESS: none
       EXECUTIONS_DATA_SAVE_ON_ERROR: all
