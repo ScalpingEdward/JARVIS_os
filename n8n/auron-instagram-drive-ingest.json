@@ -209,7 +209,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Dublettenpruefung VOR dem Download.\n// Die Backend-Pruefung in analyze_and_ingest spart nur die Vision-Analyse --\n// Drive-Download, Base64 und Payload liefen trotzdem jedes Mal komplett durch.\n// Hier fliegen bekannte Dateien raus, bevor sie irgendetwas kosten.\n//\n// \"Bekannt\" heisst: im Pool UND dort mit einer echten Analyse. Ein Eintrag mit\n// Platzhaltern (Video ohne Frame-Extraktion: theme \"video\", keine tags, kein\n// captured_at) muss wieder durchlaufen duerfen, sonst behaelt er seine leere\n// Analyse fuer immer -- genau das war der Zustand von 30 Videos im Pool.\n//\n// Das Kriterium dafuer lebt ausschliesslich im Backend\n// (analysis_completeness.py) und kommt als analysis_complete mit. Hier wird es\n// nur gelesen, nie nachgebaut: zwei Definitionen wuerden auseinanderdriften.\nconst pool = $('AURON: Load Known Refs v7').first().json;\nconst entries = Array.isArray(pool) ? pool : (pool.items || []);\n\nconst withoutField = entries.filter((e) => typeof e.analysis_complete !== 'boolean');\nif (entries.length > 0 && withoutField.length > 0) {\n  // Fail loud. Ohne das Feld waere `known` leer und ALLE Drive-Dateien gingen\n  // in die Vision-Analyse -- ein stiller, teurer Komplettlauf.\n  throw new Error(\n    `media-pool liefert kein analysis_complete (${withoutField.length}/${entries.length} Eintraege). ` +\n    `Backend ist aelter als dieser Workflow. Abbruch, statt alle ${entries.length} Dateien neu zu analysieren.`\n  );\n}\n\nconst analyzed = new Set(\n  entries.filter((e) => e.analysis_complete === true).map((e) => e.media_ref).filter(Boolean)\n);\n\nconst driveItems = $input.all();\nconst fresh = driveItems.filter((item) => !analyzed.has(item.json.id));\n\nconsole.log(\n  `Pool: ${entries.length} Eintraege, davon ${analyzed.size} vollstaendig analysiert, ` +\n  `${entries.length - analyzed.size} unvollstaendig. ` +\n  `Drive: ${driveItems.length} Dateien -> ${fresh.length} gehen weiter (neu oder unvollstaendig).`\n);\n\nreturn fresh;"
+        "jsCode": "// Dublettenpruefung VOR dem Download.\n// Die Backend-Pruefung in analyze_and_ingest spart nur die Vision-Analyse --\n// Drive-Download, Base64 und Payload liefen trotzdem jedes Mal komplett durch.\n// Hier fliegen bekannte Dateien raus, bevor sie irgendetwas kosten.\n//\n// \"Bekannt\" heisst: im Pool UND dort mit einer echten Analyse. Ein Eintrag mit\n// Platzhaltern (Video ohne Frame-Extraktion: theme \"video\", keine tags, kein\n// captured_at) muss wieder durchlaufen duerfen, sonst behaelt er seine leere\n// Analyse fuer immer -- genau das war der Zustand von 30 Videos im Pool.\n//\n// Das Kriterium dafuer lebt ausschliesslich im Backend\n// (analysis_completeness.py) und kommt als analysis_complete mit. Hier wird es\n// nur gelesen, nie nachgebaut: zwei Definitionen wuerden auseinanderdriften.\nconst pool = $('AURON: Load Known Refs v7').first().json;\nconst entries = Array.isArray(pool) ? pool : (pool.items || []);\n\nconst withoutField = entries.filter((e) => typeof e.analysis_complete !== 'boolean');\nif (entries.length > 0 && withoutField.length > 0) {\n  // Fail loud. Ohne das Feld waere `known` leer und ALLE Drive-Dateien gingen\n  // in die Vision-Analyse -- ein stiller, teurer Komplettlauf.\n  throw new Error(\n    `media-pool liefert kein analysis_complete (${withoutField.length}/${entries.length} Eintraege). ` +\n    `Backend ist aelter als dieser Workflow. Abbruch, statt alle ${entries.length} Dateien neu zu analysieren.`\n  );\n}\n\nconst analyzed = new Set(\n  entries.filter((e) => e.analysis_complete === true).map((e) => e.media_ref).filter(Boolean)\n);\n\n// Bewusst der Drive-Node und nicht $input: davor haengt seit v10 der\n// Nachtrag des Aufnahmedatums, dessen Ausgabe die API-Antwort ist und\n// nicht die Dateiliste. Denselben Fehler gab es schon einmal, als\n// 'Extract from File' das json des Eingangsitems verworfen hat.\nconst driveItems = $('Google Drive: List New Files v7').all();\nconst fresh = driveItems.filter((item) => !analyzed.has(item.json.id));\n\nconsole.log(\n  `Pool: ${entries.length} Eintraege, davon ${analyzed.size} vollstaendig analysiert, ` +\n  `${entries.length - analyzed.size} unvollstaendig. ` +\n  `Drive: ${driveItems.length} Dateien -> ${fresh.length} gehen weiter (neu oder unvollstaendig).`\n);\n\nreturn fresh;"
       },
       "id": "c5abbf32-1c9b-4551-9cdf-4de884c03919",
       "name": "Filter: Not Yet Ingested v7",
@@ -260,6 +260,28 @@
       ],
       "id": "5a088369-5914-4b91-9d4b-f07042ccb7bf",
       "name": "Write File To Ingest Dir v9"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:8000/v1/instagram/media-pool/captured-at-from-names",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"items\": $('Google Drive: List New Files v7').all().map(i => ({ media_ref: i.json.id, file_name: i.json.name })) } }}",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "id": "c1a7e4d2-9b31-4f6a-8e52-7d0c93b4af11",
+      "name": "AURON: Aufnahmedatum aus Dateinamen v10",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -2280,
+        176
+      ],
+      "notes": "Traegt fuer bereits analysierte Dateien das Aufnahmedatum aus dem Dateinamen nach (2026-03-05_1430.mp4). Noetig, weil 'Filter: Not Yet Ingested' genau diese Dateien ueberspringt -- sie werden nie wieder heruntergeladen, also liest sonst niemand den neuen Namen. Kostet nichts: kein Download, keine Vision-Analyse. Ueberschreibt nie ein vorhandenes Datum.",
+      "executeOnce": true
     }
   ],
   "connections": {
@@ -296,7 +318,7 @@
       "main": [
         [
           {
-            "node": "Filter: Not Yet Ingested v7",
+            "node": "AURON: Aufnahmedatum aus Dateinamen v10",
             "type": "main",
             "index": 0
           }
@@ -407,6 +429,17 @@
         [
           {
             "node": "Extract from File v7",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AURON: Aufnahmedatum aus Dateinamen v10": {
+      "main": [
+        [
+          {
+            "node": "Filter: Not Yet Ingested v7",
             "type": "main",
             "index": 0
           }

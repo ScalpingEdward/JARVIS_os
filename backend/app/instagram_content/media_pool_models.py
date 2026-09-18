@@ -176,6 +176,31 @@ class ContentGapReport(BaseModel):
     low_water_mark: int
 
 
+class CapturedAtFromNameItem(BaseModel):
+    """One file's current name in Drive, for recovering a capture date that
+    was never in the file to begin with."""
+
+    media_ref: str = Field(min_length=1, max_length=2000)
+    file_name: str = Field(min_length=1, max_length=500)
+
+
+class CapturedAtFromNameRequest(BaseModel):
+    items: list[CapturedAtFromNameItem] = Field(min_length=1, max_length=500)
+
+
+class CapturedAtFromNameResponse(BaseModel):
+    """Deliberately reports every outcome separately rather than one count.
+    A backfill that silently did nothing looks identical to one that worked
+    unless it says which of the two happened, and this exact class of
+    silence has already cost this project a full run of paid analyses."""
+
+    filled: int = Field(description="Items that had no capture date and got one from the name.")
+    already_had_one: int = Field(description="Left untouched -- an existing date is never overwritten.")
+    no_date_in_name: int = Field(description="The name carries no readable date. Not an error.")
+    unknown_media_ref: int = Field(description="No pool item with that media_ref.")
+    filled_refs: list[str] = Field(default_factory=list)
+
+
 class MediaPoolIngestResponse(BaseModel):
     ingested: int
     skipped_duplicates: int

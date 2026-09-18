@@ -10,6 +10,8 @@ from app.security.operator_auth import require_operator_token
 
 from .ingest_paths import ingest_directory_status
 from .media_pool_models import (
+    CapturedAtFromNameRequest,
+    CapturedAtFromNameResponse,
     ContentGapReport,
     IngestDirectoryStatus,
     CuratedDraft,
@@ -135,6 +137,22 @@ def ingest_media(request: MediaPoolIngestRequest) -> MediaPoolIngestResponse:
     does not analyze pixels itself -- theme/tags/aesthetic_score come from
     whatever vision-analysis step runs where the files actually live."""
     return media_pool_service.ingest(request)
+
+
+@router.post("/media-pool/captured-at-from-names", response_model=CapturedAtFromNameResponse)
+def captured_at_from_names(request: CapturedAtFromNameRequest) -> CapturedAtFromNameResponse:
+    """Recovers a shoot date from the file's name in Drive, for items that
+    are already analyzed.
+
+    Renaming a file in Drive keeps its id, so the analysis already paid for
+    stays valid -- but the ingest pre-filter skips an analyzed media_ref,
+    so nobody ever reads the new name. This is the way in for the name
+    alone: no download, no frames, no vision call, no cost.
+
+    Never overwrites a date that is already there, and never invents one
+    from a name that has none.
+    """
+    return media_pool_service.captured_at_from_names(request)
 
 
 @router.get("/media-pool", response_model=MediaPoolList)

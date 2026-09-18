@@ -8,9 +8,15 @@ from app.db import SessionLocal
 from app.db_models import InstagramCuratedDraftRow, InstagramMediaPoolItemRow
 
 from .analysis_completeness import analysis_is_complete
-from .captured_at_resolution import CapturedAtSource
+from .captured_at_resolution import (
+    CapturedAtSource,
+    is_plausible_capture_time,
+    parse_capture_time_from_filename,
+)
 from .curation import analyze_gaps, curate
 from .media_pool_models import (
+    CapturedAtFromNameRequest,
+    CapturedAtFromNameResponse,
     ContentGapReport,
     CuratedDraft,
     MediaPoolIngestRequest,
@@ -102,6 +108,57 @@ class MediaPoolService:
             "already_had_a_source": already,
             "non_image_left_untouched": untouched_videos,
         }
+
+    def captured_at_from_names(self, request: CapturedAtFromNameRequest) -> CapturedAtFromNameResponse:
+        """Recovers a capture date from a file name, for items already in
+        the pool with a real analysis.
+
+        Renaming a file in Drive keeps its id, so the media_ref -- and with
+        it the paid-for analysis -- survives. What does not happen by itself
+        is anyone reading the new name: the ingest pre-filter skips a
+        media_ref that is already fully analyzed, so those files are never
+        downloaded or looked at again. This is the way in for the name alone.
+
+        Never overwrites an existing captured_at: a value already there came
+        from EXIF or the container, and a name typed later is not grounds to
+        replace it. A name without a readable date is simply skipped -- the
+        item keeps no date at all rather than being given an invented one.
+
+        Costs nothing: no download, no frames, no vision call.
+        """
+        filled = 0
+        already = 0
+        no_date = 0
+        unknown = 0
+        filled_refs: list[str] = []
+        with SessionLocal() as session:
+            for entry in request.items:
+                row = (
+                    session.query(InstagramMediaPoolItemRow)
+                    .filter(InstagramMediaPoolItemRow.media_ref == entry.media_ref)
+                    .first()
+                )
+                if row is None:
+                    unknown += 1
+                    continue
+                item = MediaPoolItem.model_validate_json(row.data)
+                if item.captured_at is not None:
+                    already += 1
+                    continue
+                parsed = parse_capture_time_from_filename(entry.file_name)
+                if not is_plausible_capture_time(parsed):
+                    no_date += 1
+                    continue
+                item.captured_at = parsed
+                item.captured_at_source = CapturedAtSource.filename
+                row.data = item.model_dump_json()
+                filled += 1
+                filled_refs.append(entry.media_ref)
+            session.commit()
+        return CapturedAtFromNameResponse(
+            filled=filled, already_had_one=already, no_date_in_name=no_date,
+            unknown_media_ref=unknown, filled_refs=filled_refs,
+        )
 
     def backfill_content_day(self) -> dict[str, int]:
         """One-off migration for drafts created before content_day existed.
