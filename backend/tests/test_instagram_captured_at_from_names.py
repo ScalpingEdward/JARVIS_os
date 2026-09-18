@@ -22,6 +22,7 @@ from app.instagram_content.media_pool_models import (
     MediaPoolIngestRequest,
     MediaPoolItemCreate,
 )
+from app.instagram_content.curation import ELITE_SOLO_THRESHOLD
 from app.instagram_content.media_pool_service import MediaPoolService
 
 
@@ -43,7 +44,7 @@ def _analyzed_video(ref: str, **overrides) -> MediaPoolItemCreate:
     destroyed it."""
     payload = dict(
         media_ref=ref, media_type="video", theme="riverside-park-walk",
-        tags=["park", "river"], aesthetic_score=0.55, duration_seconds=16.6,
+        tags=["park", "river"], aesthetic_score=ELITE_SOLO_THRESHOLD + 0.05, duration_seconds=16.6,
     )
     payload.update(overrides)
     return MediaPoolItemCreate(**payload)
@@ -66,7 +67,7 @@ def test_a_renamed_video_gets_its_shoot_day_without_being_re_analyzed():
     assert item.captured_at_source == CapturedAtSource.filename
     assert item.theme == "riverside-park-walk", "the paid-for analysis must survive untouched"
     assert item.tags == ["park", "river"]
-    assert item.aesthetic_score == 0.55
+    assert item.aesthetic_score == ELITE_SOLO_THRESHOLD + 0.05
 
 
 def test_an_existing_date_is_never_overwritten():

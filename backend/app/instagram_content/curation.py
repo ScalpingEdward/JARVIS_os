@@ -61,14 +61,33 @@ def _order_group(items: list[MediaPoolItem]) -> list[MediaPoolItem]:
     return [hook, *rest]
 
 
+def _carousel_reasoning(batch: list[MediaPoolItem], theme: str, *, full: bool) -> str:
+    """Says what is actually in the set. A carousel may now mix stills and
+    clips, so describing every one of them as "images" would misreport what
+    is going out."""
+    videos = sum(1 for i in batch if i.media_type == MediaType.video)
+    what = f"{len(batch)} items"
+    if videos:
+        what += f" ({len(batch) - videos} image, {videos} video)"
+    tail = "batched into a full carousel." if full else "-- enough for a real carousel set."
+    return f"{what} from '{theme}' {tail}"
+
+
 def curate(pool_items: list[MediaPoolItem], max_groups: int = 10) -> list[CuratedGroup]:
-    """Groups unused pool items into post-worthy sets, respecting real
-    account-curation logic: standout single images become hero posts,
-    videos always stand alone as Reels, same-theme images get batched into
-    right-sized carousels (3-6 items) ranked best-first, and no item is
-    proposed more than once (across groups within this single call --
-    marking items 'used' for real happens one layer up once a group is
-    actually turned into a submitted candidate).
+    """Groups unused pool items into post-worthy sets.
+
+    One quality bar decides everything, and it applies to photos and videos
+    alike: at or above the elite solo threshold an item carries a post on
+    its own (a video becomes a Reel, a photo a single post); below it, the
+    item joins a carousel, where stills and clips may mix freely. Leftovers
+    too small for a carousel stay in the pool rather than forcing a thin
+    post. No item is proposed twice within one call -- marking items 'used'
+    for real happens a layer up, once a group actually becomes a candidate.
+
+    Videos used to bypass the bar entirely and always went solo, so a 0.15
+    clip became a Reel while a 0.70 photo was judged too weak to stand
+    alone. Reels carry this account's reach; a weak one costs more than a
+    weak carousel slide.
     """
     strategy = platform_strategy_store.current()
     unused = [item for item in pool_items if item.available]
@@ -84,28 +103,30 @@ def curate(pool_items: list[MediaPoolItem], max_groups: int = 10) -> list[Curate
         remaining: list[MediaPoolItem] = []
 
         for item in items:
-            if item.media_type == MediaType.video:
-                groups.append(
-                    CuratedGroup(
-                        theme=theme,
-                        media_items=[item],
-                        reasoning=f"Video in theme '{theme}' -- always a standalone Reel, never grouped.",
-                        day=day,
-                    )
-                )
-            elif item.aesthetic_score >= strategy.elite_solo_threshold:
+            # One bar for both media types. A video used to go solo whatever
+            # it scored, which meant a 0.15 clip became a Reel while a 0.70
+            # photo was considered too weak to stand alone -- 19 of the 31
+            # videos in the pool scored under 0.35 and every one of them was
+            # being proposed as its own post. Reels carry the account's
+            # reach, so a weak one costs more than a weak carousel slide.
+            if item.aesthetic_score >= strategy.elite_solo_threshold:
+                kind = "Reel" if item.media_type == MediaType.video else "single post"
                 groups.append(
                     CuratedGroup(
                         theme=theme,
                         media_items=[item],
                         reasoning=(
                             f"Aesthetic score {item.aesthetic_score:.2f} is above the elite solo bar "
-                            f"({strategy.elite_solo_threshold}) -- stands better alone than diluted into a carousel."
+                            f"({strategy.elite_solo_threshold}) -- strong enough to carry a {kind} on its own."
                         ),
                         day=day,
                     )
                 )
             else:
+                # Below the bar, photos and videos mix in one carousel.
+                # Instagram allows it, and a clip that is not strong enough
+                # to hold a Reel can still earn its place between stills --
+                # it is also what stops a swipe.
                 remaining.append(item)
 
         batch: list[MediaPoolItem] = []
@@ -116,7 +137,7 @@ def curate(pool_items: list[MediaPoolItem], max_groups: int = 10) -> list[Curate
                     CuratedGroup(
                         theme=theme,
                         media_items=_order_group(list(batch)),
-                        reasoning=f"{len(batch)} same-theme images ('{theme}') batched into a full carousel.",
+                        reasoning=_carousel_reasoning(batch, theme, full=True),
                         day=day,
                     )
                 )
@@ -126,7 +147,7 @@ def curate(pool_items: list[MediaPoolItem], max_groups: int = 10) -> list[Curate
                 CuratedGroup(
                     theme=theme,
                     media_items=_order_group(list(batch)),
-                    reasoning=f"{len(batch)} same-theme images ('{theme}') -- enough for a real carousel set.",
+                    reasoning=_carousel_reasoning(batch, theme, full=False),
                     day=day,
                 )
             )

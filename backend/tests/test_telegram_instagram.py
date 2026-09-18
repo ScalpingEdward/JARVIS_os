@@ -18,6 +18,7 @@ from uuid import UUID, uuid4
 import pytest
 
 from app.instagram_content.media_pool_models import MediaPoolIngestRequest, MediaPoolItemCreate
+from app.instagram_content.curation import ELITE_SOLO_THRESHOLD
 from app.instagram_content.media_pool_service import MediaPoolService
 from app.instagram_content.models import ContentCandidateCreate, ContentStatus, MediaItem
 from app.instagram_content.service import InstagramContentService
@@ -175,13 +176,13 @@ def test_next_takes_the_oldest_shoot_day_first():
     pool.ingest(MediaPoolIngestRequest(items=[
         MediaPoolItemCreate(
             media_ref="newer", media_type="video", theme="gym-clip", tags=["gym"],
-            aesthetic_score=0.6, duration_seconds=20.0,
+            aesthetic_score=ELITE_SOLO_THRESHOLD + 0.05, duration_seconds=20.0,
             captured_at=datetime(2026, 3, 10, tzinfo=timezone.utc),
             captured_at_source=CapturedAtSource.filename,
         ),
         MediaPoolItemCreate(
             media_ref="older", media_type="video", theme="coast", tags=["sea"],
-            aesthetic_score=0.6, duration_seconds=20.0,
+            aesthetic_score=ELITE_SOLO_THRESHOLD + 0.05, duration_seconds=20.0,
             captured_at=datetime(2026, 2, 14, tzinfo=timezone.utc),
             captured_at_source=CapturedAtSource.filename,
         ),

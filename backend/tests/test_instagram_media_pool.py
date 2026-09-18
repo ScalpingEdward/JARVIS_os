@@ -108,16 +108,36 @@ def test_curate_elite_solo_threshold_is_a_hard_boundary():
     assert carousel_refs == {"just-below", "filler-0", "filler-1"}
 
 
-def test_curate_always_puts_a_video_alone():
+def test_a_strong_video_carries_a_reel_on_its_own():
     from app.instagram_content.media_pool_models import MediaPoolItem
 
-    video = MediaPoolItem(**_video_create("clip", score=0.5).model_dump())
+    video = MediaPoolItem(**_video_create("clip", score=ELITE_SOLO_THRESHOLD + 0.05).model_dump())
     images = [MediaPoolItem(**_image_create(f"img-{i}", score=0.5).model_dump()) for i in range(3)]
     groups = curate([video, *images])
 
-    video_groups = [g for g in groups if any(m.media_type == "video" for m in g.media_items)]
-    assert len(video_groups) == 1
-    assert len(video_groups[0].media_items) == 1
+    solo = [g for g in groups if any(m.media_type == "video" for m in g.media_items)]
+    assert len(solo) == 1
+    assert len(solo[0].media_items) == 1
+    assert "Reel" in solo[0].reasoning
+
+
+def test_a_weak_video_joins_a_carousel_instead_of_becoming_a_weak_reel():
+    """The rule Brano asked for, and the one that changed: a video used to
+    go solo whatever it scored. 19 of the 31 videos in the real pool score
+    under 0.35 -- every one was being proposed as its own Reel, which is
+    where this account's reach actually comes from."""
+    from app.instagram_content.media_pool_models import MediaPoolItem
+
+    video = MediaPoolItem(**_video_create("weak-clip", score=0.3).model_dump())
+    images = [MediaPoolItem(**_image_create(f"img-{i}", score=0.4).model_dump()) for i in range(3)]
+
+    groups = curate([video, *images])
+
+    assert len(groups) == 1, "one mixed carousel, not a Reel plus a carousel"
+    carousel = groups[0]
+    assert len(carousel.media_items) == 4
+    assert any(m.media_type == "video" for m in carousel.media_items), "photo/video mixed, as Instagram allows"
+    assert "1 video" in carousel.reasoning, "the reasoning must not call a clip an image"
 
 
 def test_curate_orders_groups_by_shoot_day_oldest_first_never_interleaving_days():
@@ -490,7 +510,8 @@ def test_a_dated_file_name_carries_a_video_all_the_way_into_its_shoot_day_group(
 
     def handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(200, json={"content": [{"type": "text", "text": json.dumps(
-            {"theme": "gym-clip", "tags": ["gym"], "aesthetic_score": 0.5, "reasoning": "ok"}
+            {"theme": "gym-clip", "tags": ["gym"], "aesthetic_score": ELITE_SOLO_THRESHOLD + 0.1,
+             "reasoning": "ok"}
         )}]})
 
     analyzer = AnthropicVisionAnalyzer(
