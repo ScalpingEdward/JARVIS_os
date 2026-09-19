@@ -4,7 +4,7 @@ import json
 from datetime import date, datetime, timezone
 from uuid import UUID
 
-from app.db import SessionLocal
+from app.db import SessionLocal, refuse_reset_in_production
 from app.db_models import InstagramCuratedDraftRow, InstagramMediaPoolItemRow
 
 from .analysis_completeness import analysis_is_complete
@@ -16,6 +16,10 @@ from .captured_at_resolution import (
 from .curation import analyze_gaps, curate
 from .media_pool_models import (
     CapturedAtFromNameRequest,
+    PendingUploadItem,
+    PendingUploadList,
+    ProcessedUploadedRequest,
+    ProcessedUploadedResponse,
     CapturedAtFromNameResponse,
     ContentGapReport,
     CuratedDraft,
@@ -45,6 +49,7 @@ class MediaPoolService:
     """
 
     def reset(self) -> None:
+        refuse_reset_in_production("the media pool and its drafts")
         with SessionLocal() as session:
             session.query(InstagramMediaPoolItemRow).delete()
             session.query(InstagramCuratedDraftRow).delete()
@@ -108,6 +113,53 @@ class MediaPoolService:
             "already_had_a_source": already,
             "non_image_left_untouched": untouched_videos,
         }
+
+    def pending_uploads(self) -> PendingUploadList:
+        """Processed files that still exist only on this disk.
+
+        n8n asks rather than guesses: it has no view into which items were
+        processed, and a directory listing would not say which media_ref a
+        file belongs to or whether its upload already succeeded. Items whose
+        processed version is already in Drive drop out here, so a repeated
+        run uploads nothing twice.
+        """
+        items = [
+            PendingUploadItem(
+                media_ref=item.media_ref,
+                processed_file=item.processed_file,
+                media_type=item.media_type,
+            )
+            for item in self.list_all()
+            if item.processed_file is not None and item.processed_media_ref is None
+        ]
+        return PendingUploadList(items=items, count=len(items))
+
+    def record_processed_uploads(self, request: ProcessedUploadedRequest) -> ProcessedUploadedResponse:
+        """Remember where the processed version ended up in Drive.
+
+        Kept separate from the original media_ref rather than replacing it:
+        the original stays the source of record, so a re-grade later starts
+        from the footage as uploaded instead of from something already cut
+        and colour-graded once.
+        """
+        recorded = 0
+        unknown = 0
+        with SessionLocal() as session:
+            for entry in request.items:
+                row = (
+                    session.query(InstagramMediaPoolItemRow)
+                    .filter(InstagramMediaPoolItemRow.media_ref == entry.media_ref)
+                    .first()
+                )
+                if row is None:
+                    unknown += 1
+                    continue
+                item = MediaPoolItem.model_validate_json(row.data)
+                item.processed_media_ref = entry.processed_media_ref
+                row.data = item.model_dump_json()
+                recorded += 1
+            session.commit()
+        return ProcessedUploadedResponse(recorded=recorded, unknown_media_ref=unknown)
 
     def captured_at_from_names(self, request: CapturedAtFromNameRequest) -> CapturedAtFromNameResponse:
         """Recovers a capture date from a file name, for items already in

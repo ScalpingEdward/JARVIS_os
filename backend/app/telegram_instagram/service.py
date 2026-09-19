@@ -14,7 +14,7 @@ from __future__ import annotations
 import logging
 from uuid import UUID
 
-from app.db import SessionLocal
+from app.db import SessionLocal, refuse_reset_in_production
 from app.db_models import TelegramInstagramAuditRow
 from app.instagram_content.media_pool_models import FinalizeDraftRequest
 from app.instagram_content.media_pool_service import media_pool_service
@@ -114,6 +114,7 @@ class TelegramInstagramService:
         return [InstagramAuditRecord.model_validate_json(r.data) for r in rows]
 
     def reset(self) -> None:
+        refuse_reset_in_production("telegram_instagram's audit log")
         with SessionLocal() as session:
             session.query(TelegramInstagramAuditRow).delete()
             session.commit()

@@ -31,3 +31,31 @@ def get_db() -> Generator[Session, None, None]:
 
 
 initialize_database()
+
+
+class ProductionResetRefused(RuntimeError):
+    """Raised instead of wiping a live database."""
+
+
+def refuse_reset_in_production(what: str) -> None:
+    """Guard every reset() that deletes whole tables.
+
+    Learned the hard way on 2026-09-19: a pytest file was executed inside
+    the running api container to reach its ffmpeg, and its fixture called
+    MediaPoolService().reset(). That container is wired to the real
+    Postgres, so the "clean slate for the test" deleted 223 analysed pool
+    items and 50 curated drafts -- analyses that had been paid for.
+
+    The tests genuinely need reset(); production never does. The two are
+    distinguishable, and this is the line: ENVIRONMENT=production (set in
+    docker-compose) refuses, anything else proceeds. A guard beats
+    remembering to be careful, because the careless path was the
+    convenient one.
+    """
+    from app.config import get_settings
+
+    if get_settings().environment.lower() == "production":
+        raise ProductionResetRefused(
+            f"refusing to reset {what} against the production database. "
+            f"Run tests outside the api container, or against a scratch database."
+        )

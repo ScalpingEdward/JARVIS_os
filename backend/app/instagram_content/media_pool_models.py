@@ -64,6 +64,13 @@ class MediaPoolItemCreate(BaseModel):
         "posted. None means nothing has been processed yet -- never that the original is fine "
         "as it is.",
     )
+    processed_media_ref: str | None = Field(
+        default=None,
+        max_length=2000,
+        description="Drive file id of the processed version, once n8n has uploaded it. This is "
+        "what gets posted -- the original media_ref stays untouched as the source of record. "
+        "None while the processed file exists only on disk.",
+    )
     cover_timestamp_seconds: float | None = Field(
         default=None,
         gt=0,
@@ -183,6 +190,33 @@ class ContentGapReport(BaseModel):
     theme_gaps: list[ThemeGap]
     pool_low: bool = Field(description="True when available_count is at or below the configured low-water mark")
     low_water_mark: int
+
+
+class PendingUploadItem(BaseModel):
+    """One processed file waiting to be uploaded back to Drive."""
+
+    media_ref: str
+    processed_file: str
+    media_type: MediaType
+
+
+class PendingUploadList(BaseModel):
+    items: list[PendingUploadItem]
+    count: int
+
+
+class ProcessedUploadedItem(BaseModel):
+    media_ref: str = Field(min_length=1, max_length=2000)
+    processed_media_ref: str = Field(min_length=1, max_length=2000)
+
+
+class ProcessedUploadedRequest(BaseModel):
+    items: list[ProcessedUploadedItem] = Field(min_length=1, max_length=500)
+
+
+class ProcessedUploadedResponse(BaseModel):
+    recorded: int
+    unknown_media_ref: int
 
 
 class CapturedAtFromNameItem(BaseModel):

@@ -12,6 +12,9 @@ from .ingest_paths import ingest_directory_status
 from .media_pool_models import (
     CapturedAtFromNameRequest,
     CapturedAtFromNameResponse,
+    PendingUploadList,
+    ProcessedUploadedRequest,
+    ProcessedUploadedResponse,
     ContentGapReport,
     IngestDirectoryStatus,
     CuratedDraft,
@@ -137,6 +140,23 @@ def ingest_media(request: MediaPoolIngestRequest) -> MediaPoolIngestResponse:
     does not analyze pixels itself -- theme/tags/aesthetic_score come from
     whatever vision-analysis step runs where the files actually live."""
     return media_pool_service.ingest(request)
+
+
+@router.get("/media-pool/pending-uploads", response_model=PendingUploadList)
+def pending_uploads() -> PendingUploadList:
+    """Processed files that exist only on disk so far.
+
+    n8n reads this instead of guessing: a directory listing says nothing
+    about which item a file belongs to, or whether it is already in Drive.
+    """
+    return media_pool_service.pending_uploads()
+
+
+@router.post("/media-pool/processed-uploaded", response_model=ProcessedUploadedResponse)
+def processed_uploaded(request: ProcessedUploadedRequest) -> ProcessedUploadedResponse:
+    """Record where n8n put the processed version. That file is what gets
+    posted; the original media_ref stays the source of record."""
+    return media_pool_service.record_processed_uploads(request)
 
 
 @router.post("/media-pool/captured-at-from-names", response_model=CapturedAtFromNameResponse)

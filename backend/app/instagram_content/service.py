@@ -5,7 +5,7 @@ from uuid import UUID
 
 from sqlalchemy import update
 
-from app.db import SessionLocal
+from app.db import SessionLocal, refuse_reset_in_production
 from app.db_models import InstagramContentCandidateRow
 
 from .caption_writer import AnthropicCaptionWriter, CaptionWriterError
@@ -50,6 +50,7 @@ class InstagramContentService:
         self._publish_lock = threading.Lock()
 
     def reset(self) -> None:
+        refuse_reset_in_production("the Instagram content candidates")
         with SessionLocal() as session:
             session.query(InstagramContentCandidateRow).delete()
             session.commit()
