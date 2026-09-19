@@ -11,6 +11,7 @@ generate genuine footage, run it through, and measure the result.
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import subprocess
 from pathlib import Path
@@ -222,3 +223,78 @@ def test_a_real_lut_is_actually_applied(source_video, monkeypatch, tmp_path):
 
     assert graded.graded is True
     assert graded.path.read_bytes() != plain.path.read_bytes()
+
+
+# -- the chain: does ingest actually produce a processed file? ---------------
+
+
+def test_ingest_cuts_and_grades_while_the_file_is_still_there(tmp_path, monkeypatch):
+    """The whole reason processing sits in the ingest step: the handed-over
+    original lives in a directory the sweeper empties within a day, while a
+    draft can wait for a decision far longer. If it does not happen here, it
+    cannot happen at all.
+    """
+    import json as json_module
+
+    import httpx
+
+    from app.instagram_content.analyze_and_ingest import analyze_and_ingest
+    from app.instagram_content.media_pool_models import MediaAnalyzeAndIngestItem
+    from app.instagram_content.media_pool_service import MediaPoolService
+    from app.instagram_content.vision_analysis import AnthropicVisionAnalyzer, VisionAnalysisConfig
+
+    ingest = tmp_path / "ingest"
+    ingest.mkdir()
+    monkeypatch.setenv("JARVIS_INGEST_DIR", str(ingest))
+
+    clip = ingest / "clip-1.mp4"
+    subprocess.run(
+        ["ffmpeg", "-y", "-f", "lavfi", "-i", "testsrc=size=640x1136:rate=25:duration=40",
+         "-c:v", "libx264", "-pix_fmt", "yuv420p", str(clip)],
+        capture_output=True, check=True,
+    )
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"content": [{"type": "text", "text": json_module.dumps(
+            {"theme": "gym-clip", "tags": ["gym"], "aesthetic_score": 0.8,
+             "reasoning": "ok", "cover_timestamp_seconds": 5.0}
+        )}]})
+
+    client = httpx.Client(transport=httpx.MockTransport(handler))
+    pool = MediaPoolService()
+    pool.reset()
+
+    response = analyze_and_ingest(
+        [MediaAnalyzeAndIngestItem(
+            media_ref="clip-1", media_type="video", video_path="clip-1.mp4", duration_seconds=40.0,
+        )],
+        AnthropicVisionAnalyzer(config=VisionAnalysisConfig(api_key="k"), client=client),
+        pool,
+        trim_analyzer=_FixedTrim(12.0, 30.0),
+    )
+    assert response.failed == 0
+
+    item = pool.list_all()[0]
+    assert item.processed_file == "clip-1.mp4", "the pool must point at the processed file"
+
+    produced = Path(os.environ["JARVIS_PROCESSED_DIR"]) / item.processed_file
+    assert produced.is_file()
+    assert _probe(produced)["duration"] == pytest.approx(18.0, abs=0.5), "cut to the analyzed window"
+    assert clip.is_file(), "the handed-over original must survive untouched"
+
+
+class _FixedTrim:
+    """Stands in for the trim analyzer -- the window is the input here, not
+    what is being tested."""
+
+    def __init__(self, start: float, end: float) -> None:
+        self._start, self._end = start, end
+
+    def analyze(self, frames, target_min, target_max):
+        from app.instagram_content.media_pool_models import TrimAnalysisResult
+
+        return TrimAnalysisResult(
+            recommended_start_seconds=self._start,
+            recommended_end_seconds=self._end,
+            reasoning="fixed for the test",
+        )

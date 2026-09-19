@@ -19,6 +19,7 @@ from .media_pool_models import (
     MediaPoolItemCreate,
     TrimAnalysisResult,
 )
+from .media_processing import MediaProcessingError, process_video
 from .media_pool_service import MediaPoolService
 from .models import MediaType
 from .reel_targets import needs_trim, target_max_seconds, target_min_seconds
@@ -180,6 +181,51 @@ def _choose_cover_timestamp(analysis, trim: "TrimAnalysisResult | None", frames:
     return representative_frame(frames).timestamp_seconds
 
 
+def _process_now(
+    video_path,
+    *,
+    media_ref: str,
+    trim: "TrimAnalysisResult | None",
+    duration_seconds: float,
+) -> str | None:
+    """Cut and grade the clip while the file is still here.
+
+    This is the only moment it can happen: the handed-over original lives in
+    the ingest directory, which the sweeper empties within a day, and a
+    draft may sit waiting for a decision far longer than that. What comes
+    out of here survives in the processed directory and is what actually
+    gets posted.
+
+    Deliberately no crop yet. The aspect ratio depends on whether the item
+    ends up a Reel or a slide in a carousel, and that is decided later by
+    curation -- cropping to a guess now would mean re-cropping an already
+    cropped file, losing pixels twice.
+
+    Not fatal on failure: the analysis is real and worth keeping either way,
+    and the result says plainly that nothing was processed rather than
+    pretending the original is ready to post.
+    """
+    try:
+        processed = process_video(
+            video_path,
+            ratio=None,
+            trim_start_seconds=trim.recommended_start_seconds if trim else None,
+            trim_end_seconds=trim.recommended_end_seconds if trim else None,
+            output_name=f"{media_ref}.mp4",
+        )
+    except MediaProcessingError as exc:
+        logger.warning("could not process %s, keeping the analysis without it: %s", media_ref, exc)
+        return None
+    logger.info(
+        "processed %s: %s%s",
+        media_ref,
+        "graded" if processed.graded else "ungraded (no LUT configured)",
+        f", cut to {trim.recommended_start_seconds:.1f}-{trim.recommended_end_seconds:.1f}s"
+        if trim else f", full {duration_seconds:.1f}s",
+    )
+    return processed.path.name
+
+
 def _trim_note(trim: "TrimAnalysisResult | None") -> str:
     if trim is None:
         return ""
@@ -280,6 +326,12 @@ def analyze_and_ingest(
                 video_creation_time=item.video_creation_time or probe_creation_time(resolved_video_path),
                 upload_time=item.upload_time,
             )
+            processed_file = _process_now(
+                resolved_video_path,
+                media_ref=item.media_ref,
+                trim=trim,
+                duration_seconds=duration_seconds,
+            )
             creates.append(
                 MediaPoolItemCreate(
                     media_ref=item.media_ref,
@@ -292,6 +344,7 @@ def analyze_and_ingest(
                     captured_at=captured_at,
                     captured_at_source=captured_at_source,
                     cover_timestamp_seconds=cover_timestamp,
+                    processed_file=processed_file,
                     recommended_trim_start_seconds=trim.recommended_start_seconds if trim else None,
                     recommended_trim_end_seconds=trim.recommended_end_seconds if trim else None,
                     trim_reasoning=trim.reasoning if trim else "",

@@ -55,6 +55,15 @@ class MediaPoolItemCreate(BaseModel):
     )
     recommended_trim_end_seconds: float | None = Field(default=None, gt=0)
     trim_reasoning: str = Field(default="", max_length=1000)
+    processed_file: str | None = Field(
+        default=None,
+        max_length=500,
+        description="File name in the processed directory, once AURON has actually cut and "
+        "graded this item. The handed-over original lives in the ingest directory and is "
+        "deleted by the sweeper within a day; this one survives, because it is what gets "
+        "posted. None means nothing has been processed yet -- never that the original is fine "
+        "as it is.",
+    )
     cover_timestamp_seconds: float | None = Field(
         default=None,
         gt=0,
