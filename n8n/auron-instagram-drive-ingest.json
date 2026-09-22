@@ -5,7 +5,7 @@
   "nodes": [
     {
       "parameters": {
-        "batchSize": 5,
+        "batchSize": 1,
         "options": {}
       },
       "id": "05b9fb8b-fc38-402f-b4db-09a95bbac2d2",
@@ -16,7 +16,7 @@
         -1840,
         176
       ],
-      "notes": "Processes the folder in batches of 5. Keeps the Code node's base64 footprint small and, together with the batch-wide .all() lookup in 'Prepare AURON Payload1', avoids the paired-item tracing that made the task runner time out partway through a 223-file run."
+      "notes": "Processes the folder one file at a time. Five at once sent five parallel requests to AURON, and a 4K iPhone video graded next to four vision calls ran the 3.5 GB Docker VM out of memory (OOMKilled, ffmpeg died mid-file). Keeps the Code node's base64 footprint small and, together with the batch-wide .all() lookup in 'Prepare AURON Payload1', avoids the paired-item tracing that made the task runner time out partway through a 223-file run."
     },
     {
       "parameters": {
@@ -107,7 +107,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Base64-encode the downloaded binaries for AURON's vision endpoint.\n// AURON never holds a Drive credential itself -- n8n fetches bytes,\n// AURON only ever sees the encoded image it's handed.\n//\n// Runs once for ALL items of the current batch on purpose: $('Loop Over\n// Items').all() returns just this batch's items, a plain array read. The\n// per-item form ($('Loop Over Items v7').item) makes n8n trace paired items\n// back through every previous batch, which gets slower each round and\n// eventually times the task runner out on a large folder.\n\n// Die Dauer kommt nicht mehr von hier. Ein mvhd-Parser lief an dieser\n// Stelle, solange unbelegt war, ob er dasselbe liefert wie ffprobe im\n// Backend. Der Vergleich liegt vor: 31 von 31 Dateien, groesste\n// Abweichung 0.000s. Damit war er nur noch eine zweite Quelle fuer eine\n// Zahl, die AURON ohnehin selbst aus der Datei liest -- und zwei Quellen\n// fuer dieselbe Zahl driften irgendwann auseinander.\n\nconst driveItems = $('Loop Over Items v7').all();\n\n// Pfad und Groesse kommen vom Write-Node, NICHT aus $json.\n//\n// Grund: 'Extract from File v7' verwirft das json des Eingangsitems. Sein\n// Parameter options.keepSource hat zwar den Beschreibungs-Default 'json',\n// aber das ist ein Feld in einer Collection -- solange es nicht ausdruecklich\n// gesetzt ist, liefert getNodeParameter('options') schlicht {} und der Code\n// springt ueber das deepCopy hinweg. ingest_path und drive_size_bytes gingen\n// so verloren, video_path und expected_size_bytes wurden undefined und fielen\n// beim Serialisieren ersatzlos weg. Die API sah 29 Videos ohne Pfad und ohne\n// Bild und meldete 0 eingefuegt, 0 fehlgeschlagen.\n//\n// fileName ist der Pfad, den der Write-Node tatsaechlich geschrieben hat --\n// ein belegter Wert, kein durchgereichter Wunsch. Deshalb hier und nicht\n// keepSource: der Umweg ueber eine Collection-Option mit irrefuehrendem\n// Default waere dieselbe Falle mit einem Pflaster drauf.\nconst written = $('Write File To Ingest Dir v9').all();\n\nreturn $input.all().map((item, i) => {\n  const drive = driveItems[i].json;\n  const mediaType = drive.mimeType || 'image/jpeg';\n  const isVideo = mediaType.startsWith('video/');\n\n  if (!isVideo) {\n    return {\n      json: {\n        media_ref: drive.id,\n        media_type: 'image',\n        image_base64: item.json.image_b64,\n        image_media_type: mediaType,\n        duration_seconds: null\n      }\n    };\n  }\n\n  const writtenFile = written[i].json;\n  if (!writtenFile || !writtenFile.fileName) {\n    // Lieber hier abbrechen als ein Video ohne Pfad losschicken: die API\n    // weist das inzwischen zurueck, aber der Fehler gehoert dorthin, wo die\n    // Ursache sitzt.\n    throw new Error(\n      `Kein geschriebener Pfad fuer ${drive.id} (Index ${i}) -- ` +\n      `Write File To Ingest Dir v9 hat fuer dieses Item kein fileName geliefert.`\n    );\n  }\n\n  // Videos gehen per Pfad, nicht als Base64: eine 19-MB-Datei waere ~26 MB\n  // JSON, und n8n haelt sie hier ohnehin schon komplett im Speicher.\n  //\n  // expected_size_bytes ist die Groesse, die Drive selbst nennt. AURON\n  // vergleicht sie mit den Bytes auf der Platte, bevor es die Datei\n  // oeffnet -- ein abgebrochener Schreibvorgang faellt damit an einer Zahl\n  // auf und nicht daran, wie kaputt die Datei aussieht.\n  return {\n    json: {\n      media_ref: drive.id,\n      media_type: 'video',\n      image_base64: null,\n      image_media_type: null,\n      video_path: writtenFile.fileName,\n      expected_size_bytes: writtenFile.drive_size_bytes ?? null,\n      // Der Dateiname ist die einzige Aufnahmezeit-Quelle, die ein\n      // Lightroom-Export nicht ueberschreibt: der Video-Encoder schreibt die\n      // Datei neu und stempelt seinen eigenen Export-Moment als creation_time.\n      // Deshalb trug jedes der ersten 30 Videos denselben Nachmittag. AURON\n      // liest ein Datum nur, wenn es am Anfang des Namens steht.\n      file_name: drive.name || null\n    }\n  };\n});"
+        "jsCode": "// Build AURON's payload: images as base64 for the vision endpoint, videos\n// as a path to the file n8n already wrote.\n// AURON never holds a Drive credential itself -- n8n fetches bytes,\n// AURON only ever sees what it's handed.\n//\n// Runs once for ALL items of the current batch on purpose: $('Loop Over\n// Items').all() returns just this batch's items, a plain array read. The\n// per-item form ($('Loop Over Items v7').item) makes n8n trace paired items\n// back through every previous batch, which gets slower each round and\n// eventually times the task runner out on a large folder.\n\n// Die Dauer kommt nicht mehr von hier. Ein mvhd-Parser lief an dieser\n// Stelle, solange unbelegt war, ob er dasselbe liefert wie ffprobe im\n// Backend. Der Vergleich liegt vor: 31 von 31 Dateien, groesste\n// Abweichung 0.000s. Damit war er nur noch eine zweite Quelle fuer eine\n// Zahl, die AURON ohnehin selbst aus der Datei liest -- und zwei Quellen\n// fuer dieselbe Zahl driften irgendwann auseinander.\n\nconst driveItems = $('Loop Over Items v7').all();\n\n// Pfad und Groesse kommen vom Write-Node: fileName ist der Pfad, den er\n// tatsaechlich geschrieben hat -- ein belegter Wert, kein durchgereichter\n// Wunsch.\nconst written = $('Write File To Ingest Dir v9').all();\n\n// Base64 nur fuer Bilder, und nur hier. Frueher machte ein eigener Node\n// 'Extract from File v7' das fuer JEDE Datei, auch fuer Videos, deren\n// Base64 danach niemand las. Ein 403-MB-iPhone-Video sprengte damit die\n// String-Grenze von Node (~512 Mio. Zeichen) und brach den ganzen Lauf ab.\n// Ein Bild ist ein paar MB -- das passt immer.\nconst out = [];\nfor (let i = 0; i < $input.all().length; i++) {\n  const drive = driveItems[i].json;\n  const mediaType = drive.mimeType || 'image/jpeg';\n  const isVideo = mediaType.startsWith('video/');\n\n  if (!isVideo) {\n    const bytes = await this.helpers.getBinaryDataBuffer(i, 'data');\n    out.push({\n      json: {\n        media_ref: drive.id,\n        media_type: 'image',\n        image_base64: bytes.toString('base64'),\n        image_media_type: mediaType,\n        duration_seconds: null\n      }\n    });\n    continue;\n  }\n\n  const writtenFile = written[i].json;\n  if (!writtenFile || !writtenFile.fileName) {\n    // Lieber hier abbrechen als ein Video ohne Pfad losschicken: die API\n    // weist das inzwischen zurueck, aber der Fehler gehoert dorthin, wo die\n    // Ursache sitzt.\n    throw new Error(\n      `Kein geschriebener Pfad fuer ${drive.id} (Index ${i}) -- ` +\n      `Write File To Ingest Dir v9 hat fuer dieses Item kein fileName geliefert.`\n    );\n  }\n\n  // Videos gehen per Pfad, nicht als Base64: eine 19-MB-Datei waere ~26 MB\n  // JSON, eine 403-MB-Datei gar nicht darstellbar.\n  //\n  // expected_size_bytes ist die Groesse, die Drive selbst nennt. AURON\n  // vergleicht sie mit den Bytes auf der Platte, bevor es die Datei\n  // oeffnet -- ein abgebrochener Schreibvorgang faellt damit an einer Zahl\n  // auf und nicht daran, wie kaputt die Datei aussieht.\n  out.push({\n    json: {\n      media_ref: drive.id,\n      media_type: 'video',\n      image_base64: null,\n      image_media_type: null,\n      video_path: writtenFile.fileName,\n      expected_size_bytes: writtenFile.drive_size_bytes ?? null,\n      // Der Dateiname ist die einzige Aufnahmezeit-Quelle, die ein\n      // Lightroom-Export nicht ueberschreibt: der Video-Encoder schreibt die\n      // Datei neu und stempelt seinen eigenen Export-Moment als creation_time.\n      // Deshalb trug jedes der ersten 30 Videos denselben Nachmittag. AURON\n      // liest ein Datum nur, wenn es am Anfang des Namens steht.\n      file_name: drive.name || null\n    }\n  });\n}\nreturn out;"
       },
       "id": "b0bc6c80-69aa-4f7d-9c2f-ced955668b5e",
       "name": "Prepare AURON Payload v7",
@@ -121,12 +121,12 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "http://host.docker.internal:8000/v1/instagram/media-pool/analyze-and-ingest",
+        "url": "http://api:8000/v1/instagram/media-pool/analyze-and-ingest",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ { \"items\": [ $json ] } }}",
         "options": {
-          "timeout": 60000
+          "timeout": 600000
         }
       },
       "id": "9ecdd03b-f92a-4bb1-9904-5b025199faa1",
@@ -137,12 +137,15 @@
         -992,
         176
       ],
-      "notes": "Replace 'auron-api' with your actual AURON api container name if different -- both containers must be on the shared 'jarvis_shared' Docker network (see docs/n8n-instagram-setup.md). Test with the real container hostname, not 'localhost'."
+      "notes": "Replace 'auron-api' with your actual AURON api container name if different -- both containers must be on the shared 'jarvis_shared' Docker network (see docs/n8n-instagram-setup.md). Test with the real container hostname, not 'localhost'.",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
     },
     {
       "parameters": {
         "method": "POST",
-        "url": "http://host.docker.internal:8000/v1/instagram/curate",
+        "url": "http://api:8000/v1/instagram/curate",
         "options": {
           "timeout": 60000
         }
@@ -156,12 +159,15 @@
         176
       ],
       "executeOnce": true,
-      "notes": "Runs once per schedule trigger, after every file in this batch has been ingested -- not once per file. n8n's default 'Run Once for All Items' setting on this node is correct; do not change it to 'Run Once for Each Item'."
+      "notes": "Runs once per schedule trigger, after every file in this batch has been ingested -- not once per file. n8n's default 'Run Once for All Items' setting on this node is correct; do not change it to 'Run Once for Each Item'.",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
     },
     {
       "parameters": {
         "method": "POST",
-        "url": "http://host.docker.internal:8000/v1/notification-hub/process-due",
+        "url": "http://api:8000/v1/notification-hub/process-due",
         "options": {
           "timeout": 30000
         }
@@ -173,26 +179,14 @@
       "position": [
         -512,
         176
-      ]
-    },
-    {
-      "parameters": {
-        "operation": "binaryToPropery",
-        "destinationKey": "image_b64",
-        "options": {}
-      },
-      "type": "n8n-nodes-base.extractFromFile",
-      "typeVersion": 1.1,
-      "position": [
-        -1380,
-        176
       ],
-      "id": "42a42f20-eca2-4fee-a504-a5ef63016464",
-      "name": "Extract from File v7"
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
     },
     {
       "parameters": {
-        "url": "http://host.docker.internal:8000/v1/instagram/media-pool",
+        "url": "http://api:8000/v1/instagram/media-pool",
         "options": {
           "timeout": 60000
         }
@@ -234,7 +228,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Zielpfad im Uebergabeverzeichnis, plus die Groesse, die Drive selbst nennt.\n//\n// Die Zuordnung Drive-Item <-> heruntergeladene Bytes laeuft ueber den Index,\n// genau wie in 'Prepare AURON Payload v7'. Die Kette bleibt deshalb linear:\n// ein Verzweigen und Wiederzusammenfuehren wuerde die Reihenfolge aendern und\n// damit media_ref an die falschen Bytes haengen (batchSize ist 5, nicht 1).\n//\n// Der Name ist deterministisch <drive_id>.<ext>. Der Write-Node oeffnet mit\n// O_TRUNC, ueberschreibt also immer -- eine liegengebliebene Datei ist der\n// wahrscheinlichste Kandidat fuer einen abgebrochenen Download und wird nie\n// wiederverwendet.\nconst drive = $('Loop Over Items v7').all();\n\nfunction extensionFor(mimeType) {\n  if (mimeType === 'video/quicktime') return 'mov';\n  if (mimeType === 'video/x-m4v') return 'm4v';\n  if (mimeType.startsWith('video/')) return 'mp4';\n  return (mimeType.split('/')[1] || 'bin').toLowerCase();\n}\n\nreturn $input.all().map((item, i) => {\n  const file = drive[i].json;\n  const mimeType = file.mimeType || '';\n  item.json.ingest_path = `/data/images/ingest/${file.id}.${extensionFor(mimeType)}`;\n  // Drive liefert size als String; null bleibt null, damit die API weiss,\n  // dass es keine Vergleichsgroesse gibt, statt eine 0 zu pruefen.\n  item.json.drive_size_bytes = file.size == null ? null : Number(file.size);\n  return item;\n});"
+        "jsCode": "// Zielpfad im Uebergabeverzeichnis, plus die Groesse, die Drive selbst nennt.\n//\n// Die Zuordnung Drive-Item <-> heruntergeladene Bytes laeuft ueber den Index,\n// genau wie in 'Prepare AURON Payload v7'. Die Kette bleibt deshalb linear:\n// ein Verzweigen und Wiederzusammenfuehren wuerde die Reihenfolge aendern und\n// damit media_ref an die falschen Bytes haengen (heute batchSize 1 -- die Regel\n// gilt aber fuer jede Groesse, und 1 ist keine Garantie, dass es so bleibt).\n//\n// Der Name ist deterministisch <drive_id>.<ext>. Der Write-Node oeffnet mit\n// O_TRUNC, ueberschreibt also immer -- eine liegengebliebene Datei ist der\n// wahrscheinlichste Kandidat fuer einen abgebrochenen Download und wird nie\n// wiederverwendet.\nconst drive = $('Loop Over Items v7').all();\n\nfunction extensionFor(mimeType) {\n  if (mimeType === 'video/quicktime') return 'mov';\n  if (mimeType === 'video/x-m4v') return 'm4v';\n  if (mimeType.startsWith('video/')) return 'mp4';\n  return (mimeType.split('/')[1] || 'bin').toLowerCase();\n}\n\nreturn $input.all().map((item, i) => {\n  const file = drive[i].json;\n  const mimeType = file.mimeType || '';\n  item.json.ingest_path = `/data/images/ingest/${file.id}.${extensionFor(mimeType)}`;\n  // Drive liefert size als String; null bleibt null, damit die API weiss,\n  // dass es keine Vergleichsgroesse gibt, statt eine 0 zu pruefen.\n  item.json.drive_size_bytes = file.size == null ? null : Number(file.size);\n  return item;\n});"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -264,7 +258,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "http://host.docker.internal:8000/v1/instagram/media-pool/captured-at-from-names",
+        "url": "http://api:8000/v1/instagram/media-pool/captured-at-from-names",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ { \"items\": $('Google Drive: List New Files v7').all().map(i => ({ media_ref: i.json.id, file_name: i.json.name })) } }}",
@@ -285,7 +279,7 @@
     },
     {
       "parameters": {
-        "url": "http://host.docker.internal:8000/v1/instagram/media-pool/pending-uploads",
+        "url": "http://api:8000/v1/instagram/media-pool/pending-uploads",
         "options": {
           "timeout": 60000
         }
@@ -363,7 +357,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "http://host.docker.internal:8000/v1/instagram/media-pool/processed-uploaded",
+        "url": "http://api:8000/v1/instagram/media-pool/processed-uploaded",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ { \"items\": $input.all().map((x, i) => ({ media_ref: $('Je Datei v10').all()[i].json.media_ref, processed_media_ref: x.json.id })) } }}",
@@ -484,17 +478,6 @@
         ]
       ]
     },
-    "Extract from File v7": {
-      "main": [
-        [
-          {
-            "node": "Prepare AURON Payload v7",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "AURON: Load Known Refs v7": {
       "main": [
         [
@@ -532,7 +515,7 @@
       "main": [
         [
           {
-            "node": "Extract from File v7",
+            "node": "Prepare AURON Payload v7",
             "type": "main",
             "index": 0
           }
