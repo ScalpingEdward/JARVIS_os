@@ -13,6 +13,7 @@ from .telegram_instagram.api import router as telegram_instagram_router
 from .position_monitor.api import router as position_monitor_router
 from .account_intake.api import router as account_intake_router
 from .position_monitor.service import position_monitor_service
+from .telegram_inbound.poller import telegram_poller
 from .strategy_orchestrator.api import router as strategy_orchestrator_router
 from .api.routes.auron_demo1_approval_handoff_v21_260 import router as auron_demo1_approval_handoff_v21_260_router
 from .api.routes.auron_demo1_approval_resolution_v21_261 import router as auron_demo1_approval_resolution_v21_261_router
@@ -215,7 +216,12 @@ async def lifespan(app: FastAPI):
     if os.getenv("POSITION_MONITOR_ENABLED", "false").lower() in ("1", "true", "yes"):
         interval = float(os.getenv("POSITION_MONITOR_INTERVAL_SECONDS", "10"))
         position_monitor_service.start(interval)
+    # Same opt-in rule: polling consumes the bot's real update queue, which
+    # a test run must never touch.
+    if os.getenv("TELEGRAM_POLLING_ENABLED", "false").lower() in ("1", "true", "yes"):
+        telegram_poller.start()
     yield
+    await telegram_poller.stop()
     await position_monitor_service.stop()
 
 
