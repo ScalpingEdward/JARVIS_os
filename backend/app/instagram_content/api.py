@@ -142,6 +142,14 @@ def ingest_media(request: MediaPoolIngestRequest) -> MediaPoolIngestResponse:
     return media_pool_service.ingest(request)
 
 
+@router.post("/media-pool/deduplicate")
+def deduplicate_pool(apply: bool = False) -> dict:
+    """Report (and with apply=true, remove) pool rows that hold the same
+    Drive file twice -- the result of two ingest attempts for one file
+    racing each other."""
+    return media_pool_service.deduplicate(apply=apply)
+
+
 @router.post("/media-pool/grade-existing-photos")
 def grade_existing_photos(limit: int = 20) -> dict:
     """Grade up to `limit` photos that entered the pool before photos were

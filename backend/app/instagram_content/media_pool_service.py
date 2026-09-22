@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from datetime import date, datetime, timezone
+import threading
 from uuid import UUID
 
 from app.db import SessionLocal, refuse_reset_in_production
@@ -32,6 +33,12 @@ from .media_pool_models import (
 
 class MediaPoolError(ValueError):
     pass
+
+
+#: One writer at a time for the read-then-insert above. A process-wide lock
+#: is enough while the api runs as a single uvicorn process; a second worker
+#: would need a unique index on media_ref instead.
+_INGEST_LOCK = threading.Lock()
 
 
 class MediaPoolService:
@@ -161,6 +168,85 @@ class MediaPoolService:
             session.commit()
         return ProcessedUploadedResponse(recorded=recorded, unknown_media_ref=unknown)
 
+    def deduplicate(self, apply: bool = False) -> dict:
+        """Find media_refs that are in the pool more than once, and keep one
+        row per ref.
+
+        Kept is the row that most of the work hangs off: one already planned
+        into a draft or a post first, then one with a processed file, then
+        the older. Dry run by default -- this deletes analyses that were paid
+        for, so the report is worth reading before the deletion happens.
+
+        A dropped row is taken out of any draft that reserved it, and a draft
+        left with nothing is discarded. Both halves of a duplicate were
+        planned into different drafts -- that is the damage the duplicate
+        does: the same photo in two posts. Deleting the row alone would swap
+        that for a draft pointing at nothing.
+        """
+        by_ref: dict[str, list[tuple[str, MediaPoolItem]]] = {}
+        with SessionLocal() as session:
+            for row in session.query(InstagramMediaPoolItemRow).all():
+                item = MediaPoolItem.model_validate_json(row.data)
+                by_ref.setdefault(item.media_ref, []).append((row.id, item))
+
+            duplicates = {ref: rows for ref, rows in by_ref.items() if len(rows) > 1}
+            report: list[dict] = []
+            for ref, rows in duplicates.items():
+                ranked = sorted(
+                    rows,
+                    key=lambda pair: (
+                        pair[1].used or pair[1].reserved_in_draft_id is not None,
+                        pair[1].processed_file is not None,
+                    ),
+                    reverse=True,
+                )
+                keep, drop = ranked[0], ranked[1:]
+                report.append({
+                    "media_ref": ref,
+                    "kept": str(keep[1].id),
+                    "dropped": [str(item.id) for _, item in drop],
+                    "dropped_were_planned": [
+                        str(item.id) for _, item in drop
+                        if item.used or item.reserved_in_draft_id is not None
+                    ],
+                })
+                if apply:
+                    for row_id, _ in drop:
+                        session.delete(session.get(InstagramMediaPoolItemRow, row_id))
+
+            dropped_ids = {row_id for entry in report for row_id in entry["dropped"]}
+            drafts_touched, drafts_discarded = self._drop_from_drafts(session, dropped_ids, apply)
+            if apply:
+                session.commit()
+        return {
+            "duplicate_refs": len(duplicates),
+            "applied": apply,
+            "drafts_touched": drafts_touched,
+            "drafts_discarded": drafts_discarded,
+            "details": report,
+        }
+
+    @staticmethod
+    def _drop_from_drafts(session, dropped_ids: set[str], apply: bool) -> tuple[int, int]:
+        touched = 0
+        discarded = 0
+        for row in session.query(InstagramCuratedDraftRow).all():
+            draft = CuratedDraft.model_validate_json(row.data)
+            if draft.finalized or draft.discarded:
+                continue
+            remaining = [i for i in draft.media_item_ids if str(i) not in dropped_ids]
+            if len(remaining) == len(draft.media_item_ids):
+                continue
+            touched += 1
+            if not remaining:
+                discarded += 1
+            if apply:
+                draft.media_item_ids = remaining
+                if not remaining:
+                    draft.discarded = True
+                row.data = draft.model_dump_json()
+        return touched, discarded
+
     def set_processed_file(self, media_ref: str, processed_file: str) -> bool:
         """Record a processed file for an item already in the pool -- the
         photos that were analyzed before photos were graded at all. Clears
@@ -272,6 +358,16 @@ class MediaPoolService:
         return {"filled": filled, "already_had_a_day": already, "no_dated_items": no_date}
 
     def ingest(self, request: MediaPoolIngestRequest) -> MediaPoolIngestResponse:
+        # The duplicate check and the insert have to be one step. They were
+        # not: n8n retries a request whose answer got lost, both attempts
+        # looked up the same media_ref before either had committed, and both
+        # inserted. Five files ended up in the pool twice, each with its own
+        # paid analysis -- and the same photo could then be planned into two
+        # different posts.
+        with _INGEST_LOCK:
+            return self._ingest_locked(request)
+
+    def _ingest_locked(self, request: MediaPoolIngestRequest) -> MediaPoolIngestResponse:
         ingested = 0
         skipped = 0
         updated = 0
