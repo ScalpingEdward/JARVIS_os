@@ -1,0 +1,169 @@
+{
+  "id": "AuronDriveFetch01",
+  "name": "AURON - Drive File Fetch",
+  "active": true,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "auron-drive-file",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "5b0e4c1a-7a51-4d7e-9a0e-0d1f3a6b2c01",
+      "name": "Webhook: /auron-drive-file",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "8f3d2a61-4c7b-4b1e-9f0a-2e6c5d7b9a13",
+      "notes": "AURON holds no Drive credential. When it needs a file's bytes -- a preview for the Telegram approval card -- it asks here with ?id=<drive id> and the X-Auron-Secret header."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Port 5678 is published on the host, so this webhook is reachable from\n// the LAN -- without a check, anyone there could pull any file from the\n// connected Drive by id. The secret lives in AURON's and n8n's env only.\nconst expected = $env.AURON_DRIVE_FETCH_SECRET;\nconst req = $input.first().json;\nconst given = (req.headers || {})['x-auron-secret'];\nif (!expected) {\n  throw new Error('AURON_DRIVE_FETCH_SECRET is not set in n8n -- refusing every request');\n}\nif (given !== expected) {\n  throw new Error('wrong or missing X-Auron-Secret');\n}\nconst id = String((req.query || {}).id || '');\nif (!/^[A-Za-z0-9_-]{10,200}$/.test(id)) {\n  throw new Error('missing or malformed ?id=');\n}\nreturn [{ json: { id } }];"
+      },
+      "id": "5b0e4c1a-7a51-4d7e-9a0e-0d1f3a6b2c02",
+      "name": "Check secret + id",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        0
+      ],
+      "onError": "continueErrorOutput",
+      "notes": "Throws on a missing/wrong secret or a malformed id; the error output answers 403. Without it n8n answered an empty 200 -- no bytes leaked, but it looked like success."
+    },
+    {
+      "parameters": {
+        "operation": "download",
+        "fileId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $json.id }}"
+        },
+        "options": {}
+      },
+      "id": "5b0e4c1a-7a51-4d7e-9a0e-0d1f3a6b2c03",
+      "name": "Google Drive: Download",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        440,
+        0
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "sVwp500LT1RTHHDT",
+          "name": "Google Drive account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "respondWith": "binary",
+        "options": {}
+      },
+      "id": "5b0e4c1a-7a51-4d7e-9a0e-0d1f3a6b2c04",
+      "name": "Respond: file bytes",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        660,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"error\": $json.error?.message || $json.error || 'refused' } }}",
+        "options": {
+          "responseCode": 403
+        }
+      },
+      "id": "5b0e4c1a-7a51-4d7e-9a0e-0d1f3a6b2c05",
+      "name": "Respond: refused",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        440,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"error\": 'Drive download failed: ' + ($json.error?.message || $json.error || 'unknown') } }}",
+        "options": {
+          "responseCode": 502
+        }
+      },
+      "id": "5b0e4c1a-7a51-4d7e-9a0e-0d1f3a6b2c06",
+      "name": "Respond: drive failed",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        660,
+        200
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook: /auron-drive-file": {
+      "main": [
+        [
+          {
+            "node": "Check secret + id",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check secret + id": {
+      "main": [
+        [
+          {
+            "node": "Google Drive: Download",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond: refused",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Drive: Download": {
+      "main": [
+        [
+          {
+            "node": "Respond: file bytes",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond: drive failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  }
+}

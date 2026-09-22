@@ -125,6 +125,9 @@ services:
       # Instagram Graph API (aus .env, nie im Repo)
       AURON_IG_ACCESS_TOKEN: ${AURON_IG_ACCESS_TOKEN}
       AURON_IG_USER_ID: ${AURON_IG_USER_ID}
+      # Shared with the api (via .env): the Drive-fetch webhook refuses any
+      # request without it, since port 5678 is reachable from the LAN.
+      AURON_DRIVE_FETCH_SECRET: ${AURON_DRIVE_FETCH_SECRET}
       # Baseline-Werte des urspruenglichen docker-run-Containers
       N8N_RUNNERS_HEARTBEAT_INTERVAL: "120"
       N8N_RUNNERS_MAX_OLD_SPACE_SIZE: "2048"
