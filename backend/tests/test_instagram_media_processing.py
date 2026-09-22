@@ -22,6 +22,7 @@ from app.instagram_content.media_processing import (
     RATIO_FEED,
     RATIO_REEL,
     MediaProcessingError,
+    is_hdr,
     process_image,
     process_video,
 )
@@ -223,6 +224,74 @@ def test_a_real_lut_is_actually_applied(source_video, monkeypatch, tmp_path):
 
     assert graded.graded is True
     assert graded.path.read_bytes() != plain.path.read_bytes()
+
+
+def test_a_4k_video_is_shrunk_to_what_instagram_shows(tmp_path):
+    """A 4K phone clip comes out at 1080x1920, not at full size -- measured
+    on the file, the same shape, never stretched."""
+    source = tmp_path / "uhd.mp4"
+    subprocess.run(
+        ["ffmpeg", "-y", "-f", "lavfi", "-i", "testsrc=size=2160x3840:rate=25:duration=1",
+         "-c:v", "libx264", "-pix_fmt", "yuv420p", str(source)],
+        capture_output=True, check=True,
+    )
+    result = process_video(source)
+    probe = _probe(result.path)
+    assert (probe["width"], probe["height"]) == (1080, 1920)
+
+
+def test_a_small_video_is_never_upscaled(source_video, tmp_path):
+    small = tmp_path / "small.mp4"
+    subprocess.run(
+        ["ffmpeg", "-y", "-f", "lavfi", "-i", "testsrc=size=720x1280:rate=25:duration=1",
+         "-c:v", "libx264", "-pix_fmt", "yuv420p", str(small)],
+        capture_output=True, check=True,
+    )
+    probe = _probe(process_video(small).path)
+    assert (probe["width"], probe["height"]) == (720, 1280)
+
+
+def _hlg_video(path: Path) -> Path:
+    """Footage tagged the way an iPhone tags its HLG recordings."""
+    subprocess.run(
+        # setparams, not -color_trc: the output flags alone left the stream
+        # tagged "unknown", which is not what an iPhone file looks like.
+        ["ffmpeg", "-y", "-f", "lavfi", "-i", "testsrc=size=1080x1920:rate=25:duration=1",
+         "-vf", "setparams=color_primaries=bt2020:color_trc=arib-std-b67:colorspace=bt2020nc",
+         "-c:v", "libx264", "-pix_fmt", "yuv420p", str(path)],
+        capture_output=True, check=True,
+    )
+    return path
+
+
+def test_hdr_footage_is_detected_from_the_file(tmp_path, source_video):
+    assert is_hdr(_hlg_video(tmp_path / "hlg.mp4")) is True
+    assert is_hdr(source_video) is False
+
+
+def test_hdr_is_detected_the_way_a_real_iphone_file_reports_it(tmp_path, monkeypatch):
+    """ffprobe prints "arib-std-b67," for an iPhone clip -- the trailing
+    comma is its empty side-data list. The generated clip above has none, so
+    it cannot catch this; the first real 4K video did."""
+    from app.instagram_content import media_processing
+
+    monkeypatch.setattr(
+        media_processing, "_run",
+        lambda command: subprocess.CompletedProcess(command, 0, b"arib-std-b67,\n", b""),
+    )
+    assert is_hdr(tmp_path / "any.mov") is True
+
+
+def test_hdr_footage_comes_out_as_sdr(tmp_path):
+    """The LUT is built for Rec.709. What leaves here must be SDR, checked
+    on the output's own tags, and the flag must say so."""
+    result = process_video(_hlg_video(tmp_path / "hlg.mp4"))
+    assert result.tone_mapped is True
+    assert is_hdr(result.path) is False
+
+
+def test_sdr_footage_is_not_tone_mapped(source_video):
+    assert process_video(source_video).tone_mapped is False
 
 
 # -- the chain: does ingest actually produce a processed file? ---------------

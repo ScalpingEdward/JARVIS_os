@@ -54,6 +54,24 @@ _LUT_PATH_ENV = "AURON_COLOR_LUT"
 RATIO_FEED = (4, 5)
 RATIO_REEL = (9, 16)
 
+#: Longest edge a processed video keeps. Instagram shows nothing above
+#: 1080x1920 and re-encodes anything larger down to it, so every pixel past
+#: this is paid for twice -- once here in memory and encode time, once more
+#: when Instagram throws it away. A 4K iPhone clip graded at full size ran
+#: the 3.5 GB Docker VM out of memory at 0.1 fps.
+MAX_VIDEO_EDGE_PX = 1920
+
+#: ffmpeg otherwise starts one worker per core for decoding, filtering and
+#: encoding each, and every one holds its own frames. On an 8-core laptop
+#: with a small VM that alone is enough to hit the memory limit.
+_FFMPEG_THREADS = "2"
+
+#: Transfer functions that mark HDR footage. iPhones record HLG
+#: (arib-std-b67) by default; smpte2084 is PQ, the other common one.
+_HDR_TRANSFERS = frozenset({"arib-std-b67", "smpte2084"})
+
+FFPROBE_BINARY = "ffprobe"
+
 _TIMEOUT_SECONDS = 300.0
 
 
@@ -71,6 +89,7 @@ class ProcessedMedia:
     trimmed_from: float | None = None
     trimmed_to: float | None = None
     graded: bool = False
+    tone_mapped: bool = False
 
     @property
     def was_trimmed(self) -> bool:
@@ -121,10 +140,67 @@ def _crop_filter(ratio: tuple[int, int]) -> str:
     )
 
 
-def _build_video_filters(ratio: tuple[int, int] | None, lut: Path | None) -> list[str]:
+def is_hdr(source: Path) -> bool:
+    """Whether the first video stream carries an HDR transfer function.
+
+    Asked of the file, not assumed from where it came from: a Lightroom
+    export of the same clip is SDR, the untouched iPhone original is HLG.
+    """
+    completed = _run([
+        FFPROBE_BINARY, "-v", "error", "-select_streams", "v:0",
+        "-show_entries", "stream=color_transfer", "-of", "csv=p=0", str(source),
+    ])
+    if completed.returncode != 0:
+        raise MediaProcessingError(
+            f"ffprobe could not read {source.name}: "
+            f"{completed.stderr.decode('utf-8', 'replace').strip()[-400:]}"
+        )
+    # A real iPhone file prints "arib-std-b67," -- the trailing field is its
+    # (empty) side-data list. A generated test clip has none and prints the
+    # bare value, which is why a plain comparison passed every test and
+    # missed every actual HDR video.
+    transfer = completed.stdout.decode("utf-8", "replace").strip().split(",")[0]
+    return transfer in _HDR_TRANSFERS
+
+
+def _fit_filter(max_edge: int) -> str:
+    """Shrink so neither edge exceeds max_edge, keeping the shape. Never
+    upscales -- min() leaves anything already small enough untouched."""
+    return (
+        f"scale='min({max_edge},iw)':'min({max_edge},ih)'"
+        f":force_original_aspect_ratio=decrease:force_divisible_by=2"
+    )
+
+
+#: HDR -> SDR. The LUT is a Lightroom look built on SDR Rec.709; applied to
+#: HLG values it lands on the wrong colours. Linearise, map the highlights
+#: down with hable, and hand the LUT the Rec.709 picture it was made for.
+_TONEMAP_FILTERS = [
+    "zscale=t=linear:npl=100",
+    "format=gbrpf32le",
+    "zscale=p=bt709",
+    "tonemap=tonemap=hable:desat=0",
+    "zscale=t=bt709:m=bt709:r=tv",
+    "format=yuv420p",
+]
+
+
+def _build_video_filters(
+    ratio: tuple[int, int] | None,
+    lut: Path | None,
+    *,
+    max_edge: int | None = None,
+    tone_map: bool = False,
+) -> list[str]:
+    # Order matters for cost: crop and shrink first, so the tone map and the
+    # LUT -- both per-pixel float work -- only ever see the pixels that ship.
     filters = []
     if ratio is not None:
         filters.append(_crop_filter(ratio))
+    if max_edge is not None:
+        filters.append(_fit_filter(max_edge))
+    if tone_map:
+        filters.extend(_TONEMAP_FILTERS)
     if lut is not None:
         # ffmpeg's filter syntax treats ':' and '\' specially; a Windows-style
         # path would otherwise be read as further filter arguments.
@@ -161,8 +237,11 @@ def process_video(
             )
 
     lut = lut_path()
+    tone_map = is_hdr(source)
     destination = _destination(source, output_name)
-    command = [FFMPEG_BINARY, "-y"]
+    # -threads before -i limits the decoder, after it the encoder;
+    # -filter_threads covers the filter graph in between.
+    command = [FFMPEG_BINARY, "-y", "-threads", _FFMPEG_THREADS, "-filter_threads", _FFMPEG_THREADS]
     if trim_start_seconds is not None:
         # Before -i: ffmpeg seeks rather than decoding and discarding.
         command += ["-ss", f"{trim_start_seconds:.3f}"]
@@ -170,10 +249,10 @@ def process_video(
     if trim_end_seconds is not None:
         command += ["-t", f"{trim_end_seconds - trim_start_seconds:.3f}"]
 
-    filters = _build_video_filters(ratio, lut)
-    if filters:
-        command += ["-vf", ",".join(filters)]
+    filters = _build_video_filters(ratio, lut, max_edge=MAX_VIDEO_EDGE_PX, tone_map=tone_map)
+    command += ["-vf", ",".join(filters)]
     command += [
+        "-threads", _FFMPEG_THREADS,
         "-c:v", "libx264", "-preset", "medium", "-crf", "18",
         "-pix_fmt", "yuv420p",       # what every player and Instagram expects
         "-movflags", "+faststart",   # metadata at the front, so playback starts immediately
@@ -193,6 +272,7 @@ def process_video(
         trimmed_from=trim_start_seconds,
         trimmed_to=trim_end_seconds,
         graded=lut is not None,
+        tone_mapped=tone_map,
     )
 
 
