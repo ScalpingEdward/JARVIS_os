@@ -3,7 +3,9 @@ from __future__ import annotations
 import base64
 import logging
 import os
+import tempfile
 from datetime import datetime
+from pathlib import Path
 from io import BytesIO
 
 from PIL import Image
@@ -19,7 +21,7 @@ from .media_pool_models import (
     MediaPoolItemCreate,
     TrimAnalysisResult,
 )
-from .media_processing import MediaProcessingError, process_video
+from .media_processing import MediaProcessingError, process_image, process_video
 from .media_pool_service import MediaPoolService
 from .models import MediaType
 from .reel_targets import needs_trim, target_max_seconds, target_min_seconds
@@ -226,6 +228,28 @@ def _process_now(
     return processed.path.name
 
 
+def grade_photo_bytes(data: bytes, media_ref: str) -> str | None:
+    """Grade a photo in Brano's look while its bytes are in hand -- the
+    original full-size bytes, not the copy shrunk for the vision call.
+
+    No crop: whether it becomes a 4:5 slide or something else is decided by
+    curation later, and cropping now would cost pixels twice. Not fatal on
+    failure, same as a video: the analysis is real either way, and a missing
+    processed_file says plainly that nothing was graded.
+    """
+    handle = tempfile.NamedTemporaryFile(suffix=".img", delete=False)
+    try:
+        handle.write(data)
+        handle.close()
+        processed = process_image(Path(handle.name), ratio=None, output_name=f"{media_ref}.jpg")
+    except MediaProcessingError as exc:
+        logger.warning("could not grade photo %s, keeping the analysis without it: %s", media_ref, exc)
+        return None
+    finally:
+        Path(handle.name).unlink(missing_ok=True)
+    return processed.path.name
+
+
 def _trim_note(trim: "TrimAnalysisResult | None") -> str:
     if trim is None:
         return ""
@@ -428,6 +452,10 @@ def analyze_and_ingest(
                 source_group=item.source_group,
                 captured_at=captured_at,
                 captured_at_source=captured_at_source,
+                processed_file=(
+                    grade_photo_bytes(base64.b64decode(item.image_base64), item.media_ref)
+                    if item.media_type == MediaType.image and item.image_base64 else None
+                ),
             )
         )
         results.append(

@@ -32,6 +32,7 @@ import logging
 import os
 import shutil
 import subprocess
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -60,6 +61,11 @@ RATIO_REEL = (9, 16)
 #: when Instagram throws it away. A 4K iPhone clip graded at full size ran
 #: the 3.5 GB Docker VM out of memory at 0.1 fps.
 MAX_VIDEO_EDGE_PX = 1920
+
+#: Photos keep more than a video frame: Brano posts carousels himself from
+#: the app, which scales down on its own, and a crop to 4:5 may still come
+#: later. 2560 px leaves room for that without shipping 12 MP originals.
+MAX_PHOTO_EDGE_PX = 2560
 
 #: ffmpeg otherwise starts one worker per core for decoding, filtering and
 #: encoding each, and every one holds its own frames. On an 8-core laptop
@@ -276,11 +282,33 @@ def process_video(
     )
 
 
+def _upright_copy(source: Path) -> Path | None:
+    """ffmpeg ignores the EXIF orientation flag, so a portrait phone photo
+    stored sideways would come out sideways. Pillow applies the flag; the
+    upright pixels go to a temp file that ffmpeg then grades. None when the
+    file is already upright (or Pillow cannot read it -- ffmpeg gets the
+    original and fails loudly on its own if it cannot either)."""
+    try:
+        from PIL import Image, ImageOps
+
+        with Image.open(source) as image:
+            if image.getexif().get(0x0112, 1) == 1:
+                return None
+            upright = ImageOps.exif_transpose(image)
+            handle = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
+            handle.close()
+            upright.save(handle.name, format="PNG")
+            return Path(handle.name)
+    except Exception:  # noqa: BLE001
+        return None
+
+
 def process_image(
     source: Path,
     *,
     ratio: tuple[int, int] | None = RATIO_FEED,
     output_name: str | None = None,
+    max_edge: int | None = MAX_PHOTO_EDGE_PX,
 ) -> ProcessedMedia:
     """Crop and grade one photo into a new file.
 
@@ -294,13 +322,18 @@ def process_image(
 
     lut = lut_path()
     destination = _destination(source, output_name)
-    filters = _build_video_filters(ratio, lut)
-    command = [FFMPEG_BINARY, "-y", "-i", str(source)]
+    upright = _upright_copy(source)
+    filters = _build_video_filters(ratio, lut, max_edge=max_edge)
+    command = [FFMPEG_BINARY, "-y", "-i", str(upright or source)]
     if filters:
         command += ["-vf", ",".join(filters)]
     command += ["-q:v", "2", str(destination)]
 
-    completed = _run(command)
+    try:
+        completed = _run(command)
+    finally:
+        if upright is not None:
+            upright.unlink(missing_ok=True)
     if completed.returncode != 0 or not destination.is_file():
         raise MediaProcessingError(
             f"ffmpeg could not process {source.name}: "

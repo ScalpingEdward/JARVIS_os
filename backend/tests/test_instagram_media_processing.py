@@ -367,3 +367,68 @@ class _FixedTrim:
             recommended_end_seconds=self._end,
             reasoning="fixed for the test",
         )
+
+
+# -- photos: orientation, size, graded at ingest ------------------------------
+
+
+def _photo_with_orientation(path: Path, size=(400, 200), orientation=6) -> Path:
+    from PIL import Image
+
+    image = Image.new("RGB", size, (200, 120, 40))
+    exif = image.getexif()
+    exif[0x0112] = orientation  # 6 = "rotate 90 CW to display", how an iPhone stores portrait shots
+    image.save(path, format="JPEG", exif=exif.tobytes())
+    return path
+
+
+def test_a_photo_stored_sideways_comes_out_upright(tmp_path):
+    """ffmpeg ignores the EXIF orientation flag; a portrait phone photo
+    would otherwise be graded -- and posted -- lying on its side."""
+    from PIL import Image
+
+    result = process_image(_photo_with_orientation(tmp_path / "portrait.jpg"), ratio=None)
+    assert Image.open(result.path).size == (200, 400)
+
+
+def test_a_12mp_photo_is_capped_but_keeps_its_shape(tmp_path):
+    source = tmp_path / "big.jpg"
+    subprocess.run(["ffmpeg", "-y", "-f", "lavfi", "-i", "testsrc=size=4032x3024", "-frames:v", "1", str(source)],
+                   capture_output=True, check=True)
+    from PIL import Image
+
+    assert Image.open(process_image(source, ratio=None).path).size == (2560, 1920)
+
+
+def test_ingest_grades_a_photo_from_its_original_bytes(tmp_path, monkeypatch):
+    import base64
+    import json as json_module
+
+    import httpx
+
+    from app.instagram_content.analyze_and_ingest import analyze_and_ingest
+    from app.instagram_content.media_pool_models import MediaAnalyzeAndIngestItem
+    from app.instagram_content.media_pool_service import MediaPoolService
+    from app.instagram_content.vision_analysis import AnthropicVisionAnalyzer, VisionAnalysisConfig
+
+    photo = _photo_with_orientation(tmp_path / "p.jpg", size=(300, 200), orientation=1)
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"content": [{"type": "text", "text": json_module.dumps(
+            {"theme": "beach", "tags": ["beach"], "aesthetic_score": 0.8, "reasoning": "ok"}
+        )}]})
+
+    pool = MediaPoolService()
+    pool.reset()
+    analyze_and_ingest(
+        [MediaAnalyzeAndIngestItem(media_ref="photo-1", media_type="image",
+                                   image_base64=base64.b64encode(photo.read_bytes()).decode(),
+                                   image_media_type="image/jpeg")],
+        AnthropicVisionAnalyzer(config=VisionAnalysisConfig(api_key="k"),
+                                client=httpx.Client(transport=httpx.MockTransport(handler))),
+        pool,
+    )
+    item = pool.list_all()[0]
+    assert item.processed_file == "photo-1.jpg"
+    assert (Path(os.environ["JARVIS_PROCESSED_DIR"]) / "photo-1.jpg").is_file()
+    assert pool.pending_uploads().count == 1, "the graded photo must be queued for upload like a video"

@@ -142,6 +142,16 @@ def ingest_media(request: MediaPoolIngestRequest) -> MediaPoolIngestResponse:
     return media_pool_service.ingest(request)
 
 
+@router.post("/media-pool/grade-existing-photos")
+def grade_existing_photos(limit: int = 20) -> dict:
+    """Grade up to `limit` photos that entered the pool before photos were
+    graded at ingest. Call repeatedly until `remaining` is 0; each call
+    fetches the originals from Drive through n8n."""
+    from .photo_backfill import grade_existing_photos as run
+
+    return run(limit=max(1, min(limit, 50)))
+
+
 @router.get("/media-pool/pending-uploads", response_model=PendingUploadList)
 def pending_uploads() -> PendingUploadList:
     """Processed files that exist only on disk so far.

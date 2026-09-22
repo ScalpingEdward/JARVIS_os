@@ -161,6 +161,26 @@ class MediaPoolService:
             session.commit()
         return ProcessedUploadedResponse(recorded=recorded, unknown_media_ref=unknown)
 
+    def set_processed_file(self, media_ref: str, processed_file: str) -> bool:
+        """Record a processed file for an item already in the pool -- the
+        photos that were analyzed before photos were graded at all. Clears
+        processed_media_ref so the next ingest run uploads the new file.
+        False if the media_ref is unknown."""
+        with SessionLocal() as session:
+            row = (
+                session.query(InstagramMediaPoolItemRow)
+                .filter(InstagramMediaPoolItemRow.media_ref == media_ref)
+                .first()
+            )
+            if row is None:
+                return False
+            item = MediaPoolItem.model_validate_json(row.data)
+            item.processed_file = processed_file
+            item.processed_media_ref = None
+            row.data = item.model_dump_json()
+            session.commit()
+        return True
+
     def captured_at_from_names(self, request: CapturedAtFromNameRequest) -> CapturedAtFromNameResponse:
         """Recovers a capture date from a file name, for items already in
         the pool with a real analysis.
