@@ -44,6 +44,20 @@ Ziel der Instagram-Seite: Reichweite aufbauen fuer den Weg zum hauptberuflichen 
   keine erfundenen Tags.
 - Kein Pillar zweimal hintereinander, kein gleiches visuelles Muster in
   benachbarten Grid-Plaetzen. Bild 1 eines Carousels ist der Hook.
+- Musik ist Pflicht-Atmosphaere (Brano, 2026-09-22). Daraus folgt der
+  Veroeffentlichungsweg:
+  * Carousels + Einzelfotos: halbautomatisch. Karte mit Vorschau in
+    Reihenfolge -> Freigabe -> Bot schickt Dateien in voller Qualitaet +
+    Caption/Hashtags zum Kopieren -> Brano postet in der App mit Musik ->
+    Button "Gepostet". Grund: keine API (auch nicht Meta) kann Musik an
+    Fotos/Carousels haengen.
+  * Reels: vollautomatisch. AURON waehlt Musik ueber die Instagram Audio API
+    (audio_id, nur Reels, nur "Instagram API with Facebook Login" -- wir
+    laufen aktuell ueber Instagram Login, Umstellung noetig), Brano gibt frei,
+    AURON postet. Spricht Brano im Video: Musik leise darunter
+    (audio_volume/video_volume) oder keine.
+  * Zeiten: Reels 19:00, Fotos/Carousels 12:00, Di-Do bevorzugt. Nach
+    4 Wochen gegen eigene Insights pruefen.
 
 ## Aktueller Stand und offene Punkte
 - Reel-Pfad (media_type=REELS, Status-Polling bis FINISHED, mvhd-Duration-Parsing)
