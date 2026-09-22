@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import re
 from dataclasses import dataclass, field
 
 import httpx
@@ -29,6 +30,13 @@ DEFAULT_BRAND_VOICE = (
 
 class CaptionWriterError(RuntimeError):
     pass
+
+
+_HASHTAG = re.compile(r"(?<![\w#])#\w+")
+
+
+def count_hashtags(caption: str) -> int:
+    return len(_HASHTAG.findall(caption))
 
 
 @dataclass(frozen=True)
@@ -78,13 +86,38 @@ class AnthropicCaptionWriter:
         )
 
     def generate(self, theme: str, media_items: list[MediaPoolItem], post_format: str) -> str:
+        """Write the caption, and check the one rule the model demonstrably
+        skips: the first real card went out with no hashtags at all although
+        the prompt demanded 3-5. The count is checked here, one corrective
+        retry is made, and a caption that still misses fails loudly instead
+        of reaching the phone looking finished."""
         if not self.config.api_key:
             raise CaptionWriterError(
                 "ANTHROPIC_API_KEY is not set -- AURON cannot generate a caption without it. "
                 "Set it in the backend's environment, or supply caption_draft explicitly instead."
             )
 
+        strategy = platform_strategy_store.current()
+        low, high = strategy.optimal_hashtag_min, strategy.optimal_hashtag_max
         prompt = self._build_prompt(theme, media_items, post_format)
+        caption = self._complete(prompt)
+        count = count_hashtags(caption)
+        if low <= count <= high:
+            return caption
+
+        caption = self._complete(
+            prompt
+            + f"\nYour previous answer contained {count} hashtags. That is not allowed: "
+            f"end the caption with between {low} and {high} hashtags, each a real, narrow topic label."
+        )
+        count = count_hashtags(caption)
+        if low <= count <= high:
+            return caption
+        raise CaptionWriterError(
+            f"caption still has {count} hashtags after a corrective retry (need {low}-{high}) -- not sending it"
+        )
+
+    def _complete(self, prompt: str) -> str:
         client, should_close = (self._client, False) if self._client else (httpx.Client(), True)
         try:
             response = client.post(

@@ -40,6 +40,42 @@ def test_generate_returns_the_model_text():
     assert "Quiet mornings" in caption
 
 
+def test_a_caption_without_hashtags_gets_one_corrective_retry():
+    """The first real card went out with no hashtags although the prompt
+    demanded 3-5. The count is checked, and the retry says what was wrong."""
+    prompts: list[str] = []
+    answers = iter(["Nobody claps at the top of a mountain.", "Nobody claps. #trading #discipline #patience"])
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        prompts.append(json.loads(request.content)["messages"][0]["content"])
+        return _anthropic_text_response(next(answers))
+
+    writer = AnthropicCaptionWriter(
+        config=CaptionWriterConfig(api_key="k"), client=httpx.Client(transport=httpx.MockTransport(handler))
+    )
+    assert writer.generate("t", [], "carousel").endswith("#patience")
+    assert len(prompts) == 2
+    assert "contained 0 hashtags" in prompts[1]
+
+
+def test_a_caption_that_misses_the_hashtag_range_twice_is_refused():
+    def handler(request: httpx.Request) -> httpx.Response:
+        return _anthropic_text_response("Text. #a #b #c #d #e #f #g")
+
+    writer = AnthropicCaptionWriter(
+        config=CaptionWriterConfig(api_key="k"), client=httpx.Client(transport=httpx.MockTransport(handler))
+    )
+    with pytest.raises(CaptionWriterError, match="7 hashtags"):
+        writer.generate("t", [], "carousel")
+
+
+def test_count_hashtags_ignores_things_that_only_look_like_one():
+    from app.instagram_content.caption_writer import count_hashtags
+
+    assert count_hashtags("Level #1 kept. #trading #gym\n#food") == 4
+    assert count_hashtags("mail me: a#b, C# ist eine Sprache, ##") == 0
+
+
 def test_generate_sends_the_real_api_key_and_model():
     captured: dict = {}
 
