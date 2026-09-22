@@ -52,5 +52,31 @@ Ziel der Instagram-Seite: Reichweite aufbauen fuer den Weg zum hauptberuflichen 
 - Schedule-Trigger im Drive-Ingest-Workflow steht auf 20 Minuten statt taeglich 09:00.
 - Pillar-Feld (Trading/Portrait/Gym/Essen/Travel) fehlt noch im Datenmodell.
 - Secrets rotieren.
-- Docker Desktop RAM anheben.
+- Docker Desktop RAM: Laptop hat nur 7,4 GB, Docker-VM ~3,5 GB -- anheben geht
+  kaum. Deshalb: Ingest-Loop verarbeitet 1 Datei pro Runde, ffmpeg auf 2
+  Threads, Videos werden auf max. 1920 px Kante verkleinert (4K HDR lief sonst
+  in OOMKilled).
 - Content-Status rejected ist reversibel, post_failed ist retry-faehig.
+- Geplant: Kennzeichen-Engine -- Auto-Kennzeichen in Fotos/Videos erkennen und
+  unkenntlich machen, beim Ingest (gleiche Stelle wie Schnitt/Grading, solange
+  die Datei noch existiert). Eigener Baustein, nicht nebenbei.
+- Geplant: Tagesregel + Duplikat-Filter (ein Shooting -> ein Post, fast gleiche
+  Bilder raus), danach Score-Kriterien schaerfen (Hook, Themenbezug,
+  Einzigartigkeit, Technik, Grid-Nachbarn). Starke Videos als Reel, gute
+  Videos duerfen ins gemischte Carousel.
+- Offen: Publish-Webhook nimmt immer das Drive-Original, nie processed_media_ref
+  -> gegradete Videos werden nicht gepostet, HEIC wuerde bei Instagram
+  scheitern (nur JPG). Fix: HEIC beim Ingest -> JPG (pillow-heif), Publish auf
+  processed_media_ref umstellen. Bis dahin HEIC vor dem Upload lokal umwandeln,
+  Live-Photo-MOVs (gleicher Name wie HEIC, <3 s) nicht hochladen.
+  Dazu gehoert: Fotos beim Ingest ebenfalls graden (process_image existiert,
+  wird nicht aufgerufen) und nach "AURON fertig" hochladen. Erst danach
+  duerfen Originale im Drive-Upload-Ordner geloescht werden -- vorher zeigen
+  alle Pool-Eintraege auf sie.
+- Offen: 34 Videos ohne bearbeitete Fassung (30 alte von vor der
+  Ingest-Bearbeitung, 4 wo ffmpeg vor dem Speicher-Fix starb) nachholen;
+  3 bearbeitete Videos noch nicht in Drive (naechster Lauf nimmt sie mit).
+- Offen: Curation laeuft nach jeder einzelnen Datei statt einmal am Ende.
+- Offen: n8n-SQLite ~1,5 GB, "Database connection timed out" -- verliert
+  gelegentlich einzelne Requests (API-Nodes haben deshalb 3 Retries).
+- Drive: Google One 100 GB seit 2026-09-22 (15 GB waren voll -> 403 beim Upload).
