@@ -18,11 +18,12 @@ from app.db import SessionLocal, refuse_reset_in_production
 from app.db_models import TelegramInstagramAuditRow
 from app.instagram_content.media_pool_models import FinalizeDraftRequest
 from app.instagram_content.media_pool_service import media_pool_service
-from app.instagram_content.models import ContentCandidate, ContentDecision, ContentStatus
+from app.instagram_content.models import ContentCandidate, ContentDecision, ContentStatus, MediaType
 from app.instagram_content.service import InstagramContentError, instagram_content_service
 from app.notification_hub.telegram_delivery import TelegramDeliveryClient, TelegramDeliveryError
 
 from . import tokens
+from .preview import PostPreviewSender, PreviewError
 from .models import (
     InstagramAuditRecord,
     NotifyResult,
@@ -38,29 +39,43 @@ class TelegramInstagramError(RuntimeError):
     pass
 
 
-def _format_card(candidate: ContentCandidate) -> str:
-    """Everything needed to decide, and nothing that needs a second screen.
+def _escape_markdown(text: str) -> str:
+    """The card is sent with legacy Markdown; an underscore in a hashtag
+    like #trading_life would otherwise open an italic span and Telegram
+    rejects the whole message."""
+    for char in ("\\", "_", "*", "`", "["):
+        text = text.replace(char, "\\" + char)
+    return text
 
-    No preview image: AURON holds no Drive credentials and never has the
-    file, only its reference. Saying the media_ref plainly is honest about
-    that -- a card that looked like it had seen the photo would be worse
-    than one that admits it has not.
+
+def _format_card(candidate: ContentCandidate, preview_problem: str | None = None) -> str:
+    """Everything needed to decide. The post itself arrives just above this
+    card as numbered photos/videos (see preview.py); if that failed, the
+    card says so in its first lines rather than pretending it was shown.
     """
-    lines = [
+    lines = []
+    if preview_problem:
+        lines += [f"⚠️ Vorschau fehlt: {_escape_markdown(preview_problem)}", ""]
+    lines += [
         f"*Instagram: {candidate.post_format.value} zur Freigabe*",
         f"{len(candidate.media_items)} Medium/Medien"
         f" · Score {sum(m.aesthetic_score for m in candidate.media_items) / len(candidate.media_items):.2f}",
         "",
-        candidate.caption_draft[:600],
+        _escape_markdown(candidate.caption_draft[:900]),
     ]
+    if len(candidate.media_items) > 1:
+        # The preview above is a Telegram album, which lays the items out as
+        # a collage -- the posting order is not obvious from it.
+        kinds = ["Video" if m.media_type == MediaType.video else "Foto" for m in candidate.media_items]
+        order = " → ".join(f"{i + 1} {k}" + (" (Hook)" if i == 0 else "") for i, k in enumerate(kinds))
+        lines += ["", f"Reihenfolge: {order}"]
     if candidate.edit_warnings:
         lines += ["", "⚠️ " + "\n⚠️ ".join(candidate.edit_warnings)]
     if candidate.moderation_warnings:
         lines += ["", "Moderation: " + "; ".join(candidate.moderation_warnings)]
     if candidate.hook_warnings:
         lines += ["", "Hook: " + "; ".join(candidate.hook_warnings)]
-    lines += ["", "Dateien: " + ", ".join(m.media_ref for m in candidate.media_items[:5])]
-    lines += [f"`{candidate.id}`"]
+    lines += ["", f"`{candidate.id}`"]
     return "\n".join(lines)
 
 
@@ -73,9 +88,11 @@ class TelegramInstagramService:
         self,
         config: TelegramInstagramConfig | None = None,
         client: TelegramDeliveryClient | None = None,
+        preview: PostPreviewSender | None = None,
     ) -> None:
         self.config = config or TelegramInstagramConfig()
         self._client = client or TelegramDeliveryClient()
+        self._preview = preview or PostPreviewSender()
 
     # --------------------------------------------------------------- audit
 
@@ -162,6 +179,15 @@ class TelegramInstagramService:
                 f"candidate {candidate_id} is {candidate.status.value}, not awaiting a decision"
             )
 
+        preview_problem = None
+        try:
+            self._preview.send(candidate)
+        except PreviewError as exc:
+            # Still send the card: the decision can wait for a retry, but
+            # Brano should see that something is missing rather than nothing.
+            preview_problem = str(exc)
+            self._record("preview", False, preview_problem, candidate_id)
+
         secret = self.config.callback_secret
         keyboard = [[
             {"text": "✅ Freigeben",
@@ -169,8 +195,16 @@ class TelegramInstagramService:
             {"text": "❌ Ablehnen",
              "callback_data": tokens.make_token(secret, candidate_id, tokens.DECLINE)},
         ]]
+        count = len(candidate.media_items)
+        if count > 1:
+            removes = [
+                {"text": f"{i + 1} raus",
+                 "callback_data": tokens.make_token(secret, candidate_id, tokens.remove_action(i))}
+                for i in range(min(count, 10))
+            ]
+            keyboard += [removes[i:i + 5] for i in range(0, len(removes), 5)]
         try:
-            message_id = self._client.send_with_keyboard(_format_card(candidate), keyboard)
+            message_id = self._client.send_with_keyboard(_format_card(candidate, preview_problem), keyboard)
         except TelegramDeliveryError as exc:
             self._record("notify", False, str(exc), candidate_id)
             raise TelegramInstagramError(f"could not deliver the card: {exc}") from exc
@@ -254,6 +288,28 @@ class TelegramInstagramService:
             self._safe_send(f"Schon entschieden: {current.status.value}.")
             return current
 
+        # Whatever was tapped, this card is spent: a removal shifts every
+        # position after it, and a decision ends the card's purpose. Leaving
+        # the buttons would invite a second tap on a stale layout.
+        message_id = (query.get("message") or {}).get("message_id")
+        if message_id is not None:
+            self._safe_clear_keyboard(int(message_id))
+
+        if action in tokens.REMOVE_ACTIONS:
+            index = int(action)
+            try:
+                updated = instagram_content_service.remove_media_item(
+                    candidate_id, index, f"Telegram tap by {actor or 'unknown'}"
+                )
+            except InstagramContentError as exc:
+                self._record("remove", False, str(exc), candidate_id, actor)
+                self._safe_send(f"Konnte Nr. {index + 1} nicht entfernen: {exc}")
+                raise TelegramInstagramError(str(exc)) from exc
+            self._record("remove", True, f"item {index + 1}", candidate_id, actor)
+            self._safe_send(f"Nr. {index + 1} ist raus. Neue Vorschau kommt.")
+            self.notify(candidate_id)
+            return updated
+
         approved = action == tokens.PUBLISH_OK
         decision = ContentDecision(
             approved=approved,
@@ -274,6 +330,12 @@ class TelegramInstagramService:
         else:
             self._safe_send("Abgelehnt. Die Medien bleiben vergeben, der Post geht nicht raus.")
         return decided
+
+    def _safe_clear_keyboard(self, message_id: int) -> None:
+        try:
+            self._client.clear_keyboard(message_id)
+        except TelegramDeliveryError as exc:
+            log.warning("telegram_instagram: could not clear the old card's buttons: %s", exc)
 
     def _safe_send(self, message: str) -> None:
         """A confirmation nobody depends on. The decision is already

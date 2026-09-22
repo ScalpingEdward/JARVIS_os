@@ -52,6 +52,23 @@ class FakeTelegram:
     def get_me(self) -> dict:
         return {"username": "auron_bot"}
 
+    def clear_keyboard(self, message_id: int) -> None:
+        self.cleared = getattr(self, "cleared", []) + [message_id]
+
+
+class FakePreview:
+    """Stands in for the photo/video upload; records which posts were shown."""
+
+    def __init__(self, fail_with: Exception | None = None) -> None:
+        self.shown: list[list[str]] = []
+        self.fail_with = fail_with
+
+    def send(self, candidate) -> int:
+        if self.fail_with:
+            raise self.fail_with
+        self.shown.append([m.media_ref for m in candidate.media_items])
+        return len(candidate.media_items)
+
 
 @pytest.fixture(autouse=True)
 def _clean():
@@ -61,10 +78,12 @@ def _clean():
     yield
 
 
-def _service(client: FakeTelegram | None = None, secret: str | None = SECRET, chat: str | None = CHAT):
+def _service(client: FakeTelegram | None = None, secret: str | None = SECRET, chat: str | None = CHAT,
+             preview: FakePreview | None = None):
     return TelegramInstagramService(
         config=TelegramInstagramConfig(callback_secret=secret, allowed_chat_id=chat),
         client=client or FakeTelegram(),
+        preview=preview or FakePreview(),
     )
 
 
@@ -292,3 +311,91 @@ def test_status_is_honest_when_nothing_is_configured():
 
     assert status.callback_secret_configured is False
     assert status.allowed_chat_configured is False
+
+
+# -- preview, removing an item ----------------------------------------------
+
+
+def _carousel(refs=("a", "b", "c")):
+    return InstagramContentService().propose(ContentCandidateCreate(
+        media_items=[MediaItem(media_ref=r, media_type="image", aesthetic_score=0.7) for r in refs],
+        caption_draft=CAPTION,
+    ))
+
+
+def _tap_on(candidate_id: UUID, action: str, message_id: int = 555) -> dict:
+    tap = _tap(candidate_id, action)
+    tap["callback_query"]["message"]["message_id"] = message_id
+    return tap
+
+
+def test_the_post_is_shown_before_the_card_and_every_item_can_be_taken_out():
+    telegram, preview = FakeTelegram(), FakePreview()
+    candidate = _carousel()
+    _service(telegram, preview=preview).notify(candidate.id)
+
+    assert preview.shown == [["a", "b", "c"]]
+    text, keyboard = telegram.sent[0]
+    labels = [button["text"] for row in keyboard for button in row]
+    assert labels == ["✅ Freigeben", "❌ Ablehnen", "1 raus", "2 raus", "3 raus"]
+
+
+def test_a_single_item_post_offers_no_remove_button():
+    telegram = FakeTelegram()
+    _service(telegram).notify(_candidate().id)
+    labels = [button["text"] for row in telegram.sent[0][1] for button in row]
+    assert labels == ["✅ Freigeben", "❌ Ablehnen"]
+
+
+def test_tapping_2_raus_removes_that_item_and_shows_the_post_again():
+    telegram, preview = FakeTelegram(), FakePreview()
+    candidate = _carousel()
+    service = _service(telegram, preview=preview)
+
+    updated = service.handle_update(_tap_on(candidate.id, tokens.remove_action(1)))
+
+    assert [m.media_ref for m in updated.media_items] == ["a", "c"]
+    assert updated.status == ContentStatus.proposed
+    assert preview.shown == [["a", "c"]]
+    assert telegram.cleared == [555]
+    assert any("Nr. 2 ist raus" in m for m in telegram.plain)
+
+
+def test_a_decision_also_takes_the_buttons_off_the_old_card():
+    telegram = FakeTelegram()
+    candidate = _carousel()
+    _service(telegram).handle_update(_tap_on(candidate.id, tokens.DECLINE))
+    assert telegram.cleared == [555]
+
+
+def test_a_failed_preview_still_sends_the_card_but_says_what_is_missing():
+    from app.telegram_instagram.preview import PreviewError
+
+    telegram = FakeTelegram()
+    candidate = _carousel()
+    _service(telegram, preview=FakePreview(fail_with=PreviewError("n8n fetch answered 403"))).notify(candidate.id)
+    assert telegram.sent[0][0].startswith("⚠️ Vorschau fehlt: n8n fetch answered 403")
+
+
+def test_an_underscore_in_a_hashtag_cannot_break_the_card():
+    from app.telegram_instagram.service import _format_card
+
+    candidate = InstagramContentService().propose(ContentCandidateCreate(
+        media_items=[MediaItem(media_ref="x", media_type="image", aesthetic_score=0.7)],
+        caption_draft="Quiet. #trading_life #gym #food",
+    ))
+    assert r"#trading\_life" in _format_card(candidate)
+
+
+def test_the_card_spells_out_the_posting_order():
+    from app.telegram_instagram.service import _format_card
+
+    candidate = InstagramContentService().propose(ContentCandidateCreate(
+        media_items=[
+            MediaItem(media_ref="a", media_type="image", aesthetic_score=0.7),
+            MediaItem(media_ref="b", media_type="video", aesthetic_score=0.7, duration_seconds=10.0),
+            MediaItem(media_ref="c", media_type="image", aesthetic_score=0.7),
+        ],
+        caption_draft=CAPTION,
+    ))
+    assert "Reihenfolge: 1 Foto (Hook) → 2 Video → 3 Foto" in _format_card(candidate)

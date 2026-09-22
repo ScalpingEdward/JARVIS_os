@@ -17,7 +17,17 @@ from uuid import UUID
 
 PUBLISH_OK = "p"
 DECLINE = "d"
-_ACTIONS = {PUBLISH_OK, DECLINE}
+#: "Take item N out of this post" -- one digit per position, 0-based. A
+#: digit rather than a letter keeps it clear of every other module's
+#: alphabet, and ten covers Instagram's own carousel maximum.
+REMOVE_ACTIONS = frozenset("0123456789")
+_ACTIONS = {PUBLISH_OK, DECLINE} | REMOVE_ACTIONS
+
+
+def remove_action(index: int) -> str:
+    if not 0 <= index <= 9:
+        raise TokenError(f"no remove action for position {index}")
+    return str(index)
 _SIG_LEN = 12
 
 

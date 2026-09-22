@@ -77,6 +77,27 @@ class TelegramDeliveryClient:
             raise TelegramDeliveryError(f"Telegram API response had no message_id: {result}")
         return int(message_id)
 
+    def clear_keyboard(self, message_id: int) -> None:
+        """Remove the buttons from an already sent message, so a spent card
+        cannot be tapped again."""
+        if not self.config.bot_token or not self.config.chat_id:
+            raise TelegramDeliveryError("TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID must both be set")
+        client, should_close = (self._client, False) if self._client else (httpx.Client(), True)
+        try:
+            response = client.post(
+                f"https://api.telegram.org/bot{self.config.bot_token}/editMessageReplyMarkup",
+                json={"chat_id": self.config.chat_id, "message_id": message_id,
+                      "reply_markup": {"inline_keyboard": []}},
+                timeout=self.config.timeout_seconds,
+            )
+            if response.status_code >= 400:
+                raise TelegramDeliveryError(f"Telegram API returned {response.status_code}: {response.text[:300]}")
+        except httpx.HTTPError as exc:
+            raise TelegramDeliveryError(f"Could not reach the Telegram API: {exc}") from exc
+        finally:
+            if should_close:
+                client.close()
+
     def _post_message(self, text: str, reply_markup: dict | None = None) -> dict:
         if not self.config.bot_token or not self.config.chat_id:
             raise TelegramDeliveryError(

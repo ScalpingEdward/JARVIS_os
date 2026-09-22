@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import threading
+from datetime import datetime, timezone
 from uuid import UUID
 
 from sqlalchemy import update
@@ -199,6 +200,35 @@ class InstagramContentService:
             if was_moderation_rejected and decision.approved:
                 item.audit_log.append("Human override: approved despite automated moderation rejection.")
             row.status = item.status.value
+            row.data = item.model_dump_json()
+            session.commit()
+        return item
+
+    def remove_media_item(self, candidate_id: UUID, index: int, reason: str) -> ContentCandidate:
+        """Take one photo or clip out of a post that is still awaiting a
+        decision -- too private, or simply not good enough next to the rest.
+
+        The item does not go back into the pool: it was taken out by a human
+        for a reason the pool cannot see, and offering it again in the next
+        draft would ask the same question twice. The format is recomputed,
+        since a carousel reduced to one item is no longer a carousel.
+        """
+        with SessionLocal() as session:
+            row = session.get(InstagramContentCandidateRow, str(candidate_id))
+            if row is None:
+                raise InstagramContentError("Content candidate not found")
+            item = ContentCandidate.model_validate_json(row.data)
+            if item.status != ContentStatus.proposed:
+                raise InstagramContentError(f"Cannot change a candidate in status {item.status}")
+            if len(item.media_items) <= 1:
+                raise InstagramContentError("the last item cannot be removed -- reject the post instead")
+            if not 0 <= index < len(item.media_items):
+                raise InstagramContentError(f"no item at position {index + 1}")
+
+            removed = item.media_items.pop(index)
+            item.post_format, item.format_reasoning = decide_format(item.media_items)
+            item.audit_log.append(f"Removed item {index + 1} ({removed.media_ref}): {reason}")
+            item.updated_at = datetime.now(timezone.utc)
             row.data = item.model_dump_json()
             session.commit()
         return item
