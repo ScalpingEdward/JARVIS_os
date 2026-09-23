@@ -37,12 +37,14 @@ Ziel der Instagram-Seite: Reichweite aufbauen fuer den Weg zum hauptberuflichen 
 
 ## Content-Strategie Instagram
 - Phase 1 (ab 2026-09-23, Brano): sichtbares Thema ist **Lifestyle** --
-  Travel, Portrait, Gym, Essen. **Trading laeuft nebenbei mit, nie im
-  Vordergrund**: keine Charts, keine Setups, keine Zahlen, keine Gewinne,
-  keine Ergebnisse. Grund: Brano handelt noch nicht hauptberuflich und will
-  weder als Ratgeber angesprochen werden ("was soll ich investieren?") noch
-  Neid ernten, bevor er es beherrscht. Man darf ahnen, dass ein Handwerk
-  dahintersteckt -- mehr nicht.
+  Travel, Portrait, Gym, Essen. **Trading-BILDER duerfen rein** (Screens,
+  Setup, Schreibtisch): sie werden nicht aussortiert. Was nicht passiert,
+  ist, dass die **Caption** darueber redet -- keine Maerkte, keine Charts
+  als Thema, keine Zahlen, keine Gewinne, keine Ergebnisse, und nicht
+  zweimal hintereinander dieselbe Trading-Anspielung. Grund: Brano handelt
+  noch nicht hauptberuflich und will weder als Ratgeber angesprochen werden
+  ("was soll ich investieren?") noch Neid ernten, bevor er es beherrscht.
+  Man darf ahnen, dass ein Handwerk dahintersteckt -- mehr nicht.
 - Phase 2, spaeter und erst auf Brano's Ansage: Charts und Zahlen duerfen
   dazukommen. Bis dahin gilt Phase 1 auch fuer Captions (siehe
   DEFAULT_BRAND_VOICE in caption_writer.py).
