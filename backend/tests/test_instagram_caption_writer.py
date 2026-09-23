@@ -31,7 +31,7 @@ def test_generate_fails_closed_without_an_api_key():
 
 def test_generate_returns_the_model_text():
     def handler(request: httpx.Request) -> httpx.Response:
-        return _anthropic_text_response("Quiet mornings build the account. #tradingmindset #discipline #patience")
+        return _anthropic_text_response("Quiet mornings build the account. #trading #discipline #mindset")
 
     writer = AnthropicCaptionWriter(
         config=CaptionWriterConfig(api_key="test-key"), client=httpx.Client(transport=httpx.MockTransport(handler))
@@ -44,7 +44,7 @@ def test_a_caption_without_hashtags_gets_one_corrective_retry():
     """The first real card went out with no hashtags although the prompt
     demanded 3-5. The count is checked, and the retry says what was wrong."""
     prompts: list[str] = []
-    answers = iter(["Nobody claps at the top of a mountain.", "Nobody claps. #trading #discipline #patience"])
+    answers = iter(["Nobody claps at the top of a mountain.", "Nobody claps. #trading #discipline #mindset"])
 
     def handler(request: httpx.Request) -> httpx.Response:
         prompts.append(json.loads(request.content)["messages"][0]["content"])
@@ -53,14 +53,15 @@ def test_a_caption_without_hashtags_gets_one_corrective_retry():
     writer = AnthropicCaptionWriter(
         config=CaptionWriterConfig(api_key="k"), client=httpx.Client(transport=httpx.MockTransport(handler))
     )
-    assert writer.generate("t", [], "carousel").endswith("#patience")
+    assert writer.generate("t", [], "carousel").endswith("#mindset")
     assert len(prompts) == 2
     assert "contained 0 hashtags" in prompts[1]
 
 
 def test_a_caption_that_misses_the_hashtag_range_twice_is_refused():
     def handler(request: httpx.Request) -> httpx.Response:
-        return _anthropic_text_response("Text. #a #b #c #d #e #f #g")
+        return _anthropic_text_response(
+            "Text. #trading #forex #gym #travel #portrait #mindset #discipline")
 
     writer = AnthropicCaptionWriter(
         config=CaptionWriterConfig(api_key="k"), client=httpx.Client(transport=httpx.MockTransport(handler))
@@ -82,7 +83,7 @@ def test_generate_sends_the_real_api_key_and_model():
     def handler(request: httpx.Request) -> httpx.Response:
         captured["x-api-key"] = request.headers.get("x-api-key")
         captured["body"] = json.loads(request.content)
-        return _anthropic_text_response("Caption text. #tag1 #tag2 #tag3")
+        return _anthropic_text_response("Caption text. #trading #forex #mindset")
 
     writer = AnthropicCaptionWriter(
         config=CaptionWriterConfig(api_key="sk-test-123", model="claude-sonnet-5"),
@@ -139,7 +140,7 @@ def test_finalize_without_a_caption_generates_one_via_the_real_writer():
     draft = pool_module.media_pool_service.run_curation()[0]
 
     def caption_handler(request: httpx.Request) -> httpx.Response:
-        return _anthropic_text_response("Discipline compounds quietly. #tradingmindset #consistency #patience")
+        return _anthropic_text_response("Discipline compounds quietly. #trading #tradingpsychology #discipline")
 
     service = _service_with_mocks(lambda r: httpx.Response(200, json={"media_id": "x"}), caption_handler)
     candidate = service.finalize_draft(draft.id)  # no request at all -- fully automated
@@ -184,3 +185,46 @@ def test_finalize_fails_closed_when_caption_generation_fails():
     assert refreshed.finalized is False
     for item_id in refreshed.media_item_ids:
         assert pool_module.media_pool_service.get(item_id).used is False
+
+
+def test_invented_hashtags_are_rejected_and_named_in_the_retry():
+    """#QuietWealth and #StillWaters read well and are browsed by nobody --
+    the second real card went out with five of them."""
+    prompts: list[str] = []
+    answers = iter([
+        "Built quietly. #QuietWealth #StillWaters #discipline",
+        "Built quietly. #trading #discipline #mindset",
+    ])
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        prompts.append(json.loads(request.content)["messages"][0]["content"])
+        return _anthropic_text_response(next(answers))
+
+    writer = AnthropicCaptionWriter(
+        config=CaptionWriterConfig(api_key="k"), client=httpx.Client(transport=httpx.MockTransport(handler))
+    )
+    caption = writer.generate("t", [], "carousel")
+
+    assert caption.endswith("#trading #discipline #mindset")
+    assert "#QuietWealth #StillWaters" in prompts[1]
+    assert "#trading" in prompts[0], "the allowed list is part of the first prompt already"
+
+
+def test_the_same_hashtag_twice_is_rejected():
+    def handler(request: httpx.Request) -> httpx.Response:
+        return _anthropic_text_response("Text. #trading #trading #Trading")
+
+    writer = AnthropicCaptionWriter(
+        config=CaptionWriterConfig(api_key="k"), client=httpx.Client(transport=httpx.MockTransport(handler))
+    )
+    with pytest.raises(CaptionWriterError, match="repeated the same hashtag"):
+        writer.generate("t", [], "carousel")
+
+
+def test_the_allowed_list_covers_every_pillar_and_holds_no_duplicates():
+    from app.instagram_content.hashtags import ALLOWED, ALLOWED_BY_PILLAR
+
+    assert set(ALLOWED_BY_PILLAR) == {"trading", "gym", "food", "travel", "portrait"}
+    flat = [tag for tags in ALLOWED_BY_PILLAR.values() for tag in tags]
+    assert len(flat) == len(set(flat)), "a tag listed under two pillars would be maintained twice"
+    assert all(tag == tag.lower() and tag.startswith("#") for tag in ALLOWED)

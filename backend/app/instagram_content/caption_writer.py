@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 
 import httpx
 
+from . import hashtags
 from .media_pool_models import MediaPoolItem
 from .platform_strategy import platform_strategy_store
 
@@ -35,8 +36,12 @@ class CaptionWriterError(RuntimeError):
 _HASHTAG = re.compile(r"(?<![\w#])#\w+")
 
 
+def hashtags_in(caption: str) -> list[str]:
+    return _HASHTAG.findall(caption)
+
+
 def count_hashtags(caption: str) -> int:
-    return len(_HASHTAG.findall(caption))
+    return len(hashtags_in(caption))
 
 
 @dataclass(frozen=True)
@@ -78,19 +83,23 @@ class AnthropicCaptionWriter:
             f"Requirements:\n"
             f"- Opening line must work as a scroll-stopping hook, under 125 characters, "
             f"not a hashtag, not written in all caps.\n"
-            f"- Include exactly {strategy.optimal_hashtag_min}-{strategy.optimal_hashtag_max} relevant hashtags at the end -- "
-            f"Instagram enforces a hard {strategy.max_hashtags}-hashtag cap platform-wide as of 2026, and Meta's own "
-            f"guidance is that hashtags now categorize content rather than drive reach, so precision matters more than count.\n"
+            f"- End with exactly {strategy.optimal_hashtag_min}-{strategy.optimal_hashtag_max} hashtags, chosen ONLY "
+            f"from this list and copied exactly as written:\n{hashtags.prompt_block()}\n"
+            f"  Do not invent hashtags and do not combine words into new ones. Instagram enforces a hard "
+            f"{strategy.max_hashtags}-hashtag cap platform-wide as of 2026, and hashtags categorize content "
+            f"rather than drive reach -- an invented tag labels the post with something nobody browses.\n"
             f"- No engagement-bait phrases (\"like4like\", \"tag a friend\", \"link in bio now\", \"follow for more\").\n"
             f"- Return ONLY the caption text itself -- no preamble, no explanation, no quotation marks around it.\n"
         )
 
     def generate(self, theme: str, media_items: list[MediaPoolItem], post_format: str) -> str:
-        """Write the caption, and check the one rule the model demonstrably
-        skips: the first real card went out with no hashtags at all although
-        the prompt demanded 3-5. The count is checked here, one corrective
-        retry is made, and a caption that still misses fails loudly instead
-        of reaching the phone looking finished."""
+        """Write the caption, and check the two hashtag rules the model
+        demonstrably skips: the first real card went out with no hashtags at
+        all although the prompt demanded 3-5, the second with five invented
+        mood words (#QuietWealth, #StillWaters) nobody browses. Count and
+        list membership are both checked here, one corrective retry is made,
+        and a caption that still misses fails loudly instead of reaching the
+        phone looking finished."""
         if not self.config.api_key:
             raise CaptionWriterError(
                 "ANTHROPIC_API_KEY is not set -- AURON cannot generate a caption without it. "
@@ -101,21 +110,32 @@ class AnthropicCaptionWriter:
         low, high = strategy.optimal_hashtag_min, strategy.optimal_hashtag_max
         prompt = self._build_prompt(theme, media_items, post_format)
         caption = self._complete(prompt)
-        count = count_hashtags(caption)
-        if low <= count <= high:
+        problem = self._hashtag_problem(caption, low, high)
+        if problem is None:
             return caption
 
-        caption = self._complete(
-            prompt
-            + f"\nYour previous answer contained {count} hashtags. That is not allowed: "
-            f"end the caption with between {low} and {high} hashtags, each a real, narrow topic label."
-        )
-        count = count_hashtags(caption)
-        if low <= count <= high:
+        caption = self._complete(prompt + f"\nYour previous answer was rejected: {problem} Fix exactly that.")
+        problem = self._hashtag_problem(caption, low, high)
+        if problem is None:
             return caption
-        raise CaptionWriterError(
-            f"caption still has {count} hashtags after a corrective retry (need {low}-{high}) -- not sending it"
-        )
+        raise CaptionWriterError(f"caption rejected after a corrective retry: {problem}")
+
+    @staticmethod
+    def _hashtag_problem(caption: str, low: int, high: int) -> str | None:
+        """What is wrong with this caption's hashtags, worded so the retry
+        can act on it. None when they are fine."""
+        tags = hashtags_in(caption)
+        unknown = hashtags.unknown_tags(tags)
+        if unknown:
+            return (
+                f"it used {' '.join(unknown)}, which are not on the allowed list. "
+                f"Use only hashtags from that list, copied exactly."
+            )
+        if not low <= len(tags) <= high:
+            return f"it contained {len(tags)} hashtags, and the caption must end with {low} to {high}."
+        if len({hashtags.normalize(tag) for tag in tags}) != len(tags):
+            return "it repeated the same hashtag."
+        return None
 
     def _complete(self, prompt: str) -> str:
         client, should_close = (self._client, False) if self._client else (httpx.Client(), True)
