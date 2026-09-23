@@ -36,9 +36,16 @@ Ziel der Instagram-Seite: Reichweite aufbauen fuer den Weg zum hauptberuflichen 
   abgeschnittene Datei die ffprobe mit voller Dauer passierte.
 
 ## Content-Strategie Instagram
-- Kernthema Trading traegt den Account (ca. die Haelfte der Posts).
-- Portrait, Gym, Essen, Travel sind Stuetzsaeulen und muessen einen Bezug
-  zum Kernthema haben.
+- Phase 1 (ab 2026-09-23, Brano): sichtbares Thema ist **Lifestyle** --
+  Travel, Portrait, Gym, Essen. **Trading laeuft nebenbei mit, nie im
+  Vordergrund**: keine Charts, keine Setups, keine Zahlen, keine Gewinne,
+  keine Ergebnisse. Grund: Brano handelt noch nicht hauptberuflich und will
+  weder als Ratgeber angesprochen werden ("was soll ich investieren?") noch
+  Neid ernten, bevor er es beherrscht. Man darf ahnen, dass ein Handwerk
+  dahintersteckt -- mehr nicht.
+- Phase 2, spaeter und erst auf Brano's Ansage: Charts und Zahlen duerfen
+  dazukommen. Bis dahin gilt Phase 1 auch fuer Captions (siehe
+  DEFAULT_BRAND_VOICE in caption_writer.py).
 - Reels sind der Reichweiten-Hebel, Carousels erreichen fast nur Follower.
 - Hashtags sind Themenlabel, kein Reichweiten-Hebel: max 5, eng und real,
   keine erfundenen Tags.
