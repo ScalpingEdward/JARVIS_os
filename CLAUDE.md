@@ -65,8 +65,15 @@ Ziel der Instagram-Seite: Reichweite aufbauen fuer den Weg zum hauptberuflichen 
     laufen aktuell ueber Instagram Login, Umstellung noetig), Brano gibt frei,
     AURON postet. Spricht Brano im Video: Musik leise darunter
     (audio_volume/video_volume) oder keine.
-  * Zeiten: Reels 19:00, Fotos/Carousels 12:00, Di-Do bevorzugt. Nach
-    4 Wochen gegen eigene Insights pruefen.
+  * Zeiten: **ein Post pro Tag, im Wechsel** -- Fotos/Carousel 12:00, Reel
+    19:00 (schedule.py). Zwei Karten am Tag waren die erste Version und
+    wurden gestoppt: verbrennt den Vorrat und wirkt wie Laerm. Nach 4 Wochen
+    gegen eigene Insights pruefen.
+  * Verworfen (2026-09-23): Instagram-Oberflaeche lokal per Browser
+    fernsteuern, um Musik zu setzen. Brano hat im Web geprueft -- **die
+    Web-Oberflaeche bietet bei Foto-Posts gar keine Musikauswahl**, und
+    UI-Automatisierung verstoesst gegen Instagrams Nutzungsbedingungen
+    (Account-Sperre). Der halbautomatische Weg bleibt.
 
 ## Aktueller Stand und offene Punkte
 - Reel-Pfad (media_type=REELS, Status-Polling bis FINISHED, mvhd-Duration-Parsing)
