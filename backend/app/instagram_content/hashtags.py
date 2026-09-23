@@ -23,7 +23,7 @@ ALLOWED_BY_PILLAR: dict[str, tuple[str, ...]] = {
     ),
     "gym": ("#gym", "#calisthenics", "#strengthtraining", "#fitnessjourney", "#homeworkout"),
     "food": ("#healthyfood", "#highprotein", "#mealprep", "#cleaneating"),
-    "travel": ("#travel", "#dubai", "#digitalnomad", "#travelphotography", "#vanlife"),
+    "travel": ("#travel", "#dubai", "#travelphotography", "#vanlife"),
     "portrait": ("#portrait", "#mensstyle", "#lifestyle", "#mindset", "#discipline"),
 }
 
