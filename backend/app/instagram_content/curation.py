@@ -109,13 +109,16 @@ def curate(pool_items: list[MediaPoolItem], max_groups: int = 10) -> list[Curate
             # videos in the pool scored under 0.35 and every one of them was
             # being proposed as its own post. Reels carry the account's
             # reach, so a weak one costs more than a weak carousel slide.
-            if item.aesthetic_score >= strategy.elite_solo_threshold:
+            if item.favorite or item.aesthetic_score >= strategy.elite_solo_threshold:
                 kind = "Reel" if item.media_type == MediaType.video else "single post"
                 groups.append(
                     CuratedGroup(
                         theme=theme,
                         media_items=[item],
                         reasoning=(
+                            f"Brano marked this one a favourite -- it carries a {kind} whatever the "
+                            f"score says (analysis gave it {item.aesthetic_score:.2f})."
+                            if item.favorite else
                             f"Aesthetic score {item.aesthetic_score:.2f} is above the elite solo bar "
                             f"({strategy.elite_solo_threshold}) -- strong enough to carry a {kind} on its own."
                         ),

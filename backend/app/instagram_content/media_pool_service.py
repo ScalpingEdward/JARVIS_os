@@ -78,6 +78,7 @@ class MediaPoolService:
         "dominant_color_hex",
         "analyzed_at",
         "cover_timestamp_seconds",
+        "analysis_reasoning",
     )
 
     def backfill_captured_at_source(self) -> dict[str, int]:
@@ -246,6 +247,25 @@ class MediaPoolService:
                     draft.discarded = True
                 row.data = draft.model_dump_json()
         return touched, discarded
+
+    def set_favorite(self, media_ref: str, favorite: bool = True) -> MediaPoolItem:
+        """Brano's own pick. The score sees pixels; he knows what the moment
+        was worth -- a 0.35 photo of something that cost real money and meant
+        something is not a 0.35 post. A favorite carries a post on its own,
+        whatever the analysis said."""
+        with SessionLocal() as session:
+            row = (
+                session.query(InstagramMediaPoolItemRow)
+                .filter(InstagramMediaPoolItemRow.media_ref == media_ref)
+                .first()
+            )
+            if row is None:
+                raise MediaPoolError(f"No pool item with media_ref {media_ref}")
+            item = MediaPoolItem.model_validate_json(row.data)
+            item.favorite = favorite
+            row.data = item.model_dump_json()
+            session.commit()
+        return item
 
     def set_processed_file(self, media_ref: str, processed_file: str) -> bool:
         """Record a processed file for an item already in the pool -- the

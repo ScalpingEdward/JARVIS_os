@@ -448,6 +448,7 @@ def analyze_and_ingest(
                 theme=analysis.theme,
                 tags=analysis.tags,
                 aesthetic_score=analysis.aesthetic_score,
+                analysis_reasoning=analysis.reasoning or "",
                 duration_seconds=item.duration_seconds,
                 source_group=item.source_group,
                 captured_at=captured_at,
@@ -465,6 +466,7 @@ def analyze_and_ingest(
                 theme=analysis.theme,
                 tags=analysis.tags,
                 aesthetic_score=analysis.aesthetic_score,
+                analysis_reasoning=analysis.reasoning or "",
                 reasoning=analysis.reasoning,
             )
         )

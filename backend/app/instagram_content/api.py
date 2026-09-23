@@ -142,6 +142,18 @@ def ingest_media(request: MediaPoolIngestRequest) -> MediaPoolIngestResponse:
     return media_pool_service.ingest(request)
 
 
+@router.post("/media-pool/{media_ref}/favorite")
+def set_favorite(media_ref: str, on: bool = True) -> dict:
+    """Mark (or unmark) one pool item as Brano's own pick: it then carries a
+    post on its own, whatever the analysis scored it."""
+    try:
+        item = media_pool_service.set_favorite(media_ref, on)
+    except MediaPoolError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return {"media_ref": item.media_ref, "favorite": item.favorite,
+            "aesthetic_score": item.aesthetic_score, "used": item.used}
+
+
 @router.post("/media-pool/deduplicate")
 def deduplicate_pool(apply: bool = False) -> dict:
     """Report (and with apply=true, remove) pool rows that hold the same

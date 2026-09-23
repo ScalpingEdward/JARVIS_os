@@ -45,6 +45,13 @@ class MediaPoolItemCreate(BaseModel):
         "is None. Kept as its own field so an upload time can never masquerade as a capture time.",
     )
     aesthetic_score: float = Field(ge=0, le=1)
+    analysis_reasoning: str = Field(
+        default="",
+        max_length=2000,
+        description="Why the vision step gave this score, in its own words. Written once at ingest "
+        "and kept: without it a 0.35 is a verdict nobody can argue with, and the fix (crop the "
+        "cluttered edge, blur the background) is invisible.",
+    )
     duration_seconds: float | None = Field(default=None, gt=0)
     dominant_color_hex: str | None = Field(default=None, max_length=7)
     recommended_trim_start_seconds: float | None = Field(
@@ -111,6 +118,10 @@ class MediaPoolItemCreate(BaseModel):
 
 class MediaPoolItem(MediaPoolItemCreate):
     id: UUID = Field(default_factory=uuid4)
+    #: Brano picked this one himself. It then carries a post regardless of
+    #: its score -- he knows what the moment was worth, the score only sees
+    #: pixels. Never set by the analysis.
+    favorite: bool = False
     used: bool = False
     used_in_candidate_id: UUID | None = None
     used_at: datetime | None = None
