@@ -1,10 +1,13 @@
 """The card arrives when the post should go out, not when someone asks.
 
-Two slots a day, from the 2026 data: a Reel in the evening, where Reels
-reach people who do not follow the account yet, and a feed post at midday.
-The card is the start of Brano's own posting minute -- files, caption,
-music picked in the app -- so it has to land shortly before the time the
-post should be up, not hours earlier.
+One post a day at most, alternating: a feed post at midday on one day, a
+Reel in the evening on the next. Two cards a day was the first version and
+Brano stopped it -- posting twice a day burns the backlog faster than it
+refills and reads as noise on a growing account. The times come from the
+2026 data (evening for Reels, where they reach people who do not follow
+the account yet; midday for feed posts). The card is the start of Brano's
+own posting minute -- files, caption, music picked in the app -- so it has
+to land at the time the post should go up, not hours earlier.
 
 Deliberately simple: a minute tick, a local clock, and one memory of what
 already fired today. A slot missed because the laptop was asleep is not
@@ -42,7 +45,15 @@ class Slot:
     kind: str  # "feed" or "reel"
 
 
-DEFAULT_SLOTS = (Slot(12, 0, "feed"), Slot(19, 0, "reel"))
+FEED_SLOT = Slot(12, 0, "feed")
+REEL_SLOT = Slot(19, 0, "reel")
+
+
+def slot_for(day: date, slots: tuple[Slot, Slot] = (FEED_SLOT, REEL_SLOT)) -> Slot:
+    """The one slot this day has. Alternates on the calendar itself, not on
+    a counter, so a day the laptop was off does not shift the rhythm for
+    every day after it."""
+    return slots[day.toordinal() % 2]
 
 
 def _timezone() -> ZoneInfo:
@@ -57,7 +68,7 @@ def waiting_for_a_decision() -> bool:
 
 
 class PostingScheduler:
-    def __init__(self, slots: tuple[Slot, ...] = DEFAULT_SLOTS) -> None:
+    def __init__(self, slots: tuple[Slot, Slot] = (FEED_SLOT, REEL_SLOT)) -> None:
         self.slots = slots
         self._fired: dict[tuple[date, int, int], bool] = {}
         self._task: asyncio.Task | None = None
@@ -71,13 +82,11 @@ class PostingScheduler:
         return sorted(self._fired)
 
     def due(self, now: datetime) -> Slot | None:
-        for slot in self.slots:
-            if self._fired.get((now.date(), slot.hour, slot.minute)):
-                continue
-            minutes_late = (now.hour - slot.hour) * 60 + (now.minute - slot.minute)
-            if 0 <= minutes_late <= _GRACE_MINUTES:
-                return slot
-        return None
+        slot = slot_for(now.date(), self.slots)
+        if self._fired.get((now.date(), slot.hour, slot.minute)):
+            return None
+        minutes_late = (now.hour - slot.hour) * 60 + (now.minute - slot.minute)
+        return slot if 0 <= minutes_late <= _GRACE_MINUTES else None
 
     def fire(self, slot: Slot, now: datetime) -> str:
         """Send one card for this slot. Returns what happened, for the log.
@@ -108,7 +117,7 @@ class PostingScheduler:
 
     def start(self) -> None:
         self._task = asyncio.create_task(self._run())
-        log.info("posting schedule started: %s", ", ".join(
+        log.info("posting schedule started, alternating daily: %s", ", ".join(
             f"{s.hour:02d}:{s.minute:02d} {s.kind}" for s in self.slots))
 
     async def stop(self) -> None:

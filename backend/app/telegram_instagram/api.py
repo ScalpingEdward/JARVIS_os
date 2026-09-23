@@ -44,15 +44,17 @@ def telegram_instagram_status() -> TelegramInstagramStatus:
 def schedule_status() -> dict:
     """What the posting schedule will do next, and whether it is running at
     all -- otherwise "it is enabled" is a claim nobody can check."""
-    from datetime import datetime
+    from datetime import datetime, timedelta
 
-    from .schedule import posting_scheduler, waiting_for_a_decision, _timezone
+    from .schedule import _timezone, posting_scheduler, slot_for, waiting_for_a_decision
 
     now = datetime.now(_timezone())
     return {
         "running": posting_scheduler.is_running,
         "now": now.isoformat(timespec="seconds"),
-        "slots": [f"{s.hour:02d}:{s.minute:02d} {s.kind}" for s in posting_scheduler.slots],
+        "today": f"{slot_for(now.date()).hour:02d}:{slot_for(now.date()).minute:02d} "
+                 f"{slot_for(now.date()).kind}",
+        "tomorrow": f"{slot_for(now.date() + timedelta(days=1)).kind}",
         "already_fired_today": [
             f"{hour:02d}:{minute:02d}"
             for (day, hour, minute) in posting_scheduler.fired_slots

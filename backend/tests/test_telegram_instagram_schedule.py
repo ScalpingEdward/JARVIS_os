@@ -3,7 +3,7 @@ stack a second card on top of an undecided one."""
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime, timedelta
 
 import pytest
 
@@ -12,7 +12,14 @@ from app.instagram_content.media_pool_service import MediaPoolService, media_poo
 from app.instagram_content.models import ContentCandidateCreate, MediaItem
 from app.instagram_content.service import InstagramContentService
 from app.telegram_instagram import schedule as schedule_module
-from app.telegram_instagram.schedule import PostingScheduler, Slot, waiting_for_a_decision
+from app.telegram_instagram.schedule import (
+    FEED_SLOT,
+    REEL_SLOT,
+    PostingScheduler,
+    Slot,
+    slot_for,
+    waiting_for_a_decision,
+)
 
 
 @pytest.fixture(autouse=True)
@@ -23,17 +30,33 @@ def _clean():
 
 
 def _at(hour: int, minute: int = 0) -> datetime:
-    return datetime(2026, 9, 23, hour, minute)
+    """A time on a day whose slot matches that hour, so the tests read the
+    way the schedule behaves rather than depending on today's parity."""
+    day = next(d for d in (date(2026, 9, 23), date(2026, 9, 24))
+               if slot_for(d).hour == hour)
+    return datetime(day.year, day.month, day.day, hour, minute)
 
 
-def test_each_slot_is_due_once_and_only_within_its_grace_window():
+def test_one_post_a_day_alternating_feed_and_reel():
+    """Two cards a day was the first version; posting twice a day burns the
+    backlog and reads as noise."""
+    days = [date(2026, 9, 23) + timedelta(days=i) for i in range(6)]
+    kinds = [slot_for(day).kind for day in days]
+
+    assert kinds in (["feed", "reel"] * 3, ["reel", "feed"] * 3), "strictly alternating"
+    assert slot_for(days[0]) in (FEED_SLOT, REEL_SLOT)
+
+
+def test_only_todays_slot_is_due_and_only_in_its_grace_window():
     scheduler = PostingScheduler()
+    feed_day = next(d for d in (date(2026, 9, 23), date(2026, 9, 24)) if slot_for(d) == FEED_SLOT)
+    noon = datetime(feed_day.year, feed_day.month, feed_day.day, 12, 0)
 
-    assert scheduler.due(_at(11, 59)) is None
-    assert scheduler.due(_at(12, 0)).kind == "feed"
-    assert scheduler.due(_at(12, 39)).kind == "feed", "a late start still sends a useful card"
-    assert scheduler.due(_at(13, 30)) is None, "a card for a moment that has passed is worse than none"
-    assert scheduler.due(_at(19, 0)).kind == "reel"
+    assert scheduler.due(noon.replace(hour=11, minute=59)) is None
+    assert scheduler.due(noon).kind == "feed"
+    assert scheduler.due(noon.replace(minute=39)).kind == "feed", "a late start still sends a useful card"
+    assert scheduler.due(noon.replace(hour=13, minute=30)) is None, "a passed moment gets no card"
+    assert scheduler.due(noon.replace(hour=19)) is None, "the Reel slot belongs to the other day"
 
 
 def test_a_fired_slot_does_not_fire_again_the_same_day_but_does_the_next(monkeypatch):
@@ -42,9 +65,11 @@ def test_a_fired_slot_does_not_fire_again_the_same_day_but_does_the_next(monkeyp
 
     scheduler.fire(scheduler.due(_at(12, 0)), _at(12, 0))
 
-    assert scheduler.due(_at(12, 5)) is None
-    assert scheduler.due(_at(19, 0)).kind == "reel", "the other slot is untouched"
-    assert scheduler.due(datetime(2026, 9, 24, 12, 0)).kind == "feed"
+    noon = _at(12, 0)
+    assert scheduler.due(noon.replace(minute=5)) is None
+    assert scheduler.due(noon.replace(hour=19)) is None, "this day has no second slot"
+    in_two_days = noon.date() + timedelta(days=2)
+    assert scheduler.due(datetime(in_two_days.year, in_two_days.month, in_two_days.day, 12, 0)).kind == "feed"
 
 
 def test_a_slot_with_an_undecided_card_open_sends_nothing(monkeypatch):
