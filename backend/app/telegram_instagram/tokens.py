@@ -3,7 +3,7 @@
 Deliberately its own secret and its own action alphabet, for the same
 reason telegram_live_execution has its own: callback_data is plain text the
 tapping client sends back verbatim, so a token minted for one module must
-be provably unusable against another. The actions here are {p, d} --
+be provably unusable against another. The actions here are {p, d, g, 0-9} --
 disjoint from telegram_approvals' {a, r} and telegram_live_execution's
 {x, c}, so a leaked token from either of those cannot approve a post, and a
 leaked one from here cannot touch a trade.
@@ -17,11 +17,15 @@ from uuid import UUID
 
 PUBLISH_OK = "p"
 DECLINE = "d"
+#: "I have posted this one in the app myself" -- the end of the
+#: half-automatic path for photos and carousels, where the music is picked
+#: in Instagram and no API can do it.
+POSTED = "g"
 #: "Take item N out of this post" -- one digit per position, 0-based. A
 #: digit rather than a letter keeps it clear of every other module's
 #: alphabet, and ten covers Instagram's own carousel maximum.
 REMOVE_ACTIONS = frozenset("0123456789")
-_ACTIONS = {PUBLISH_OK, DECLINE} | REMOVE_ACTIONS
+_ACTIONS = {PUBLISH_OK, DECLINE, POSTED} | REMOVE_ACTIONS
 
 
 def remove_action(index: int) -> str:

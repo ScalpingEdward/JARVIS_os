@@ -63,10 +63,20 @@ class FakePreview:
         self.shown: list[list[str]] = []
         self.fail_with = fail_with
 
+    def __post_init__(self) -> None:  # pragma: no cover - dataclass-free helper
+        pass
+
     def send(self, candidate) -> int:
         if self.fail_with:
             raise self.fail_with
         self.shown.append([m.media_ref for m in candidate.media_items])
+        return len(candidate.media_items)
+
+    def send_files(self, candidate) -> int:
+        if self.fail_with:
+            raise self.fail_with
+        self.files_sent = getattr(self, "files_sent", []) + [
+            [m.media_ref for m in candidate.media_items]]
         return len(candidate.media_items)
 
 
@@ -235,7 +245,7 @@ def test_approving_records_the_decision_and_publishes_nothing():
     assert decided is not None
     assert decided.status == ContentStatus.approved
     assert decided.published_media_id is None, "nothing may reach Instagram from a tap"
-    assert any("selbst posten" in m for m in client.plain)
+    assert any("in instagram posten" in m.lower() for m in [t for t, _ in client.sent])
 
 
 def test_declining_rejects_the_candidate():
@@ -399,3 +409,53 @@ def test_the_card_spells_out_the_posting_order():
         caption_draft=CAPTION,
     ))
     assert "Reihenfolge: 1 Foto (Hook) → 2 Video → 3 Foto" in _format_card(candidate)
+
+
+# -- the post pack ----------------------------------------------------------
+
+
+def test_approving_sends_the_files_the_caption_and_a_posted_button():
+    telegram, preview = FakeTelegram(), FakePreview()
+    candidate = _carousel()
+    service = _service(telegram, preview=preview)
+
+    service.handle_update(_tap_on(candidate.id, tokens.PUBLISH_OK))
+
+    assert preview.files_sent == [["a", "b", "c"]], "the files themselves, in full quality"
+    assert CAPTION in telegram.plain, "the caption as its own message, to copy"
+    text, keyboard = telegram.sent[-1]
+    assert [b["text"] for row in keyboard for b in row] == ["📤 Gepostet"]
+
+
+def test_the_posted_button_records_the_post_without_claiming_a_media_id():
+    telegram, preview = FakeTelegram(), FakePreview()
+    candidate = _carousel()
+    service = _service(telegram, preview=preview)
+    service.handle_update(_tap_on(candidate.id, tokens.PUBLISH_OK))
+
+    posted = service.handle_update(_tap_on(candidate.id, tokens.POSTED, message_id=556))
+
+    assert posted.status == ContentStatus.posted
+    assert posted.published_media_id is None, "AURON never saw the post Instagram created"
+    assert telegram.cleared[-1] == 556
+
+
+def test_the_posted_button_is_refused_before_a_decision():
+    service = _service()
+    candidate = _carousel()
+    service.handle_update(_tap_on(candidate.id, tokens.POSTED))
+    assert candidate.status == ContentStatus.proposed
+    assert InstagramContentService().get(candidate.id).status == ContentStatus.proposed
+
+
+def test_failing_to_send_the_files_does_not_undo_the_approval():
+    from app.telegram_instagram.preview import PreviewError
+
+    telegram = FakeTelegram()
+    candidate = _carousel()
+    service = _service(telegram, preview=FakePreview(fail_with=PreviewError("n8n answered 403")))
+
+    decided = service.handle_update(_tap_on(candidate.id, tokens.PUBLISH_OK))
+
+    assert decided.status == ContentStatus.approved
+    assert any("konnte ich aber nicht schicken" in m for m in telegram.plain)

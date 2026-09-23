@@ -233,6 +233,39 @@ class InstagramContentService:
             session.commit()
         return item
 
+    def mark_posted_manually(self, candidate_id: UUID, by: str) -> ContentCandidate:
+        """Brano posted this one himself, in the Instagram app.
+
+        The API can attach music to a Reel but to nothing else, so a photo
+        or a carousel is posted by hand with the sound picked in the app.
+        The system still has to know it went out: the next post is planned
+        against what is already published (no pillar twice in a row), and a
+        post nobody marks as done would be offered again.
+
+        No published_media_id: AURON never saw the post Instagram created.
+        Claiming an id it does not have would be worse than leaving it empty.
+        """
+        with SessionLocal() as session:
+            row = session.get(InstagramContentCandidateRow, str(candidate_id))
+            if row is None:
+                raise InstagramContentError("Content candidate not found")
+            item = ContentCandidate.model_validate_json(row.data)
+            if item.status == ContentStatus.posted:
+                return item
+            if item.status != ContentStatus.approved:
+                raise InstagramContentError(
+                    f"Cannot mark a candidate in status {item.status} as posted; it must be approved first"
+                )
+            item.status = ContentStatus.posted
+            item.decision_reason = f"Manuell in der Instagram-App gepostet ({by})"
+            item.audit_log.append(f"Marked as posted by hand, in the app, by {by}.")
+            item.updated_at = datetime.now(timezone.utc)
+            row.status = item.status.value
+            row.data = item.model_dump_json()
+            session.commit()
+        self._record_post_in_knowledge_graph(item)
+        return item
+
     def publish(self, candidate_id: UUID) -> ContentCandidate:
         """The one real execution boundary in this whole module -- and, as
         of this fix, a genuinely atomic one. Found by an external test

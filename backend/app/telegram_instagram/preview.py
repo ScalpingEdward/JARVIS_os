@@ -82,6 +82,38 @@ class PostPreviewSender:
         except Exception as exc:  # noqa: BLE001 -- anything Pillow cannot read is not a photo we can show
             raise PreviewError(f"could not read the photo: {exc}") from exc
 
+    def file_for(self, client: httpx.Client, item: MediaItem, position: int) -> PreviewMedia:
+        """The file as it should be posted: graded, full size, uncompressed.
+        Sent as a document rather than a photo, because Telegram re-encodes
+        photos and Brano uploads what he receives straight to Instagram."""
+        processed = self._processed_file(item.media_ref)
+        suffix = "mp4" if item.media_type == MediaType.video else "jpg"
+        data = processed.read_bytes() if processed is not None else self._fetch_from_drive(client, item.media_ref)
+        if processed is not None and processed.stat().st_size > MAX_UPLOAD_BYTES:
+            raise PreviewError(f"{processed.name} is larger than {MAX_UPLOAD_BYTES // 2**20} MB")
+        return PreviewMedia("document", f"{position:02d}_{item.media_ref[:12]}.{suffix}", data)
+
+    def send_files(self, candidate: ContentCandidate) -> int:
+        """The post pack: every file, numbered in posting order, in full
+        quality. What Brano picks up in the app afterwards."""
+        if not self.telegram.bot_token or not self.telegram.chat_id:
+            raise PreviewError("TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID must both be set")
+        client, should_close = (self._client, False) if self._client else (httpx.Client(), True)
+        try:
+            for position, item in enumerate(candidate.media_items, start=1):
+                document = self.file_for(client, item, position)
+                self._call(
+                    client, "sendDocument",
+                    {"chat_id": self.telegram.chat_id, "caption": f"{position}/{len(candidate.media_items)}"},
+                    {"document": (document.filename, document.data)},
+                )
+            return len(candidate.media_items)
+        except httpx.HTTPError as exc:
+            raise PreviewError(f"network error while sending the files: {exc}") from exc
+        finally:
+            if should_close:
+                client.close()
+
     def media_for(self, client: httpx.Client, item: MediaItem, position: int) -> PreviewMedia:
         # The processed file, graded in Brano's look, is what would be
         # posted -- so it is what gets shown whenever it exists.

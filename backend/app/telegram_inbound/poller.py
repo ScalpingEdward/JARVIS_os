@@ -12,7 +12,7 @@ refuses getUpdates while a webhook is set, and one bot has one queue.
 
 Routing is by the action letter in callback_data, not by trying each
 module in turn. The three token alphabets are disjoint by design
-(instagram {p, d, 0-9}, setups {a, r}, live orders {x, c}), so the letter names
+(instagram {p, d, g, 0-9}, setups {a, r}, live orders {x, c}), so the letter names
 exactly one module. Trying all three would work too, but every miss would
 be written to the other modules' audit logs as a rejected token -- a tap on
 a post would show up as an attack on the trading approvals.
@@ -54,6 +54,7 @@ def _live_orders(update: dict) -> object:
 ROUTES: dict[str, Callable[[dict], object]] = {
     "p": _instagram,
     "d": _instagram,
+    "g": _instagram,
     "a": _setups,
     "r": _setups,
     "x": _live_orders,

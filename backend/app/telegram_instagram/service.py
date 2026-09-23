@@ -283,7 +283,10 @@ class TelegramInstagramService:
         except InstagramContentError as exc:
             self._record("callback", False, str(exc), candidate_id, actor)
             raise TelegramInstagramError(str(exc)) from exc
-        if current.status != ContentStatus.proposed:
+        # "Gepostet" comes after the approval, so it is the one action whose
+        # card is meant to be tapped in a state other than proposed.
+        expected = ContentStatus.approved if action == tokens.POSTED else ContentStatus.proposed
+        if current.status != expected:
             self._record("callback", False, f"already {current.status.value}", candidate_id, actor)
             self._safe_send(f"Schon entschieden: {current.status.value}.")
             return current
@@ -294,6 +297,18 @@ class TelegramInstagramService:
         message_id = (query.get("message") or {}).get("message_id")
         if message_id is not None:
             self._safe_clear_keyboard(int(message_id))
+
+        if action == tokens.POSTED:
+            try:
+                posted = instagram_content_service.mark_posted_manually(
+                    candidate_id, actor or "unknown"
+                )
+            except InstagramContentError as exc:
+                self._record("posted", False, str(exc), candidate_id, actor)
+                raise TelegramInstagramError(str(exc)) from exc
+            self._record("posted", True, "manual", candidate_id, actor)
+            self._safe_send("Als gepostet vermerkt. Der naechste Post wird darauf abgestimmt geplant.")
+            return posted
 
         if action in tokens.REMOVE_ACTIONS:
             index = int(action)
@@ -323,13 +338,39 @@ class TelegramInstagramService:
 
         self._record("decide", True, decided.status.value, candidate_id, actor)
         if approved:
-            self._safe_send(
-                "Freigegeben. Nichts wurde gepostet -- Musik aussuchen und selbst posten, "
-                "oder publish ausloesen."
-            )
+            self._send_post_pack(decided)
         else:
             self._safe_send("Abgelehnt. Die Medien bleiben vergeben, der Post geht nicht raus.")
         return decided
+
+    def _send_post_pack(self, candidate: ContentCandidate) -> None:
+        """What Brano needs to post it himself: the files in full quality,
+        the caption as its own message to copy, and the button that says it
+        went out.
+
+        No API can put Instagram's music on a photo or a carousel, so this
+        is the honest end of that path -- not a placeholder for an automatic
+        publish that does not exist.
+        """
+        try:
+            self._preview.send_files(candidate)
+        except PreviewError as exc:
+            self._record("post_pack", False, str(exc), candidate.id)
+            self._safe_send(f"Freigegeben. Die Dateien konnte ich aber nicht schicken: {exc}")
+            return
+        self._safe_send(candidate.caption_draft)
+        try:
+            self._client.send_with_keyboard(
+                "Dateien und Caption sind oben. In Instagram posten, Musik aussuchen, "
+                "danach hier bestaetigen:",
+                [[{"text": "📤 Gepostet",
+                   "callback_data": tokens.make_token(
+                       self.config.callback_secret, candidate.id, tokens.POSTED)}]],
+            )
+        except TelegramDeliveryError as exc:
+            self._record("post_pack", False, str(exc), candidate.id)
+            return
+        self._record("post_pack", True, f"{len(candidate.media_items)} files", candidate.id)
 
     def _safe_clear_keyboard(self, message_id: int) -> None:
         try:
