@@ -64,6 +64,28 @@ def schedule_status() -> dict:
     }
 
 
+@router.post("/leftovers/start-review")
+def start_leftover_review(min_score: float = 0.0, singles_only: bool = True) -> dict:
+    """Freeze the list of leftovers and number it from 1, so a number in a
+    caption still means the same photo tomorrow."""
+    from .leftovers import start_review
+
+    return {"count": len(start_review(min_score=min_score, singles_only=singles_only))}
+
+
+@router.post("/leftovers")
+def send_leftovers(min_score: float = 0.4, offset: int = 0, limit: int = 10,
+                   use_review_list: bool = False) -> dict:
+    """Send one batch of the photos curation left lying, numbered
+    continuously -- score, day and theme in every caption, no decision
+    made."""
+    from .leftovers import send_leftovers as run
+
+    batch = run(min_score=min_score, offset=offset, limit=max(1, min(limit, 10)),
+                use_review_list=use_review_list)
+    return {"sent": batch.sent, "remaining": batch.remaining, "refs": batch.refs}
+
+
 @router.get("/audit", response_model=list[InstagramAuditRecord])
 def audit(limit: int = 50) -> list[InstagramAuditRecord]:
     return telegram_instagram_service.audit_records(limit)

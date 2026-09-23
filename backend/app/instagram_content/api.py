@@ -154,6 +154,19 @@ def set_favorite(media_ref: str, on: bool = True) -> dict:
             "aesthetic_score": item.aesthetic_score, "used": item.used}
 
 
+@router.post("/media-pool/{media_ref}/reframe")
+def reframe_media(media_ref: str, mode: str = "crop") -> dict:
+    """Pull the frame in on the subject ("crop") or push the background out
+    of focus ("blur") -- the two ways to rescue a strong subject from a
+    cluttered background without retouching anything away."""
+    from .reframe import ReframeError, reframe_pool_item
+
+    try:
+        return reframe_pool_item(media_ref, mode)
+    except ReframeError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
 @router.post("/media-pool/deduplicate")
 def deduplicate_pool(apply: bool = False) -> dict:
     """Report (and with apply=true, remove) pool rows that hold the same
@@ -170,6 +183,16 @@ def grade_existing_photos(limit: int = 20) -> dict:
     from .photo_backfill import grade_existing_photos as run
 
     return run(limit=max(1, min(limit, 50)))
+
+
+@router.post("/media-pool/process-existing-videos")
+def process_existing_videos(limit: int = 3) -> dict:
+    """Cut and grade up to `limit` videos that entered the pool before the
+    ingest did that (or whose ffmpeg run died). Call repeatedly until
+    `remaining` is 0; each one is fetched back from Drive through n8n."""
+    from .video_backfill import process_existing_videos as run
+
+    return run(limit=max(1, min(limit, 10)))
 
 
 @router.get("/media-pool/pending-uploads", response_model=PendingUploadList)
