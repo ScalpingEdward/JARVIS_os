@@ -211,7 +211,9 @@ class TelegramInstagramService:
         self._record("notify", True, f"message_id={message_id}", candidate_id)
         return message_id
 
-    def finalize_next_and_notify(self, caption_draft: str | None = None) -> NotifyResult:
+    def finalize_next_and_notify(
+        self, caption_draft: str | None = None, kind: str | None = None
+    ) -> NotifyResult:
         """Take the next draft in posting order, give it a caption, send it.
 
         "Next" is the queue's own order, which is shoot-day order: the
@@ -220,10 +222,19 @@ class TelegramInstagramService:
         finalizing writes a caption via a real Anthropic call, and fifty of
         those for posts that may never go out is not a decision to make by
         accident.
+
+        `kind` picks from that queue rather than reordering it: "reel" for
+        the evening slot, "feed" for midday. A Reel and a carousel are read
+        at different times of day, and the Reel is the one that reaches
+        people who do not follow the account yet.
         """
         drafts = media_pool_service.list_drafts(pending_only=True)
+        if kind is not None:
+            drafts = [d for d in drafts if self._draft_kind(d) == kind]
         if not drafts:
-            raise TelegramInstagramError("no pending drafts to finalize")
+            raise TelegramInstagramError(
+                f"no pending drafts to finalize{'' if kind is None else f' for {kind}'}"
+            )
         draft = drafts[0]
         try:
             candidate = instagram_content_service.finalize_draft(
@@ -241,6 +252,18 @@ class TelegramInstagramService:
 
         message_id = self.notify(candidate.id)
         return NotifyResult(candidate_id=candidate.id, message_id=message_id, from_draft_id=draft.id)
+
+    @staticmethod
+    def _draft_kind(draft) -> str:
+        """"reel" or "feed", decided the same way the candidate's format is
+        decided later (format_decision.py): one video on its own becomes a
+        Reel, everything else is a feed post. Read from the draft's items so
+        the slot can pick without finalizing -- and finalizing costs a real
+        caption call."""
+        items = media_pool_service.draft_media_items(draft)
+        if len(items) == 1 and items[0].media_type == MediaType.video:
+            return "reel"
+        return "feed"
 
     # ------------------------------------------------------------- inbound
 

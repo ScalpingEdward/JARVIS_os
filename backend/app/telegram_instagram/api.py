@@ -40,6 +40,28 @@ def telegram_instagram_status() -> TelegramInstagramStatus:
     return telegram_instagram_service.status()
 
 
+@router.get("/schedule")
+def schedule_status() -> dict:
+    """What the posting schedule will do next, and whether it is running at
+    all -- otherwise "it is enabled" is a claim nobody can check."""
+    from datetime import datetime
+
+    from .schedule import posting_scheduler, waiting_for_a_decision, _timezone
+
+    now = datetime.now(_timezone())
+    return {
+        "running": posting_scheduler.is_running,
+        "now": now.isoformat(timespec="seconds"),
+        "slots": [f"{s.hour:02d}:{s.minute:02d} {s.kind}" for s in posting_scheduler.slots],
+        "already_fired_today": [
+            f"{hour:02d}:{minute:02d}"
+            for (day, hour, minute) in posting_scheduler.fired_slots
+            if day == now.date()
+        ],
+        "a_card_is_waiting_for_a_decision": waiting_for_a_decision(),
+    }
+
+
 @router.get("/audit", response_model=list[InstagramAuditRecord])
 def audit(limit: int = 50) -> list[InstagramAuditRecord]:
     return telegram_instagram_service.audit_records(limit)

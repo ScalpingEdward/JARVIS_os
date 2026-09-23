@@ -14,6 +14,7 @@ from .position_monitor.api import router as position_monitor_router
 from .account_intake.api import router as account_intake_router
 from .position_monitor.service import position_monitor_service
 from .telegram_inbound.poller import telegram_poller
+from .telegram_instagram.schedule import posting_scheduler
 from .strategy_orchestrator.api import router as strategy_orchestrator_router
 from .api.routes.auron_demo1_approval_handoff_v21_260 import router as auron_demo1_approval_handoff_v21_260_router
 from .api.routes.auron_demo1_approval_resolution_v21_261 import router as auron_demo1_approval_resolution_v21_261_router
@@ -220,7 +221,11 @@ async def lifespan(app: FastAPI):
     # a test run must never touch.
     if os.getenv("TELEGRAM_POLLING_ENABLED", "false").lower() in ("1", "true", "yes"):
         telegram_poller.start()
+    # Same opt-in rule again: this one sends real cards to a real phone.
+    if os.getenv("AURON_POSTING_SCHEDULE_ENABLED", "false").lower() in ("1", "true", "yes"):
+        posting_scheduler.start()
     yield
+    await posting_scheduler.stop()
     await telegram_poller.stop()
     await position_monitor_service.stop()
 
