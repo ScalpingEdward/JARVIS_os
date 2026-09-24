@@ -186,13 +186,13 @@ def grade_existing_photos(limit: int = 20) -> dict:
 
 
 @router.post("/media-pool/process-existing-videos")
-def process_existing_videos(limit: int = 3) -> dict:
+def process_existing_videos(limit: int = 3, offset: int = 0) -> dict:
     """Cut and grade up to `limit` videos that entered the pool before the
     ingest did that (or whose ffmpeg run died). Call repeatedly until
     `remaining` is 0; each one is fetched back from Drive through n8n."""
     from .video_backfill import process_existing_videos as run
 
-    return run(limit=max(1, min(limit, 10)))
+    return run(limit=max(1, min(limit, 10)), offset=max(0, offset))
 
 
 @router.get("/media-pool/pending-uploads", response_model=PendingUploadList)

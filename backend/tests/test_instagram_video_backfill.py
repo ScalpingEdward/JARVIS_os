@@ -74,3 +74,15 @@ def test_the_downloaded_original_does_not_stay_behind(tmp_path):
     process_existing_videos(limit=5, client=_client(tmp_path))
     leftovers = list((tmp_path / "processed").glob("*.src.mp4"))
     assert leftovers == [], "a few hundred MB per clip would fill the disk quietly"
+
+
+def test_an_offset_works_past_a_clip_that_keeps_failing(tmp_path):
+    """One stubborn clip must not mean the whole backlog is retried: that is
+    what turned a re-render into two hours of the same three files."""
+    assert process_existing_videos(limit=1, offset=0, client=_client(tmp_path))["processed"] == 1
+
+    stuck = process_existing_videos(limit=1, offset=0, client=_client(tmp_path))
+    assert list(stuck["failed"]) == ["clip-gone"], "the queue's head is the one that fails"
+
+    skipped = process_existing_videos(limit=5, offset=1, client=_client(tmp_path))
+    assert skipped == {"processed": 0, "failed": {}, "remaining": 1},         "past it there is nothing left, and it was not tried again"

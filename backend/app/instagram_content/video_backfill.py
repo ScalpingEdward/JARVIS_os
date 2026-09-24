@@ -42,12 +42,18 @@ def unprocessed_videos() -> list[MediaPoolItem]:
     ]
 
 
-def process_existing_videos(limit: int = 3, client: httpx.Client | None = None) -> dict:
+def process_existing_videos(limit: int = 3, offset: int = 0, client: httpx.Client | None = None) -> dict:
     """Fetch, cut and grade up to `limit` of them. A bounded batch on
     purpose: each video is a download plus a full re-encode, and a batch
-    that fails halfway has still saved its work."""
-    todo = unprocessed_videos()
-    batch = todo[:limit]
+    that fails halfway has still saved its work.
+
+    `offset` skips past the ones that already failed: without it every call
+    starts at the same head of the queue, and one stubborn clip means the
+    whole backlog is retried instead of worked through -- two hours of
+    re-encoding the same three files.
+    """
+    todo = sorted(unprocessed_videos(), key=lambda item: item.media_ref)
+    batch = todo[offset:offset + limit]
     processed: list[str] = []
     failed: dict[str, str] = {}
     own_client = client is None

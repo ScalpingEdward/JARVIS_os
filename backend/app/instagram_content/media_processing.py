@@ -78,7 +78,11 @@ _HDR_TRANSFERS = frozenset({"arib-std-b67", "smpte2084"})
 
 FFPROBE_BINARY = "ffprobe"
 
-_TIMEOUT_SECONDS = 300.0
+#: Five minutes was not enough once exposure, structure and grain joined the
+#: chain: a 4K HDR clip spends most of its time in the float tone map, and
+#: several perfectly fine videos were cut off mid-encode. Fifteen minutes is
+#: still short enough that a genuinely stuck ffmpeg is noticed the same day.
+_TIMEOUT_SECONDS = float(os.getenv("AURON_FFMPEG_TIMEOUT_SECONDS", "900"))
 
 
 class MediaProcessingError(RuntimeError):
@@ -286,7 +290,10 @@ def process_video(
     command += ["-vf", ",".join(filters)]
     command += [
         "-threads", _FFMPEG_THREADS,
-        "-c:v", "libx264", "-preset", "medium", "-crf", "18",
+        # "fast" rather than "medium": at crf 18 and 1080x1920 the visible
+        # difference is nil, the encode is roughly a third quicker, and this
+        # runs on a laptop that also has to stay usable.
+        "-c:v", "libx264", "-preset", "fast", "-crf", "18",
         "-pix_fmt", "yuv420p",       # what every player and Instagram expects
         "-movflags", "+faststart",   # metadata at the front, so playback starts immediately
         "-c:a", "aac", "-b:a", "192k",
