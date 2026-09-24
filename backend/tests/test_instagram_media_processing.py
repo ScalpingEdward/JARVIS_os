@@ -432,3 +432,40 @@ def test_ingest_grades_a_photo_from_its_original_bytes(tmp_path, monkeypatch):
     assert item.processed_file == "photo-1.jpg"
     assert (Path(os.environ["JARVIS_PROCESSED_DIR"]) / "photo-1.jpg").is_file()
     assert pool.pending_uploads().count == 1, "the graded photo must be queued for upload like a video"
+
+
+# -- the finishing pass: exposure, structure, grain ---------------------------
+
+
+def test_the_finishing_pass_runs_after_the_grade_and_in_order():
+    """Exposure before structure before grain: sharpening a lifted shadow
+    keeps what was rescued, and grain on top stays grain."""
+    from app.instagram_content.media_processing import _build_video_filters
+
+    chain = _build_video_filters(None, Path("/lut/INSTA.cube"))
+    names = [f.split("=")[0] for f in chain]
+
+    assert names == ["lut3d", "curves", "unsharp", "noise"]
+
+
+def test_a_photo_really_comes_out_with_grain_and_more_structure(source_image, tmp_path):
+    """Measured, not asserted on the command line: grain and sharpening both
+    raise local variation, so the finished file is measurably less flat."""
+    from PIL import Image, ImageStat
+
+    from app.instagram_content.media_processing import _build_video_filters
+
+    plain = tmp_path / "plain.jpg"
+    subprocess.run(
+        ["ffmpeg", "-y", "-i", str(source_image), "-vf", ",".join(_build_video_filters(
+            None, None, finish=False)) or "null", "-q:v", "2", str(plain)],
+        capture_output=True, check=True,
+    )
+    finished = process_image(source_image, ratio=None, output_name="finished.jpg")
+
+    def detail(path) -> float:
+        with Image.open(path) as image:
+            return ImageStat.Stat(image.convert("L").filter(
+                __import__("PIL.ImageFilter", fromlist=["ImageFilter"]).FIND_EDGES)).mean[0]
+
+    assert detail(finished.path) > detail(plain)

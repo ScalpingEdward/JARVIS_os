@@ -178,6 +178,26 @@ def _fit_filter(max_edge: int) -> str:
     )
 
 
+#: The three finishing steps Brano picked on 2026-09-24, after comparing his
+#: own preset against three alternatives on his own photos (landscape,
+#: outfit, city, portrait, desk). The colour stays his Lightroom look -- the
+#: alternatives read better on concrete and worse on nature -- and what was
+#: missing sits on top of it:
+#:
+#: * exposure: shadows lifted a little, highlights pulled back a little, so
+#:   a black shirt keeps its detail and a white wall does not blow out. This
+#:   is the "Tiefen +, Lichter -" move in the reference photos he sent.
+#: * structure: a light unsharp pass, which is what makes brick, fabric and
+#:   stone read as photographed rather than snapped.
+#: * grain: fine (7 of 100). Enough to break up flat sky into film; more
+#:   turns to mush once Instagram compresses the upload again.
+_FINISH_FILTERS = [
+    "curves=all=0/0 0.25/0.30 0.75/0.73 1/1",
+    "unsharp=5:5:0.6:3:3:0.3",
+    "noise=alls=7:allf=t",
+]
+
+
 #: HDR -> SDR. The LUT is a Lightroom look built on SDR Rec.709; applied to
 #: HLG values it lands on the wrong colours. Linearise, map the highlights
 #: down with hable, and hand the LUT the Rec.709 picture it was made for.
@@ -197,6 +217,7 @@ def _build_video_filters(
     *,
     max_edge: int | None = None,
     tone_map: bool = False,
+    finish: bool = True,
 ) -> list[str]:
     # Order matters for cost: crop and shrink first, so the tone map and the
     # LUT -- both per-pixel float work -- only ever see the pixels that ship.
@@ -212,6 +233,12 @@ def _build_video_filters(
         # path would otherwise be read as further filter arguments.
         escaped = str(lut).replace("\\", "/").replace(":", "\\:")
         filters.append(f"lut3d='{escaped}'")
+    if finish:
+        # Last, and in this order: exposure before structure before grain.
+        # Sharpening a lifted shadow keeps the detail that was rescued, and
+        # grain laid on top stays grain instead of being sharpened into
+        # speckle.
+        filters.extend(_FINISH_FILTERS)
     return filters
 
 
