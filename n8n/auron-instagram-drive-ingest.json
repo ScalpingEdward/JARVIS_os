@@ -375,6 +375,37 @@
       ],
       "executeOnce": true,
       "notes": "Ohne diesen Schritt weiss AURON nicht, wo die bearbeitete Datei liegt, und der Post wuerde weiter das Original nehmen."
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "auron-ingest",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "e1000000-0000-4000-8000-000000000001",
+      "name": "Webhook: /auron-ingest",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -2928,
+        400
+      ],
+      "webhookId": "b4f1c6d8-2a77-4f5e-9c30-1d8a6b2e7f45",
+      "notes": "Same run as the 09:00 schedule, on a trigger that can be pulled from outside n8n. `n8n execute --id` looks like it works and quietly does nothing in this version, which left every ingest depending on someone clicking in the UI."
+    },
+    {
+      "parameters": {
+        "jsCode": "// The ingest reads Drive and writes to the pool; the same secret guards\n// it as the other AURON webhooks.\nconst expected = $env.AURON_DRIVE_FETCH_SECRET;\nconst given = (($input.first().json.headers) || {})['x-auron-secret'];\nif (!expected || given !== expected) {\n  throw new Error('wrong or missing X-Auron-Secret');\n}\nreturn [{ json: {} }];"
+      },
+      "id": "e1000000-0000-4000-8000-000000000002",
+      "name": "Ingest: Secret pruefen",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2700,
+        400
+      ]
     }
   ],
   "connections": {
@@ -571,6 +602,28 @@
         [
           {
             "node": "AURON: Drive-ID merken v10",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook: /auron-ingest": {
+      "main": [
+        [
+          {
+            "node": "Ingest: Secret pruefen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ingest: Secret pruefen": {
+      "main": [
+        [
+          {
+            "node": "AURON: Load Known Refs v7",
             "type": "main",
             "index": 0
           }
