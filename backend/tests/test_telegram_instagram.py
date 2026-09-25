@@ -459,3 +459,58 @@ def test_failing_to_send_the_files_does_not_undo_the_approval():
 
     assert decided.status == ContentStatus.approved
     assert any("konnte ich aber nicht schicken" in m for m in telegram.plain)
+
+
+# -- auto publish -----------------------------------------------------------
+
+
+def test_approving_publishes_when_the_switch_is_on(monkeypatch):
+    """Instagram can add music to a post that is already up, so approval can
+    mean posting. The switch stays off until the path has run for real."""
+    from app.telegram_instagram import service as service_module
+
+    monkeypatch.setattr(service_module, "auto_publish_enabled", lambda: True)
+    published: list = []
+
+    class _Published:
+        published_media_id = "ig-42"
+
+    monkeypatch.setattr(service_module.instagram_content_service, "publish",
+                        lambda cid: (published.append(cid), _Published())[1])
+
+    telegram, preview = FakeTelegram(), FakePreview()
+    candidate = _carousel()
+    _service(telegram, preview=preview).handle_update(_tap_on(candidate.id, tokens.PUBLISH_OK))
+
+    assert published == [candidate.id]
+    assert preview.files_sent == [] if hasattr(preview, "files_sent") else True
+    assert any("Musik hinzufuegen" in m for m in telegram.plain)
+
+
+def test_a_failed_publish_still_puts_the_files_on_the_phone(monkeypatch):
+    from app.instagram_content.service import InstagramContentError
+    from app.telegram_instagram import service as service_module
+
+    monkeypatch.setattr(service_module, "auto_publish_enabled", lambda: True)
+    monkeypatch.setattr(service_module.instagram_content_service, "publish",
+                        lambda cid: (_ for _ in ()).throw(InstagramContentError("graph api said no")))
+
+    telegram, preview = FakeTelegram(), FakePreview()
+    candidate = _carousel()
+    _service(telegram, preview=preview).handle_update(_tap_on(candidate.id, tokens.PUBLISH_OK))
+
+    assert any("nicht geklappt" in m for m in telegram.plain)
+    assert preview.files_sent == [["a", "b", "c"]], "an evening is not lost to a Graph API hiccup"
+
+
+def test_with_the_switch_off_nothing_is_posted(monkeypatch):
+    from app.telegram_instagram import service as service_module
+
+    monkeypatch.setattr(service_module, "auto_publish_enabled", lambda: False)
+    monkeypatch.setattr(service_module.instagram_content_service, "publish",
+                        lambda cid: (_ for _ in ()).throw(AssertionError("must not publish")))
+
+    telegram, preview = FakeTelegram(), FakePreview()
+    _service(telegram, preview=preview).handle_update(_tap_on(_carousel().id, tokens.PUBLISH_OK))
+
+    assert preview.files_sent == [["a", "b", "c"]]

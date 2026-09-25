@@ -23,6 +23,7 @@ from app.instagram_content.service import InstagramContentError, instagram_conte
 from app.notification_hub.telegram_delivery import TelegramDeliveryClient, TelegramDeliveryError
 
 from . import tokens
+from .publish_mode import auto_publish_enabled
 from .preview import PostPreviewSender, PreviewError
 from .models import (
     InstagramAuditRecord,
@@ -361,10 +362,39 @@ class TelegramInstagramService:
 
         self._record("decide", True, decided.status.value, candidate_id, actor)
         if approved:
-            self._send_post_pack(decided)
+            if auto_publish_enabled():
+                self._publish_now(decided)
+            else:
+                self._send_post_pack(decided)
         else:
             self._safe_send("Abgelehnt. Die Medien bleiben vergeben, der Post geht nicht raus.")
         return decided
+
+    def _publish_now(self, candidate: ContentCandidate) -> None:
+        """Post it, then tell Brano to put the music on.
+
+        Instagram's own edit screen can add audio to a post that is already
+        up -- he checked. That is what makes full automation possible at
+        all: no API can attach music, but he can, afterwards, in twenty
+        seconds. The post is live without music for those seconds, which is
+        the whole price.
+
+        A failed publish falls back to the manual pack, loudly: the files
+        and the caption still reach the phone, so an evening is not lost to
+        a Graph API hiccup.
+        """
+        try:
+            published = instagram_content_service.publish(candidate.id)
+        except InstagramContentError as exc:
+            self._record("publish", False, str(exc), candidate.id)
+            self._safe_send(f"Posten hat nicht geklappt: {exc} -- Dateien kommen gleich, dann von Hand.")
+            self._send_post_pack(candidate)
+            return
+        self._record("publish", True, f"media_id={published.published_media_id}", candidate.id)
+        self._safe_send(
+            "Ist online. Jetzt in Instagram oeffnen, beim Beitrag auf die drei Punkte, "
+            "Bearbeiten, Musik hinzufuegen."
+        )
 
     def _send_post_pack(self, candidate: ContentCandidate) -> None:
         """What Brano needs to post it himself: the files in full quality,

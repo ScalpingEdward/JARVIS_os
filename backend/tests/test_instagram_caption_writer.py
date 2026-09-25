@@ -228,3 +228,59 @@ def test_the_allowed_list_covers_every_pillar_and_holds_no_duplicates():
     flat = [tag for tags in ALLOWED_BY_PILLAR.values() for tag in tags]
     assert len(flat) == len(set(flat)), "a tag listed under two pillars would be maintained twice"
     assert all(tag == tag.lower() and tag.startswith("#") for tag in ALLOWED)
+
+
+def test_publishing_sends_the_processed_file_not_the_phone_original():
+    """Every edit -- cut, grade, exposure, crop -- lives in the processed
+    file. Posting media_ref would have quietly undone all of it."""
+    from app.instagram_content import media_pool_service as pool_module
+    from app.instagram_content.media_pool_models import ProcessedUploadedRequest
+    from app.instagram_content.models import ContentCandidateCreate, ContentDecision, MediaItem
+
+    pool_module.media_pool_service.reset()
+    pool_module.media_pool_service.ingest(MediaPoolIngestRequest(items=[_image_create("orig-1")]))
+    pool_module.media_pool_service.set_processed_file("orig-1", "orig-1.jpg")
+    pool_module.media_pool_service.record_processed_uploads(ProcessedUploadedRequest(
+        items=[{"media_ref": "orig-1", "processed_media_ref": "drive-processed-1"}]))
+
+    seen: dict = {}
+
+    def publisher_handler(request: httpx.Request) -> httpx.Response:
+        seen["body"] = json.loads(request.content)
+        return httpx.Response(200, json={"media_id": "ig-1"})
+
+    service = _service_with_mocks(publisher_handler)
+    service.reset()
+    candidate = service.propose(ContentCandidateCreate(
+        media_items=[MediaItem(media_ref="orig-1", media_type="image", aesthetic_score=0.8)],
+        caption_draft="Quiet. #trading #discipline #mindset",
+    ))
+    service.decide(candidate.id, ContentDecision(approved=True, reason="test"))
+    service.publish(candidate.id)
+
+    assert seen["body"]["media_items"][0]["post_ref"] == "drive-processed-1"
+    assert seen["body"]["media_items"][0]["media_ref"] == "orig-1", "the original stays named, for the record"
+
+
+def test_publishing_refuses_when_the_processed_file_never_reached_drive():
+    from app.instagram_content import media_pool_service as pool_module
+    from app.instagram_content.models import ContentCandidateCreate, ContentDecision, MediaItem
+    from app.instagram_content.models import ContentStatus as Status
+
+    pool_module.media_pool_service.reset()
+    pool_module.media_pool_service.ingest(MediaPoolIngestRequest(items=[_image_create("orig-2")]))
+
+    def publisher_handler(request: httpx.Request) -> httpx.Response:  # pragma: no cover
+        raise AssertionError("nothing may reach Instagram without a processed file")
+
+    service = _service_with_mocks(publisher_handler)
+    service.reset()
+    candidate = service.propose(ContentCandidateCreate(
+        media_items=[MediaItem(media_ref="orig-2", media_type="image", aesthetic_score=0.8)],
+        caption_draft="Quiet. #trading #discipline #mindset",
+    ))
+    service.decide(candidate.id, ContentDecision(approved=True, reason="test"))
+
+    with pytest.raises(InstagramContentError, match="no processed file in Drive"):
+        service.publish(candidate.id)
+    assert service.get(candidate.id).status == Status.post_failed, "loud, and retryable once the upload ran"

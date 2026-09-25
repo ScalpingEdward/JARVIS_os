@@ -195,6 +195,20 @@ def process_existing_videos(limit: int = 3, offset: int = 0) -> dict:
     return run(limit=max(1, min(limit, 10)), offset=max(0, offset))
 
 
+@router.get("/media-pool/current-processed-refs")
+def current_processed_refs() -> dict:
+    """The Drive ids of the processed files that are actually in use.
+
+    Anything else in the "AURON fertig" folder is a leftover from an earlier
+    render: Drive keeps a second file when a name repeats instead of
+    replacing it, so every re-render doubled the folder. AURON itself was
+    never confused -- it stores the id, not the name -- but the folder was.
+    """
+    refs = [item.processed_media_ref for item in media_pool_service.list_all()
+            if item.processed_media_ref]
+    return {"count": len(refs), "refs": refs}
+
+
 @router.get("/media-pool/pending-uploads", response_model=PendingUploadList)
 def pending_uploads() -> PendingUploadList:
     """Processed files that exist only on disk so far.

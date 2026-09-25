@@ -51,7 +51,13 @@ class N8nInstagramPublisher:
         edit_plan: list[EditInstruction],
         caption: str,
         request_id: str,
+        post_refs: dict[str, str] | None = None,
     ) -> str:
+        """post_refs maps a media_ref to the Drive id that should actually be
+        posted -- the processed file, cut, graded and finished. Without it
+        n8n would hand Instagram the untouched phone original, which is what
+        it did until now: the whole editing chain existed and nothing of it
+        ever reached the feed."""
         client, should_close = (self._client, False) if self._client else (httpx.Client(), True)
         try:
             response = client.post(
@@ -59,7 +65,11 @@ class N8nInstagramPublisher:
                 json={
                     "request_id": request_id,
                     "post_format": post_format.value,
-                    "media_items": [item.model_dump(mode="json") for item in media_items],
+                    "media_items": [
+                        {**item.model_dump(mode="json"),
+                         "post_ref": (post_refs or {}).get(item.media_ref, item.media_ref)}
+                        for item in media_items
+                    ],
                     "edit_plan": [instruction.model_dump(mode="json") for instruction in edit_plan],
                     "caption": caption,
                 },

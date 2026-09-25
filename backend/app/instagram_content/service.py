@@ -233,6 +233,31 @@ class InstagramContentService:
             session.commit()
         return item
 
+    @staticmethod
+    def _post_refs(item: ContentCandidate) -> dict[str, str]:
+        """The Drive id of the processed file for every item in this post.
+
+        Refuses rather than falling back to the original: posting the
+        untouched phone file would look like success and quietly undo every
+        edit -- the cut, the grade, the exposure, the crop. If a processed
+        version is missing the honest answer is "not yet", not a worse post.
+        """
+        by_ref = {pool.media_ref: pool for pool in media_pool_service.list_all()}
+        refs: dict[str, str] = {}
+        missing: list[str] = []
+        for media in item.media_items:
+            pool_item = by_ref.get(media.media_ref)
+            if pool_item is None or not pool_item.processed_media_ref:
+                missing.append(media.media_ref)
+                continue
+            refs[media.media_ref] = pool_item.processed_media_ref
+        if missing:
+            raise InstagramContentError(
+                "no processed file in Drive for " + ", ".join(missing)
+                + " -- posting the untouched original would throw away the edit"
+            )
+        return refs
+
     def mark_posted_manually(self, candidate_id: UUID, by: str) -> ContentCandidate:
         """Brano posted this one himself, in the Instagram app.
 
@@ -321,12 +346,14 @@ class InstagramContentService:
                 session.commit()
 
         try:
+            post_refs = self._post_refs(item)
             media_id = self._publisher.publish(
                 media_items=item.media_items,
                 post_format=item.post_format,
                 edit_plan=item.edit_plan,
                 caption=item.caption_draft,
                 request_id=str(item.id),
+                post_refs=post_refs,
             )
         except Exception as exc:
             # Deliberately broad: N8nInstagramPublisherError isn't the only
