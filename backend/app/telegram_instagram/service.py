@@ -189,6 +189,10 @@ class TelegramInstagramService:
             preview_problem = str(exc)
             self._record("preview", False, preview_problem, candidate_id)
 
+        return self._send_card(candidate, preview_problem)
+
+    def _send_card(self, candidate: ContentCandidate, preview_problem: str | None = None) -> int:
+        candidate_id = candidate.id
         secret = self.config.callback_secret
         keyboard = [[
             {"text": "✅ Freigeben",
@@ -196,6 +200,10 @@ class TelegramInstagramService:
             {"text": "❌ Ablehnen",
              "callback_data": tokens.make_token(secret, candidate_id, tokens.DECLINE)},
         ]]
+        keyboard.append([
+            {"text": "🔁 Neue Caption",
+             "callback_data": tokens.make_token(secret, candidate_id, tokens.NEW_CAPTION)},
+        ])
         count = len(candidate.media_items)
         if count > 1:
             removes = [
@@ -321,6 +329,20 @@ class TelegramInstagramService:
         message_id = (query.get("message") or {}).get("message_id")
         if message_id is not None:
             self._safe_clear_keyboard(int(message_id))
+
+        if action == tokens.NEW_CAPTION:
+            try:
+                rewritten = instagram_content_service.regenerate_caption(candidate_id)
+            except InstagramContentError as exc:
+                self._record("caption", False, str(exc), candidate_id, actor)
+                self._safe_send(f"Neue Caption hat nicht geklappt: {exc}")
+                raise TelegramInstagramError(str(exc)) from exc
+            self._record("caption", True, "rewritten", candidate_id, actor)
+            # The pictures were already sent and have not changed; sending
+            # the album again would push the card off the screen for a text
+            # change.
+            self._send_card(rewritten)
+            return rewritten
 
         if action == tokens.POSTED:
             try:

@@ -258,6 +258,32 @@ class InstagramContentService:
             )
         return refs
 
+    def regenerate_caption(self, candidate_id: UUID) -> ContentCandidate:
+        """Write a new caption for a post that is still awaiting a decision.
+
+        The pictures are the part that took a day to shoot; a caption is one
+        API call. Rejecting a whole post because the words missed would
+        throw away the wrong half.
+        """
+        item = self.get(candidate_id)
+        if item.status != ContentStatus.proposed:
+            raise InstagramContentError(f"Cannot rewrite the caption of a candidate in status {item.status}")
+        pool_items = [
+            pool for pool in media_pool_service.list_all()
+            if pool.media_ref in {media.media_ref for media in item.media_items}
+        ]
+        theme = pool_items[0].theme if pool_items else "lifestyle"
+        try:
+            caption = self._caption_writer.generate(theme, pool_items, item.post_format.value)
+        except CaptionWriterError as exc:
+            raise InstagramContentError(f"Caption generation failed: {exc}") from exc
+        item.caption_draft = caption
+        item.hook_warnings = check_hook(caption)
+        item.audit_log.append("Caption rewritten on request.")
+        item.updated_at = datetime.now(timezone.utc)
+        self._save_candidate(item)
+        return item
+
     def mark_posted_manually(self, candidate_id: UUID, by: str) -> ContentCandidate:
         """Brano posted this one himself, in the Instagram app.
 

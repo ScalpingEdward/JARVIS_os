@@ -347,14 +347,14 @@ def test_the_post_is_shown_before_the_card_and_every_item_can_be_taken_out():
     assert preview.shown == [["a", "b", "c"]]
     text, keyboard = telegram.sent[0]
     labels = [button["text"] for row in keyboard for button in row]
-    assert labels == ["✅ Freigeben", "❌ Ablehnen", "1 raus", "2 raus", "3 raus"]
+    assert labels == ["✅ Freigeben", "❌ Ablehnen", "🔁 Neue Caption", "1 raus", "2 raus", "3 raus"]
 
 
 def test_a_single_item_post_offers_no_remove_button():
     telegram = FakeTelegram()
     _service(telegram).notify(_candidate().id)
     labels = [button["text"] for row in telegram.sent[0][1] for button in row]
-    assert labels == ["✅ Freigeben", "❌ Ablehnen"]
+    assert labels == ["✅ Freigeben", "❌ Ablehnen", "🔁 Neue Caption"]
 
 
 def test_tapping_2_raus_removes_that_item_and_shows_the_post_again():
@@ -514,3 +514,42 @@ def test_with_the_switch_off_nothing_is_posted(monkeypatch):
     _service(telegram, preview=preview).handle_update(_tap_on(_carousel().id, tokens.PUBLISH_OK))
 
     assert preview.files_sent == [["a", "b", "c"]]
+
+
+# -- a different caption ----------------------------------------------------
+
+
+def test_the_card_offers_a_new_caption():
+    telegram = FakeTelegram()
+    _service(telegram).notify(_carousel().id)
+    labels = [b["text"] for row in telegram.sent[0][1] for b in row]
+    assert "🔁 Neue Caption" in labels
+
+
+def test_tapping_it_rewrites_the_words_and_keeps_the_pictures(monkeypatch):
+    """The photos took a day to shoot, the caption is one API call. Rejecting
+    the post because the words missed would throw away the wrong half."""
+    from app.telegram_instagram import service as service_module
+
+    telegram, preview = FakeTelegram(), FakePreview()
+    candidate = _carousel()
+    monkeypatch.setattr(service_module.instagram_content_service, "regenerate_caption",
+                        lambda cid: service_module.instagram_content_service.get(cid))
+
+    service = _service(telegram, preview=preview)
+    service.handle_update(_tap_on(candidate.id, tokens.NEW_CAPTION))
+
+    assert preview.shown == [], "the album is not sent again for a text change"
+    assert len(telegram.sent) == 1, "one new card, with the buttons back"
+    assert telegram.cleared == [555], "and the old card's buttons are gone"
+
+
+def test_a_caption_rewrite_is_refused_once_the_post_is_decided():
+    from app.instagram_content.models import ContentDecision
+    from app.instagram_content.service import InstagramContentError
+
+    candidate = _carousel()
+    InstagramContentService().decide(candidate.id, ContentDecision(approved=False, reason="no"))
+
+    with pytest.raises(InstagramContentError, match="Cannot rewrite the caption"):
+        InstagramContentService().regenerate_caption(candidate.id)
