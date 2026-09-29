@@ -438,17 +438,17 @@ def test_ingest_grades_a_photo_from_its_original_bytes(tmp_path, monkeypatch):
 
 
 def test_the_finishing_pass_runs_after_the_grade_and_in_order():
-    """Exposure before structure before grain: sharpening a lifted shadow
-    keeps what was rescued, and grain on top stays grain."""
+    """Exposure first, then structure: sharpening a lifted shadow keeps the
+    detail that was rescued rather than the noise that was not."""
     from app.instagram_content.media_processing import _build_video_filters
 
     chain = _build_video_filters(None, Path("/lut/INSTA.cube"))
     names = [f.split("=")[0] for f in chain]
 
-    assert names == ["lut3d", "curves", "unsharp", "noise"]
+    assert names == ["lut3d", "curves", "unsharp"]
 
 
-def test_a_photo_really_comes_out_with_grain_and_more_structure(source_image, tmp_path):
+def test_a_photo_really_comes_out_with_more_structure(source_image, tmp_path):
     """Measured, not asserted on the command line: grain and sharpening both
     raise local variation, so the finished file is measurably less flat."""
     from PIL import Image, ImageStat

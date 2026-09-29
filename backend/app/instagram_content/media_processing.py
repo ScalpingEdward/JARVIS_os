@@ -182,23 +182,23 @@ def _fit_filter(max_edge: int) -> str:
     )
 
 
-#: The three finishing steps Brano picked on 2026-09-24, after comparing his
-#: own preset against three alternatives on his own photos (landscape,
-#: outfit, city, portrait, desk). The colour stays his Lightroom look -- the
-#: alternatives read better on concrete and worse on nature -- and what was
-#: missing sits on top of it:
+#: The finishing pass, as Brano chose it on 2026-09-29 after comparing
+#: three steps on his own photos. His Lightroom colour stays untouched; two
+#: things sit on top of it:
 #:
-#: * exposure: shadows lifted a little, highlights pulled back a little, so
-#:   a black shirt keeps its detail and a white wall does not blow out. This
-#:   is the "Tiefen +, Lichter -" move in the reference photos he sent.
-#: * structure: a light unsharp pass, which is what makes brick, fabric and
-#:   stone read as photographed rather than snapped.
-#: * grain: fine (7 of 100). Enough to break up flat sky into film; more
-#:   turns to mush once Instagram compresses the upload again.
+#: * exposure: shadows opened and highlights pulled back, enough that the
+#:   inside of a dark blazer keeps its folds and a palm against the sky
+#:   reads almost three-dimensional.
+#: * structure: a firm unsharp pass. This is also the one dial with a
+#:   visible cost -- too much of it paints a bright halo along hard edges
+#:   (palm leaves against sky), which looked like "over-filtered" grain and
+#:   was not grain at all.
+#:
+#: Film grain was in here for a day and is deliberately gone: it broke up
+#: smooth sky into speckle once Instagram re-compressed the upload.
 _FINISH_FILTERS = [
-    "curves=all=0/0 0.25/0.30 0.75/0.73 1/1",
-    "unsharp=5:5:0.6:3:3:0.3",
-    "noise=alls=7:allf=t",
+    "curves=all=0/0 0.25/0.33 0.75/0.70 1/1",
+    "unsharp=5:5:0.8:3:3:0.4",
 ]
 
 
