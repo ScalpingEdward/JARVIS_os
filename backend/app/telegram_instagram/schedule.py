@@ -24,7 +24,7 @@ from dataclasses import dataclass
 from datetime import date, datetime
 from zoneinfo import ZoneInfo
 
-from app.instagram_content.models import ContentStatus
+from app.instagram_content.models import ContentStatus, PostFormat
 from app.instagram_content.service import instagram_content_service
 
 from .service import TelegramInstagramError, telegram_instagram_service
@@ -49,11 +49,34 @@ FEED_SLOT = Slot(12, 0, "feed")
 REEL_SLOT = Slot(19, 0, "reel")
 
 
-def slot_for(day: date, slots: tuple[Slot, Slot] = (FEED_SLOT, REEL_SLOT)) -> Slot:
-    """The one slot this day has. Alternates on the calendar itself, not on
-    a counter, so a day the laptop was off does not shift the rhythm for
-    every day after it."""
-    return slots[day.toordinal() % 2]
+def last_posted_kind() -> str | None:
+    """"reel" or "feed" of the post that actually went out last, or None if
+    nothing ever did."""
+    posted = [c for c in instagram_content_service.list_all() if c.status == ContentStatus.posted]
+    if not posted:
+        return None
+    latest = max(posted, key=lambda c: c.updated_at)
+    return "reel" if latest.post_format == PostFormat.reel else "feed"
+
+
+def posted_today(today: date) -> bool:
+    return any(
+        c.status == ContentStatus.posted and c.updated_at.date() == today
+        for c in instagram_content_service.list_all()
+    )
+
+
+def next_slot(slots: tuple[Slot, Slot] = (FEED_SLOT, REEL_SLOT)) -> Slot:
+    """Which sort is due next: the opposite of what went out last.
+
+    Was the calendar's parity before, and that silently dropped a whole sort
+    whenever its day was skipped -- a Reel day spent waiting for an
+    undecided card meant the next Reel was two days later, and the feed kept
+    its turn. The alternation now follows what really got posted, so a
+    skipped day postpones that sort instead of losing it.
+    """
+    feed, reel = slots
+    return feed if last_posted_kind() == "reel" else reel if last_posted_kind() == "feed" else feed
 
 
 def _timezone() -> ZoneInfo:
@@ -82,8 +105,12 @@ class PostingScheduler:
         return sorted(self._fired)
 
     def due(self, now: datetime) -> Slot | None:
-        slot = slot_for(now.date(), self.slots)
+        slot = next_slot(self.slots)
         if self._fired.get((now.date(), slot.hour, slot.minute)):
+            return None
+        # One post a day, whatever the clock says: a Reel that becomes due
+        # at 19:00 because a photo went out at 12:00 would make two.
+        if posted_today(now.date()):
             return None
         minutes_late = (now.hour - slot.hour) * 60 + (now.minute - slot.minute)
         return slot if 0 <= minutes_late <= _GRACE_MINUTES else None
@@ -117,7 +144,7 @@ class PostingScheduler:
 
     def start(self) -> None:
         self._task = asyncio.create_task(self._run())
-        log.info("posting schedule started, alternating daily: %s", ", ".join(
+        log.info("posting schedule started, one a day alternating: %s", ", ".join(
             f"{s.hour:02d}:{s.minute:02d} {s.kind}" for s in self.slots))
 
     async def stop(self) -> None:
