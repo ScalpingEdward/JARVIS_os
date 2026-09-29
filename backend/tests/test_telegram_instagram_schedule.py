@@ -32,67 +32,77 @@ def _at(hour: int, minute: int = 0) -> datetime:
     return datetime(2026, 9, 23, hour, minute)
 
 
-def _posted(kind: str, when: datetime):
-    """A post that really went out, of this sort, at this time."""
-    from app.instagram_content.models import ContentCandidateCreate, ContentDecision
+def _draft(kind: str, day: int):
+    """One pending draft of this sort, shot on this day."""
+    from app.instagram_content.media_pool_models import MediaPoolIngestRequest, MediaPoolItemCreate
 
-    service = InstagramContentService()
-    media = ([MediaItem(media_ref=f"clip-{when.isoformat()}", media_type="video",
-                        aesthetic_score=0.8, duration_seconds=20.0)] if kind == "reel"
-             else [MediaItem(media_ref=f"pic-{when.isoformat()}", media_type="image", aesthetic_score=0.8)])
-    candidate = service.propose(ContentCandidateCreate(
-        media_items=media, caption_draft="Quiet. #trading #discipline #mindset"))
-    service.decide(candidate.id, ContentDecision(approved=True, reason="test"))
+    ref = f"{kind}-{day}"
+    media_pool_service.ingest(MediaPoolIngestRequest(items=[MediaPoolItemCreate(
+        media_ref=ref, media_type="video" if kind == "reel" else "image",
+        theme="t", aesthetic_score=0.8,
+        duration_seconds=20.0 if kind == "reel" else None,
+        captured_at=datetime(2024, 1, day, 12, 0, tzinfo=timezone.utc),
+        captured_at_source="exif")]))
+    return ref
+
+
+def test_the_queue_decides_what_is_next_and_the_sort_only_decides_the_hour():
+    """Shoot-day order wins: photos from the 1st go before a Reel from the
+    3rd, and the Reel's evening slot does not let it overtake them."""
+    from app.telegram_instagram.schedule import next_slot
+
+    from app.instagram_content.media_pool_models import MediaPoolIngestRequest, MediaPoolItemCreate
+
+    _draft("reel", 3)
+    media_pool_service.ingest(MediaPoolIngestRequest(items=[
+        MediaPoolItemCreate(media_ref=f"photo-{i}", media_type="image", theme="t",
+                            aesthetic_score=0.5,
+                            captured_at=datetime(2024, 1, 1, 12, 0, tzinfo=timezone.utc),
+                            captured_at_source="exif")
+        for i in range(3)]))
+    media_pool_service.run_curation()
+
+    assert next_slot() == FEED_SLOT, "the oldest day is a photo day"
+
+
+def test_with_a_reel_at_the_head_the_card_is_due_in_the_evening():
+    from app.telegram_instagram.schedule import next_slot
+
+    _draft("reel", 1)
+    media_pool_service.run_curation()
+
+    assert next_slot() == REEL_SLOT
+
+
+def test_with_nothing_in_the_queue_the_midday_slot_stands():
+    from app.telegram_instagram.schedule import next_slot
+
+    assert next_slot() == FEED_SLOT
+
+
+def test_only_one_post_a_day():
+    from app.instagram_content.models import ContentCandidateCreate, ContentDecision
     from app.db import SessionLocal
     from app.db_models import InstagramContentCandidateRow
     from app.instagram_content.models import ContentCandidate, ContentStatus
 
+    service = InstagramContentService()
+    candidate = service.propose(ContentCandidateCreate(
+        media_items=[MediaItem(media_ref="x", media_type="image", aesthetic_score=0.8)],
+        caption_draft="Quiet. #trading #discipline #mindset"))
+    service.decide(candidate.id, ContentDecision(approved=True, reason="test"))
+    now = datetime.now(timezone.utc)
     with SessionLocal() as session:
         row = session.get(InstagramContentCandidateRow, str(candidate.id))
         item = ContentCandidate.model_validate_json(row.data)
         item.status = ContentStatus.posted
-        item.updated_at = when
-        row.status = item.status.value
-        row.data = item.model_dump_json()
+        item.updated_at = now
+        row.status, row.data = item.status.value, item.model_dump_json()
         session.commit()
-    return candidate
 
-
-def test_the_next_sort_follows_what_was_really_posted():
-    """Calendar parity dropped a whole sort whenever its day was skipped: a
-    Reel day spent waiting for an undecided card meant the next Reel came
-    two days later, while the feed kept its turn."""
-    from app.telegram_instagram.schedule import next_slot
-
-    assert next_slot() == FEED_SLOT, "nothing posted yet -- start with a feed post"
-
-    _posted("feed", datetime(2026, 9, 20, 12, 0, tzinfo=timezone.utc))
-    assert next_slot() == REEL_SLOT
-
-    _posted("reel", datetime(2026, 9, 21, 19, 0, tzinfo=timezone.utc))
-    assert next_slot() == FEED_SLOT
-
-
-def test_a_skipped_day_postpones_the_sort_instead_of_losing_it():
-    from app.telegram_instagram.schedule import next_slot
-
-    _posted("feed", datetime(2026, 9, 20, 12, 0, tzinfo=timezone.utc))
     scheduler = PostingScheduler()
-
-    # The Reel day passes with a card still open: nothing is sent.
-    assert next_slot() == REEL_SLOT
-    # Two days later the Reel is still the one that is due.
-    assert scheduler.due(datetime(2026, 9, 23, 19, 0)).kind == "reel"
-
-
-def test_only_one_post_a_day_even_when_the_other_sort_is_due():
-    from datetime import timezone as tz
-
-    today = datetime.now(tz.utc)
-    _posted("feed", today)
-    scheduler = PostingScheduler()
-
-    assert scheduler.due(datetime(today.year, today.month, today.day, 19, 0)) is None
+    assert scheduler.due(datetime(now.year, now.month, now.day, 12, 0)) is None
+    assert scheduler.due(datetime(now.year, now.month, now.day, 19, 0)) is None
 
 
 def test_a_fired_slot_does_not_fire_again_the_same_day_but_does_the_next(monkeypatch):
@@ -120,21 +130,21 @@ def test_a_slot_with_an_undecided_card_open_sends_nothing(monkeypatch):
     assert sent == []
 
 
-def test_the_evening_slot_asks_for_a_reel_and_the_midday_slot_for_a_feed_post(monkeypatch):
+def test_firing_takes_the_head_of_the_queue_without_asking_for_a_sort(monkeypatch):
+    """The slot's hour came from the head draft; asking again for that sort
+    could hand out a different post than the one the hour was chosen for."""
     monkeypatch.setattr(schedule_module, "waiting_for_a_decision", lambda: False)
-    asked: list = []
+    calls: list = []
 
     class _Result:
         candidate_id = "x"
 
     monkeypatch.setattr(schedule_module.telegram_instagram_service, "finalize_next_and_notify",
-                        lambda **kwargs: (asked.append(kwargs["kind"]), _Result())[1])
+                        lambda **kwargs: (calls.append(kwargs), _Result())[1])
 
-    scheduler = PostingScheduler()
-    scheduler.fire(Slot(12, 0, "feed"), _at(12, 0))
-    scheduler.fire(Slot(19, 0, "reel"), _at(19, 0))
+    PostingScheduler().fire(Slot(19, 0, "reel"), _at(19, 0))
 
-    assert asked == ["feed", "reel"]
+    assert calls == [{}], "no kind filter -- the queue's head is the post that is due"
 
 
 def test_an_empty_queue_is_reported_and_not_retried_every_minute(monkeypatch):

@@ -1,13 +1,12 @@
 """The card arrives when the post should go out, not when someone asks.
 
-One post a day at most, alternating: a feed post at midday on one day, a
-Reel in the evening on the next. Two cards a day was the first version and
-Brano stopped it -- posting twice a day burns the backlog faster than it
-refills and reads as noise on a growing account. The times come from the
-2026 data (evening for Reels, where they reach people who do not follow
-the account yet; midday for feed posts). The card is the start of Brano's
-own posting minute -- files, caption, music picked in the app -- so it has
-to land at the time the post should go up, not hours earlier.
+One post a day at most, and which post is never a matter of the calendar:
+the queue is shoot-day order, oldest day first, and a day is exhausted
+before the next begins. Whether that next post is a Reel or a carousel only
+decides the hour -- evening for a Reel, where Reels reach people who do not
+follow the account yet, midday for a feed post. Alternating by day was the
+version before this one, and it let a Reel from a later shoot overtake
+photos from the day before it.
 
 Deliberately simple: a minute tick, a local clock, and one memory of what
 already fired today. A slot missed because the laptop was asleep is not
@@ -24,7 +23,8 @@ from dataclasses import dataclass
 from datetime import date, datetime
 from zoneinfo import ZoneInfo
 
-from app.instagram_content.models import ContentStatus, PostFormat
+from app.instagram_content.media_pool_service import media_pool_service
+from app.instagram_content.models import ContentStatus
 from app.instagram_content.service import instagram_content_service
 
 from .service import TelegramInstagramError, telegram_instagram_service
@@ -49,14 +49,19 @@ FEED_SLOT = Slot(12, 0, "feed")
 REEL_SLOT = Slot(19, 0, "reel")
 
 
-def last_posted_kind() -> str | None:
-    """"reel" or "feed" of the post that actually went out last, or None if
-    nothing ever did."""
-    posted = [c for c in instagram_content_service.list_all() if c.status == ContentStatus.posted]
-    if not posted:
+def next_draft_kind() -> str | None:
+    """The sort of the next draft in the queue, or None when nothing waits.
+
+    The queue's order is the shoot day, oldest first, and one day is
+    exhausted before the next begins. That order decides what goes out --
+    not an alternation between sorts: alternating by calendar meant a Reel
+    from a later shoot could jump ahead of photos from the day before it,
+    and the feed stopped telling the days in the order they happened.
+    """
+    drafts = media_pool_service.list_drafts(pending_only=True)
+    if not drafts:
         return None
-    latest = max(posted, key=lambda c: c.updated_at)
-    return "reel" if latest.post_format == PostFormat.reel else "feed"
+    return telegram_instagram_service._draft_kind(drafts[0])
 
 
 def posted_today(today: date) -> bool:
@@ -67,16 +72,11 @@ def posted_today(today: date) -> bool:
 
 
 def next_slot(slots: tuple[Slot, Slot] = (FEED_SLOT, REEL_SLOT)) -> Slot:
-    """Which sort is due next: the opposite of what went out last.
-
-    Was the calendar's parity before, and that silently dropped a whole sort
-    whenever its day was skipped -- a Reel day spent waiting for an
-    undecided card meant the next Reel was two days later, and the feed kept
-    its turn. The alternation now follows what really got posted, so a
-    skipped day postpones that sort instead of losing it.
-    """
+    """When today's card is due: the time that belongs to the sort of the
+    next draft. A Reel is worth the evening, a feed post the midday hour --
+    but which of them comes next is the queue's decision, not the clock's."""
     feed, reel = slots
-    return feed if last_posted_kind() == "reel" else reel if last_posted_kind() == "feed" else feed
+    return reel if next_draft_kind() == "reel" else feed
 
 
 def _timezone() -> ZoneInfo:
@@ -123,7 +123,9 @@ class PostingScheduler:
         if waiting_for_a_decision():
             return "skipped: a card is still waiting for a decision"
         try:
-            result = telegram_instagram_service.finalize_next_and_notify(kind=slot.kind)
+            # No kind filter: the head of the queue is the post that is due,
+            # and the slot's time was chosen from that same head.
+            result = telegram_instagram_service.finalize_next_and_notify()
         except TelegramInstagramError as exc:
             return f"nothing sent: {exc}"
         return f"sent candidate {result.candidate_id}"

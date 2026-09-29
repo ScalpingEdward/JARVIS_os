@@ -46,7 +46,7 @@ def schedule_status() -> dict:
     all -- otherwise "it is enabled" is a claim nobody can check."""
     from datetime import datetime
 
-    from .schedule import _timezone, last_posted_kind, next_slot, posted_today, posting_scheduler, waiting_for_a_decision
+    from .schedule import _timezone, next_draft_kind, next_slot, posted_today, posting_scheduler, waiting_for_a_decision
 
     now = datetime.now(_timezone())
     due = next_slot()
@@ -54,7 +54,7 @@ def schedule_status() -> dict:
         "running": posting_scheduler.is_running,
         "now": now.isoformat(timespec="seconds"),
         "next": f"{due.hour:02d}:{due.minute:02d} {due.kind}",
-        "last_posted": last_posted_kind(),
+        "next_kind": next_draft_kind(),
         "already_posted_today": posted_today(now.date()),
         "already_fired_today": [
             f"{hour:02d}:{minute:02d}"

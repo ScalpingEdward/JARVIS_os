@@ -65,10 +65,13 @@ Ziel der Instagram-Seite: Reichweite aufbauen fuer den Weg zum hauptberuflichen 
     laufen aktuell ueber Instagram Login, Umstellung noetig), Brano gibt frei,
     AURON postet. Spricht Brano im Video: Musik leise darunter
     (audio_volume/video_volume) oder keine.
-  * Zeiten: **ein Post pro Tag, im Wechsel** -- Fotos/Carousel 12:00, Reel
-    19:00 (schedule.py). Zwei Karten am Tag waren die erste Version und
-    wurden gestoppt: verbrennt den Vorrat und wirkt wie Laerm. Nach 4 Wochen
-    gegen eigene Insights pruefen.
+  * Zeiten: **ein Post pro Tag**, und WELCHER entscheidet die Warteschlange,
+    nicht der Kalender: aeltester Aufnahmetag zuerst, ein Tag wird
+    abgearbeitet bevor der naechste beginnt. Die Sorte bestimmt nur die
+    Uhrzeit -- Reel 19:00, Foto/Carousel 12:00 (schedule.py). Zwei Versionen
+    davor waren falsch: zwei Karten taeglich (verbrennt den Vorrat) und
+    Wechsel nach Kalender/letztem Post (liess ein Reel vom 3. die Fotos vom
+    1. ueberholen). Nach 4 Wochen gegen eigene Insights pruefen.
   * Verworfen (2026-09-23): Instagram-Oberflaeche lokal per Browser
     fernsteuern, um Musik zu setzen. Brano hat im Web geprueft -- **die
     Web-Oberflaeche bietet bei Foto-Posts gar keine Musikauswahl**, und
