@@ -35,6 +35,37 @@ Ziel der Instagram-Seite: Reichweite aufbauen fuer den Weg zum hauptberuflichen 
   Pool-Eintraege), Prefilter der "im Pool" mit "fertig analysiert" gleichsetzte,
   abgeschnittene Datei die ffprobe mit voller Dauer passierte.
 
+## Bildbearbeitung: zwei Wege, nicht einer
+- Zwei Drittel der Fotos im Pool kamen schon aus Lightroom Mobile (EXIF
+  Software = "Adobe Lightroom ... (iOS)"). Die trugen Brano's Look bereits in
+  den Pixeln und bekamen ihn durch INSTA.cube ein zweites Mal -- sie sahen
+  knallig aus, waehrend rohe Kameradateien daneben wie unbearbeitet wirkten.
+  Brano hat das an zwei Bildern gesehen, bevor eine Messung es sagte.
+  Seitdem: `developed_by()` liest EXIF Software, und es gibt zwei Ketten.
+  * schon entwickelt -> kein LUT, keine Kurve, nur eq=saturation=1.05 und
+    halbe Schaerfe.
+  * Kameradatei oder kein EXIF -> LUT + Kurve + Angleichung + Schaerfe.
+- Die Angleichung wurde gemessen, nicht geschaetzt: dasselbe Foto dreimal
+  (roh / AURON / Lightroom), ueber drei Szenen (Himmel, Innenpool, graues
+  Autocockpit). Blau war das Einzige, das in allen dreien in dieselbe
+  Richtung fehlte, und zwar proportional zum Blauanteil (+11,6 / +11,8 /
+  +2,3) -- deshalb `colorchannelmixer=bb=1.06`, ein Faktor, kein Zuschlag.
+  `eq=brightness=0.015`, weil kleinere Werte die YUV-Rundung nicht
+  ueberleben (0.008 kam dunkler heraus als gar nichts).
+- Saettigung und Kontrast bleiben absichtlich ungeregelt. Sie wichen ueber
+  dieselben drei Bilder zwischen -9 und +17,6 ab, in beide Richtungen:
+  Lightroom entscheidet sie pro Bild (Dynamik gewichtet nach vorhandener
+  Farbe). Jeder feste Wert waere fuer ein Bild richtig und fuer zwei falsch.
+  Wer das "nachbessert", macht es schlechter.
+- Was eine .cube grundsaetzlich nicht kann: Weissabgleich pro Bild, Klarheit,
+  Textur, Dunst, Objektivkorrektur. Masken spielen keine Rolle -- die gibt es
+  in Lightroom Mobile nur mit Premium, und Brano hat das nicht.
+- Richtiger Weg fuer neue Fotos: Brano entwickelt in LR, laedt den Export
+  hoch, AURON fasst die Farbe nicht an. Videos kommen als Original und werden
+  bearbeitet. Verworfen: LR Classic ueber einen ueberwachten Ordner
+  fernsteuern -- PC und LR muessten laufen, der Export braucht trotzdem einen
+  Klick, und Brano's Vorgabe liegt in LR Mobile, das keinen solchen Ordner hat.
+
 ## Content-Strategie Instagram
 - Phase 1 (ab 2026-09-23, Brano): sichtbares Thema ist **Lifestyle** --
   Travel, Portrait, Gym, Essen. **Trading-BILDER duerfen rein** (Screens,

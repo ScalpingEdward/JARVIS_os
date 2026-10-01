@@ -185,6 +185,17 @@ def grade_existing_photos(limit: int = 20) -> dict:
     return run(limit=max(1, min(limit, 50)))
 
 
+@router.post("/media-pool/regrade-developed-photos")
+def regrade_developed_photos(limit: int = 20, offset: int = 0, which: str = "developed") -> dict:
+    """Re-grade the photos that got the LUT on top of a grade Lightroom had
+    already baked in. Walk with `offset` until it reaches `photos_total`;
+    camera originals are recognised and left alone."""
+    from .photo_backfill import regrade_developed_photos as run
+
+    return run(limit=max(1, min(limit, 50)), offset=max(0, offset),
+               which="camera" if which == "camera" else "developed")
+
+
 @router.post("/media-pool/process-existing-videos")
 def process_existing_videos(limit: int = 3, offset: int = 0) -> dict:
     """Cut and grade up to `limit` videos that entered the pool before the
