@@ -100,6 +100,9 @@ class ProcessedMedia:
     trimmed_to: float | None = None
     graded: bool = False
     tone_mapped: bool = False
+    #: The editor the source came out of, when it had already been
+    #: developed. Set means the LUT was deliberately skipped.
+    developed_by: str | None = None
 
     @property
     def was_trimmed(self) -> bool:
@@ -198,8 +201,62 @@ def _fit_filter(max_edge: int) -> str:
 #: smooth sky into speckle once Instagram re-compressed the upload.
 _FINISH_FILTERS = [
     "curves=all=0/0 0.25/0.33 0.75/0.70 1/1",
+    # Measured against the same three photos developed in Lightroom
+    # (2026-10-01): a sky, an indoor pool, a grey car interior. Blue was
+    # the only channel that missed in all three, and it missed in
+    # proportion to how much blue the picture held -- 11.6 and 11.8 points
+    # in the two blue scenes against 2.3 in the grey one. A factor, then,
+    # not an offset, which is why this is a mixer and not a colour
+    # balance. The brightness is the smallest step that survives the
+    # conversion to YUV at all: 0.008 came out a point *darker* than
+    # nothing, eaten by rounding.
+    #
+    # Saturation and contrast are deliberately not corrected. They missed
+    # by -9 to +17.6 across the same three photos, in both directions --
+    # Lightroom decides them per image, and any fixed value here would be
+    # right for one photo and wrong for the next two.
+    "colorchannelmixer=bb=1.06",
+    "eq=brightness=0.015",
     "unsharp=5:5:0.8:3:3:0.4",
 ]
+
+
+#: Software names that mean the file arrived already developed. Lightroom
+#: and Camera Raw write themselves into EXIF Software on export, and when
+#: they do, Brano's look is already in the pixels -- laying the LUT on top
+#: applies it a second time. That is what made some photos read as garish
+#: while untouched camera files looked barely processed: one grade versus
+#: two, from one and the same pass.
+_DEVELOPED_BY = ("lightroom", "camera raw", "photoshop", "capture one")
+
+#: What an already developed photo still gets. No LUT and no exposure
+#: curve -- Lightroom did both, per image and on raw data, better than a
+#: fixed table can. What is left is the little that serves the upload: a
+#: whisper more colour, as Brano asked for ("ganz, ganz bisschen"), and
+#: half the sharpening, because an export is already sharpened once.
+_DEVELOPED_FINISH_FILTERS = [
+    "eq=saturation=1.05",
+    "unsharp=5:5:0.4:3:3:0.2",
+]
+
+
+def developed_by(source: Path) -> str | None:
+    """The editor a file came out of, or None for a camera original.
+
+    Read from EXIF Software, which is where Lightroom names itself. A file
+    without EXIF (a messenger copy, a screenshot) counts as a camera
+    original: treating an unknown file as finished would leave genuinely
+    flat photos ungraded, which is the worse of the two mistakes.
+    """
+    try:
+        from PIL import Image
+
+        with Image.open(source) as image:
+            software = str(image.getexif().get(0x0131) or "")
+    except Exception:  # noqa: BLE001 -- unreadable EXIF is simply no answer
+        return None
+    lowered = software.lower()
+    return software.strip() or None if any(n in lowered for n in _DEVELOPED_BY) else None
 
 
 #: HDR -> SDR. The LUT is a Lightroom look built on SDR Rec.709; applied to
@@ -222,6 +279,7 @@ def _build_video_filters(
     max_edge: int | None = None,
     tone_map: bool = False,
     finish: bool = True,
+    finish_filters: list[str] | None = None,
 ) -> list[str]:
     # Order matters for cost: crop and shrink first, so the tone map and the
     # LUT -- both per-pixel float work -- only ever see the pixels that ship.
@@ -242,7 +300,7 @@ def _build_video_filters(
         # Sharpening a lifted shadow keeps the detail that was rescued, and
         # grain laid on top stays grain instead of being sharpened into
         # speckle.
-        filters.extend(_FINISH_FILTERS)
+        filters.extend(_FINISH_FILTERS if finish_filters is None else finish_filters)
     return filters
 
 
@@ -350,14 +408,26 @@ def process_image(
     identical crop arithmetic and the identical LUT applied the identical
     way. Two implementations of "the account's look" would drift, and the
     whole point of one grade is that a feed reads as one feed.
+
+    A photo that already came out of Lightroom is the exception, and not a
+    small one: its grade is in the pixels, so the LUT and the exposure curve
+    are skipped and only the upload pass runs. One chain for both sorts
+    cannot be right -- it grades one of them twice.
     """
     if not source.is_file():
         raise MediaProcessingError(f"no such image: {source}")
 
-    lut = lut_path()
+    developed = developed_by(source)
+    lut = None if developed else lut_path()
+    if developed:
+        logger.info("%s came out of %s -- skipping the LUT, it is already graded",
+                    source.name, developed)
     destination = _destination(source, output_name)
     upright = _upright_copy(source)
-    filters = _build_video_filters(ratio, lut, max_edge=max_edge)
+    filters = _build_video_filters(
+        ratio, lut, max_edge=max_edge,
+        finish_filters=_DEVELOPED_FINISH_FILTERS if developed else None,
+    )
     command = [FFMPEG_BINARY, "-y", "-i", str(upright or source)]
     if filters:
         command += ["-vf", ",".join(filters)]
@@ -373,7 +443,8 @@ def process_image(
             f"ffmpeg could not process {source.name}: "
             f"{completed.stderr.decode('utf-8', 'replace').strip()[-400:]}"
         )
-    return ProcessedMedia(path=destination, cropped_to=ratio, graded=lut is not None)
+    return ProcessedMedia(path=destination, cropped_to=ratio, graded=lut is not None,
+                          developed_by=developed)
 
 
 def _destination(source: Path, output_name: str | None) -> Path:

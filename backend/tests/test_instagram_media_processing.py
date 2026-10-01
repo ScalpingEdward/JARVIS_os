@@ -445,7 +445,7 @@ def test_the_finishing_pass_runs_after_the_grade_and_in_order():
     chain = _build_video_filters(None, Path("/lut/INSTA.cube"))
     names = [f.split("=")[0] for f in chain]
 
-    assert names == ["lut3d", "curves", "unsharp"]
+    assert names == ["lut3d", "curves", "colorchannelmixer", "eq", "unsharp"]
 
 
 def test_a_photo_really_comes_out_with_more_structure(source_image, tmp_path):
@@ -469,3 +469,112 @@ def test_a_photo_really_comes_out_with_more_structure(source_image, tmp_path):
                 __import__("PIL.ImageFilter", fromlist=["ImageFilter"]).FIND_EDGES)).mean[0]
 
     assert detail(finished.path) > detail(plain)
+
+
+# -- already developed files -------------------------------------------------
+
+
+def _with_software(source: Path, name: str, destination: Path) -> Path:
+    """The same photo, but claiming in EXIF to have come out of `name`."""
+    from PIL import Image
+
+    with Image.open(source) as image:
+        exif = image.getexif()
+        exif[0x0131] = name
+        image.save(destination, exif=exif)
+    return destination
+
+
+def test_a_lightroom_export_is_recognised_as_already_developed(source_image, tmp_path):
+    from app.instagram_content.media_processing import developed_by
+
+    export = _with_software(source_image, "Adobe Lightroom 11.2.1", tmp_path / "lr.jpg")
+
+    assert developed_by(export) == "Adobe Lightroom 11.2.1"
+
+
+def test_a_camera_original_is_not_taken_for_a_developed_file(source_image, tmp_path):
+    """iOS writes its version into the same field. Reading any value as
+    "already edited" would leave every phone photo ungraded."""
+    from app.instagram_content.media_processing import developed_by
+
+    from_phone = _with_software(source_image, "18.6.2", tmp_path / "ios.jpg")
+
+    assert developed_by(from_phone) is None
+    assert developed_by(source_image) is None, "no EXIF at all is a camera original too"
+
+
+def test_an_already_developed_photo_is_not_graded_a_second_time(source_image, tmp_path, monkeypatch):
+    """The bug this exists for: Brano's look baked in by Lightroom, then the
+    same look applied again from the LUT -- garish, while untouched camera
+    files out of the same run looked barely processed."""
+    lut = tmp_path / "look.cube"
+    lut.write_text("LUT_3D_SIZE 2\n" + "\n".join(
+        f"{r} {g} {b}" for b in (0, 1) for g in (0, 1) for r in (0, 1)), encoding="utf-8")
+    monkeypatch.setenv("AURON_COLOR_LUT", str(lut))
+    export = _with_software(source_image, "Adobe Lightroom 11.2.1", tmp_path / "lr.jpg")
+
+    result = process_image(export, ratio=None, output_name="lr_out.jpg")
+
+    assert result.developed_by == "Adobe Lightroom 11.2.1"
+    assert result.graded is False, "its grade was already in the pixels"
+
+
+def test_a_camera_original_still_gets_the_full_chain(source_image, monkeypatch, tmp_path):
+    lut = tmp_path / "look.cube"
+    lut.write_text("LUT_3D_SIZE 2\n" + "\n".join(
+        f"{r} {g} {b}" for b in (0, 1) for g in (0, 1) for r in (0, 1)), encoding="utf-8")
+    monkeypatch.setenv("AURON_COLOR_LUT", str(lut))
+
+    result = process_image(source_image, ratio=None, output_name="cam_out.jpg")
+
+    assert result.developed_by is None
+    assert result.graded is True
+
+
+def test_a_developed_photo_keeps_the_exposure_curve_off_but_still_gets_sharpening():
+    """What is left for an export is the upload pass only: no curve, because
+    Lightroom set the exposure per image and better than a fixed table."""
+    from app.instagram_content.media_processing import (
+        _DEVELOPED_FINISH_FILTERS,
+        _build_video_filters,
+    )
+
+    chain = _build_video_filters(None, None, finish_filters=_DEVELOPED_FINISH_FILTERS)
+    names = [f.split("=")[0] for f in chain]
+
+    assert names == ["eq", "unsharp"]
+    assert "curves" not in names
+
+
+def test_the_blue_lift_scales_with_the_blue_in_the_picture(tmp_path):
+    """Measured, and measured as the mixer's own contribution: Lightroom's
+    blue sat higher in proportion to how much blue a photo held, so the
+    correction has to be a factor. An offset would overshoot a grey
+    interior by as much as it corrected a sky.
+
+    The whole chain cannot answer this -- the exposure curve pulls bright
+    blues back down, so a lifted sky nets out smaller than a lifted
+    dashboard. What is compared here is the same chain with the mixer and
+    without it.
+    """
+    from PIL import Image, ImageStat
+
+    from app.instagram_content.media_processing import _FINISH_FILTERS, _build_video_filters
+
+    with_mixer = ",".join(_build_video_filters(None, None))
+    without = ",".join(f for f in _FINISH_FILTERS if not f.startswith("colorchannelmixer"))
+
+    def blue_after(chain: str, value: int, tag: str) -> float:
+        flat = tmp_path / f"flat{value}.png"
+        Image.new("RGB", (64, 64), (80, 80, value)).save(flat)
+        out = tmp_path / f"out{value}{tag}.png"
+        subprocess.run(["ffmpeg", "-y", "-i", str(flat), "-vf", chain, str(out)],
+                       capture_output=True, check=True)
+        with Image.open(out) as image:
+            return ImageStat.Stat(image.convert("RGB")).mean[2]
+
+    little = blue_after(with_mixer, 60, "a") - blue_after(without, 60, "b")
+    much = blue_after(with_mixer, 180, "a") - blue_after(without, 180, "b")
+
+    assert much > little * 1.5, "the bluer picture must gain more blue"
