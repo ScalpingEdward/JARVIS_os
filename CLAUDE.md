@@ -111,7 +111,11 @@ Ziel der Instagram-Seite: Reichweite aufbauen fuer den Weg zum hauptberuflichen 
     nur Reels, nur "Instagram API with Facebook Login"; wir laufen ueber
     Instagram Login). Bis dahin verweigert publish_mode.auto_publish_refusal
     jedes automatische Posten mit Begruendung -- der Schalter allein reicht
-    nicht mehr. Spricht Brano im Video: Musik leise darunter oder keine.
+    nicht mehr -- **nur fuer Reels**. Fotos und Karussells posten sich
+    weiter selbst, Brano legt die Musik danach im Bearbeiten-Fenster nach
+    (das geht dort, er hat es im September geprueft). Sie mit
+    zurueckzuhalten waere Mehraufwand fuer ihn statt weniger.
+    Spricht Brano im Video: Musik leise darunter oder keine.
   * Zeiten: **ein Post pro Tag**, und WELCHER entscheidet die Warteschlange,
     nicht der Kalender: aeltester Aufnahmetag zuerst, ein Tag wird
     abgearbeitet bevor der naechste beginnt. Die Sorte bestimmt nur die

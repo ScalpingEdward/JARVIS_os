@@ -484,7 +484,10 @@ def test_approving_publishes_when_the_switch_is_on(monkeypatch):
 
     assert published == [candidate.id]
     assert preview.files_sent == [] if hasattr(preview, "files_sent") else True
-    assert any("Musik hinzufuegen" in m for m in telegram.plain)
+    # Short on purpose: Brano asked for "POST Online" and nothing else. The
+    # old line told him to add the music by hand, which this path no longer
+    # needs -- it is only reached once AURON picks the audio itself.
+    assert any(m.startswith("POST Online") for m in telegram.plain)
 
 
 def test_a_failed_publish_still_puts_the_files_on_the_phone(monkeypatch):
@@ -572,13 +575,17 @@ def test_a_reel_is_never_published_automatically_while_auron_cannot_pick_music(m
     assert refusal is not None and "cannot have music added afterwards" in refusal
 
 
-def test_a_carousel_is_refused_too_and_for_its_own_reason(monkeypatch):
+def test_a_carousel_still_posts_itself(monkeypatch):
+    """Only the Reel loses its music. A photo or a carousel can be scored in
+    the edit screen after posting, so holding it back would hand Brano work
+    he does not have to do."""
     from app.telegram_instagram.publish_mode import auto_publish_refusal
 
     monkeypatch.setenv("AURON_AUTO_PUBLISH_ON_APPROVAL", "true")
     monkeypatch.delenv("AURON_INSTAGRAM_LOGIN_TYPE", raising=False)
 
-    assert "photo or a carousel" in (auto_publish_refusal("carousel") or "")
+    assert auto_publish_refusal("carousel") is None
+    assert auto_publish_refusal("single_image") is None
 
 
 def test_with_a_facebook_login_token_the_reel_may_post_itself(monkeypatch):

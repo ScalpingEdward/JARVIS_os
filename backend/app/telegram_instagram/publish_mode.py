@@ -12,10 +12,10 @@ handing the Graph API an `audio_id`. That second way needs the
 "Instagram API with Facebook Login" token type; this account runs on
 Instagram Login, so it does not exist yet.
 
-Music is mandatory atmosphere here, not a nice-to-have. So nothing
-publishes itself until AURON can actually choose the audio: the files and
-the caption go to the phone instead, and Brano posts with music. The
-switch below stays, because that is the day it flips back -- not a deploy.
+Music is mandatory atmosphere here, not a nice-to-have. So Reels wait for
+the files-to-the-phone path until AURON can choose the audio itself.
+Photos and carousels are untouched: they post themselves and Brano scores
+them afterwards, which is less work for him, not more.
 """
 
 from __future__ import annotations
@@ -36,14 +36,19 @@ def can_choose_audio() -> bool:
 
 def auto_publish_refusal(post_format: str) -> str | None:
     """Why this post must not be published automatically, or None when it
-    may be. Worded for the log and for the message to Brano."""
+    may be.
+
+    Only a Reel is held back. A photo or a carousel posted by API can still
+    be scored afterwards in Instagram's edit screen -- Brano checked that in
+    September and it is what made automatic posting worth having. Holding
+    those back too would hand him work he does not have to do, which is the
+    opposite of the point.
+    """
     if not auto_publish_enabled():
         return "automatic publishing is switched off"
-    if can_choose_audio():
+    if post_format != "reel" or can_choose_audio():
         return None
-    if post_format == "reel":
-        return (
-            "a Reel posted through the API cannot have music added afterwards -- "
-            "its edit screen offers none"
-        )
-    return "no API can attach music to a photo or a carousel"
+    return (
+        "a Reel posted through the API cannot have music added afterwards -- "
+        "its edit screen offers none"
+    )

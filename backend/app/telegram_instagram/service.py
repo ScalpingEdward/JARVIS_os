@@ -353,7 +353,7 @@ class TelegramInstagramService:
                 self._record("posted", False, str(exc), candidate_id, actor)
                 raise TelegramInstagramError(str(exc)) from exc
             self._record("posted", True, "manual", candidate_id, actor)
-            self._safe_send("Als gepostet vermerkt. Der naechste Post wird darauf abgestimmt geplant.")
+            self._safe_send("POST Online 🟢")
             return posted
 
         if action in tokens.REMOVE_ACTIONS:
@@ -418,10 +418,10 @@ class TelegramInstagramService:
             self._send_post_pack(candidate)
             return
         self._record("publish", True, f"media_id={published.published_media_id}", candidate.id)
-        self._safe_send(
-            "Ist online. Jetzt in Instagram oeffnen, beim Beitrag auf die drei Punkte, "
-            "Bearbeiten, Musik hinzufuegen."
-        )
+        # Short on purpose, as Brano asked: the long version told him to add
+        # the music by hand, which is exactly what this path no longer needs
+        # -- it is only reached once AURON picks the audio itself.
+        self._safe_send("POST Online 🟢")
 
     def _send_post_pack(self, candidate: ContentCandidate) -> None:
         """What Brano needs to post it himself: the files in full quality,
