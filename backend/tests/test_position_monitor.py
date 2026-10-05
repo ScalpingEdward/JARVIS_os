@@ -32,6 +32,10 @@ def _reset_shared_state():
     each test needs a clean slate for the audit trail, the pinned
     original-stop-loss table, and the last-notified-state table."""
     PositionMonitorService().reset()
+    # The MT5 bridge keeps its terminals in Postgres now, so a terminal
+    # registered by one test is still there for the next -- and these tests
+    # share one fixed login, which register() rightly refuses twice.
+    MT5BridgeService().reset()
     yield
 
 NOW = datetime(2026, 9, 7, 12, 0, tzinfo=timezone.utc)
@@ -49,6 +53,21 @@ def rig(tmp_path):
         bridge_service=bridge, accounts_service=accounts, clock=lambda: NOW,
     )
     return monitor, accounts, bridge, break_even, trailing
+
+
+def _backdate_heartbeat(bridge, terminal_id, when):
+    """Age a terminal's last heartbeat, the way time would.
+
+    The bridge keeps its terminals in Postgres now, so there is no dict to
+    reach into; this goes through the same load/save the service uses.
+    """
+    from app.db import SessionLocal
+
+    with SessionLocal() as session:
+        data = bridge._load(session, terminal_id)
+        data.terminal.last_heartbeat_at = when
+        bridge._save(session, data)
+        session.commit()
 
 
 def _register_account(accounts: AccountRegistryService, login: int = LOGIN):
@@ -129,8 +148,7 @@ def test_trailing_honestly_reports_stream_unavailable_when_disconnected(rig):
     _push_position(bridge, terminal.id, open_price=1.10000, stop_loss=1.09900, current_price=1.10500)
 
     # Simulate the terminal having gone silent well past the staleness window.
-    internal = bridge._items[terminal.id]
-    internal.terminal.last_heartbeat_at = NOW - timedelta(minutes=5)
+    _backdate_heartbeat(bridge, terminal.id, NOW - timedelta(minutes=5))
     bridge.refresh_states(NOW)
 
     result = monitor.tick()
@@ -518,8 +536,7 @@ def test_break_even_is_also_structurally_blocked_by_the_honest_trailing_precondi
     _register_account(accounts)
     terminal = _register_terminal(bridge)
     _push_position(bridge, terminal.id, open_price=1.10000, stop_loss=1.09900, current_price=1.10500)
-    internal = bridge._items[terminal.id]
-    internal.terminal.last_heartbeat_at = NOW - timedelta(minutes=5)
+    _backdate_heartbeat(bridge, terminal.id, NOW - timedelta(minutes=5))
     bridge.refresh_states(NOW)
 
     result = monitor.tick()

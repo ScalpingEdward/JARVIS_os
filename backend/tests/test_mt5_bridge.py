@@ -3,6 +3,7 @@ from datetime import datetime, timedelta, timezone
 import pytest
 
 from app.mt5_bridge.models import (
+    MT5SymbolSpec,
     MT5AccountSnapshot,
     MT5ConnectionState,
     MT5Heartbeat,
@@ -89,17 +90,31 @@ def test_multi_terminal_registration_and_duplicate_protection() -> None:
         _terminal()
 
 
+def _backdate_heartbeat(bridge, terminal_id, when):
+    """Age a terminal's last heartbeat, the way time would.
+
+    The bridge keeps its terminals in Postgres now, so there is no dict to
+    reach into; this goes through the same load/save the service uses.
+    """
+    from app.db import SessionLocal
+
+    with SessionLocal() as session:
+        data = bridge._load(session, terminal_id)
+        data.terminal.last_heartbeat_at = when
+        bridge._save(session, data)
+        session.commit()
+
+
 def test_stale_and_disconnected_states_are_derived_from_heartbeat_age() -> None:
     terminal = _terminal()
     mt5_bridge_service.heartbeat(terminal.id, MT5Heartbeat(bridge_version="2.1.0", latency_ms=10))
     now = datetime.now(timezone.utc)
-    internal = mt5_bridge_service._items[terminal.id]
-    internal.terminal.last_heartbeat_at = now - timedelta(seconds=45)
+    _backdate_heartbeat(mt5_bridge_service, terminal.id, now - timedelta(seconds=45))
     mt5_bridge_service.refresh_states(now)
-    assert internal.terminal.state == MT5ConnectionState.stale
-    internal.terminal.last_heartbeat_at = now - timedelta(minutes=3)
+    assert mt5_bridge_service.get(terminal.id).terminal.state == MT5ConnectionState.stale
+    _backdate_heartbeat(mt5_bridge_service, terminal.id, now - timedelta(minutes=3))
     mt5_bridge_service.refresh_states(now)
-    assert internal.terminal.state == MT5ConnectionState.disconnected
+    assert mt5_bridge_service.get(terminal.id).terminal.state == MT5ConnectionState.disconnected
 
 
 # -- sequence gap detection ---------------------------------------------
@@ -165,3 +180,61 @@ def test_a_restart_resetting_to_a_low_sequence_is_correctly_flagged_as_a_gap() -
     _ingest(terminal.id, sequence=500)
     data = _ingest(terminal.id, sequence=1)  # pusher restarted
     assert data.sequence_contiguous is False
+
+
+# -- it has to survive a restart --------------------------------------------
+
+
+def test_a_terminal_and_its_snapshot_survive_a_fresh_service_instance():
+    """The bridge kept everything in a dict in the api process, so a rebuild
+    of the container threw away the registration, the balance, the ticks and
+    the contract specs -- while the pusher on Brano's machine went on sending
+    to a terminal_id saved in its own state file, which no longer existed."""
+    from app.mt5_bridge.service import MT5BridgeService
+
+    terminal = _terminal()
+    mt5_bridge_service.ingest(terminal.id, MT5SnapshotIngest(
+        account=MT5AccountSnapshot(
+            balance=10000.0, equity=10050.0, margin=0.0, free_margin=10050.0,
+            margin_level=None, floating_pnl=50.0, daily_pnl=0.0, currency="EUR"),
+        symbols=[MT5SymbolSpec(
+            symbol="XAUUSD", point=0.01, digits=2, volume_min=0.01, volume_max=50.0,
+            volume_step=0.01, trade_contract_size=100.0, trade_tick_size=0.01,
+            trade_tick_value=1.0)],
+    ))
+
+    after_restart = MT5BridgeService().get(terminal.id)
+
+    assert after_restart.account.balance == 10000.0
+    assert [s.symbol for s in after_restart.symbols] == ["XAUUSD"]
+    assert after_restart.terminal.account_login == terminal.account_login
+
+
+def test_the_same_terminal_cannot_register_twice_across_a_restart():
+    """The duplicate check used to look at one process's dict; registering
+    the same account twice after a rebuild would have left two records and
+    two terminal_ids for one terminal."""
+    from app.mt5_bridge.service import MT5BridgeService
+
+    terminal = _terminal()
+
+    with pytest.raises(MT5BridgeError):
+        MT5BridgeService().register(MT5TerminalRegister(
+            name="again", terminal_path="C:/again", account_login=terminal.account_login,
+            broker="Broker", server=terminal.server, read_only=True))
+
+
+def test_a_terminal_can_be_forgotten():
+    """Records outlive the process now, so a dry run or a wrong login would
+    otherwise sit there forever -- and a stale record with another account
+    number is what confuses the (login, server) match the accounts registry
+    relies on."""
+    from app.mt5_bridge.service import MT5BridgeService
+
+    terminal = _terminal()
+
+    mt5_bridge_service.forget(terminal.id)
+
+    assert MT5BridgeService().list() == []
+    with pytest.raises(MT5BridgeError):
+        mt5_bridge_service.forget(terminal.id)
