@@ -59,3 +59,45 @@ def test_a_favourite_is_never_set_by_an_analysis():
     """Only Brano sets it -- an ingest must not be able to declare its own
     item a favourite and jump the quality bar."""
     assert "favorite" not in MediaPoolItemCreate.model_fields
+
+
+# -- and the other direction -------------------------------------------------
+
+
+def test_an_item_brano_vetoed_never_goes_solo_however_it_scored():
+    """Lowering the bar to 0.62 promoted eleven videos. He watched them and
+    said three do not carry a Reel -- a still frame cannot see pace or a
+    reveal. Without a veto the number would have overruled his eye."""
+    from app.instagram_content.curation import curate
+    from app.instagram_content.media_pool_models import MediaPoolIngestRequest, MediaPoolItemCreate
+    from app.instagram_content.media_pool_service import media_pool_service
+
+    media_pool_service.ingest(MediaPoolIngestRequest(items=[
+        MediaPoolItemCreate(media_ref="strong", media_type="video", theme="t",
+                            aesthetic_score=0.72, duration_seconds=20.0),
+        MediaPoolItemCreate(media_ref="vetoed", media_type="video", theme="t",
+                            aesthetic_score=0.72, duration_seconds=20.0),
+    ]))
+    media_pool_service.set_never_solo("vetoed")
+
+    groups = curate(media_pool_service.list_all())
+    solo_refs = {g.media_items[0].media_ref for g in groups if len(g.media_items) == 1}
+
+    assert "strong" in solo_refs
+    assert "vetoed" not in solo_refs
+
+
+def test_the_veto_clears_a_favourite_rather_than_fighting_it():
+    """Both set would be a contradiction with no obvious winner, and the
+    later decision is the one he just made."""
+    from app.instagram_content.media_pool_models import MediaPoolIngestRequest, MediaPoolItemCreate
+    from app.instagram_content.media_pool_service import media_pool_service
+
+    media_pool_service.ingest(MediaPoolIngestRequest(items=[MediaPoolItemCreate(
+        media_ref="clip", media_type="video", theme="t", aesthetic_score=0.2,
+        duration_seconds=20.0)]))
+    media_pool_service.set_favorite("clip")
+
+    item = media_pool_service.set_never_solo("clip")
+
+    assert item.never_solo is True and item.favorite is False

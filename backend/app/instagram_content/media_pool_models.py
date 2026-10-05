@@ -122,6 +122,13 @@ class MediaPoolItem(MediaPoolItemCreate):
     #: its score -- he knows what the moment was worth, the score only sees
     #: pixels. Never set by the analysis.
     favorite: bool = False
+    #: Brano looked at this one and said it does not carry a post alone.
+    #: The counterpart to `favorite`: the score can lift an item to a solo
+    #: post, and nothing could push one back down, so lowering the bar to
+    #: 0.62 would have overruled a judgement he had already made on three
+    #: specific videos. A still frame cannot see what makes a clip work --
+    #: his eye outranks the number in both directions.
+    never_solo: bool = False
     used: bool = False
     used_in_candidate_id: UUID | None = None
     used_at: datetime | None = None

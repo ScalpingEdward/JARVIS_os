@@ -154,6 +154,18 @@ def set_favorite(media_ref: str, on: bool = True) -> dict:
             "aesthetic_score": item.aesthetic_score, "used": item.used}
 
 
+@router.post("/media-pool/{media_ref}/never-solo")
+def set_never_solo(media_ref: str, never_solo: bool = True) -> dict:
+    """Mark that this item does not carry a post on its own, whatever the
+    score says -- the counterpart to favorite."""
+    try:
+        item = media_pool_service.set_never_solo(media_ref, never_solo)
+    except MediaPoolError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    return {"media_ref": item.media_ref, "never_solo": item.never_solo,
+            "aesthetic_score": item.aesthetic_score}
+
+
 @router.post("/media-pool/{media_ref}/reframe")
 def reframe_media(media_ref: str, mode: str = "crop") -> dict:
     """Pull the frame in on the subject ("crop") or push the background out

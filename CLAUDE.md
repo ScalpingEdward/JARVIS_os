@@ -90,6 +90,21 @@ Ziel der Instagram-Seite: Reichweite aufbauen fuer den Weg zum hauptberuflichen 
 - Brano ueber sich (2026-10-05, fuer die Caption-Stimme): ein bisschen
   verrueckt, bescheiden, gutes Herz, diszipliniert, hart gegen sich, trotzdem
   witzig. Der Humor fehlte am meisten. Sprache: Englisch.
+- Solo-Latte steht auf **0,62** (ab 2026-10-05, vorher 0,75). Bei 0,75
+  schaffte sie **kein einziges** von 79 Videos und acht von 270 Fotos --
+  Reels, der Reichweiten-Hebel, waeren nie entstanden. Dazu `never_solo`
+  als Gegenpol zu `favorite`: Brano's Auge schlaegt die Zahl in beide
+  Richtungen. Noetig, weil eine Standbild-Analyse Tempo, Schwenk und
+  Enthuellung eines Clips nicht sehen kann -- er hat 11 Videos angesehen
+  und 3 davon als "kein Reel" aussortiert.
+- Die Bewertung sortiert nichts aus: ein schwaches Foto landet im Karussell,
+  nicht im Muell. Die Latte entscheidet nur solo oder Gruppe. Und ein
+  strenger Massstab ordnet trotzdem richtig -- nur die Zahlen sind niedrig.
+  Offene Frage von Brano (2026-10-05): ob der Analyse-Prompt statt
+  "high-end, curated" auf Reichweite umgestellt werden soll (Hook, Bewegung,
+  Gesichter). Das aendert die Rangfolge wirklich, kostet aber 349 neue
+  Analysen. Entschieden wird es nach 4 Wochen anhand seiner eigenen
+  Insights, nicht vorher nach Theorie.
 - Reels sind der Reichweiten-Hebel, Carousels erreichen fast nur Follower.
 - Hashtags sind Themenlabel, kein Reichweiten-Hebel: max 5, eng und real,
   keine erfundenen Tags.

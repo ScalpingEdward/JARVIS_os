@@ -48,9 +48,12 @@ def _video_create(ref, theme="desert-gold", score=0.6, duration=25.0):
 
 
 def test_curate_groups_same_theme_images_into_one_carousel():
+    """Scores below the solo bar. 0.7 used to be below it and silently
+    stopped being so when the bar moved to 0.62 -- the carousel rule was
+    never about that number, so it is no longer written in terms of it."""
     from app.instagram_content.media_pool_models import MediaPoolItem
 
-    items = [MediaPoolItem(**_image_create(f"img-{i}", score=0.7).model_dump()) for i in range(4)]
+    items = [MediaPoolItem(**_image_create(f"img-{i}", score=0.5).model_dump()) for i in range(4)]
     groups = curate(items)
     assert len(groups) == 1
     assert len(groups[0].media_items) == 4

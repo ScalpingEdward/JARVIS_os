@@ -248,6 +248,27 @@ class MediaPoolService:
                 row.data = draft.model_dump_json()
         return touched, discarded
 
+    def set_never_solo(self, media_ref: str, never_solo: bool = True) -> MediaPoolItem:
+        """The other direction. Brano watched three of the eleven videos the
+        score had promoted and said they do not carry a Reel -- a still frame
+        cannot see pace, a reveal, or whether a clip holds for nine seconds.
+        Without this, lowering the bar would have quietly overruled him."""
+        with SessionLocal() as session:
+            row = (
+                session.query(InstagramMediaPoolItemRow)
+                .filter(InstagramMediaPoolItemRow.media_ref == media_ref)
+                .first()
+            )
+            if row is None:
+                raise MediaPoolError(f"No pool item with media_ref {media_ref}")
+            item = MediaPoolItem.model_validate_json(row.data)
+            item.never_solo = never_solo
+            if never_solo:
+                item.favorite = False
+            row.data = item.model_dump_json()
+            session.commit()
+        return item
+
     def set_favorite(self, media_ref: str, favorite: bool = True) -> MediaPoolItem:
         """Brano's own pick. The score sees pixels; he knows what the moment
         was worth -- a 0.35 photo of something that cost real money and meant
