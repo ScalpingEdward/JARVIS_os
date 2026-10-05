@@ -109,6 +109,27 @@ Ziel der Instagram-Seite: Reichweite aufbauen fuer den Weg zum hauptberuflichen 
     UI-Automatisierung verstoesst gegen Instagrams Nutzungsbedingungen
     (Account-Sperre). Der halbautomatische Weg bleibt.
 
+## Trading-Seite: viel Code, noch kein Strom
+- Stand 2026-10-05: rund 250 Module, 47 Trading-Testdateien -- und
+  `/v1/accounts` ist leer, kein MT5-Terminal laeuft,
+  `bridge/mt5_bridge_state.json` zuletzt am 4. September angefasst. Alles
+  Gruene dort ist pytest-gruen, nicht betriebsgruen. Wer hier weiterbaut,
+  baut auf etwas, das noch nie echte Daten gesehen hat.
+- Die MT5-Bruecke ist absichtlich **nur lesend** (`read_only=True`, sonst
+  verweigert `mt5_bridge` die Registrierung). Order-Ausfuehrung ist ein
+  eigener Baustein, nicht ein Flag.
+- Brano hat ein MT5-Konto, handelt aber aktuell eine **Challenge auf MT4**
+  (2026-10-05). Das Python-Paket `MetaTrader5` spricht ausschliesslich mit
+  MT5-Terminals -- fuer MT4 braeuchte es einen eigenen Weg (MQL4-EA, der
+  Daten herausschreibt). Diese Arbeit faellt weg, sobald die Challenge auf
+  MT5 laeuft: also nicht bauen, solange die MT4-Challenge laeuft.
+- Erster sinnvoller Schritt, wenn es soweit ist: MT5-Demokonto anschliessen
+  und pruefen, dass `/v1/accounts` denselben Kontostand zeigt wie das
+  Terminal. Nachweisbar wahr oder nachweisbar falsch, an einem Abend.
+- Geplant, extern im Bau: ein Futures-Bot auf **DXFeed**-Daten, der spaeter
+  Teil von AURON werden soll (Daten verarbeiten, analysieren, handeln).
+  Eigener Baustein -- erst anfassen, wenn Instagram wirklich laeuft.
+
 ## Aktueller Stand und offene Punkte
 - Reel-Pfad (media_type=REELS, Status-Polling bis FINISHED, mvhd-Duration-Parsing)
   ist in n8n importiert, aber noch ungetestet -- kein Testlauf gegen die echte
