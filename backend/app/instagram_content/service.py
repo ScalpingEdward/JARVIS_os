@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import threading
 from datetime import datetime, timezone
 from uuid import UUID
@@ -18,6 +19,8 @@ from .media_pool_service import MediaPoolError, media_pool_service
 from .models import ContentCandidate, ContentCandidateCreate, ContentDecision, ContentStatus, MediaItem
 from .moderation import moderate
 from .publisher import N8nInstagramPublisher
+
+logger = logging.getLogger(__name__)
 
 from app.knowledge_graph.models import NodeCreate, NodeKind
 from app.knowledge_graph.service import knowledge_graph_service
@@ -257,6 +260,31 @@ class InstagramContentService:
                 + " -- posting the untouched original would throw away the edit"
             )
         return refs
+
+    def withdraw_posted(self, candidate_id: UUID, reason: str) -> ContentCandidate:
+        """Take back a post that no longer exists on Instagram.
+
+        Brano deleted the first real Reel from his account after the test,
+        and its video stayed marked used -- a post that is gone, blocking
+        footage that is free. Nothing could reclaim it: release only ever
+        happened on a failed publish. This is the honest counterpart, and it
+        says in the audit log that the post was published and then removed,
+        rather than quietly pretending it never went out.
+        """
+        item = self.get(candidate_id)
+        if item.status != ContentStatus.posted:
+            raise InstagramContentError(
+                f"Only a posted candidate can be withdrawn, this one is {item.status}"
+            )
+        item.status = ContentStatus.rejected
+        item.audit_log.append(
+            f"Withdrawn after posting (media_id={item.published_media_id}): {reason}. "
+            f"Media released back into the pool."
+        )
+        self._save_candidate(item)
+        released = media_pool_service.release_items_used_by(item.id)
+        logger.info("withdrew posted candidate %s, released %s media items", candidate_id, released)
+        return item
 
     def _recent_captions(self, exclude_id=None, limit: int = 8) -> list[str]:
         """The captions that actually went out or are waiting, newest first.

@@ -206,6 +206,16 @@ def process_existing_videos(limit: int = 3, offset: int = 0) -> dict:
     return run(limit=max(1, min(limit, 10)), offset=max(0, offset))
 
 
+@router.post("/candidates/{candidate_id}/withdraw", response_model=ContentCandidate)
+def withdraw_posted(candidate_id: UUID, reason: str = "deleted on Instagram") -> ContentCandidate:
+    """Take back a post that was deleted on Instagram, so its media can be
+    used again."""
+    try:
+        return instagram_content_service.withdraw_posted(candidate_id, reason)
+    except InstagramContentError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+
+
 @router.get("/media-pool/current-processed-refs")
 def current_processed_refs() -> dict:
     """The Drive ids of the processed files that are actually in use.
