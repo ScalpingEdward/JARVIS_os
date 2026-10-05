@@ -284,3 +284,48 @@ def test_publishing_refuses_when_the_processed_file_never_reached_drive():
     with pytest.raises(InstagramContentError, match="no processed file in Drive"):
         service.publish(candidate.id)
     assert service.get(candidate.id).status == Status.post_failed, "loud, and retryable once the upload ran"
+
+
+# -- the voice must not become a tic ----------------------------------------
+
+
+def test_the_quiet_register_is_allowed_when_the_one_before_it_was_not():
+    """Brano did not want it removed -- "built in silence muss nicht komplett
+    weg" -- only stopped from arriving every single time."""
+    from app.instagram_content.caption_writer import _sermon_problem
+
+    assert _sermon_problem(
+        "Built in silence. #travel #lifestyle #mindset",
+        ["Third coffee today. The waiter has started counting. #food"],
+    ) is None
+
+
+def test_two_sermons_in_a_row_are_refused():
+    from app.instagram_content.caption_writer import _sermon_problem
+
+    problem = _sermon_problem(
+        "Some rewards are quiet enough to need no audience. #travel",
+        ["Nobody claps at the top of a mountain. #travel"],
+    )
+
+    assert problem is not None and "two in a row" in problem
+
+
+def test_with_no_history_the_first_caption_may_sound_like_him():
+    from app.instagram_content.caption_writer import _sermon_problem
+
+    assert _sermon_problem("Built in silence. #travel", []) is None
+    assert _sermon_problem("Built in silence. #travel", None) is None
+
+
+def test_the_recent_captions_reach_the_prompt():
+    """They did not before: every caption was written alone, from the same
+    voice, which is why the same one kept coming back."""
+    from app.instagram_content.caption_writer import _recent_block
+
+    block = _recent_block(["Nobody claps at the top of a mountain.\nsecond line", "Smoke clears slower."])
+
+    assert "Nobody claps at the top of a mountain." in block
+    assert "second line" not in block, "only the opening line matters here"
+    assert "Do not reuse their opening move" in block
+    assert _recent_block([]) == "" and _recent_block(None) == ""

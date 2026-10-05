@@ -23,7 +23,7 @@ from app.instagram_content.service import InstagramContentError, instagram_conte
 from app.notification_hub.telegram_delivery import TelegramDeliveryClient, TelegramDeliveryError
 
 from . import tokens
-from .publish_mode import auto_publish_enabled
+from .publish_mode import auto_publish_refusal
 from .preview import PostPreviewSender, PreviewError
 from .models import (
     InstagramAuditRecord,
@@ -384,22 +384,27 @@ class TelegramInstagramService:
 
         self._record("decide", True, decided.status.value, candidate_id, actor)
         if approved:
-            if auto_publish_enabled():
+            refusal = auto_publish_refusal(decided.post_format.value)
+            if refusal is None:
                 self._publish_now(decided)
             else:
+                self._record("auto_publish_refused", True, refusal, candidate_id, actor)
                 self._send_post_pack(decided)
         else:
             self._safe_send("Abgelehnt. Die Medien bleiben vergeben, der Post geht nicht raus.")
         return decided
 
     def _publish_now(self, candidate: ContentCandidate) -> None:
-        """Post it, then tell Brano to put the music on.
+        """Post it by API. Only reached when AURON can choose the audio
+        itself -- see publish_mode.
 
-        Instagram's own edit screen can add audio to a post that is already
-        up -- he checked. That is what makes full automation possible at
-        all: no API can attach music, but he can, afterwards, in twenty
-        seconds. The post is live without music for those seconds, which is
-        the whole price.
+        It used to be reached whenever the switch was on, on the premise
+        that Brano could add the music afterwards in the app. That holds
+        for a photo and not for a Reel: a Reel posted through the API has
+        no music option in its edit screen at all, which he found on
+        2026-10-05 on a Reel AURON had just published. Music is mandatory
+        here, so this path now waits for an audio_id rather than posting
+        something silent.
 
         A failed publish falls back to the manual pack, loudly: the files
         and the caption still reach the phone, so an evening is not lost to

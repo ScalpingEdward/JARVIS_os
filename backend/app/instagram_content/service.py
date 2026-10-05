@@ -258,6 +258,21 @@ class InstagramContentService:
             )
         return refs
 
+    def _recent_captions(self, exclude_id=None, limit: int = 8) -> list[str]:
+        """The captions that actually went out or are waiting, newest first.
+
+        The writer used to work without them, so every caption was composed
+        alone from the same voice instruction and the same one kept coming
+        back -- five in a row about silence and patience. Rejected ones are
+        included on purpose: Brano rejected them for other reasons, and they
+        still show what the writer has just been reaching for.
+        """
+        items = sorted(self.list_all(), key=lambda c: c.created_at, reverse=True)
+        return [
+            c.caption_draft for c in items
+            if c.caption_draft and (exclude_id is None or c.id != exclude_id)
+        ][:limit]
+
     def regenerate_caption(self, candidate_id: UUID) -> ContentCandidate:
         """Write a new caption for a post that is still awaiting a decision.
 
@@ -274,7 +289,10 @@ class InstagramContentService:
         ]
         theme = pool_items[0].theme if pool_items else "lifestyle"
         try:
-            caption = self._caption_writer.generate(theme, pool_items, item.post_format.value)
+            caption = self._caption_writer.generate(
+                theme, pool_items, item.post_format.value,
+                recent=self._recent_captions(exclude_id=item.id),
+            )
         except CaptionWriterError as exc:
             raise InstagramContentError(f"Caption generation failed: {exc}") from exc
         item.caption_draft = caption
@@ -478,7 +496,10 @@ class InstagramContentService:
         caption_draft = request.caption_draft
         if caption_draft is None:
             try:
-                caption_draft = self._caption_writer.generate(draft.theme, pool_items, post_format.value)
+                caption_draft = self._caption_writer.generate(
+                    draft.theme, pool_items, post_format.value,
+                    recent=self._recent_captions(),
+                )
             except CaptionWriterError as exc:
                 raise InstagramContentError(f"Caption generation failed: {exc}") from exc
 

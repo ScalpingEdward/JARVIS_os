@@ -469,7 +469,7 @@ def test_approving_publishes_when_the_switch_is_on(monkeypatch):
     mean posting. The switch stays off until the path has run for real."""
     from app.telegram_instagram import service as service_module
 
-    monkeypatch.setattr(service_module, "auto_publish_enabled", lambda: True)
+    monkeypatch.setattr(service_module, "auto_publish_refusal", lambda fmt: None)
     published: list = []
 
     class _Published:
@@ -491,7 +491,7 @@ def test_a_failed_publish_still_puts_the_files_on_the_phone(monkeypatch):
     from app.instagram_content.service import InstagramContentError
     from app.telegram_instagram import service as service_module
 
-    monkeypatch.setattr(service_module, "auto_publish_enabled", lambda: True)
+    monkeypatch.setattr(service_module, "auto_publish_refusal", lambda fmt: None)
     monkeypatch.setattr(service_module.instagram_content_service, "publish",
                         lambda cid: (_ for _ in ()).throw(InstagramContentError("graph api said no")))
 
@@ -506,7 +506,7 @@ def test_a_failed_publish_still_puts_the_files_on_the_phone(monkeypatch):
 def test_with_the_switch_off_nothing_is_posted(monkeypatch):
     from app.telegram_instagram import service as service_module
 
-    monkeypatch.setattr(service_module, "auto_publish_enabled", lambda: False)
+    monkeypatch.setattr(service_module, "auto_publish_refusal", lambda fmt: "switched off")
     monkeypatch.setattr(service_module.instagram_content_service, "publish",
                         lambda cid: (_ for _ in ()).throw(AssertionError("must not publish")))
 
@@ -553,3 +553,48 @@ def test_a_caption_rewrite_is_refused_once_the_post_is_decided():
 
     with pytest.raises(InstagramContentError, match="Cannot rewrite the caption"):
         InstagramContentService().regenerate_caption(candidate.id)
+
+
+# -- music decides whether anything posts itself ----------------------------
+
+
+def test_a_reel_is_never_published_automatically_while_auron_cannot_pick_music(monkeypatch):
+    """Brano checked on 2026-10-05: a Reel posted through the API has no
+    music option in its edit screen. Posting it automatically would mean a
+    silent Reel on an account where music is mandatory atmosphere."""
+    from app.telegram_instagram.publish_mode import auto_publish_refusal
+
+    monkeypatch.setenv("AURON_AUTO_PUBLISH_ON_APPROVAL", "true")
+    monkeypatch.delenv("AURON_INSTAGRAM_LOGIN_TYPE", raising=False)
+
+    refusal = auto_publish_refusal("reel")
+
+    assert refusal is not None and "cannot have music added afterwards" in refusal
+
+
+def test_a_carousel_is_refused_too_and_for_its_own_reason(monkeypatch):
+    from app.telegram_instagram.publish_mode import auto_publish_refusal
+
+    monkeypatch.setenv("AURON_AUTO_PUBLISH_ON_APPROVAL", "true")
+    monkeypatch.delenv("AURON_INSTAGRAM_LOGIN_TYPE", raising=False)
+
+    assert "photo or a carousel" in (auto_publish_refusal("carousel") or "")
+
+
+def test_with_a_facebook_login_token_the_reel_may_post_itself(monkeypatch):
+    """The day the audio_id path exists, this is what flips -- not a deploy."""
+    from app.telegram_instagram.publish_mode import auto_publish_refusal
+
+    monkeypatch.setenv("AURON_AUTO_PUBLISH_ON_APPROVAL", "true")
+    monkeypatch.setenv("AURON_INSTAGRAM_LOGIN_TYPE", "facebook")
+
+    assert auto_publish_refusal("reel") is None
+
+
+def test_the_switch_being_off_is_reason_enough(monkeypatch):
+    from app.telegram_instagram.publish_mode import auto_publish_refusal
+
+    monkeypatch.setenv("AURON_AUTO_PUBLISH_ON_APPROVAL", "false")
+    monkeypatch.setenv("AURON_INSTAGRAM_LOGIN_TYPE", "facebook")
+
+    assert auto_publish_refusal("reel") == "automatic publishing is switched off"

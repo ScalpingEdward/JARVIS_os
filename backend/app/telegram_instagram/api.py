@@ -101,14 +101,21 @@ def notify(candidate_id: UUID) -> dict:
 
 
 @router.post("/next", response_model=NotifyResult)
-def finalize_next_and_notify(caption_draft: str | None = None) -> NotifyResult:
+def finalize_next_and_notify(
+    caption_draft: str | None = None, kind: str | None = None
+) -> NotifyResult:
     """Next draft in posting order -> caption -> card on the phone.
 
     caption_draft is optional; omitted, AURON writes it itself via a real
     Anthropic call.
+
+    kind picks from the queue without reordering it ("reel" or "feed").
+    The schedule never passes it -- the queue's head is what is due. It is
+    here for asking by hand, which is how the Reel path gets exercised at
+    all while no Reel sits at the head.
     """
     try:
-        return telegram_instagram_service.finalize_next_and_notify(caption_draft)
+        return telegram_instagram_service.finalize_next_and_notify(caption_draft, kind=kind)
     except TelegramInstagramError as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
 

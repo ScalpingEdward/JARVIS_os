@@ -79,6 +79,17 @@ Ziel der Instagram-Seite: Reichweite aufbauen fuer den Weg zum hauptberuflichen 
 - Phase 2, spaeter und erst auf Brano's Ansage: Charts und Zahlen duerfen
   dazukommen. Bis dahin gilt Phase 1 auch fuer Captions (siehe
   DEFAULT_BRAND_VOICE in caption_writer.py).
+- Captions: der Schreiber kannte seine eigenen letzten Captions nicht --
+  jede entstand allein aus derselben Stimme, also kam fuenfmal hintereinander
+  dieselbe Predigt ("some rewards are quiet enough to need no audience").
+  Brano hat es am Feed gemerkt, nicht an einer Pruefung. Seitdem: die letzten
+  acht Captions gehen in den Prompt, und der ruhige Disziplin-Ton ist
+  **erlaubt, aber nicht zweimal hintereinander** (_sermon_problem prueft gegen
+  die vorige Caption, nicht gegen eine Quote). Loeschen wollte er ihn
+  ausdruecklich nicht -- er gehoert zu ihm, er darf nur kein Tic werden.
+- Brano ueber sich (2026-10-05, fuer die Caption-Stimme): ein bisschen
+  verrueckt, bescheiden, gutes Herz, diszipliniert, hart gegen sich, trotzdem
+  witzig. Der Humor fehlte am meisten. Sprache: Englisch.
 - Reels sind der Reichweiten-Hebel, Carousels erreichen fast nur Follower.
 - Hashtags sind Themenlabel, kein Reichweiten-Hebel: max 5, eng und real,
   keine erfundenen Tags.
@@ -91,11 +102,16 @@ Ziel der Instagram-Seite: Reichweite aufbauen fuer den Weg zum hauptberuflichen 
     Caption/Hashtags zum Kopieren -> Brano postet in der App mit Musik ->
     Button "Gepostet". Grund: keine API (auch nicht Meta) kann Musik an
     Fotos/Carousels haengen.
-  * Reels: vollautomatisch. AURON waehlt Musik ueber die Instagram Audio API
-    (audio_id, nur Reels, nur "Instagram API with Facebook Login" -- wir
-    laufen aktuell ueber Instagram Login, Umstellung noetig), Brano gibt frei,
-    AURON postet. Spricht Brano im Video: Musik leise darunter
-    (audio_volume/video_volume) oder keine.
+  * Reels: **ebenfalls halbautomatisch** (korrigiert 2026-10-05). Der erste
+    echte Reel-Post lief technisch durch (media_id 17909762832554719), aber
+    Brano hat danach geprueft: ein per API gepostetes Reel bietet im
+    Bearbeiten-Fenster **gar keine Musikauswahl**. Nachlegen geht nur bei
+    Fotos. Damit faellt die Grundlage der Vollautomatik weg -- sie kommt
+    zurueck, wenn AURON die audio_id selbst setzen kann (Instagram Audio API,
+    nur Reels, nur "Instagram API with Facebook Login"; wir laufen ueber
+    Instagram Login). Bis dahin verweigert publish_mode.auto_publish_refusal
+    jedes automatische Posten mit Begruendung -- der Schalter allein reicht
+    nicht mehr. Spricht Brano im Video: Musik leise darunter oder keine.
   * Zeiten: **ein Post pro Tag**, und WELCHER entscheidet die Warteschlange,
     nicht der Kalender: aeltester Aufnahmetag zuerst, ein Tag wird
     abgearbeitet bevor der naechste beginnt. Die Sorte bestimmt nur die
