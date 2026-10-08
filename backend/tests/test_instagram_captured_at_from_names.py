@@ -177,3 +177,36 @@ def test_the_recovered_date_actually_drives_the_posting_order():
     groups = curate(pool.list_available())
 
     assert [g.day for g in groups] == [date(2026, 2, 14), date(2026, 3, 10)]
+
+
+def test_an_empty_batch_is_nothing_to_do_and_not_an_error():
+    """The ingest workflow sends whatever Drive listed. Once every file was
+    ingested that is an empty list, and a 422 killed the whole run -- a
+    scheduled ingest looked broken when there was nothing to do."""
+    from app.instagram_content.media_pool_models import CapturedAtFromNameRequest
+    from app.instagram_content.media_pool_service import media_pool_service
+
+    result = media_pool_service.captured_at_from_names(CapturedAtFromNameRequest(items=[]))
+
+    assert result.filled == 0
+
+
+def test_a_folder_with_more_than_five_hundred_files_is_not_a_bad_request():
+    """The ingest workflow sends every file the Drive listing returned. The
+    folder passed 500 and the 422 killed the run before anything was even
+    downloaded -- a cap that protected nothing (this endpoint only reads
+    names) while being able to stop the whole pipeline."""
+    from app.instagram_content.media_pool_models import (
+        CapturedAtFromNameItem,
+        CapturedAtFromNameRequest,
+    )
+    from app.instagram_content.media_pool_service import media_pool_service
+
+    request = CapturedAtFromNameRequest(items=[
+        CapturedAtFromNameItem(media_ref=f"id{i}", file_name=f"IMG_{i}.jpg")
+        for i in range(600)
+    ])
+
+    result = media_pool_service.captured_at_from_names(request)
+
+    assert result.filled == 0

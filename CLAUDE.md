@@ -197,7 +197,22 @@ Ziel der Instagram-Seite: Reichweite aufbauen fuer den Weg zum hauptberuflichen 
   Pool-Eintrag mehr auf sie zeigt.
 - Erledigt (geprueft 2026-10-08): 270 Fotos und 79 Videos haben alle eine
   bearbeitete Fassung, und alle liegen in Drive -- 0 offene Uploads.
-- Offen: Curation laeuft nach jeder einzelnen Datei statt einmal am Ende.
+- Erledigt 2026-10-08: Curation lief nach jeder einzelnen Datei und haengt
+  jetzt am "fertig"-Ausgang der Schleife -- einmal pro Lauf. Vorher wurden
+  die ersten zwei Fotos eines Tages schon zu einem Entwurf verheiratet,
+  bevor das dritte ueberhaupt eingelesen war: Karussells zerfielen.
+- Dabei gefunden und behoben: **jeder Ingest-Lauf schlug fehl**, seit alles
+  eingelesen war. n8ns Google-Drive-Knoten gibt bei leerem Suchergebnis ein
+  leeres Element aus statt gar keines; der Workflow machte daraus einen
+  Eintrag ohne Felder, die API lehnte mit 422 ab, der Lauf starb. Jetzt
+  verwirft der Ausdruck leere Eintraege, die API akzeptiert leere Listen,
+  und eine IF-Weiche fuehrt "nichts Neues" an der Schleife vorbei direkt
+  zur Kuration -- ein normaler Lauf mit Antwort 200 statt 500.
+- Ein 422 an einen n8n-HTTP-Knoten zeigt sich dort nur als "Your request is
+  invalid or could not be processed by the service". Deshalb loggt die API
+  seit 2026-10-08 jede Validierungs-Ablehnung mit Feld und Grund
+  (main.py, _log_validation_errors) -- die Suche danach hat eine Stunde
+  gekostet.
 - Offen: n8n-SQLite ~1,5 GB, "Database connection timed out" -- verliert
   gelegentlich einzelne Requests (API-Nodes haben deshalb 3 Retries).
 - Drive: Google One 100 GB seit 2026-09-22 (15 GB waren voll -> 403 beim Upload).

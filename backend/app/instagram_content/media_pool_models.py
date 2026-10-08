@@ -246,7 +246,15 @@ class CapturedAtFromNameItem(BaseModel):
 
 
 class CapturedAtFromNameRequest(BaseModel):
-    items: list[CapturedAtFromNameItem] = Field(min_length=1, max_length=500)
+    #: An empty batch is "nothing new in Drive", not a malformed request.
+    #: Rejecting it killed the whole ingest run: n8n's Google Drive node
+    #: emits one empty item when a listing finds nothing, the workflow
+    #: mapped that into one item with no fields, and the 422 ended the run
+    #: before anything was downloaded (found 2026-10-08; the workflow now
+    #: drops empty entries, and this accepts the empty list they leave).
+    #: The cap is generous rather than tight because nothing here costs
+    #: anything -- no download, no frames, no vision call, only names.
+    items: list[CapturedAtFromNameItem] = Field(default_factory=list, max_length=5000)
 
 
 class CapturedAtFromNameResponse(BaseModel):

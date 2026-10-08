@@ -230,7 +230,34 @@ async def lifespan(app: FastAPI):
     await position_monitor_service.stop()
 
 
+import logging
+
+from fastapi import Request
+from fastapi.encoders import jsonable_encoder
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
+
+logger = logging.getLogger(__name__)
+
 app = FastAPI(title=settings.app_name, version=settings.version, lifespan=lifespan)
+@app.exception_handler(RequestValidationError)
+async def _log_validation_errors(request: Request, exc: RequestValidationError):
+    """Say what was rejected, in the log, not only to the caller.
+
+    A 422 to an n8n HTTP node surfaces as "Your request is invalid or could
+    not be processed by the service" and nothing else: the workflow dies and
+    the reason stays inside the response body nobody reads. Finding one such
+    rejection cost an hour of guessing on 2026-10-08. The body itself is not
+    logged -- it can be a few hundred kilobytes of Drive listing -- only
+    which field failed and why.
+    """
+    logger.warning(
+        "422 on %s %s: %s",
+        request.method,
+        request.url.path,
+        "; ".join(f"{'.'.join(str(p) for p in e.get('loc', ()))}: {e.get('msg')}" for e in exc.errors()[:10]),
+    )
+    return JSONResponse(status_code=422, content={"detail": jsonable_encoder(exc.errors())})
 app.include_router(account_state_sync_router)
 app.include_router(accounts_router)
 app.include_router(agent_adapters_router)

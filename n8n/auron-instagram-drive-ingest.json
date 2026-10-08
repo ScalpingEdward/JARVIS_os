@@ -261,7 +261,7 @@
         "url": "http://api:8000/v1/instagram/media-pool/captured-at-from-names",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ { \"items\": $('Google Drive: List New Files v7').all().map(i => ({ media_ref: i.json.id, file_name: i.json.name })) } }}",
+        "jsonBody": "={{ { \"items\": $('Google Drive: List New Files v7').all().filter(i => i.json && i.json.id && i.json.name).map(i => ({ media_ref: i.json.id, file_name: i.json.name })) } }}",
         "options": {
           "timeout": 60000
         }
@@ -406,6 +406,41 @@
         -2700,
         400
       ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "has-new-files",
+              "leftValue": "={{ $input.all().filter(i => i.json && i.json.id).length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "b7f1c4a2-3d58-4e91-9a07-5c2e8d6b1f34",
+      "name": "Gibt es neue Dateien? v11",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -1868,
+        176
+      ],
+      "notes": "Nichts Neues in Drive ist ein normaler Lauf, kein Fehler. Ohne diese Weiche endete der Workflow mit leerer Antwort, n8n meldete 500, und der taegliche Lauf sah immer nach Fehler aus -- was echte Fehler unsichtbar gemacht haette."
     }
   ],
   "connections": {
@@ -475,7 +510,12 @@
       "main": [
         [
           {
-            "node": "AURON: Run Curation v7",
+            "node": "Loop Over Items v7",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "AURON: Was ist fertig bearbeitet v10",
             "type": "main",
             "index": 0
           }
@@ -495,18 +535,7 @@
     },
     "AURON: Deliver Due Notifications v7": {
       "main": [
-        [
-          {
-            "node": "Loop Over Items v7",
-            "type": "main",
-            "index": 0
-          },
-          {
-            "node": "AURON: Was ist fertig bearbeitet v10",
-            "type": "main",
-            "index": 0
-          }
-        ]
+        []
       ]
     },
     "AURON: Load Known Refs v7": {
@@ -524,7 +553,7 @@
       "main": [
         [
           {
-            "node": "Loop Over Items v7",
+            "node": "Gibt es neue Dateien? v11",
             "type": "main",
             "index": 0
           }
@@ -624,6 +653,35 @@
         [
           {
             "node": "AURON: Load Known Refs v7",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Done: Alle Batches durch v8": {
+      "main": [
+        [
+          {
+            "node": "AURON: Run Curation v7",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gibt es neue Dateien? v11": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items v7",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Done: Alle Batches durch v8",
             "type": "main",
             "index": 0
           }
