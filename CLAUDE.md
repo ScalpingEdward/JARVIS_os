@@ -166,9 +166,10 @@ Ziel der Instagram-Seite: Reichweite aufbauen fuer den Weg zum hauptberuflichen 
   Eigener Baustein -- erst anfassen, wenn Instagram wirklich laeuft.
 
 ## Aktueller Stand und offene Punkte
-- Reel-Pfad (media_type=REELS, Status-Polling bis FINISHED, mvhd-Duration-Parsing)
-  ist in n8n importiert, aber noch ungetestet -- kein Testlauf gegen die echte
-  Graph API bisher.
+- Reel-Pfad ist **gegen die echte Graph API gelaufen** (2026-10-05, media_id
+  17909762832554719, danach von Brano geloescht). Upload, Status-Polling bis
+  FINISHED und Veroeffentlichung halten. Was dabei auffiel, steht oben unter
+  Musik: ein per API gepostetes Reel bekommt keine Musik mehr.
 - Schedule-Trigger im Drive-Ingest-Workflow steht auf 20 Minuten statt taeglich 09:00.
 - Pillar-Feld (Trading/Portrait/Gym/Essen/Travel) fehlt noch im Datenmodell.
 - Secrets rotieren.
@@ -184,18 +185,18 @@ Ziel der Instagram-Seite: Reichweite aufbauen fuer den Weg zum hauptberuflichen 
   Bilder raus), danach Score-Kriterien schaerfen (Hook, Themenbezug,
   Einzigartigkeit, Technik, Grid-Nachbarn). Starke Videos als Reel, gute
   Videos duerfen ins gemischte Carousel.
-- Offen: Publish-Webhook nimmt immer das Drive-Original, nie processed_media_ref
-  -> gegradete Videos werden nicht gepostet, HEIC wuerde bei Instagram
-  scheitern (nur JPG). Fix: HEIC beim Ingest -> JPG (pillow-heif), Publish auf
-  processed_media_ref umstellen. Bis dahin HEIC vor dem Upload lokal umwandeln,
-  Live-Photo-MOVs (gleicher Name wie HEIC, <3 s) nicht hochladen.
-  Dazu gehoert: Fotos beim Ingest ebenfalls graden (process_image existiert,
-  wird nicht aufgerufen) und nach "AURON fertig" hochladen. Erst danach
-  duerfen Originale im Drive-Upload-Ordner geloescht werden -- vorher zeigen
-  alle Pool-Eintraege auf sie.
-- Offen: 34 Videos ohne bearbeitete Fassung (30 alte von vor der
-  Ingest-Bearbeitung, 4 wo ffmpeg vor dem Speicher-Fix starb) nachholen;
-  3 bearbeitete Videos noch nicht in Drive (naechster Lauf nimmt sie mit).
+- Erledigt (geprueft 2026-10-08): der Publish-Webhook nimmt `post_ref`, also
+  die bearbeitete Fassung, und `_post_refs()` verweigert den Post, wenn sie
+  fehlt, statt auf das Original zurueckzufallen. Fotos werden beim Ingest
+  gegradet (grade_photo_bytes -> process_image) und nach "AURON fertig"
+  hochgeladen.
+- Weiter offen: HEIC wuerde bei Instagram scheitern (nur JPG). Bis zum
+  Ingest-Konverter (pillow-heif) HEIC vor dem Upload lokal umwandeln,
+  Live-Photo-MOVs (gleicher Name wie HEIC, <3 s) nicht hochladen. Originale
+  im Drive-Upload-Ordner erst loeschen, wenn klar ist, dass kein
+  Pool-Eintrag mehr auf sie zeigt.
+- Erledigt (geprueft 2026-10-08): 270 Fotos und 79 Videos haben alle eine
+  bearbeitete Fassung, und alle liegen in Drive -- 0 offene Uploads.
 - Offen: Curation laeuft nach jeder einzelnen Datei statt einmal am Ende.
 - Offen: n8n-SQLite ~1,5 GB, "Database connection timed out" -- verliert
   gelegentlich einzelne Requests (API-Nodes haben deshalb 3 Retries).
