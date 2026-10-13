@@ -161,9 +161,20 @@ Ziel der Instagram-Seite: Reichweite aufbauen fuer den Weg zum hauptberuflichen 
 - Erster sinnvoller Schritt, wenn es soweit ist: MT5-Demokonto anschliessen
   und pruefen, dass `/v1/accounts` denselben Kontostand zeigt wie das
   Terminal. Nachweisbar wahr oder nachweisbar falsch, an einem Abend.
-- Geplant, extern im Bau: ein Futures-Bot auf **DXFeed**-Daten, der spaeter
-  Teil von AURON werden soll (Daten verarbeiten, analysieren, handeln).
-  Eigener Baustein -- erst anfassen, wenn Instagram wirklich laeuft.
+- Geplant, extern im Bau (eigener Chat): ein Futures-Bot fuer
+  **NinjaTrader + Python** (Stand 2026-10-13), der spaeter Teil von AURON
+  werden soll. Orderflow, Delta, Absorption. Eigener Baustein -- hier erst
+  anfassen, wenn Instagram wirklich laeuft.
+- Datenquellen dazu: siehe `docs/futures-bot-datenquellen.md`. Kurz: CME-L2
+  (~16-17 $/Monat je Boerse) traegt Delta, Absorption und Imbalance; eine
+  echte Heatmap braucht Market-by-Order (Databento); Options-Flow und Gamma
+  sind **OPRA**, ein zweiter Markt und ein zweites Abo. Reihenfolge: ein
+  Kontrakt, eine Quelle, ein Signal -- Optionen zuletzt.
+- Verworfen: DeepCharts/Bookmap mit REA (Reverse Engineer Anything) oder
+  aehnlichem nachbauen. Der Decompiler zeigt, wie sie zeichnen, nicht woher
+  die Trades kommen -- der Engpass ist die Lizenz. Brano will ausdruecklich
+  keinen Verstoss gegen Nutzungsbedingungen. Ausserdem braucht ein Bot die
+  Darstellung nie, nur die Zahlen darunter.
 
 ## Aktueller Stand und offene Punkte
 - Reel-Pfad ist **gegen die echte Graph API gelaufen** (2026-10-05, media_id
