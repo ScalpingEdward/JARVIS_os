@@ -227,3 +227,11 @@ backend/data/accounts.db
 # got whatever stale snapshot was last committed instead of real,
 # current data, and every commit touching it added pure binary noise.
 backend/jarvis.db
+
+# Telegram login of the signal copier -- as good as the account itself
+*.session
+*.session-journal
+# Signal copier runtime: open trades and their log
+signal_copier/state.json
+signal_copier/state.tmp
+signal_copier/copier.log
