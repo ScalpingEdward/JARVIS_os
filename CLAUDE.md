@@ -32,6 +32,19 @@ Ziel der Instagram-Seite: Reichweite aufbauen fuer den Weg zum hauptberuflichen 
 - Kein Pillar zweimal hintereinander, kein gleiches visuelles Muster in
   benachbarten Grid-Plaetzen. Bild 1 eines Carousels ist der Hook.
 
+## Signal-Kopierer (signal_copier/)
+- Telegram-Gruppe -> MT5, nur Brano's eigenes Konto (PU Prime Demo, spaeter
+  RoboForex Cent). Ein Python-Prozess (`python -m signal_copier.copier`),
+  kein EA: er spricht ueber das Paket MetaTrader5 mit dem laufenden Terminal.
+  Im Terminal erkennt man seine Positionen an Magic 26101400 und Kommentar
+  `sig:<msg_id>:<leg>`. Laeuft seit 2026-10-15 scharf auf Demo.
+- **Signale kommen verspaetet** (Brano, 2026-10-15): #4909 Sell Gold @ 4144
+  kam bei 4140,57 an -- 34 Pips weg, abgelehnt bei damals 30 Pips Grenze.
+  Gold steht jetzt auf 60 Pips (6 $). Offen: die Verspaetung messen
+  (Nachrichtenzeit gegen Empfang und gegen den Kurs zur Nachrichtenzeit),
+  bevor die Grenze weiter wandert -- eine weitere Grenze heisst schlechteres
+  Chance-Risiko-Verhaeltnis, nicht mehr Risiko.
+
 ## Aktueller Stand und offene Punkte
 - Reel-Pfad (media_type=REELS, Status-Polling bis FINISHED, mvhd-Duration-Parsing)
   ist in n8n importiert, aber noch ungetestet -- kein Testlauf gegen die echte
