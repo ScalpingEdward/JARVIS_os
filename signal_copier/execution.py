@@ -42,6 +42,12 @@ def connect(allow_live: bool = False) -> None:
         raise ExecutionError("Algo Trading is switched off in the terminal")
 
 
+def account_id() -> str:
+    """'<login>@<server>': which account the terminal is logged in to right now."""
+    a = mt5.account_info()
+    return f"{a.login}@{a.server}"
+
+
 def tradable_symbols() -> list[str]:
     """Names that take orders -- quote-only twins are left out (see symbols.py)."""
     return [s.name for s in mt5.symbols_get() if s.trade_mode == mt5.SYMBOL_TRADE_MODE_FULL]

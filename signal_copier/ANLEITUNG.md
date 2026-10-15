@@ -87,7 +87,7 @@ In MT5 erkennst du seine Trades am Kommentar `sig:<Nachrichtennummer>:<Leg>`.
 |---|---|
 | `channels` | Name(n) der Gruppe(n) |
 | `allow_live` | `false` = nur Demo. Erst auf `true` stellen, wenn du ihn wochenlang auf Demo beobachtet hast. |
-| `initial_balance` | leer = Kontostand beim ersten Start. Daran hängen die Verlustgrenzen. |
+| `initial_balance` | leer = Kontostand beim ersten Start **dieses Kontos**. Daran hängen die Verlustgrenzen. Ein Wert hier gilt für jedes Konto – bei mehreren Konten leer lassen. |
 | `risk_per_position_pct` | Risiko **je TP-Position** in % (0,5 = bei 2 TPs insgesamt 1 %) |
 | `daily_loss_stop_pct` | Tagesverlust in % → alles schließen, bis Mitternacht (Prag) keine neuen Trades |
 | `overall_loss_stop_pct` | Gesamtverlust in % → alles schließen, dauerhaft Schluss |
@@ -96,7 +96,24 @@ In MT5 erkennst du seine Trades am Kommentar `sig:<Nachrichtennummer>:<Leg>`.
 
 Nach einer Änderung den Kopierer neu starten.
 
-**Dauerhafter Stopp aufheben:** Kopierer schließen, die Datei `state.json` mit
+## Konto wechseln
+
+Der Kopierer handelt auf dem Konto, das gerade in MT5 angemeldet ist. Jedes
+Konto bekommt eine eigene Datei `state_<Kontonummer>_<Server>.json`. Darin
+stehen das Startkapital, die Verlustsperre und welche Trades zu welchem Signal
+gehören. Wechselst du zurück, ist der alte Stand wieder da.
+
+So wechselst du:
+1. Kopierer schließen.
+2. In MT5 beim anderen Konto anmelden.
+3. Kopierer starten. Die Startmeldung nennt das Konto.
+
+Wechselst du in MT5 das Konto, **während** der Kopierer läuft, meldet er
+„ACCOUNT CHANGED“. Er handelt dann nichts mehr und prüft keine Verlustgrenze,
+bis MT5 wieder auf dem alten Konto ist oder du ihn neu startest. Sonst würde
+er das neue Konto mit den Grenzen des alten handeln.
+
+**Dauerhafter Stopp aufheben:** Kopierer schließen, die Datei `state_<Konto>.json` mit
 Notepad öffnen, `halt_reason` auf `""` setzen, speichern, neu starten. Das
 ist absichtlich Handarbeit.
 
@@ -105,7 +122,7 @@ ist absichtlich Handarbeit.
 - `.env`: deine Schlüssel.
 - `copier.session`: **das ist dein Telegram-Login.** Wer die Datei hat, ist
   in Telegram du.
-- `state.json`: deine offenen Trades.
+- `state_*.json`: deine Konten und offenen Trades.
 
 ## Wenn etwas nicht geht
 

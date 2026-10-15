@@ -1,7 +1,8 @@
 from types import SimpleNamespace
 
+from signal_copier import copier as copier_mod
 from signal_copier.book import Book
-from signal_copier.copier import Copier
+from signal_copier.copier import Copier, migrate_legacy_state, state_path
 from signal_copier.execution import Opened
 from signal_copier.risk import AccountState
 from signal_copier.sizing import RiskProfile, SymbolSpec
@@ -22,6 +23,10 @@ class FakeTerminal:
         self.balance = 10_000.0
         self.too_close = False
         self.calls = []
+        self.account = "1001@PUPrime-Demo"
+
+    def account_id(self):
+        return self.account
 
     def tradable_symbols(self):
         return ["XAUUSD.s", "EURUSD.s"]
@@ -74,7 +79,7 @@ class FakeTerminal:
 
 def make(dry=False):
     t, said, now = FakeTerminal(), [], [1000.0]
-    c = Copier(t, Book(initial_balance=10_000.0), PROFILE, CONFIG, said.append, clock=lambda: now[0], dry=dry)
+    c = Copier(t, Book(initial_balance=10_000.0, account="1001@PUPrime-Demo"), PROFILE, CONFIG, said.append, clock=lambda: now[0], dry=dry)
     return c, t, said, now
 
 
@@ -191,3 +196,27 @@ def test_dry_run_reports_and_sends_nothing():
     c.on_message(CHAT, 10, None, SIGNAL)
     assert not t.positions and said[-1].startswith("[DRY]") and "would open 2 x 0.05" in said[-1]
     assert not c.book.signals
+
+
+def test_other_account_in_mt5_blocks_trades_and_loss_stop_until_it_is_back():
+    c, t, said, now = make()
+    t.account = "2002@RoboForex-Cent"
+    c.on_message(CHAT, 10, None, SIGNAL)
+    assert not t.positions and "ACCOUNT CHANGED" in said[-2] and "ignored" in said[-1]
+    t.equity = 1.0  # would be a loss stop -- but not this book's account
+    c.watch()
+    assert not c.book.halt_reason
+    t.account, t.equity = "1001@PUPrime-Demo", None
+    c.on_message(CHAT, 11, None, SIGNAL)
+    assert "trading again" in said[-2] and len(t.positions) == 2
+
+
+def test_one_state_file_per_account_and_the_old_one_moves(tmp_path, monkeypatch):
+    monkeypatch.setattr(copier_mod, "HERE", tmp_path)
+    monkeypatch.setattr(copier_mod, "LEGACY_STATE", tmp_path / "state.json")
+    assert state_path("1001@PUPrime-Demo").name == "state_1001_PUPrime_Demo.json"
+    old = Book(initial_balance=9926.2)
+    old.save(tmp_path / "state.json")
+    migrate_legacy_state("1001@PUPrime-Demo")
+    moved = Book.load(state_path("1001@PUPrime-Demo"))
+    assert moved.initial_balance == 9926.2 and not (tmp_path / "state.json").exists()

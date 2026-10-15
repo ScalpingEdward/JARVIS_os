@@ -36,6 +36,8 @@ class Book:
     # reply ("Set Breakeven" answered with "Close half") still finds it.
     about: dict[str, int] = field(default_factory=dict)
     initial_balance: float | None = None
+    # "<login>@<server>" this book belongs to; everything above is about that account only.
+    account: str = ""
     # Tickets whose SL should go to entry once the broker's minimum distance allows it.
     pending_be: list[int] = field(default_factory=list)
     # Set when a loss stop was hit: no new trades until halt_until (None = for good).
@@ -87,7 +89,7 @@ class Book:
     def save(self, path: Path) -> None:
         data = {"signals": {k: asdict(v) for k, v in self.signals.items()},
                 "about": self.about, "initial_balance": self.initial_balance,
-                "pending_be": self.pending_be, "halt_reason": self.halt_reason, "halt_until": self.halt_until}
+                "account": self.account, "pending_be": self.pending_be, "halt_reason": self.halt_reason, "halt_until": self.halt_until}
         tmp = path.with_suffix(".tmp")
         tmp.write_text(json.dumps(data, indent=1), encoding="utf-8")
         tmp.replace(path)
@@ -98,7 +100,7 @@ class Book:
             return cls()
         data = json.loads(path.read_text(encoding="utf-8"))
         return cls({k: TrackedSignal(**v) for k, v in data["signals"].items()},
-                   data["about"], data.get("initial_balance"), data.get("pending_be", []),
+                   data["about"], data.get("initial_balance"), data.get("account", ""), data.get("pending_be", []),
                    data.get("halt_reason", ""), data.get("halt_until"))
 
 

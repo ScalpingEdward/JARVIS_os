@@ -235,3 +235,5 @@ backend/jarvis.db
 signal_copier/state.json
 signal_copier/state.tmp
 signal_copier/copier.log
+signal_copier/state_*.json
+signal_copier/state_*.tmp

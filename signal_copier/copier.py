@@ -15,6 +15,7 @@ import json
 import logging
 import os
 import queue
+import re
 import threading
 import time
 import urllib.parse
@@ -30,11 +31,26 @@ from signal_copier.sizing import RiskProfile, entry_deviation_ok, lots_for_risk
 from signal_copier.symbols import resolve
 
 HERE = Path(__file__).parent
-STATE = HERE / "state.json"
+LEGACY_STATE = HERE / "state.json"  # before one file per account
 LOG = HERE / "copier.log"
 WATCH_EVERY_S = 5
 
 log = logging.getLogger("copier")
+
+
+def state_path(account: str) -> Path:
+    """One book per MT5 account: start balance, loss stop and tickets belong to it alone."""
+    return HERE / f"state_{re.sub(r'[^A-Za-z0-9]+', '_', account)}.json"
+
+
+def migrate_legacy_state(account: str) -> None:
+    """The old single state.json goes to the account it was written for -- or, unmarked, to this one."""
+    if not LEGACY_STATE.exists():
+        return
+    owner = Book.load(LEGACY_STATE).account or account
+    target = state_path(owner)
+    if not target.exists():
+        LEGACY_STATE.replace(target)
 
 
 def profile_from(config: dict) -> RiskProfile:
@@ -50,6 +66,21 @@ class Copier:
         self.notify, self.state_path, self.clock, self.dry = notify, state_path, clock, dry
         self.symbols = ex.tradable_symbols()
         self.overrides = config.get("symbol_overrides", {})
+        self.account_lost = False
+
+    def _account_ok(self) -> bool:
+        """Same account as the book? Another one would be traded with this one's limits."""
+        current = self.ex.account_id()
+        if current == self.book.account:
+            if self.account_lost:
+                self.account_lost = False
+                self._say(f"MT5 is back on {current} -- trading again")
+            return True
+        if not self.account_lost:
+            self.account_lost = True
+            self._say(f"ACCOUNT CHANGED: MT5 is on {current}, this copier was started for {self.book.account}. "
+                      f"No trades, no loss stop until MT5 is back on it -- or restart the copier for {current}.")
+        return False
 
     def _save(self) -> None:
         if self.state_path is not None and not self.dry:
@@ -66,6 +97,9 @@ class Copier:
         if result is None:
             return
         where = f"#{msg_id}"
+        if not self._account_ok():
+            self._say(f"{where} ignored: MT5 is not on {self.book.account}\n{text[:200]}")
+            return
         try:
             if isinstance(result, Rejected):
                 self._say(f"{where} not traded: {result.reason}\n{text[:200]}")
@@ -268,6 +302,8 @@ class Copier:
 
     def watch(self) -> None:
         """Every few seconds: loss stops, then stops that could not go to entry yet."""
+        if not self._account_ok():
+            return
         try:
             self._guard()
             self._retry_breakeven()
@@ -355,12 +391,19 @@ async def main(dry: bool) -> None:
     notify = BotNotifier(os.environ["TELEGRAM_BOT_TOKEN"], os.environ["TELEGRAM_NOTIFY_CHAT_ID"])
 
     execution.connect(allow_live=config.get("allow_live", False))
-    book = Book.load(STATE)
+    account = execution.account_id()
+    migrate_legacy_state(account)
+    state = state_path(account)
+    book = Book.load(state)
+    if not book.account:
+        book.account = account
+    if book.account != account:
+        raise SystemExit(f"{state.name} belongs to {book.account}, MT5 is on {account}")
     if config.get("initial_balance"):
         book.initial_balance = config["initial_balance"]
     elif book.initial_balance is None:
         book.initial_balance = execution.account_state(0.0).balance
-    copier = Copier(execution, book, profile_from(config), config, notify, STATE, dry=dry)
+    copier = Copier(execution, book, profile_from(config), config, notify, state, dry=dry)
     copier._save()
 
     client = TelegramClient(str(HERE / "copier"), int(os.environ["TELEGRAM_API_ID"]), os.environ["TELEGRAM_API_HASH"])
@@ -385,7 +428,7 @@ async def main(dry: bool) -> None:
             await asyncio.sleep(WATCH_EVERY_S)
 
     halted = f", TRADING STOPPED: {book.halt_reason}" if book.halted(time.time()) else ""
-    copier._say(f"copier started{halted}: {', '.join(c.name for c in chats)}, "
+    copier._say(f"copier started on {account}{halted}: {', '.join(c.name for c in chats)}, "
                 f"initial balance {book.initial_balance}, {len(book.signals)} signals in the book")
     asyncio.create_task(watchdog())
     await client.run_until_disconnected()
