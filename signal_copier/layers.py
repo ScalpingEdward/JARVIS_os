@@ -14,8 +14,9 @@ What the copier does with it:
 
     open    layer 1 at market, layers 2..n as limit orders spread from there
             to the far end of the zone (the pullback), all with the group's SL
-    PARTIAL every SL to its own entry, unfilled limits cancelled, one layer
-            closed -- the one in most profit; never the last one (the runner)
+    PARTIAL one layer closed (20 % of five) -- the one in most profit, never
+            the last one (the runner) -- and every open SL to its own entry.
+            Limits still waiting stay: the group never says to cancel them.
     TRAIL   from then on the watchdog pulls each SL to trail_pips behind price
     CLOSE   everything out
     SL_HIT  unfilled limits cancelled

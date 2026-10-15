@@ -309,7 +309,8 @@ class Copier:
             elif positions:
                 lines.append(f"{len(positions)} layers still open -- their SL will take them")
         else:
-            lines += self._cancel_pending(orders)
+            # Only what the group says: close 20 %, stop to BE. It says nothing
+            # about the limits still waiting in the zone, so they stay.
             if event == layers.Event.PARTIAL:
                 victim = layers.layer_to_close(positions)
                 if victim is not None:
@@ -365,15 +366,19 @@ class Copier:
         self._save()
 
     def _trail_and_expire(self) -> None:
-        """Watchdog part for layers: trail SLs after TP3, drop limits nobody cancelled in time."""
+        """Watchdog part for layers: trail SLs after TP3 (the group's own instruction).
+
+        Limits are left alone unless the profile sets pending_expiry_minutes --
+        the group never says to cancel them, and the copier follows the group.
+        """
         now = self.clock()
-        expiry = float(self.config.get("pending_expiry_minutes", 120)) * 60
+        expiry_min = self.config.get("pending_expiry_minutes")
         for s in self.book.signals.values():
             if s.strategy != "layers":
                 continue
             positions, orders = self._layer_parts(s)
-            if orders and (now - s.opened_at > expiry or (not positions and s.trailing)):
-                self._say(f"#{s.msg_id} limits expired after {expiry / 60:.0f} min\n"
+            if orders and expiry_min and now - s.opened_at > float(expiry_min) * 60:
+                self._say(f"#{s.msg_id} limits expired after {float(expiry_min):.0f} min\n"
                           + "\n".join(self._cancel_pending(orders)))
             if not s.trailing:
                 continue

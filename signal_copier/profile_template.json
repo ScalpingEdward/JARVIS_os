@@ -7,7 +7,7 @@
   "strategy": "signals",
   "layers": 5,
   "trail_pips": 100,
-  "pending_expiry_minutes": 120,
+  "pending_expiry_minutes": null,
   "sizing": "risk_pct",
   "fixed_lot": 0.01,
   "risk": {

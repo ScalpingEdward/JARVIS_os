@@ -90,7 +90,7 @@ Doppelklick auf `signal_copier\setup.bat`.
 | `strategy` | `"signals"` = normale Signale (Einstieg, SL, TPs). `"layers"` = Zonen-Signale mit mehreren Einstiegen, z. B. VIP SIGNALS Inner Circle (siehe unten). |
 | `layers` | Anzahl Einstiege je Zonen-Signal: 1 sofort, der Rest als Limit-Orders tiefer in der Zone. Standard 5. |
 | `trail_pips` | Nach „TP3 … trail your SL“ zieht er den SL so weit hinter dem Preis nach. 100 Pips Gold = 10 $. |
-| `pending_expiry_minutes` | Nicht gefüllte Limit-Orders werden nach so vielen Minuten gelöscht. Standard 120. |
+| `pending_expiry_minutes` | `null` (Standard) = Limits bleiben, bis die Gruppe „Close all“ oder „HIT SL“ schreibt. Eine Zahl = nach so vielen Minuten löschen. |
 | `sizing` | `"risk_pct"` = Lotgröße aus dem Risiko in %. `"fixed_lot"` = jede Position mit genau `fixed_lot`, für Layering-Gruppen und kleine Konten. |
 | `fixed_lot` | Lotgröße bei `"fixed_lot"`, z. B. `0.01`. Die Verlustgrenzen gelten trotzdem, sofern sie an sind. |
 | `risk_per_position_pct` | Risiko **je TP-Position** in % (0,5 bei 2 TPs = insgesamt 1 %). Nur bei `"risk_pct"`. |
@@ -109,7 +109,7 @@ Für Gruppen wie „VIP SIGNALS Inner Circle“: Signal mit Zone statt Preis
 |---|---|
 | Setup | Layer 1 sofort, die übrigen als Limit-Orders gleichmäßig bis ans Ende der Zone, alle mit dem SL der Gruppe |
 | Setup nachträglich bearbeitet („UPDATED“) | SL und Limit-Orders auf die neuen Werte |
-| „TP1/TP2 HIT … closing 20% … BreakEven“ oder „shakey … closing 20%“ | Limits löschen, den Layer mit dem meisten Gewinn schließen, SL der übrigen auf ihren Einstieg. Der letzte Layer bleibt immer (Runner). |
+| „TP1/TP2 HIT … closing 20% … BreakEven“ oder „shakey … closing 20%“ | den Layer mit dem meisten Gewinn schließen, SL der übrigen auf ihren Einstieg. Der letzte Layer bleibt immer (Runner). Wartende Limits bleiben – die Gruppe sagt nichts dazu. |
 | „TP3 HIT … trail your SL 100 pips“ | ab jetzt SL `trail_pips` hinter dem Preis nachziehen |
 | „Close all now“ / „CUT LOSS NOW“ | alles schließen |
 | „HIT SL“ | übrige Limits löschen |

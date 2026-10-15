@@ -106,14 +106,14 @@ def test_several_setups_the_same_way_are_not_reposts():
     assert len(c.book.signals) == 3
 
 
-def test_tp1_cancels_limits_closes_the_best_layer_and_moves_the_rest_to_entry():
+def test_tp1_does_only_what_it_says_close_the_best_layer_and_move_the_rest_to_entry():
     c, t, said, _ = make()
     c.on_message(CHAT, 100, None, SELL)
     t.fill(2)
     t.fill(3)  # the pullback filled two limits
     t.positions[1].profit, t.positions[2].profit, t.positions[3].profit = 5.0, 6.5, 8.0
     c.on_message(CHAT, 110, 100, "TP1 HIT ✅ +100PIPS\n\n🥷 Consider closing 20% of your Entry Layers + Move stop to BreakEven")
-    assert not t.orders                              # unfilled limits gone
+    assert sorted(t.orders) == [4, 5]                # the group says nothing about them: they stay
     assert sorted(t.positions) == [1, 2]             # #3 had the most profit
     assert all(p.sl == p.price_open for p in t.positions.values())
 
@@ -163,10 +163,13 @@ def test_refused_setup_is_taken_when_an_edit_fixes_it():
     assert len(t.positions) == 1
 
 
-def test_unfilled_limits_expire_and_loss_stop_cancels_them():
+def test_limits_stay_until_the_group_says_otherwise_and_loss_stop_cancels_them():
     c, t, said, now = make()
     c.on_message(CHAT, 100, None, SELL)
-    now[0] += 121 * 60
+    now[0] += 24 * 3600
+    c.watch()
+    assert len(t.orders) == 4                       # no expiry of our own
+    c.config["pending_expiry_minutes"] = 120        # only if the profile asks for one
     c.watch()
     assert not t.orders and "expired" in said[-1]
     c.on_message(CHAT, 200, None, SELL.replace("4192 - 4198", "4190 - 4196").replace("4203", "4201"))
