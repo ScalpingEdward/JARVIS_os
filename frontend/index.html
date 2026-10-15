@@ -14,7 +14,7 @@
   <header class="top">
     <div class="brand"><span class="glyph"></span><div><b>AURON</b><small>AI trading &amp; social agent</small></div></div>
     <div class="motto">DISCIPLINE <i>×</i> DATA <i>×</i> FREEDOM</div>
-    <div class="top-right"><div class="health" id="health" aria-label="System status"></div><div class="when"><time class="clock" id="clock">--:--</time><small id="date"></small></div></div>
+    <div class="top-right"><div class="health" id="health" aria-label="System status"></div><div class="weather" id="weather" title="Wetter"></div><div class="when"><time class="clock" id="clock">--:--</time><small id="date"></small></div></div>
   </header>
 
   <nav class="side" aria-label="Views">
@@ -32,7 +32,25 @@
           <div class="orbit o1"><i></i></div><div class="orbit o2"><i></i></div><div class="orbit o3 warm"><i></i></div>
           <div class="sphere"><img src="./auron-head.webp" alt="" draggable="false" /><i class="scan"></i></div>
           <div class="beam"></div>
-          <div class="pedestal"><i></i><i></i><i></i></div>
+          <svg class="pedestal" viewBox="0 0 400 170" aria-hidden="true">
+            <defs>
+              <linearGradient id="pdTop" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1c2a3d"/><stop offset="1" stop-color="#0a121e"/></linearGradient>
+              <linearGradient id="pdSide" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#05090f"/><stop offset=".5" stop-color="#1a2a40"/><stop offset="1" stop-color="#05090f"/></linearGradient>
+              <radialGradient id="pdCore" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#eaffff"/><stop offset=".35" stop-color="#7fe6ff" stop-opacity=".9"/><stop offset="1" stop-color="#4fd8ff" stop-opacity="0"/></radialGradient>
+            </defs>
+            <!-- base tier -->
+            <path d="M10,104 A190,44 0 0 0 390,104 L390,132 A190,44 0 0 1 10,132 Z" fill="url(#pdSide)"/>
+            <ellipse cx="200" cy="104" rx="190" ry="44" fill="url(#pdTop)"/>
+            <ellipse class="pd-ring" cx="200" cy="104" rx="172" ry="38" fill="none" stroke="#4fd8ff" stroke-width="2"/>
+            <ellipse class="pd-dash" cx="200" cy="104" rx="184" ry="41.5" fill="none" stroke="#4fd8ff" stroke-opacity=".5" stroke-width="1" stroke-dasharray="3 9"/>
+            <path d="M10,132 A190,44 0 0 0 390,132" fill="none" stroke="#4fd8ff" stroke-opacity=".35" stroke-width="1.5"/>
+            <!-- upper tier -->
+            <path d="M80,88 A120,26 0 0 0 320,88 L320,102 A120,26 0 0 1 80,102 Z" fill="url(#pdSide)"/>
+            <ellipse cx="200" cy="88" rx="120" ry="26" fill="url(#pdTop)"/>
+            <ellipse class="pd-ring2" cx="200" cy="88" rx="104" ry="22" fill="none" stroke="#7fe6ff" stroke-width="2.5"/>
+            <!-- the portal -->
+            <ellipse class="pd-core" cx="200" cy="84" rx="78" ry="16" fill="url(#pdCore)"/>
+          </svg>
         </div>
         <div class="core-text"><p id="coreLine">connecting…</p></div>
       </section>

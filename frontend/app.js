@@ -413,3 +413,36 @@ setInterval(refreshTrading, 5000);
 setInterval(refreshHistory, 60000);
 setInterval(refreshInstagram, 30000);
 setInterval(refreshHealth, 15000);
+
+// --- weather next to the clock (Open-Meteo: free, no key) ------------------------------
+// Where: the browser's location if allowed, otherwise Prague. Refreshed every 15 min.
+const WEATHER_FALLBACK = { lat: 50.08, lon: 14.43, place: 'Prag' };
+const WMO = [
+  [[0], '☀', 'klar'], [[1, 2], '⛅', 'leicht bewölkt'], [[3], '☁', 'bewölkt'], [[45, 48], '〰', 'Nebel'],
+  [[51, 53, 55, 56, 57], '☂', 'Niesel'], [[61, 63, 65, 66, 67, 80, 81, 82], '☔', 'Regen'],
+  [[71, 73, 75, 77, 85, 86], '❄', 'Schnee'], [[95, 96, 99], '⚡', 'Gewitter'],
+];
+let weatherAt = null;
+
+function locate() {
+  return new Promise((resolve) => {
+    if (!navigator.geolocation) return resolve(WEATHER_FALLBACK);
+    navigator.geolocation.getCurrentPosition(
+      (p) => resolve({ lat: p.coords.latitude, lon: p.coords.longitude, place: '' }),
+      () => resolve(WEATHER_FALLBACK), { timeout: 8000, maximumAge: 3600000 });
+  });
+}
+
+async function refreshWeather() {
+  try {
+    weatherAt = weatherAt || await locate();
+    const u = `https://api.open-meteo.com/v1/forecast?latitude=${weatherAt.lat}&longitude=${weatherAt.lon}&current=temperature_2m,weather_code&timezone=auto`;
+    const r = await fetch(u);
+    if (!r.ok) throw new Error(`weather ${r.status}`);
+    const c = (await r.json()).current;
+    const [, icon, text] = WMO.find(([codes]) => codes.includes(c.weather_code)) || [[], '·', ''];
+    $('#weather').innerHTML = `<span class="wi">${icon}</span><b>${Math.round(c.temperature_2m)}°C</b><small>${esc(text)}${weatherAt.place ? ' · ' + esc(weatherAt.place) : ''}</small>`;
+  } catch (e) { console.warn(e); }
+}
+refreshWeather();
+setInterval(refreshWeather, 15 * 60 * 1000);

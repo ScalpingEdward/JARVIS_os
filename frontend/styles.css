@@ -33,13 +33,14 @@ button { font: inherit; color: inherit; }
 .up { color: var(--up); } .down { color: var(--down); }
 
 /* one quiet light source, a fine grid that fades out */
+/* the room: a glass wall onto mountains at night (room.svg, made by make_room.py),
+   darkened at the edges so the cards stay readable */
+body { background: #03060c url("./room.svg") center / cover no-repeat fixed; }
 .backdrop {
   position: fixed; inset: 0; z-index: 0; pointer-events: none;
   background:
-    radial-gradient(60vmax 40vmax at 50% 30%, rgba(79, 216, 255, .09), transparent 70%),
-    linear-gradient(rgba(255,255,255,.025) 1px, transparent 1px) 0 0 / 64px 64px,
-    linear-gradient(90deg, rgba(255,255,255,.025) 1px, transparent 1px) 0 0 / 64px 64px;
-  mask-image: radial-gradient(ellipse at 50% 20%, #000 30%, transparent 75%);
+    radial-gradient(ellipse 80% 70% at 50% 45%, transparent 45%, rgba(3,6,12,.5) 100%),
+    linear-gradient(180deg, rgba(3,6,12,.35), rgba(3,6,12,0) 28%, rgba(3,6,12,.1) 70%, rgba(3,6,12,.45));
 }
 
 /* --- top bar ---------------------------------------------------------------- */
@@ -86,7 +87,7 @@ button { font: inherit; color: inherit; }
 @media (max-width: 1250px) { .side { display: none; } }
 
 /* --- the 3D stage ------------------------------------------------------------------ */
-.field { position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: .6; }
+.field { position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: .35; }
 .stage {
   position: relative; z-index: 1; min-height: calc(100vh - 84px);
   display: grid; place-items: center;
@@ -144,12 +145,14 @@ button { font: inherit; color: inherit; }
   background: linear-gradient(180deg, rgba(79,216,255,0), rgba(79,216,255,.35) 70%, rgba(150,230,255,.7));
   clip-path: polygon(30% 0, 70% 0, 100% 100%, 0 100%); filter: blur(5px); animation: beam 3.6s ease-in-out infinite; }
 @keyframes beam { 50% { opacity: .55; } }
-.pedestal { position: absolute; left: 12%; right: 12%; bottom: 0; height: 22%; transform: rotateX(72deg); transform-style: preserve-3d; }
-.pedestal i { position: absolute; inset: 0; border-radius: 50%; border: 2px solid rgba(79,216,255,.55); box-shadow: 0 0 24px rgba(79,216,255,.45), inset 0 0 24px rgba(79,216,255,.3); }
-.pedestal i:nth-child(2) { inset: 16%; border-color: rgba(79,216,255,.8); background: radial-gradient(circle, rgba(150,230,255,.55), rgba(79,216,255,.12) 60%, transparent 72%); animation: pulse-ring 3s ease-in-out infinite; }
-.pedestal i:nth-child(3) { inset: -14%; border: 1px dashed rgba(79,216,255,.3); animation: spin 40s linear infinite; }
-@keyframes pulse-ring { 50% { box-shadow: 0 0 40px rgba(79,216,255,.8), inset 0 0 40px rgba(79,216,255,.5); } }
-@keyframes spin { to { transform: rotate(360deg); } }
+.pedestal { position: absolute; left: 0; right: 0; bottom: -2%; width: 100%; overflow: visible; filter: drop-shadow(0 0 18px rgba(79,216,255,.35)); }
+.pd-ring { filter: drop-shadow(0 0 6px #4fd8ff); animation: pd-glow 3s ease-in-out infinite; }
+.pd-ring2 { filter: drop-shadow(0 0 8px #7fe6ff); }
+.pd-dash { animation: pd-run 18s linear infinite; }
+.pd-core { animation: pd-core 3s ease-in-out infinite; transform-origin: 200px 84px; }
+@keyframes pd-glow { 50% { stroke-opacity: .55; } }
+@keyframes pd-run { to { stroke-dashoffset: -240; } }
+@keyframes pd-core { 50% { opacity: .65; transform: scale(1.06, 1); } }
 .core.degraded { --accent: #f2c14e; }
 .core.degraded .sphere { box-shadow: 0 0 80px rgba(242,193,78,.45), inset 0 0 60px rgba(242,193,78,.35); }
 .core-text { text-align: center; margin-top: 10px; transform: translateZ(30px); }
@@ -158,18 +161,25 @@ button { font: inherit; color: inherit; }
 /* --- floating glass cards ---------------------------------------------------------- */
 .tile, .mini-tile {
   position: relative; text-align: left; min-width: 0;
-  background: linear-gradient(160deg, rgba(22,36,58,.74), rgba(8,14,26,.74));
-  border: 1px solid rgba(79,216,255,.18); border-radius: 16px;
-  backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
-  box-shadow: 0 0 0 1px rgba(255,255,255,.025) inset, 0 50px 90px -40px rgba(0,0,0,.95), 0 0 46px -20px rgba(79,216,255,.45);
+  /* glass: see-through, frosted, a bright top edge and a thin slab of thickness below */
+  background: linear-gradient(155deg, rgba(150,200,255,.13), rgba(60,110,170,.05) 45%, rgba(10,20,36,.28));
+  border: 1px solid rgba(170,220,255,.20); border-top-color: rgba(220,240,255,.38); border-radius: 16px;
+  backdrop-filter: blur(18px) saturate(140%); -webkit-backdrop-filter: blur(18px) saturate(140%);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.18), inset 0 -1px 0 rgba(79,216,255,.12),
+    0 5px 0 -1px rgba(120,190,255,.10), 0 7px 0 -1px rgba(0,0,0,.35),
+    0 50px 90px -40px rgba(0,0,0,.9), 0 0 46px -20px rgba(79,216,255,.45);
   transform-style: preserve-3d;
   animation: hover-float 8s ease-in-out infinite; animation-delay: var(--d, 0s);
 }
 .tile { cursor: pointer; padding: 20px 20px 16px;
   transform: translateZ(var(--z, 0px)) rotateY(calc(var(--base-ry, 0deg) + var(--ry, 0deg))) rotateX(var(--rx, 0deg));
   transition: transform .6s var(--ease), border-color .3s, box-shadow .3s; }
-.a-insta { border-color: rgba(190,110,255,.28); box-shadow: 0 0 0 1px rgba(255,255,255,.025) inset, 0 50px 90px -40px rgba(0,0,0,.95), 0 0 46px -20px rgba(190,110,255,.5); }
-.a-trading { border-color: rgba(255,170,70,.25); box-shadow: 0 0 0 1px rgba(255,255,255,.025) inset, 0 50px 90px -40px rgba(0,0,0,.95), 0 0 46px -20px rgba(255,160,60,.45); }
+.a-insta { border-color: rgba(200,140,255,.30); }
+.a-insta::after, .a-trading::after { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; }
+.a-insta::after { box-shadow: 0 0 46px -18px rgba(190,110,255,.6); }
+.a-trading { border-color: rgba(255,190,110,.30); }
+.a-trading::after { box-shadow: 0 0 46px -18px rgba(255,160,60,.55); }
 @keyframes hover-float { 0%, 100% { translate: 0 0; } 50% { translate: 0 -9px; } }
 .tile .corner { position: absolute; inset: -1px; border-radius: inherit; pointer-events: none;
   background:
@@ -321,3 +331,10 @@ button { font: inherit; color: inherit; }
   *, *::before, *::after { animation: none !important; transition: none !important; }
   .chart .line { stroke-dashoffset: 0; }
 }
+
+/* weather, next to the clock */
+.weather { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text); }
+.weather b { font-weight: 600; font-variant-numeric: tabular-nums; }
+.weather small { color: var(--muted); font-size: 11px; }
+.weather .wi { font-size: 16px; filter: drop-shadow(0 0 6px rgba(79,216,255,.5)); }
+@media (max-width: 600px) { .weather small { display: none; } }
