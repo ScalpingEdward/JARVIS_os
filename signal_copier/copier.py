@@ -438,10 +438,10 @@ async def main(profile: str | None, dry: bool) -> None:
     await client.start()
     dialogs = [d async for d in client.iter_dialogs()]
     chats = []
-    for name in config["channels"]:
-        found = [d for d in dialogs if _plain(name) in _plain(d.name or "")]
+    for wanted in config["channels"]:
+        found = [d for d in dialogs if _plain(wanted) in _plain(d.name or "")]
         if len(found) != 1:
-            raise SystemExit(f"{len(found)} chats match {name!r}: {[d.name for d in found]}")
+            raise SystemExit(f"{len(found)} chats match {wanted!r}: {[d.name for d in found]}")
         chats.append(found[0])
 
     @client.on(events.NewMessage(chats=[c.id for c in chats]))
