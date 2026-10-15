@@ -30,6 +30,32 @@ richtig und schnell – und er lässt Verpasstes liegen, statt es zu spät zu
 | Eigene Signale | Erst mit eigener, öffentlich nachprüfbarer Bilanz über Monate (z. B. Myfxbook) – passt zu „erst Trader werden, dann darüber reden“. |
 | ~~Fremde Signale weitergeben~~ | **Nein.** Verstößt fast sicher gegen die Bedingungen der Gruppe, macht abhängig von einer fremden Quelle, kostet den Ruf. |
 
+## Die größere Idee: Problemlöser zwischen Gruppen und Menschen ohne Zeit (2026-10-15)
+
+Brano kennt das Problem selbst und von seinem Bruder: gute Signale, aber
+man arbeitet, verpasst sie, tippt falsch, kommt zu spät. Daraus drei Teile:
+
+1. **Tool (Abo):** nimmt das Zeit- und Tippproblem weg; mehrere Gruppen und
+   Konten nebeneinander.
+2. **Geprüfte Gruppen:** Partnerschaften (Affiliate) mit mehreren
+   Gruppen-Besitzern – aber nur für Gruppen, die der Kopierer selbst über
+   Wochen mit echten, kopierten Trades bestätigt hat. Der Vorteil, den sonst
+   niemand hat: AURON misst Gewinn/Verlust **pro Gruppe** aus echten Fills
+   (`/v1/copier/overview`, Dashboard) – keine Screenshots, keine
+   Eigenwerbung der Gruppe. Daraus ließe sich später eine öffentliche,
+   ehrliche Gruppen-Statistik machen.
+3. **Gruppen-Besitzer** gewinnen Mitglieder, die bleiben, weil sie nichts
+   mehr verpassen.
+
+Ehrlich dazu: das Tool nimmt Ausführungsfehler weg, nicht das Risiko der
+Signale – eine schlechte Gruppe verliert auch perfekt kopiert. Und der Ruf
+hängt an jeder empfohlenen Gruppe; eine Betrugsgruppe in der Liste kostet
+mehr, als ihre Provision bringt. Deshalb: erst messen, dann empfehlen.
+
+Zusätzliche Frage an den Anwalt: Ist eine öffentliche Statistik über fremde
+Gruppen (mit Namen) zulässig, und was gilt, wenn ich gleichzeitig Provision
+von einigen dieser Gruppen bekomme (Interessenkonflikt offenlegen)?
+
 ## Preise (grobe Marktkenntnis, vor Entscheidung nachprüfen)
 
 - Abo: vergleichbare Telegram→MT5-Kopierer meist 30–80 $/Monat.
