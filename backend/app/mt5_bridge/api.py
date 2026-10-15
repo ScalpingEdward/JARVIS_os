@@ -15,6 +15,16 @@ from .service import MT5BridgeError, mt5_bridge_service
 router = APIRouter(prefix="/v1/mt5", tags=["mt5"])
 
 
+@router.delete("/terminals/{terminal_id}", status_code=204)
+def forget_terminal(terminal_id: UUID) -> None:
+    """Remove a terminal record. Reading-only bridge, so nothing is closed
+    or disconnected by this -- the record simply stops existing."""
+    try:
+        mt5_bridge_service.forget(terminal_id)
+    except MT5BridgeError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
 @router.get("/status", response_model=MT5BridgeStatus)
 def status() -> MT5BridgeStatus:
     return mt5_bridge_service.status()

@@ -1,22 +1,26 @@
 from __future__ import annotations
 
+import logging
 import threading
+from datetime import datetime, timezone
 from uuid import UUID
 
 from sqlalchemy import update
 
-from app.db import SessionLocal
+from app.db import SessionLocal, refuse_reset_in_production
 from app.db_models import InstagramContentCandidateRow
 
 from .caption_writer import AnthropicCaptionWriter, CaptionWriterError
 from .edit_plan import build_edit_plan
-from .format_decision import decide_format
+from .format_decision import decide_format, reel_duration_notes
 from .hook import check_hook
 from .media_pool_models import FinalizeDraftRequest
 from .media_pool_service import MediaPoolError, media_pool_service
 from .models import ContentCandidate, ContentCandidateCreate, ContentDecision, ContentStatus, MediaItem
 from .moderation import moderate
 from .publisher import N8nInstagramPublisher
+
+logger = logging.getLogger(__name__)
 
 from app.knowledge_graph.models import NodeCreate, NodeKind
 from app.knowledge_graph.service import knowledge_graph_service
@@ -50,6 +54,7 @@ class InstagramContentService:
         self._publish_lock = threading.Lock()
 
     def reset(self) -> None:
+        refuse_reset_in_production("the Instagram content candidates")
         with SessionLocal() as session:
             session.query(InstagramContentCandidateRow).delete()
             session.commit()
@@ -72,6 +77,7 @@ class InstagramContentService:
         )
         item.moderation_warnings = list(result.warnings)
         item.hook_warnings = hook_warnings
+        item.edit_warnings = [note for media in payload.media_items for note in reel_duration_notes(media)]
 
         if not result.passed:
             item.status = ContentStatus.moderation_rejected
@@ -83,6 +89,8 @@ class InstagramContentService:
                 item.audit_log.append("Moderation warnings (still pending human review): " + "; ".join(result.warnings))
             if hook_warnings:
                 item.audit_log.append("Hook warnings: " + "; ".join(hook_warnings))
+            if item.edit_warnings:
+                item.audit_log.append("Edit warnings: " + "; ".join(item.edit_warnings))
 
         with SessionLocal() as session:
             session.add(InstagramContentCandidateRow(
@@ -111,6 +119,10 @@ class InstagramContentService:
                     message=(
                         f"{len(item.media_items)} media item(s), theme notes: {item.aesthetic_notes or 'none'}.\n"
                         f"Caption: {item.caption_draft[:200]}"
+                        # Reaches a phone, where the decision often actually
+                        # happens -- a length problem is worth knowing before
+                        # opening anything.
+                        + (f"\nHeads up: {' '.join(item.edit_warnings)}" if item.edit_warnings else "")
                     ),
                     priority=DeliveryPriority.normal,
                     domain="instagram",
@@ -195,6 +207,162 @@ class InstagramContentService:
             session.commit()
         return item
 
+    def remove_media_item(self, candidate_id: UUID, index: int, reason: str) -> ContentCandidate:
+        """Take one photo or clip out of a post that is still awaiting a
+        decision -- too private, or simply not good enough next to the rest.
+
+        The item does not go back into the pool: it was taken out by a human
+        for a reason the pool cannot see, and offering it again in the next
+        draft would ask the same question twice. The format is recomputed,
+        since a carousel reduced to one item is no longer a carousel.
+        """
+        with SessionLocal() as session:
+            row = session.get(InstagramContentCandidateRow, str(candidate_id))
+            if row is None:
+                raise InstagramContentError("Content candidate not found")
+            item = ContentCandidate.model_validate_json(row.data)
+            if item.status != ContentStatus.proposed:
+                raise InstagramContentError(f"Cannot change a candidate in status {item.status}")
+            if len(item.media_items) <= 1:
+                raise InstagramContentError("the last item cannot be removed -- reject the post instead")
+            if not 0 <= index < len(item.media_items):
+                raise InstagramContentError(f"no item at position {index + 1}")
+
+            removed = item.media_items.pop(index)
+            item.post_format, item.format_reasoning = decide_format(item.media_items)
+            item.audit_log.append(f"Removed item {index + 1} ({removed.media_ref}): {reason}")
+            item.updated_at = datetime.now(timezone.utc)
+            row.data = item.model_dump_json()
+            session.commit()
+        return item
+
+    @staticmethod
+    def _post_refs(item: ContentCandidate) -> dict[str, str]:
+        """The Drive id of the processed file for every item in this post.
+
+        Refuses rather than falling back to the original: posting the
+        untouched phone file would look like success and quietly undo every
+        edit -- the cut, the grade, the exposure, the crop. If a processed
+        version is missing the honest answer is "not yet", not a worse post.
+        """
+        by_ref = {pool.media_ref: pool for pool in media_pool_service.list_all()}
+        refs: dict[str, str] = {}
+        missing: list[str] = []
+        for media in item.media_items:
+            pool_item = by_ref.get(media.media_ref)
+            if pool_item is None or not pool_item.processed_media_ref:
+                missing.append(media.media_ref)
+                continue
+            refs[media.media_ref] = pool_item.processed_media_ref
+        if missing:
+            raise InstagramContentError(
+                "no processed file in Drive for " + ", ".join(missing)
+                + " -- posting the untouched original would throw away the edit"
+            )
+        return refs
+
+    def withdraw_posted(self, candidate_id: UUID, reason: str) -> ContentCandidate:
+        """Take back a post that no longer exists on Instagram.
+
+        Brano deleted the first real Reel from his account after the test,
+        and its video stayed marked used -- a post that is gone, blocking
+        footage that is free. Nothing could reclaim it: release only ever
+        happened on a failed publish. This is the honest counterpart, and it
+        says in the audit log that the post was published and then removed,
+        rather than quietly pretending it never went out.
+        """
+        item = self.get(candidate_id)
+        if item.status != ContentStatus.posted:
+            raise InstagramContentError(
+                f"Only a posted candidate can be withdrawn, this one is {item.status}"
+            )
+        item.status = ContentStatus.rejected
+        item.audit_log.append(
+            f"Withdrawn after posting (media_id={item.published_media_id}): {reason}. "
+            f"Media released back into the pool."
+        )
+        self._save_candidate(item)
+        released = media_pool_service.release_items_used_by(item.id)
+        logger.info("withdrew posted candidate %s, released %s media items", candidate_id, released)
+        return item
+
+    def _recent_captions(self, exclude_id=None, limit: int = 8) -> list[str]:
+        """The captions that actually went out or are waiting, newest first.
+
+        The writer used to work without them, so every caption was composed
+        alone from the same voice instruction and the same one kept coming
+        back -- five in a row about silence and patience. Rejected ones are
+        included on purpose: Brano rejected them for other reasons, and they
+        still show what the writer has just been reaching for.
+        """
+        items = sorted(self.list_all(), key=lambda c: c.created_at, reverse=True)
+        return [
+            c.caption_draft for c in items
+            if c.caption_draft and (exclude_id is None or c.id != exclude_id)
+        ][:limit]
+
+    def regenerate_caption(self, candidate_id: UUID) -> ContentCandidate:
+        """Write a new caption for a post that is still awaiting a decision.
+
+        The pictures are the part that took a day to shoot; a caption is one
+        API call. Rejecting a whole post because the words missed would
+        throw away the wrong half.
+        """
+        item = self.get(candidate_id)
+        if item.status != ContentStatus.proposed:
+            raise InstagramContentError(f"Cannot rewrite the caption of a candidate in status {item.status}")
+        pool_items = [
+            pool for pool in media_pool_service.list_all()
+            if pool.media_ref in {media.media_ref for media in item.media_items}
+        ]
+        theme = pool_items[0].theme if pool_items else "lifestyle"
+        try:
+            caption = self._caption_writer.generate(
+                theme, pool_items, item.post_format.value,
+                recent=self._recent_captions(exclude_id=item.id),
+            )
+        except CaptionWriterError as exc:
+            raise InstagramContentError(f"Caption generation failed: {exc}") from exc
+        item.caption_draft = caption
+        item.hook_warnings = check_hook(caption)
+        item.audit_log.append("Caption rewritten on request.")
+        item.updated_at = datetime.now(timezone.utc)
+        self._save_candidate(item)
+        return item
+
+    def mark_posted_manually(self, candidate_id: UUID, by: str) -> ContentCandidate:
+        """Brano posted this one himself, in the Instagram app.
+
+        The API can attach music to a Reel but to nothing else, so a photo
+        or a carousel is posted by hand with the sound picked in the app.
+        The system still has to know it went out: the next post is planned
+        against what is already published (no pillar twice in a row), and a
+        post nobody marks as done would be offered again.
+
+        No published_media_id: AURON never saw the post Instagram created.
+        Claiming an id it does not have would be worse than leaving it empty.
+        """
+        with SessionLocal() as session:
+            row = session.get(InstagramContentCandidateRow, str(candidate_id))
+            if row is None:
+                raise InstagramContentError("Content candidate not found")
+            item = ContentCandidate.model_validate_json(row.data)
+            if item.status == ContentStatus.posted:
+                return item
+            if item.status != ContentStatus.approved:
+                raise InstagramContentError(
+                    f"Cannot mark a candidate in status {item.status} as posted; it must be approved first"
+                )
+            item.status = ContentStatus.posted
+            item.decision_reason = f"Manuell in der Instagram-App gepostet ({by})"
+            item.audit_log.append(f"Marked as posted by hand, in the app, by {by}.")
+            item.updated_at = datetime.now(timezone.utc)
+            row.status = item.status.value
+            row.data = item.model_dump_json()
+            session.commit()
+        self._record_post_in_knowledge_graph(item)
+        return item
+
     def publish(self, candidate_id: UUID) -> ContentCandidate:
         """The one real execution boundary in this whole module -- and, as
         of this fix, a genuinely atomic one. Found by an external test
@@ -250,12 +418,14 @@ class InstagramContentService:
                 session.commit()
 
         try:
+            post_refs = self._post_refs(item)
             media_id = self._publisher.publish(
                 media_items=item.media_items,
                 post_format=item.post_format,
                 edit_plan=item.edit_plan,
                 caption=item.caption_draft,
                 request_id=str(item.id),
+                post_refs=post_refs,
             )
         except Exception as exc:
             # Deliberately broad: N8nInstagramPublisherError isn't the only
@@ -345,6 +515,7 @@ class InstagramContentService:
                 duration_seconds=pi.duration_seconds,
                 recommended_trim_start_seconds=pi.recommended_trim_start_seconds,
                 recommended_trim_end_seconds=pi.recommended_trim_end_seconds,
+                cover_timestamp_seconds=pi.cover_timestamp_seconds,
             )
             for pi in pool_items
         ]
@@ -353,7 +524,10 @@ class InstagramContentService:
         caption_draft = request.caption_draft
         if caption_draft is None:
             try:
-                caption_draft = self._caption_writer.generate(draft.theme, pool_items, post_format.value)
+                caption_draft = self._caption_writer.generate(
+                    draft.theme, pool_items, post_format.value,
+                    recent=self._recent_captions(),
+                )
             except CaptionWriterError as exc:
                 raise InstagramContentError(f"Caption generation failed: {exc}") from exc
 

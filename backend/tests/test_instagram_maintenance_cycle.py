@@ -40,7 +40,7 @@ def test_maintenance_cycle_without_new_media_just_curates_existing_pool():
     media_pool_service.reset()
     media_pool_service.ingest(
         MediaPoolIngestRequest(
-            items=[MediaPoolItemCreate(media_ref=f"a{i}", media_type="image", theme="t", aesthetic_score=0.7) for i in range(3)]
+            items=[MediaPoolItemCreate(media_ref=f"a{i}", media_type="image", theme="t", aesthetic_score=0.5) for i in range(3)]
         )
     )
     response = api_client.post("/v1/instagram/maintenance-cycle")

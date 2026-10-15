@@ -1,10 +1,12 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from uuid import UUID, uuid4
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, computed_field, model_validator
 
+from .analysis_completeness import analysis_is_complete
+from .captured_at_resolution import CapturedAtSource
 from .models import MediaType
 
 
@@ -32,10 +34,24 @@ class MediaPoolItemCreate(BaseModel):
     )
     captured_at: datetime | None = Field(
         default=None,
-        description="EXIF capture timestamp (DateTimeOriginal). Used for chronological "
-        "grouping and sorting.",
+        description="When this was actually shot. Used for chronological grouping and sorting. "
+        "Always read together with captured_at_source -- a fallback value can be an upload "
+        "time rather than a capture time.",
+    )
+    captured_at_source: CapturedAtSource | None = Field(
+        default=None,
+        description="Which source captured_at came from: EXIF, the video container's own "
+        "creation_time, or -- weakest -- the Drive upload time. None exactly when captured_at "
+        "is None. Kept as its own field so an upload time can never masquerade as a capture time.",
     )
     aesthetic_score: float = Field(ge=0, le=1)
+    analysis_reasoning: str = Field(
+        default="",
+        max_length=2000,
+        description="Why the vision step gave this score, in its own words. Written once at ingest "
+        "and kept: without it a 0.35 is a verdict nobody can argue with, and the fix (crop the "
+        "cluttered edge, blur the background) is invisible.",
+    )
     duration_seconds: float | None = Field(default=None, gt=0)
     dominant_color_hex: str | None = Field(default=None, max_length=7)
     recommended_trim_start_seconds: float | None = Field(
@@ -46,7 +62,50 @@ class MediaPoolItemCreate(BaseModel):
     )
     recommended_trim_end_seconds: float | None = Field(default=None, gt=0)
     trim_reasoning: str = Field(default="", max_length=1000)
+    processed_file: str | None = Field(
+        default=None,
+        max_length=500,
+        description="File name in the processed directory, once AURON has actually cut and "
+        "graded this item. The handed-over original lives in the ingest directory and is "
+        "deleted by the sweeper within a day; this one survives, because it is what gets "
+        "posted. None means nothing has been processed yet -- never that the original is fine "
+        "as it is.",
+    )
+    processed_media_ref: str | None = Field(
+        default=None,
+        max_length=2000,
+        description="Drive file id of the processed version, once n8n has uploaded it. This is "
+        "what gets posted -- the original media_ref stays untouched as the source of record. "
+        "None while the processed file exists only on disk.",
+    )
+    cover_timestamp_seconds: float | None = Field(
+        default=None,
+        gt=0,
+        description="Video only: which frame becomes the Reel cover, sent to the Graph API as "
+        "thumb_offset (milliseconds). Never None for a video that went through frame extraction -- "
+        "the default thumb_offset is 0, i.e. the opening frame, which on phone footage is "
+        "regularly black or blurred.",
+    )
     analyzed_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+    @model_validator(mode="after")
+    def _cover_belongs_to_a_video_and_lands_inside_it(self) -> "MediaPoolItemCreate":
+        if self.cover_timestamp_seconds is None:
+            return self
+        if self.media_type != MediaType.video:
+            raise ValueError("cover_timestamp_seconds is only meaningful for video media items")
+        if self.duration_seconds is not None and self.cover_timestamp_seconds > self.duration_seconds:
+            raise ValueError(
+                f"cover_timestamp_seconds ({self.cover_timestamp_seconds}s) is past the end of the "
+                f"video ({self.duration_seconds}s)"
+            )
+        return self
+
+    @model_validator(mode="after")
+    def _captured_at_carries_its_source(self) -> "MediaPoolItemCreate":
+        if (self.captured_at is None) != (self.captured_at_source is None):
+            raise ValueError("captured_at and captured_at_source must be set or unset together")
+        return self
 
     @model_validator(mode="after")
     def _duration_matches_type(self) -> "MediaPoolItemCreate":
@@ -59,6 +118,17 @@ class MediaPoolItemCreate(BaseModel):
 
 class MediaPoolItem(MediaPoolItemCreate):
     id: UUID = Field(default_factory=uuid4)
+    #: Brano picked this one himself. It then carries a post regardless of
+    #: its score -- he knows what the moment was worth, the score only sees
+    #: pixels. Never set by the analysis.
+    favorite: bool = False
+    #: Brano looked at this one and said it does not carry a post alone.
+    #: The counterpart to `favorite`: the score can lift an item to a solo
+    #: post, and nothing could push one back down, so lowering the bar to
+    #: 0.62 would have overruled a judgement he had already made on three
+    #: specific videos. A still frame cannot see what makes a clip work --
+    #: his eye outranks the number in both directions.
+    never_solo: bool = False
     used: bool = False
     used_in_candidate_id: UUID | None = None
     used_at: datetime | None = None
@@ -67,6 +137,49 @@ class MediaPoolItem(MediaPoolItemCreate):
     @property
     def available(self) -> bool:
         return not self.used and self.reserved_in_draft_id is None
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def analysis_complete(self) -> bool:
+        """Whether this item carries a real analysis or only placeholders.
+        Exposed on /v1/instagram/media-pool so the n8n ingest workflow can
+        re-feed incomplete items without re-deriving the rule itself --
+        see analysis_completeness.py, the single definition."""
+        return analysis_is_complete(self)
+
+
+class IngestDirectoryFile(BaseModel):
+    """One file sitting in the handoff directory right now."""
+
+    name: str
+    size_bytes: int
+    age_hours: float
+    stale: bool = Field(
+        description="Older than the retention window, i.e. the ingest-sweeper should already have "
+        "removed it. Evidence that the sweeper has stopped, not that an ingest failed."
+    )
+
+
+class IngestDirectoryStatus(BaseModel):
+    """What is lying in the video handoff directory.
+
+    Removal is time-based and belongs to the ingest-sweeper sidecar alone:
+    n8n writes and never deletes, AURON reads and never deletes. A file
+    younger than the retention window is therefore unremarkable.
+
+    A file older than it is not. It means the sweeper has stopped, and this
+    report -- written on every ingest and available on demand -- is how that
+    becomes visible instead of quietly filling a disk. Monitoring of the
+    sweeper, by a container that has no way to delete anything itself.
+    """
+
+    file_count: int
+    total_bytes: int
+    oldest_age_hours: float | None = Field(default=None, description="None when the directory is empty.")
+    retention_hours: float
+    stale_files: list[IngestDirectoryFile] = Field(default_factory=list)
+    available: bool = Field(default=True, description="False when the directory is not mounted or unreadable.")
+    detail: str = ""
 
 
 class MediaPoolIngestRequest(BaseModel):
@@ -97,10 +210,75 @@ class ContentGapReport(BaseModel):
     low_water_mark: int
 
 
+class PendingUploadItem(BaseModel):
+    """One processed file waiting to be uploaded back to Drive."""
+
+    media_ref: str
+    processed_file: str
+    media_type: MediaType
+
+
+class PendingUploadList(BaseModel):
+    items: list[PendingUploadItem]
+    count: int
+
+
+class ProcessedUploadedItem(BaseModel):
+    media_ref: str = Field(min_length=1, max_length=2000)
+    processed_media_ref: str = Field(min_length=1, max_length=2000)
+
+
+class ProcessedUploadedRequest(BaseModel):
+    items: list[ProcessedUploadedItem] = Field(min_length=1, max_length=500)
+
+
+class ProcessedUploadedResponse(BaseModel):
+    recorded: int
+    unknown_media_ref: int
+
+
+class CapturedAtFromNameItem(BaseModel):
+    """One file's current name in Drive, for recovering a capture date that
+    was never in the file to begin with."""
+
+    media_ref: str = Field(min_length=1, max_length=2000)
+    file_name: str = Field(min_length=1, max_length=500)
+
+
+class CapturedAtFromNameRequest(BaseModel):
+    #: An empty batch is "nothing new in Drive", not a malformed request.
+    #: Rejecting it killed the whole ingest run: n8n's Google Drive node
+    #: emits one empty item when a listing finds nothing, the workflow
+    #: mapped that into one item with no fields, and the 422 ended the run
+    #: before anything was downloaded (found 2026-10-08; the workflow now
+    #: drops empty entries, and this accepts the empty list they leave).
+    #: The cap is generous rather than tight because nothing here costs
+    #: anything -- no download, no frames, no vision call, only names.
+    items: list[CapturedAtFromNameItem] = Field(default_factory=list, max_length=5000)
+
+
+class CapturedAtFromNameResponse(BaseModel):
+    """Deliberately reports every outcome separately rather than one count.
+    A backfill that silently did nothing looks identical to one that worked
+    unless it says which of the two happened, and this exact class of
+    silence has already cost this project a full run of paid analyses."""
+
+    filled: int = Field(description="Items that had no capture date and got one from the name.")
+    already_had_one: int = Field(description="Left untouched -- an existing date is never overwritten.")
+    no_date_in_name: int = Field(description="The name carries no readable date. Not an error.")
+    unknown_media_ref: int = Field(description="No pool item with that media_ref.")
+    filled_refs: list[str] = Field(default_factory=list)
+
+
 class MediaPoolIngestResponse(BaseModel):
     ingested: int
     skipped_duplicates: int
     pool_size_unused: int
+    updated_incomplete: int = Field(
+        default=0,
+        description="Known media_refs whose placeholder analysis was replaced by a real one, "
+        "rather than being skipped as duplicates.",
+    )
 
 
 class MediaPoolList(BaseModel):
@@ -123,6 +301,10 @@ class CuratedDraft(BaseModel):
     finalized: bool = False
     finalized_candidate_id: UUID | None = None
     discarded: bool = False
+    #: The shoot day this draft's items belong to (from CuratedGroup.day),
+    #: or None when no item in the group had a real captured_at. Determines
+    #: posting order -- see MediaPoolService.list_drafts().
+    content_day: date | None = None
 
 
 class CuratedDraftList(BaseModel):
@@ -155,8 +337,48 @@ class MediaAnalyzeAndIngestItem(BaseModel):
     source_group: str | None = Field(default=None, max_length=200, description="Drive subfolder name, e.g. 'tag 1'.")
     captured_at: datetime | None = Field(
         default=None,
-        description="EXIF capture timestamp (DateTimeOriginal). Used for chronological "
-        "grouping and sorting.",
+        description="EXIF capture timestamp, when the caller already knows it. Left unset, "
+        "AURON reads it from the image's own EXIF.",
+    )
+    video_path: str | None = Field(
+        default=None,
+        max_length=1000,
+        description="Path to the downloaded video inside AURON's read-only ingest directory, "
+        "relative to it ('1abc.mp4') or absolute within it. The caller (n8n) writes the file "
+        "there and passes the path instead of megabytes of base64. Validated against the ingest "
+        "root before anything is opened: traversal, symlinks leading out, non-files and "
+        "unexpected extensions are refused.",
+    )
+    expected_size_bytes: int | None = Field(
+        default=None,
+        ge=1,
+        description="The file's size as Google Drive itself reports it. AURON compares it against "
+        "the bytes actually on disk before opening the file, so a write that was cut short is "
+        "caught by a fact rather than by guessing from how damaged the file looks.",
+    )
+    file_name: str | None = Field(
+        default=None,
+        max_length=500,
+        description="The file's name in Drive. Read for VIDEO items only, and only for a capture "
+        "date deliberately put at the start of it (2026-03-05_1430.mp4). For a video it outranks "
+        "every other source, because an editing tool's export rewrites the container's own "
+        "creation_time but cannot touch the name. Ignored for images: those carry real EXIF, and "
+        "a mistyped name must not outrank a fact. A name without a date is ignored, never "
+        "guessed at.",
+    )
+    video_creation_time: datetime | None = Field(
+        default=None,
+        description="The video container's own creation_time (MP4 mvhd). Videos carry no EXIF, "
+        "so this is the only source that describes when the recording was actually made. "
+        "A zeroed field decodes to 1904 and is rejected as implausible, not stored. "
+        "Unreliable after an editing tool re-exported the file -- it then holds the export "
+        "moment, which is why a dated file name outranks it.",
+    )
+    upload_time: datetime | None = Field(
+        default=None,
+        description="Google Drive createdTime -- when the file arrived, not when it was shot. "
+        "Last-resort fallback; stored only with captured_at_source='upload_time' so it stays "
+        "distinguishable from a real capture time.",
     )
 
 

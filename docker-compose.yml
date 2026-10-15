@@ -40,6 +40,14 @@ services:
       REDIS_URL: redis://redis:6379/0
       JARVIS_DATA_DIR: /data
       JARVIS_LOG_DIR: /logs
+      JARVIS_INGEST_DIR: /data/images/ingest
+      # One definition of the retention window, read by the api (which
+      # reports) and by ingest-sweeper (which deletes). Two separate values
+      # would drift and the api would flag files the sweeper has no intention
+      # of touching yet, or miss ones it already removed.
+      AURON_INGEST_RETENTION_HOURS: ${AURON_INGEST_RETENTION_HOURS:-24}
+      JARVIS_PROCESSED_DIR: /data/images/processed
+      AURON_COLOR_LUT: ${AURON_COLOR_LUT:-/data/lut/INSTA.cube}
     depends_on:
       postgres:
         condition: service_healthy
@@ -48,6 +56,21 @@ services:
     volumes:
       - jarvis_data:/data
       - jarvis_logs:/logs
+      # n8n drops downloaded videos here and passes the path instead of ~26 MB
+      # of base64 per video. Read-only, and only the ingest subdirectory --
+      # n8n writes, AURON reads. Paths from a request are validated against
+      # this root before anything is opened (see ingest_paths.py).
+      - "C:/JARVIS_Images/ingest:/data/images/ingest:ro"
+      # The other direction: AURON writes cut/cropped/graded files here and
+      # n8n picks them up to upload. Writable on purpose -- the ingest mount
+      # above stays read-only so a processing bug can never damage an
+      # original. Same host root, so n8n (which mounts all of
+      # C:/JARVIS_Images) sees both without another mount.
+      - "C:/JARVIS_Images/processed:/data/images/processed"
+      # Brano's own Lightroom look, measured out of a HALD image rather than
+      # rebuilt from its numbers -- see hald_to_cube.py. Read-only: this is a
+      # reference AURON applies, never edits.
+      - "C:/JARVIS_Images/lut:/data/lut:ro"
     ports:
       - "${JARVIS_BIND_ADDRESS:-127.0.0.1}:${JARVIS_PORT:-8000}:8000"
     healthcheck:
@@ -94,11 +117,115 @@ services:
       - ALL
     networks: [jarvis_internal]
 
+  n8n:
+    image: n8nio/n8n:2.13.2
+    container_name: n8n
+    restart: unless-stopped
+    environment:
+      # Instagram Graph API (aus .env, nie im Repo)
+      AURON_IG_ACCESS_TOKEN: ${AURON_IG_ACCESS_TOKEN}
+      AURON_IG_USER_ID: ${AURON_IG_USER_ID}
+      # Shared with the api (via .env): the Drive-fetch webhook refuses any
+      # request without it, since port 5678 is reachable from the LAN.
+      AURON_DRIVE_FETCH_SECRET: ${AURON_DRIVE_FETCH_SECRET}
+      # Baseline-Werte des urspruenglichen docker-run-Containers
+      N8N_RUNNERS_HEARTBEAT_INTERVAL: "120"
+      N8N_RUNNERS_MAX_OLD_SPACE_SIZE: "2048"
+      N8N_BLOCK_ENV_ACCESS_IN_NODE: "false"
+      # n8n restricts file access to ~/.n8n-files by DEFAULT -- the default is
+      # not empty, so the allowlist is always active. Without this the Write
+      # File node fails with "The file ... is not writable" for every path
+      # outside it, which is n8n's own security check and has nothing to do
+      # with mounts or filesystem permissions. Pointing it at the handoff
+      # directory swaps one narrow allowlist for another; it loosens nothing,
+      # and n8n may now write there and nowhere else. Do not remove: without
+      # it the drive-ingest workflow cannot hand a single video over.
+      # Beide Richtungen: ingest (n8n schreibt Downloads) und processed
+      # (n8n liest, was AURON bearbeitet hat, und laedt es hoch). n8n
+      # prueft hiergegen zusaetzlich zu Mount und Dateirechten -- ohne
+      # den zweiten Pfad scheitert der Upload mit "is not writable",
+      # obwohl alles andere stimmt.
+      N8N_RESTRICT_FILE_ACCESS_TO: /data/images/ingest;/data/images/processed
+      # Neu: verhindert das erneute Zuwachsen der SQLite-DB
+      EXECUTIONS_DATA_SAVE_ON_SUCCESS: none
+      EXECUTIONS_DATA_SAVE_ON_ERROR: all
+      EXECUTIONS_DATA_SAVE_ON_PROGRESS: "false"
+      # Wieder "false" seit 5b durch ist -- das war die Bedingung, unter der
+      # es ueberhaupt eingeschaltet wurde. Ein manueller Lauf zeichnet damit
+      # keine Node-Daten mehr auf, und genau das haelt die SQLite-DB klein:
+      # base64 der Rohdateien landete sonst in jedem Execution-Datensatz.
+      # Diagnose bleibt trotzdem moeglich -- EXECUTIONS_DATA_SAVE_ON_ERROR
+      # steht auf "all", ein fehlgeschlagener Lauf hinterlaesst also weiter
+      # seine vollstaendige Spur. Nur erfolgreiche Laeufe schweigen.
+      EXECUTIONS_DATA_SAVE_MANUAL_EXECUTIONS: "false"
+      EXECUTIONS_DATA_PRUNE: "true"
+      EXECUTIONS_DATA_MAX_AGE: "168"
+      EXECUTIONS_DATA_PRUNE_MAX_COUNT: "5000"
+      N8N_LOG_LEVEL: warn
+      # Ohne das faellt n8n auf America/New_York zurueck -- ein
+      # taeglicher 09:00-Trigger wuerde dann 15:00 Berliner Zeit feuern.
+      GENERIC_TIMEZONE: Europe/Berlin
+      TZ: Europe/Berlin
+    volumes:
+      - n8n_data:/home/node/.n8n
+      - "C:/JARVIS_Images:/data/images"
+    ports:
+      - "5678:5678"
+    mem_limit: 3g
+    # Das Default-Netz 'bridge' laesst sich hier nicht eintragen: Compose setzt
+    # immer einen Netzwerk-Alias, den nur user-defined Netze zulassen.
+    # Nach 'compose up' daher zusaetzlich:  docker network connect bridge n8n
+    networks: [jarvis_shared]
+
+  # Deleting is nobody else's job. n8n writes into the handoff directory and
+  # never deletes; the api mounts it read-only and only reports. This is the
+  # one process allowed to remove anything, and it is deliberately the
+  # dumbest thing in the stack: no network, no API, no filenames from
+  # anywhere. It cannot be told what to delete -- there is no input to tell
+  # it with, so there is nothing to inject into and no pattern whose later
+  # loosening could widen what it touches.
+  ingest-sweeper:
+    image: alpine:3.22
+    restart: unless-stopped
+    network_mode: none
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    environment:
+      AURON_INGEST_RETENTION_HOURS: ${AURON_INGEST_RETENTION_HOURS:-24}
+      AURON_INGEST_SWEEP_INTERVAL_SECONDS: ${AURON_INGEST_SWEEP_INTERVAL_SECONDS:-900}
+    volumes:
+      - "C:/JARVIS_Images/ingest:/ingest"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    command:
+      - sh
+      - -c
+      - |
+        hours=$${AURON_INGEST_RETENTION_HOURS:-24}
+        interval=$${AURON_INGEST_SWEEP_INTERVAL_SECONDS:-900}
+        case "$$hours" in ''|*[!0-9]*) hours=24 ;; esac
+        case "$$interval" in ''|*[!0-9]*) interval=900 ;; esac
+        minutes=$$((hours * 60))
+        echo "ingest-sweeper: started, removing files older than $${hours}h every $${interval}s"
+        while true; do
+          removed=$$(find /ingest -type f -mmin +$$minutes -print -delete 2>/dev/null | wc -l)
+          echo "ingest-sweeper: swept $$removed file(s) older than $${hours}h"
+          sleep "$$interval"
+        done
+
 volumes:
   postgres_data:
   redis_data:
   jarvis_data:
   jarvis_logs:
+  n8n_data:
+    external: true
 
 networks:
   jarvis_internal:

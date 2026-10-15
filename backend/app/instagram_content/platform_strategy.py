@@ -17,7 +17,14 @@ class PlatformStrategy(BaseModel):
     optimal_hashtag_max: int = 5
     carousel_min_size: int = 3
     carousel_ideal_max_size: int = 10
-    elite_solo_threshold: float = 0.75
+    #: Lowered from 0.75 on 2026-10-05. At 0.75 exactly zero of 79 videos
+    #: and eight of 270 photos could carry a post alone, so nearly
+    #: everything became a carousel -- and Reels, which are this account's
+    #: reach, never happened at all. The scores cluster in steps, and 0.62
+    #: is the step where 11 videos and 39 photos stand. What stops the bar
+    #: from simply being moved until the answer is nice: `never_solo`, so
+    #: Brano's own eye can push an item back down.
+    elite_solo_threshold: float = 0.62
     updated_at: datetime = Field(default_factory=lambda: datetime(2026, 8, 31, tzinfo=timezone.utc))
     reason: str = (
         "Initial values verified via web search 2026-08-31: Instagram enforces a hard 5-hashtag "

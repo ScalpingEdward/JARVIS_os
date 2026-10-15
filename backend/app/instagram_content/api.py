@@ -8,8 +8,15 @@ from pydantic import BaseModel
 
 from app.security.operator_auth import require_operator_token
 
+from .ingest_paths import ingest_directory_status
 from .media_pool_models import (
+    CapturedAtFromNameRequest,
+    CapturedAtFromNameResponse,
+    PendingUploadList,
+    ProcessedUploadedRequest,
+    ProcessedUploadedResponse,
     ContentGapReport,
+    IngestDirectoryStatus,
     CuratedDraft,
     CuratedDraftList,
     FinalizeDraftRequest,
@@ -135,10 +142,158 @@ def ingest_media(request: MediaPoolIngestRequest) -> MediaPoolIngestResponse:
     return media_pool_service.ingest(request)
 
 
+@router.post("/media-pool/{media_ref}/favorite")
+def set_favorite(media_ref: str, on: bool = True) -> dict:
+    """Mark (or unmark) one pool item as Brano's own pick: it then carries a
+    post on its own, whatever the analysis scored it."""
+    try:
+        item = media_pool_service.set_favorite(media_ref, on)
+    except MediaPoolError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return {"media_ref": item.media_ref, "favorite": item.favorite,
+            "aesthetic_score": item.aesthetic_score, "used": item.used}
+
+
+@router.post("/media-pool/{media_ref}/never-solo")
+def set_never_solo(media_ref: str, never_solo: bool = True) -> dict:
+    """Mark that this item does not carry a post on its own, whatever the
+    score says -- the counterpart to favorite."""
+    try:
+        item = media_pool_service.set_never_solo(media_ref, never_solo)
+    except MediaPoolError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    return {"media_ref": item.media_ref, "never_solo": item.never_solo,
+            "aesthetic_score": item.aesthetic_score}
+
+
+@router.post("/media-pool/{media_ref}/reframe")
+def reframe_media(media_ref: str, mode: str = "crop") -> dict:
+    """Pull the frame in on the subject ("crop") or push the background out
+    of focus ("blur") -- the two ways to rescue a strong subject from a
+    cluttered background without retouching anything away."""
+    from .reframe import ReframeError, reframe_pool_item
+
+    try:
+        return reframe_pool_item(media_ref, mode)
+    except ReframeError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@router.post("/media-pool/deduplicate")
+def deduplicate_pool(apply: bool = False) -> dict:
+    """Report (and with apply=true, remove) pool rows that hold the same
+    Drive file twice -- the result of two ingest attempts for one file
+    racing each other."""
+    return media_pool_service.deduplicate(apply=apply)
+
+
+@router.post("/media-pool/grade-existing-photos")
+def grade_existing_photos(limit: int = 20) -> dict:
+    """Grade up to `limit` photos that entered the pool before photos were
+    graded at ingest. Call repeatedly until `remaining` is 0; each call
+    fetches the originals from Drive through n8n."""
+    from .photo_backfill import grade_existing_photos as run
+
+    return run(limit=max(1, min(limit, 50)))
+
+
+@router.post("/media-pool/regrade-developed-photos")
+def regrade_developed_photos(limit: int = 20, offset: int = 0, which: str = "developed") -> dict:
+    """Re-grade the photos that got the LUT on top of a grade Lightroom had
+    already baked in. Walk with `offset` until it reaches `photos_total`;
+    camera originals are recognised and left alone."""
+    from .photo_backfill import regrade_developed_photos as run
+
+    return run(limit=max(1, min(limit, 50)), offset=max(0, offset),
+               which="camera" if which == "camera" else "developed")
+
+
+@router.post("/media-pool/process-existing-videos")
+def process_existing_videos(limit: int = 3, offset: int = 0) -> dict:
+    """Cut and grade up to `limit` videos that entered the pool before the
+    ingest did that (or whose ffmpeg run died). Call repeatedly until
+    `remaining` is 0; each one is fetched back from Drive through n8n."""
+    from .video_backfill import process_existing_videos as run
+
+    return run(limit=max(1, min(limit, 10)), offset=max(0, offset))
+
+
+@router.post("/candidates/{candidate_id}/withdraw", response_model=ContentCandidate)
+def withdraw_posted(candidate_id: UUID, reason: str = "deleted on Instagram") -> ContentCandidate:
+    """Take back a post that was deleted on Instagram, so its media can be
+    used again."""
+    try:
+        return instagram_content_service.withdraw_posted(candidate_id, reason)
+    except InstagramContentError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+
+
+@router.get("/media-pool/current-processed-refs")
+def current_processed_refs() -> dict:
+    """The Drive ids of the processed files that are actually in use.
+
+    Anything else in the "AURON fertig" folder is a leftover from an earlier
+    render: Drive keeps a second file when a name repeats instead of
+    replacing it, so every re-render doubled the folder. AURON itself was
+    never confused -- it stores the id, not the name -- but the folder was.
+    """
+    refs = [item.processed_media_ref for item in media_pool_service.list_all()
+            if item.processed_media_ref]
+    return {"count": len(refs), "refs": refs}
+
+
+@router.get("/media-pool/pending-uploads", response_model=PendingUploadList)
+def pending_uploads() -> PendingUploadList:
+    """Processed files that exist only on disk so far.
+
+    n8n reads this instead of guessing: a directory listing says nothing
+    about which item a file belongs to, or whether it is already in Drive.
+    """
+    return media_pool_service.pending_uploads()
+
+
+@router.post("/media-pool/processed-uploaded", response_model=ProcessedUploadedResponse)
+def processed_uploaded(request: ProcessedUploadedRequest) -> ProcessedUploadedResponse:
+    """Record where n8n put the processed version. That file is what gets
+    posted; the original media_ref stays the source of record."""
+    return media_pool_service.record_processed_uploads(request)
+
+
+@router.post("/media-pool/captured-at-from-names", response_model=CapturedAtFromNameResponse)
+def captured_at_from_names(request: CapturedAtFromNameRequest) -> CapturedAtFromNameResponse:
+    """Recovers a shoot date from the file's name in Drive, for items that
+    are already analyzed.
+
+    Renaming a file in Drive keeps its id, so the analysis already paid for
+    stays valid -- but the ingest pre-filter skips an analyzed media_ref,
+    so nobody ever reads the new name. This is the way in for the name
+    alone: no download, no frames, no vision call, no cost.
+
+    Never overwrites a date that is already there, and never invents one
+    from a name that has none.
+    """
+    return media_pool_service.captured_at_from_names(request)
+
+
 @router.get("/media-pool", response_model=MediaPoolList)
 def list_media_pool(available_only: bool = False):
     items = media_pool_service.list_available() if available_only else media_pool_service.list_all()
     return MediaPoolList(items=items, count=len(items))
+
+
+@router.get("/media-pool/ingest-dir", response_model=IngestDirectoryStatus)
+def ingest_directory() -> IngestDirectoryStatus:
+    """What is lying in the video handoff directory right now.
+
+    n8n writes a downloaded video there and AURON reads it; neither ever
+    deletes. Removal is time-based and belongs to the ingest-sweeper sidecar,
+    so a file inside the retention window is perfectly normal.
+
+    `stale_files` lists what is past the window and should already be gone --
+    which means the sweeper has stopped. This endpoint watches that, from a
+    container mounted read-only and therefore incapable of covering it up by
+    cleaning."""
+    return ingest_directory_status()
 
 
 @router.get("/media-pool/gaps", response_model=ContentGapReport)

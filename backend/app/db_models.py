@@ -252,6 +252,45 @@ class TelegramLiveExecutionAuditRow(Base):
     data: Mapped[str] = mapped_column(Text)
 
 
+class TelegramInstagramAuditRow(Base):
+    """Backs telegram_instagram's recent-activity log. Its own table for the
+    same reason the module has its own signing secret: a tap here ends with
+    something publicly visible under Brano's name, and that trail is worth
+    reading on its own rather than interleaved with trading decisions.
+    instagram_content's own candidate records stay the durable source of
+    truth for what was decided."""
+
+    __tablename__ = "telegram_instagram_audit"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    data: Mapped[str] = mapped_column(Text)
+
+
+class MT5TerminalRow(Base):
+    """One connected MT5 terminal and its latest snapshot.
+
+    The bridge kept all of this in a dict in the API process, so a rebuild
+    of the container threw away the terminal registration, the balance, the
+    ticks and the contract specs -- and the pusher on Brano's machine went
+    on sending to a terminal_id that no longer existed, saved in its own
+    state file next to the script. Everything else in the trading chain was
+    converted away from that pattern already (live order executor, position
+    monitor, automation runtime); this was the last one still in memory.
+
+    One row per terminal, the whole MT5TerminalData as JSON. The snapshot
+    is replaced wholesale on every push, which is what the bridge already
+    does in memory -- no history is kept here, and nothing in the pipeline
+    asks for one.
+    """
+
+    __tablename__ = "mt5_terminals"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    account_login: Mapped[int] = mapped_column(Integer, index=True)
+    server: Mapped[str] = mapped_column(String(200), index=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    data: Mapped[str] = mapped_column(Text)
+
+
 class MonitorAuditRow(Base):
     """Same bounded-window pattern as TelegramAuditRow."""
 

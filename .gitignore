@@ -228,13 +228,11 @@ backend/data/accounts.db
 # current data, and every commit touching it added pure binary noise.
 backend/jarvis.db
 
+# Docker secrets (postgres_password.txt u. a.) -- gehoeren nie ins Repo
+secrets/
+
 # Telegram login of the signal copier -- as good as the account itself
 *.session
 *.session-journal
-# Signal copier runtime: open trades and their log
-signal_copier/state.json
-signal_copier/state.tmp
-signal_copier/copier.log
-signal_copier/state_*.json
-signal_copier/state_*.tmp
+# Signal copier: every profile's state, log and Telegram login
 signal_copier/profiles/

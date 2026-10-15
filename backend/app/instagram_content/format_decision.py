@@ -1,13 +1,21 @@
 from __future__ import annotations
 
 from .models import MediaItem, MediaType, PostFormat
+from .reel_targets import target_max_seconds, target_min_seconds
 
 # Instagram's own real constraints, not house preference:
 CAROUSEL_MIN_ITEMS = 2
 CAROUSEL_MAX_ITEMS = 10
-REEL_MIN_DURATION_SECONDS = 15.0
-REEL_MAX_DURATION_SECONDS = 90.0
-REEL_IDEAL_DURATION_SECONDS = (15.0, 30.0)  # where Instagram's own algorithm favors completion rate
+
+#: The platform's hard ceiling -- past this Instagram itself refuses the
+#: Reel. Not the same thing as the length we aim for, and the two must not
+#: be confused again: a single constant named "max" once served as both,
+#: so a 46s clip got a trim window calculated against the 30s target during
+#: ingest and was then marked "no trim needed" against this 90s ceiling by
+#: the edit plan. The analysis was paid for and silently discarded.
+#: What we aim for lives in reel_targets.py, is configurable, and is a
+#: content-strategy decision; this is a platform fact.
+REEL_PLATFORM_MAX_SECONDS = 90.0
 
 
 def decide_format(media_items: list[MediaItem]) -> tuple[PostFormat, str]:
@@ -43,21 +51,38 @@ def decide_format(media_items: list[MediaItem]) -> tuple[PostFormat, str]:
 
 
 def reel_duration_notes(item: MediaItem) -> list[str]:
-    """Warnings about a video's length relative to what performs well as a
-    Reel. Does not decide a trim window -- see edit_plan.py for why."""
+    """Warnings about a video's length, measured against the length we aim
+    for -- not against the platform ceiling, which is a different question.
+
+    Names the real trim window when one was analyzed, and says plainly that
+    nothing will cut the file: no step in this system touches pixels. A
+    note that merely said "trimming is recommended" would read like
+    something was going to happen.
+    """
     if item.media_type != MediaType.video or item.duration_seconds is None:
         return []
+
     notes: list[str] = []
-    if item.duration_seconds < REEL_MIN_DURATION_SECONDS:
+    if item.duration_seconds > REEL_PLATFORM_MAX_SECONDS:
         notes.append(
-            f"{item.duration_seconds:.0f}s is under Instagram's practical Reel floor of "
-            f"{REEL_MIN_DURATION_SECONDS:.0f}s -- likely to underperform or get treated as a low-effort clip."
+            f"{item.duration_seconds:.0f}s is over Instagram's own {REEL_PLATFORM_MAX_SECONDS:.0f}s ceiling -- "
+            "the platform will refuse this Reel outright. It has to be cut before it can be posted at all."
         )
-    elif item.duration_seconds > REEL_MAX_DURATION_SECONDS:
+    elif item.duration_seconds > target_max_seconds():
+        window = ""
+        if item.recommended_trim_start_seconds is not None and item.recommended_trim_end_seconds is not None:
+            window = (
+                f" AURON's analysis of the actual frames picked "
+                f"{item.recommended_trim_start_seconds:.1f}s-{item.recommended_trim_end_seconds:.1f}s "
+                f"as the strongest segment."
+            )
         notes.append(
-            f"{item.duration_seconds:.0f}s exceeds {REEL_MAX_DURATION_SECONDS:.0f}s -- trimming to the "
-            f"strongest {REEL_IDEAL_DURATION_SECONDS[0]:.0f}-{REEL_IDEAL_DURATION_SECONDS[1]:.0f}s is recommended "
-            "for completion rate, but AURON does not select which segment; that needs a human pick or a real "
-            "video-content analysis step, neither of which exists yet."
+            f"{item.duration_seconds:.0f}s is longer than the {target_max_seconds():.0f}s this account aims "
+            f"for.{window} Nothing here cuts the file -- trim it yourself before posting, or post it as is."
+        )
+    elif item.duration_seconds < target_min_seconds():
+        notes.append(
+            f"{item.duration_seconds:.0f}s is under the {target_min_seconds():.0f}s this account aims for -- "
+            "short clips tend to read as low-effort and give the algorithm little watch time to work with."
         )
     return notes

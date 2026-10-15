@@ -31,7 +31,7 @@ def test_generate_fails_closed_without_an_api_key():
 
 def test_generate_returns_the_model_text():
     def handler(request: httpx.Request) -> httpx.Response:
-        return _anthropic_text_response("Quiet mornings build the account. #tradingmindset #discipline #patience")
+        return _anthropic_text_response("Quiet mornings build the account. #trading #discipline #mindset")
 
     writer = AnthropicCaptionWriter(
         config=CaptionWriterConfig(api_key="test-key"), client=httpx.Client(transport=httpx.MockTransport(handler))
@@ -40,13 +40,50 @@ def test_generate_returns_the_model_text():
     assert "Quiet mornings" in caption
 
 
+def test_a_caption_without_hashtags_gets_one_corrective_retry():
+    """The first real card went out with no hashtags although the prompt
+    demanded 3-5. The count is checked, and the retry says what was wrong."""
+    prompts: list[str] = []
+    answers = iter(["Nobody claps at the top of a mountain.", "Nobody claps. #trading #discipline #mindset"])
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        prompts.append(json.loads(request.content)["messages"][0]["content"])
+        return _anthropic_text_response(next(answers))
+
+    writer = AnthropicCaptionWriter(
+        config=CaptionWriterConfig(api_key="k"), client=httpx.Client(transport=httpx.MockTransport(handler))
+    )
+    assert writer.generate("t", [], "carousel").endswith("#mindset")
+    assert len(prompts) == 2
+    assert "contained 0 hashtags" in prompts[1]
+
+
+def test_a_caption_that_misses_the_hashtag_range_twice_is_refused():
+    def handler(request: httpx.Request) -> httpx.Response:
+        return _anthropic_text_response(
+            "Text. #trading #forex #gym #travel #portrait #mindset #discipline")
+
+    writer = AnthropicCaptionWriter(
+        config=CaptionWriterConfig(api_key="k"), client=httpx.Client(transport=httpx.MockTransport(handler))
+    )
+    with pytest.raises(CaptionWriterError, match="7 hashtags"):
+        writer.generate("t", [], "carousel")
+
+
+def test_count_hashtags_ignores_things_that_only_look_like_one():
+    from app.instagram_content.caption_writer import count_hashtags
+
+    assert count_hashtags("Level #1 kept. #trading #gym\n#food") == 4
+    assert count_hashtags("mail me: a#b, C# ist eine Sprache, ##") == 0
+
+
 def test_generate_sends_the_real_api_key_and_model():
     captured: dict = {}
 
     def handler(request: httpx.Request) -> httpx.Response:
         captured["x-api-key"] = request.headers.get("x-api-key")
         captured["body"] = json.loads(request.content)
-        return _anthropic_text_response("Caption text. #tag1 #tag2 #tag3")
+        return _anthropic_text_response("Caption text. #trading #forex #mindset")
 
     writer = AnthropicCaptionWriter(
         config=CaptionWriterConfig(api_key="sk-test-123", model="claude-sonnet-5"),
@@ -103,7 +140,7 @@ def test_finalize_without_a_caption_generates_one_via_the_real_writer():
     draft = pool_module.media_pool_service.run_curation()[0]
 
     def caption_handler(request: httpx.Request) -> httpx.Response:
-        return _anthropic_text_response("Discipline compounds quietly. #tradingmindset #consistency #patience")
+        return _anthropic_text_response("Discipline compounds quietly. #trading #tradingpsychology #discipline")
 
     service = _service_with_mocks(lambda r: httpx.Response(200, json={"media_id": "x"}), caption_handler)
     candidate = service.finalize_draft(draft.id)  # no request at all -- fully automated
@@ -148,3 +185,147 @@ def test_finalize_fails_closed_when_caption_generation_fails():
     assert refreshed.finalized is False
     for item_id in refreshed.media_item_ids:
         assert pool_module.media_pool_service.get(item_id).used is False
+
+
+def test_invented_hashtags_are_rejected_and_named_in_the_retry():
+    """#QuietWealth and #StillWaters read well and are browsed by nobody --
+    the second real card went out with five of them."""
+    prompts: list[str] = []
+    answers = iter([
+        "Built quietly. #QuietWealth #StillWaters #discipline",
+        "Built quietly. #trading #discipline #mindset",
+    ])
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        prompts.append(json.loads(request.content)["messages"][0]["content"])
+        return _anthropic_text_response(next(answers))
+
+    writer = AnthropicCaptionWriter(
+        config=CaptionWriterConfig(api_key="k"), client=httpx.Client(transport=httpx.MockTransport(handler))
+    )
+    caption = writer.generate("t", [], "carousel")
+
+    assert caption.endswith("#trading #discipline #mindset")
+    assert "#QuietWealth #StillWaters" in prompts[1]
+    assert "#trading" in prompts[0], "the allowed list is part of the first prompt already"
+
+
+def test_the_same_hashtag_twice_is_rejected():
+    def handler(request: httpx.Request) -> httpx.Response:
+        return _anthropic_text_response("Text. #trading #trading #Trading")
+
+    writer = AnthropicCaptionWriter(
+        config=CaptionWriterConfig(api_key="k"), client=httpx.Client(transport=httpx.MockTransport(handler))
+    )
+    with pytest.raises(CaptionWriterError, match="repeated the same hashtag"):
+        writer.generate("t", [], "carousel")
+
+
+def test_the_allowed_list_covers_every_pillar_and_holds_no_duplicates():
+    from app.instagram_content.hashtags import ALLOWED, ALLOWED_BY_PILLAR
+
+    assert set(ALLOWED_BY_PILLAR) == {"trading", "gym", "food", "travel", "portrait"}
+    flat = [tag for tags in ALLOWED_BY_PILLAR.values() for tag in tags]
+    assert len(flat) == len(set(flat)), "a tag listed under two pillars would be maintained twice"
+    assert all(tag == tag.lower() and tag.startswith("#") for tag in ALLOWED)
+
+
+def test_publishing_sends_the_processed_file_not_the_phone_original():
+    """Every edit -- cut, grade, exposure, crop -- lives in the processed
+    file. Posting media_ref would have quietly undone all of it."""
+    from app.instagram_content import media_pool_service as pool_module
+    from app.instagram_content.media_pool_models import ProcessedUploadedRequest
+    from app.instagram_content.models import ContentCandidateCreate, ContentDecision, MediaItem
+
+    pool_module.media_pool_service.reset()
+    pool_module.media_pool_service.ingest(MediaPoolIngestRequest(items=[_image_create("orig-1")]))
+    pool_module.media_pool_service.set_processed_file("orig-1", "orig-1.jpg")
+    pool_module.media_pool_service.record_processed_uploads(ProcessedUploadedRequest(
+        items=[{"media_ref": "orig-1", "processed_media_ref": "drive-processed-1"}]))
+
+    seen: dict = {}
+
+    def publisher_handler(request: httpx.Request) -> httpx.Response:
+        seen["body"] = json.loads(request.content)
+        return httpx.Response(200, json={"media_id": "ig-1"})
+
+    service = _service_with_mocks(publisher_handler)
+    service.reset()
+    candidate = service.propose(ContentCandidateCreate(
+        media_items=[MediaItem(media_ref="orig-1", media_type="image", aesthetic_score=0.8)],
+        caption_draft="Quiet. #trading #discipline #mindset",
+    ))
+    service.decide(candidate.id, ContentDecision(approved=True, reason="test"))
+    service.publish(candidate.id)
+
+    assert seen["body"]["media_items"][0]["post_ref"] == "drive-processed-1"
+    assert seen["body"]["media_items"][0]["media_ref"] == "orig-1", "the original stays named, for the record"
+
+
+def test_publishing_refuses_when_the_processed_file_never_reached_drive():
+    from app.instagram_content import media_pool_service as pool_module
+    from app.instagram_content.models import ContentCandidateCreate, ContentDecision, MediaItem
+    from app.instagram_content.models import ContentStatus as Status
+
+    pool_module.media_pool_service.reset()
+    pool_module.media_pool_service.ingest(MediaPoolIngestRequest(items=[_image_create("orig-2")]))
+
+    def publisher_handler(request: httpx.Request) -> httpx.Response:  # pragma: no cover
+        raise AssertionError("nothing may reach Instagram without a processed file")
+
+    service = _service_with_mocks(publisher_handler)
+    service.reset()
+    candidate = service.propose(ContentCandidateCreate(
+        media_items=[MediaItem(media_ref="orig-2", media_type="image", aesthetic_score=0.8)],
+        caption_draft="Quiet. #trading #discipline #mindset",
+    ))
+    service.decide(candidate.id, ContentDecision(approved=True, reason="test"))
+
+    with pytest.raises(InstagramContentError, match="no processed file in Drive"):
+        service.publish(candidate.id)
+    assert service.get(candidate.id).status == Status.post_failed, "loud, and retryable once the upload ran"
+
+
+# -- the voice must not become a tic ----------------------------------------
+
+
+def test_the_quiet_register_is_allowed_when_the_one_before_it_was_not():
+    """Brano did not want it removed -- "built in silence muss nicht komplett
+    weg" -- only stopped from arriving every single time."""
+    from app.instagram_content.caption_writer import _sermon_problem
+
+    assert _sermon_problem(
+        "Built in silence. #travel #lifestyle #mindset",
+        ["Third coffee today. The waiter has started counting. #food"],
+    ) is None
+
+
+def test_two_sermons_in_a_row_are_refused():
+    from app.instagram_content.caption_writer import _sermon_problem
+
+    problem = _sermon_problem(
+        "Some rewards are quiet enough to need no audience. #travel",
+        ["Nobody claps at the top of a mountain. #travel"],
+    )
+
+    assert problem is not None and "two in a row" in problem
+
+
+def test_with_no_history_the_first_caption_may_sound_like_him():
+    from app.instagram_content.caption_writer import _sermon_problem
+
+    assert _sermon_problem("Built in silence. #travel", []) is None
+    assert _sermon_problem("Built in silence. #travel", None) is None
+
+
+def test_the_recent_captions_reach_the_prompt():
+    """They did not before: every caption was written alone, from the same
+    voice, which is why the same one kept coming back."""
+    from app.instagram_content.caption_writer import _recent_block
+
+    block = _recent_block(["Nobody claps at the top of a mountain.\nsecond line", "Smoke clears slower."])
+
+    assert "Nobody claps at the top of a mountain." in block
+    assert "second line" not in block, "only the opening line matters here"
+    assert "Do not reuse their opening move" in block
+    assert _recent_block([]) == "" and _recent_block(None) == ""

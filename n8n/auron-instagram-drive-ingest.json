@@ -5,7 +5,7 @@
   "nodes": [
     {
       "parameters": {
-        "batchSize": 5,
+        "batchSize": 1,
         "options": {}
       },
       "id": "05b9fb8b-fc38-402f-b4db-09a95bbac2d2",
@@ -16,15 +16,16 @@
         -1840,
         176
       ],
-      "notes": "Processes the folder in batches of 5. Keeps the Code node's base64 footprint small and, together with the batch-wide .all() lookup in 'Prepare AURON Payload1', avoids the paired-item tracing that made the task runner time out partway through a 223-file run."
+      "notes": "Processes the folder one file at a time. Five at once sent five parallel requests to AURON, and a 4K iPhone video graded next to four vision calls ran the 3.5 GB Docker VM out of memory (OOMKilled, ffmpeg died mid-file). Keeps the Code node's base64 footprint small and, together with the batch-wide .all() lookup in 'Prepare AURON Payload1', avoids the paired-item tracing that made the task runner time out partway through a 223-file run."
     },
     {
       "parameters": {
         "rule": {
           "interval": [
             {
-              "field": "minutes",
-              "minutesInterval": 20
+              "field": "days",
+              "triggerAtHour": 9,
+              "triggerAtMinute": 0
             }
           ]
         }
@@ -53,7 +54,8 @@
           "fields": [
             "mimeType",
             "name",
-            "id"
+            "id",
+            "size"
           ]
         }
       },
@@ -105,7 +107,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Base64-encode the downloaded binaries for AURON's vision endpoint.\n// AURON never holds a Drive credential itself -- n8n fetches bytes,\n// AURON only ever sees the encoded image it's handed.\n//\n// Runs once for ALL items of the current batch on purpose: $('Loop Over\n// Items').all() returns just this batch's items, a plain array read. The\n// per-item form ($('Loop Over Items v7').item) makes n8n trace paired items\n// back through every previous batch, which gets slower each round and\n// eventually times the task runner out on a large folder.\n\n// Reads the real duration out of a video's own MP4 'mvhd' atom\n// (duration / timescale) by walking the box structure directly on the\n// raw bytes -- no ffmpeg/ffprobe binary required, which this n8n image\n// does not ship with. Returns null (never a guess) if the file isn't a\n// box-structured container this can parse -- AURON's own\n// analyze-and-ingest endpoint already rejects a video item with\n// duration_seconds=null with a clear error rather than silently\n// accepting a wrong or missing duration.\nfunction readMp4DurationSeconds(buffer) {\n  function walk(buf, start, end) {\n    let pos = start;\n    while (pos + 8 <= end) {\n      let size = buf.readUInt32BE(pos);\n      const type = buf.toString('ascii', pos + 4, pos + 8);\n      let headerSize = 8;\n      if (size === 1) {\n        if (pos + 16 > end) break;\n        const high = buf.readUInt32BE(pos + 8);\n        const low = buf.readUInt32BE(pos + 12);\n        size = high * 2 ** 32 + low;\n        headerSize = 16;\n      } else if (size === 0) {\n        size = end - pos;\n      }\n      if (size < headerSize || pos + size > end) break;\n\n      if (type === 'moov') {\n        const result = walk(buf, pos + headerSize, pos + size);\n        if (result !== null) return result;\n      } else if (type === 'mvhd') {\n        const body = pos + headerSize;\n        const version = buf.readUInt8(body);\n        if (version === 1) {\n          const timescale = buf.readUInt32BE(body + 20);\n          const durHigh = buf.readUInt32BE(body + 24);\n          const durLow = buf.readUInt32BE(body + 28);\n          if (timescale > 0) return (durHigh * 2 ** 32 + durLow) / timescale;\n        } else {\n          const timescale = buf.readUInt32BE(body + 12);\n          const duration = buf.readUInt32BE(body + 16);\n          if (timescale > 0) return duration / timescale;\n        }\n      }\n      pos += size;\n    }\n    return null;\n  }\n\n  try {\n    return walk(buffer, 0, buffer.length);\n  } catch {\n    return null;\n  }\n}\n\nconst driveItems = $('Loop Over Items v7').all();\n\nreturn $input.all().map((item, i) => {\n  const drive = driveItems[i].json;\n  const mediaType = drive.mimeType || 'image/jpeg';\n  const isVideo = mediaType.startsWith('video/');\n  const durationSeconds = isVideo\n    ? readMp4DurationSeconds(Buffer.from(item.json.image_b64, 'base64'))\n    : null;\n\n  return {\n    json: {\n      media_ref: drive.id,\n      media_type: isVideo ? 'video' : 'image',\n      image_base64: isVideo ? null : item.json.image_b64,\n      image_media_type: isVideo ? null : mediaType,\n      duration_seconds: durationSeconds\n    }\n  };\n});"
+        "jsCode": "// Build AURON's payload: images as base64 for the vision endpoint, videos\n// as a path to the file n8n already wrote.\n// AURON never holds a Drive credential itself -- n8n fetches bytes,\n// AURON only ever sees what it's handed.\n//\n// Runs once for ALL items of the current batch on purpose: $('Loop Over\n// Items').all() returns just this batch's items, a plain array read. The\n// per-item form ($('Loop Over Items v7').item) makes n8n trace paired items\n// back through every previous batch, which gets slower each round and\n// eventually times the task runner out on a large folder.\n\n// Die Dauer kommt nicht mehr von hier. Ein mvhd-Parser lief an dieser\n// Stelle, solange unbelegt war, ob er dasselbe liefert wie ffprobe im\n// Backend. Der Vergleich liegt vor: 31 von 31 Dateien, groesste\n// Abweichung 0.000s. Damit war er nur noch eine zweite Quelle fuer eine\n// Zahl, die AURON ohnehin selbst aus der Datei liest -- und zwei Quellen\n// fuer dieselbe Zahl driften irgendwann auseinander.\n\nconst driveItems = $('Loop Over Items v7').all();\n\n// Pfad und Groesse kommen vom Write-Node: fileName ist der Pfad, den er\n// tatsaechlich geschrieben hat -- ein belegter Wert, kein durchgereichter\n// Wunsch.\nconst written = $('Write File To Ingest Dir v9').all();\n\n// Base64 nur fuer Bilder, und nur hier. Frueher machte ein eigener Node\n// 'Extract from File v7' das fuer JEDE Datei, auch fuer Videos, deren\n// Base64 danach niemand las. Ein 403-MB-iPhone-Video sprengte damit die\n// String-Grenze von Node (~512 Mio. Zeichen) und brach den ganzen Lauf ab.\n// Ein Bild ist ein paar MB -- das passt immer.\nconst out = [];\nfor (let i = 0; i < $input.all().length; i++) {\n  const drive = driveItems[i].json;\n  const mediaType = drive.mimeType || 'image/jpeg';\n  const isVideo = mediaType.startsWith('video/');\n\n  if (!isVideo) {\n    const bytes = await this.helpers.getBinaryDataBuffer(i, 'data');\n    out.push({\n      json: {\n        media_ref: drive.id,\n        media_type: 'image',\n        image_base64: bytes.toString('base64'),\n        image_media_type: mediaType,\n        duration_seconds: null\n      }\n    });\n    continue;\n  }\n\n  const writtenFile = written[i].json;\n  if (!writtenFile || !writtenFile.fileName) {\n    // Lieber hier abbrechen als ein Video ohne Pfad losschicken: die API\n    // weist das inzwischen zurueck, aber der Fehler gehoert dorthin, wo die\n    // Ursache sitzt.\n    throw new Error(\n      `Kein geschriebener Pfad fuer ${drive.id} (Index ${i}) -- ` +\n      `Write File To Ingest Dir v9 hat fuer dieses Item kein fileName geliefert.`\n    );\n  }\n\n  // Videos gehen per Pfad, nicht als Base64: eine 19-MB-Datei waere ~26 MB\n  // JSON, eine 403-MB-Datei gar nicht darstellbar.\n  //\n  // expected_size_bytes ist die Groesse, die Drive selbst nennt. AURON\n  // vergleicht sie mit den Bytes auf der Platte, bevor es die Datei\n  // oeffnet -- ein abgebrochener Schreibvorgang faellt damit an einer Zahl\n  // auf und nicht daran, wie kaputt die Datei aussieht.\n  out.push({\n    json: {\n      media_ref: drive.id,\n      media_type: 'video',\n      image_base64: null,\n      image_media_type: null,\n      video_path: writtenFile.fileName,\n      expected_size_bytes: writtenFile.drive_size_bytes ?? null,\n      // Der Dateiname ist die einzige Aufnahmezeit-Quelle, die ein\n      // Lightroom-Export nicht ueberschreibt: der Video-Encoder schreibt die\n      // Datei neu und stempelt seinen eigenen Export-Moment als creation_time.\n      // Deshalb trug jedes der ersten 30 Videos denselben Nachmittag. AURON\n      // liest ein Datum nur, wenn es am Anfang des Namens steht.\n      file_name: drive.name || null\n    }\n  });\n}\nreturn out;"
       },
       "id": "b0bc6c80-69aa-4f7d-9c2f-ced955668b5e",
       "name": "Prepare AURON Payload v7",
@@ -119,12 +121,12 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "http://host.docker.internal:8000/v1/instagram/media-pool/analyze-and-ingest",
+        "url": "http://api:8000/v1/instagram/media-pool/analyze-and-ingest",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ { \"items\": [ $json ] } }}",
         "options": {
-          "timeout": 60000
+          "timeout": 600000
         }
       },
       "id": "9ecdd03b-f92a-4bb1-9904-5b025199faa1",
@@ -135,12 +137,15 @@
         -992,
         176
       ],
-      "notes": "Replace 'auron-api' with your actual AURON api container name if different -- both containers must be on the shared 'jarvis_shared' Docker network (see docs/n8n-instagram-setup.md). Test with the real container hostname, not 'localhost'."
+      "notes": "Replace 'auron-api' with your actual AURON api container name if different -- both containers must be on the shared 'jarvis_shared' Docker network (see docs/n8n-instagram-setup.md). Test with the real container hostname, not 'localhost'.",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
     },
     {
       "parameters": {
         "method": "POST",
-        "url": "http://host.docker.internal:8000/v1/instagram/curate",
+        "url": "http://api:8000/v1/instagram/curate",
         "options": {
           "timeout": 60000
         }
@@ -154,12 +159,15 @@
         176
       ],
       "executeOnce": true,
-      "notes": "Runs once per schedule trigger, after every file in this batch has been ingested -- not once per file. n8n's default 'Run Once for All Items' setting on this node is correct; do not change it to 'Run Once for Each Item'."
+      "notes": "Runs once per schedule trigger, after every file in this batch has been ingested -- not once per file. n8n's default 'Run Once for All Items' setting on this node is correct; do not change it to 'Run Once for Each Item'.",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
     },
     {
       "parameters": {
         "method": "POST",
-        "url": "http://host.docker.internal:8000/v1/notification-hub/process-due",
+        "url": "http://api:8000/v1/notification-hub/process-due",
         "options": {
           "timeout": 30000
         }
@@ -171,26 +179,14 @@
       "position": [
         -512,
         176
-      ]
-    },
-    {
-      "parameters": {
-        "operation": "binaryToPropery",
-        "destinationKey": "image_b64",
-        "options": {}
-      },
-      "type": "n8n-nodes-base.extractFromFile",
-      "typeVersion": 1.1,
-      "position": [
-        -1424,
-        176
       ],
-      "id": "42a42f20-eca2-4fee-a504-a5ef63016464",
-      "name": "Extract from File v7"
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
     },
     {
       "parameters": {
-        "url": "http://host.docker.internal:8000/v1/instagram/media-pool",
+        "url": "http://api:8000/v1/instagram/media-pool",
         "options": {
           "timeout": 60000
         }
@@ -207,7 +203,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Dublettenpruefung VOR dem Download.\n// Die Backend-Pruefung in analyze_and_ingest spart nur die Vision-Analyse --\n// Drive-Download, Base64 und Payload liefen trotzdem jedes Mal komplett durch.\n// Hier fliegen bekannte Dateien raus, bevor sie irgendetwas kosten.\nconst pool = $('AURON: Load Known Refs v7').first().json;\nconst items = Array.isArray(pool) ? pool : (pool.items || []);\nconst known = new Set(items.map(i => i.media_ref).filter(Boolean));\n\nconst fresh = $input.all().filter(item => !known.has(item.json.id));\n\nconsole.log(`Pool kennt ${known.size} Dateien, ${$input.all().length} im Drive, ${fresh.length} neu.`);\n\nreturn fresh;"
+        "jsCode": "// Dublettenpruefung VOR dem Download.\n// Die Backend-Pruefung in analyze_and_ingest spart nur die Vision-Analyse --\n// Drive-Download, Base64 und Payload liefen trotzdem jedes Mal komplett durch.\n// Hier fliegen bekannte Dateien raus, bevor sie irgendetwas kosten.\n//\n// \"Bekannt\" heisst: im Pool UND dort mit einer echten Analyse. Ein Eintrag mit\n// Platzhaltern (Video ohne Frame-Extraktion: theme \"video\", keine tags, kein\n// captured_at) muss wieder durchlaufen duerfen, sonst behaelt er seine leere\n// Analyse fuer immer -- genau das war der Zustand von 30 Videos im Pool.\n//\n// Das Kriterium dafuer lebt ausschliesslich im Backend\n// (analysis_completeness.py) und kommt als analysis_complete mit. Hier wird es\n// nur gelesen, nie nachgebaut: zwei Definitionen wuerden auseinanderdriften.\nconst pool = $('AURON: Load Known Refs v7').first().json;\nconst entries = Array.isArray(pool) ? pool : (pool.items || []);\n\nconst withoutField = entries.filter((e) => typeof e.analysis_complete !== 'boolean');\nif (entries.length > 0 && withoutField.length > 0) {\n  // Fail loud. Ohne das Feld waere `known` leer und ALLE Drive-Dateien gingen\n  // in die Vision-Analyse -- ein stiller, teurer Komplettlauf.\n  throw new Error(\n    `media-pool liefert kein analysis_complete (${withoutField.length}/${entries.length} Eintraege). ` +\n    `Backend ist aelter als dieser Workflow. Abbruch, statt alle ${entries.length} Dateien neu zu analysieren.`\n  );\n}\n\nconst analyzed = new Set(\n  entries.filter((e) => e.analysis_complete === true).map((e) => e.media_ref).filter(Boolean)\n);\n\n// Bewusst der Drive-Node und nicht $input: davor haengt seit v10 der\n// Nachtrag des Aufnahmedatums, dessen Ausgabe die API-Antwort ist und\n// nicht die Dateiliste. Denselben Fehler gab es schon einmal, als\n// 'Extract from File' das json des Eingangsitems verworfen hat.\nconst driveItems = $('Google Drive: List New Files v7').all();\nconst fresh = driveItems.filter((item) => !analyzed.has(item.json.id));\n\nconsole.log(\n  `Pool: ${entries.length} Eintraege, davon ${analyzed.size} vollstaendig analysiert, ` +\n  `${entries.length - analyzed.size} unvollstaendig. ` +\n  `Drive: ${driveItems.length} Dateien -> ${fresh.length} gehen weiter (neu oder unvollstaendig).`\n);\n\nreturn fresh;"
       },
       "id": "c5abbf32-1c9b-4551-9cdf-4de884c03919",
       "name": "Filter: Not Yet Ingested v7",
@@ -229,6 +225,222 @@
         0
       ],
       "notes": "Platzhalter am done-Ausgang des Loops. Ohne ein echtes Ziel hier ist die erste Verbindungsgruppe leer, und n8n verwirft beim Import auch die Ziele des zweiten Ausgangs (loop)."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Zielpfad im Uebergabeverzeichnis, plus die Groesse, die Drive selbst nennt.\n//\n// Die Zuordnung Drive-Item <-> heruntergeladene Bytes laeuft ueber den Index,\n// genau wie in 'Prepare AURON Payload v7'. Die Kette bleibt deshalb linear:\n// ein Verzweigen und Wiederzusammenfuehren wuerde die Reihenfolge aendern und\n// damit media_ref an die falschen Bytes haengen (heute batchSize 1 -- die Regel\n// gilt aber fuer jede Groesse, und 1 ist keine Garantie, dass es so bleibt).\n//\n// Der Name ist deterministisch <drive_id>.<ext>. Der Write-Node oeffnet mit\n// O_TRUNC, ueberschreibt also immer -- eine liegengebliebene Datei ist der\n// wahrscheinlichste Kandidat fuer einen abgebrochenen Download und wird nie\n// wiederverwendet.\nconst drive = $('Loop Over Items v7').all();\n\nfunction extensionFor(mimeType) {\n  if (mimeType === 'video/quicktime') return 'mov';\n  if (mimeType === 'video/x-m4v') return 'm4v';\n  if (mimeType.startsWith('video/')) return 'mp4';\n  return (mimeType.split('/')[1] || 'bin').toLowerCase();\n}\n\nreturn $input.all().map((item, i) => {\n  const file = drive[i].json;\n  const mimeType = file.mimeType || '';\n  item.json.ingest_path = `/data/images/ingest/${file.id}.${extensionFor(mimeType)}`;\n  // Drive liefert size als String; null bleibt null, damit die API weiss,\n  // dass es keine Vergleichsgroesse gibt, statt eine 0 zu pruefen.\n  item.json.drive_size_bytes = file.size == null ? null : Number(file.size);\n  return item;\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1568,
+        176
+      ],
+      "id": "140e66f2-48d1-4bb1-a3b5-53c3c3a01300",
+      "name": "Compute Ingest Path v9"
+    },
+    {
+      "parameters": {
+        "operation": "write",
+        "fileName": "={{ $json.ingest_path }}",
+        "dataPropertyName": "data",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1.1,
+      "position": [
+        -1496,
+        176
+      ],
+      "id": "5a088369-5914-4b91-9d4b-f07042ccb7bf",
+      "name": "Write File To Ingest Dir v9"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://api:8000/v1/instagram/media-pool/captured-at-from-names",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"items\": $('Google Drive: List New Files v7').all().filter(i => i.json && i.json.id && i.json.name).map(i => ({ media_ref: i.json.id, file_name: i.json.name })) } }}",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "id": "c1a7e4d2-9b31-4f6a-8e52-7d0c93b4af11",
+      "name": "AURON: Aufnahmedatum aus Dateinamen v10",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -2280,
+        176
+      ],
+      "notes": "Traegt fuer bereits analysierte Dateien das Aufnahmedatum aus dem Dateinamen nach (2026-03-05_1430.mp4). Noetig, weil 'Filter: Not Yet Ingested' genau diese Dateien ueberspringt -- sie werden nie wieder heruntergeladen, also liest sonst niemand den neuen Namen. Kostet nichts: kein Download, keine Vision-Analyse. Ueberschreibt nie ein vorhandenes Datum.",
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "url": "http://api:8000/v1/instagram/media-pool/pending-uploads",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "id": "b2000000-0000-4000-8000-000000000001",
+      "name": "AURON: Was ist fertig bearbeitet v10",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -512,
+        340
+      ],
+      "executeOnce": true,
+      "notes": "Fragt AURON, welche bearbeiteten Dateien noch nicht in Drive liegen. Nicht raten: ein Verzeichnis-Listing sagt nicht, zu welchem Item eine Datei gehoert."
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "items",
+        "options": {}
+      },
+      "id": "b2000000-0000-4000-8000-000000000002",
+      "name": "Je Datei v10",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        -320,
+        340
+      ]
+    },
+    {
+      "parameters": {
+        "fileSelector": "=/data/images/processed/{{ $json.processed_file }}",
+        "options": {}
+      },
+      "id": "b2000000-0000-4000-8000-000000000003",
+      "name": "Bearbeitete Datei lesen v10",
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1.1,
+      "position": [
+        -128,
+        340
+      ]
+    },
+    {
+      "parameters": {
+        "name": "={{ $('Je Datei v10').item.json.processed_file }}",
+        "driveId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "My Drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "1bp_LxsOhQVu_VXlMmnKBwK-HNlFSjBvX"
+        },
+        "options": {}
+      },
+      "id": "b2000000-0000-4000-8000-000000000004",
+      "name": "Drive: Bearbeitete hochladen v10",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        64,
+        340
+      ],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "sVwp500LT1RTHHDT",
+          "name": "Google Drive account"
+        }
+      },
+      "notes": "Eigener Ordner, NICHT der Quellordner: sonst sieht der naechste Lauf die bearbeitete Datei als neue Datei und analysiert sie erneut."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://api:8000/v1/instagram/media-pool/processed-uploaded",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"items\": $input.all().map((x, i) => ({ media_ref: $('Je Datei v10').all()[i].json.media_ref, processed_media_ref: x.json.id })) } }}",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "id": "b2000000-0000-4000-8000-000000000005",
+      "name": "AURON: Drive-ID merken v10",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        256,
+        340
+      ],
+      "executeOnce": true,
+      "notes": "Ohne diesen Schritt weiss AURON nicht, wo die bearbeitete Datei liegt, und der Post wuerde weiter das Original nehmen."
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "auron-ingest",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "e1000000-0000-4000-8000-000000000001",
+      "name": "Webhook: /auron-ingest",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -2928,
+        400
+      ],
+      "webhookId": "b4f1c6d8-2a77-4f5e-9c30-1d8a6b2e7f45",
+      "notes": "Same run as the 09:00 schedule, on a trigger that can be pulled from outside n8n. `n8n execute --id` looks like it works and quietly does nothing in this version, which left every ingest depending on someone clicking in the UI."
+    },
+    {
+      "parameters": {
+        "jsCode": "// The ingest reads Drive and writes to the pool; the same secret guards\n// it as the other AURON webhooks.\nconst expected = $env.AURON_DRIVE_FETCH_SECRET;\nconst given = (($input.first().json.headers) || {})['x-auron-secret'];\nif (!expected || given !== expected) {\n  throw new Error('wrong or missing X-Auron-Secret');\n}\nreturn [{ json: {} }];"
+      },
+      "id": "e1000000-0000-4000-8000-000000000002",
+      "name": "Ingest: Secret pruefen",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2700,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "has-new-files",
+              "leftValue": "={{ $input.all().filter(i => i.json && i.json.id).length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "b7f1c4a2-3d58-4e91-9a07-5c2e8d6b1f34",
+      "name": "Gibt es neue Dateien? v11",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -1868,
+        176
+      ],
+      "notes": "Nichts Neues in Drive ist ein normaler Lauf, kein Fehler. Ohne diese Weiche endete der Workflow mit leerer Antwort, n8n meldete 500, und der taegliche Lauf sah immer nach Fehler aus -- was echte Fehler unsichtbar gemacht haette."
     }
   ],
   "connections": {
@@ -265,7 +477,7 @@
       "main": [
         [
           {
-            "node": "Filter: Not Yet Ingested v7",
+            "node": "AURON: Aufnahmedatum aus Dateinamen v10",
             "type": "main",
             "index": 0
           }
@@ -276,7 +488,7 @@
       "main": [
         [
           {
-            "node": "Extract from File v7",
+            "node": "Compute Ingest Path v9",
             "type": "main",
             "index": 0
           }
@@ -298,7 +510,12 @@
       "main": [
         [
           {
-            "node": "AURON: Run Curation v7",
+            "node": "Loop Over Items v7",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "AURON: Was ist fertig bearbeitet v10",
             "type": "main",
             "index": 0
           }
@@ -318,24 +535,7 @@
     },
     "AURON: Deliver Due Notifications v7": {
       "main": [
-        [
-          {
-            "node": "Loop Over Items v7",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Extract from File v7": {
-      "main": [
-        [
-          {
-            "node": "Prepare AURON Payload v7",
-            "type": "main",
-            "index": 0
-          }
-        ]
+        []
       ]
     },
     "AURON: Load Known Refs v7": {
@@ -353,7 +553,135 @@
       "main": [
         [
           {
+            "node": "Gibt es neue Dateien? v11",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compute Ingest Path v9": {
+      "main": [
+        [
+          {
+            "node": "Write File To Ingest Dir v9",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write File To Ingest Dir v9": {
+      "main": [
+        [
+          {
+            "node": "Prepare AURON Payload v7",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AURON: Aufnahmedatum aus Dateinamen v10": {
+      "main": [
+        [
+          {
+            "node": "Filter: Not Yet Ingested v7",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AURON: Was ist fertig bearbeitet v10": {
+      "main": [
+        [
+          {
+            "node": "Je Datei v10",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Je Datei v10": {
+      "main": [
+        [
+          {
+            "node": "Bearbeitete Datei lesen v10",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Bearbeitete Datei lesen v10": {
+      "main": [
+        [
+          {
+            "node": "Drive: Bearbeitete hochladen v10",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Drive: Bearbeitete hochladen v10": {
+      "main": [
+        [
+          {
+            "node": "AURON: Drive-ID merken v10",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook: /auron-ingest": {
+      "main": [
+        [
+          {
+            "node": "Ingest: Secret pruefen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ingest: Secret pruefen": {
+      "main": [
+        [
+          {
+            "node": "AURON: Load Known Refs v7",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Done: Alle Batches durch v8": {
+      "main": [
+        [
+          {
+            "node": "AURON: Run Curation v7",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gibt es neue Dateien? v11": {
+      "main": [
+        [
+          {
             "node": "Loop Over Items v7",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Done: Alle Batches durch v8",
             "type": "main",
             "index": 0
           }
@@ -363,7 +691,8 @@
   },
   "settings": {
     "executionOrder": "v1",
-    "binaryMode": "separate"
+    "binaryMode": "separate",
+    "timezone": "Europe/Berlin"
   },
   "meta": null
 }

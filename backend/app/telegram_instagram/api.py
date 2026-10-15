@@ -1,0 +1,132 @@
+"""Instagram approval from a phone.
+
+Endpoints
+---------
+GET  /v1/telegram-instagram/status
+GET  /v1/telegram-instagram/audit
+POST /v1/telegram-instagram/notify/{candidate_id}   -> {"message_id": int}
+POST /v1/telegram-instagram/next                     -> NotifyResult
+POST /v1/telegram-instagram/webhook                  -> {"status": str | None}
+
+`next` is the one that matters day to day: it takes the next draft in
+posting order (oldest shoot day first), writes its caption, and sends the
+card. One draft per call, deliberately.
+
+No route here publishes anything. Approving sets the candidate to
+`approved`; the actual publish stays the separate call it already was, so
+Brano can pick audio in the app and post Reels himself.
+
+Telegram allows one webhook URL per bot. If this shares a bot with
+telegram_approvals or telegram_live_execution, route all three through one
+receiver that tries each module's verify_token in turn -- the action
+alphabets are disjoint ({p,d} here, {a,r} and {x,c} there), so exactly one
+can ever match.
+"""
+
+from __future__ import annotations
+
+from uuid import UUID
+
+from fastapi import APIRouter, HTTPException, Request, status
+
+from .models import InstagramAuditRecord, NotifyResult, TelegramInstagramStatus
+from .service import TelegramInstagramError, telegram_instagram_service
+
+router = APIRouter(prefix="/v1/telegram-instagram", tags=["telegram-instagram"])
+
+
+@router.get("/status", response_model=TelegramInstagramStatus)
+def telegram_instagram_status() -> TelegramInstagramStatus:
+    return telegram_instagram_service.status()
+
+
+@router.get("/schedule")
+def schedule_status() -> dict:
+    """What the posting schedule will do next, and whether it is running at
+    all -- otherwise "it is enabled" is a claim nobody can check."""
+    from datetime import datetime
+
+    from .schedule import _timezone, next_draft_kind, next_slot, posted_today, posting_scheduler, waiting_for_a_decision
+
+    now = datetime.now(_timezone())
+    due = next_slot()
+    return {
+        "running": posting_scheduler.is_running,
+        "now": now.isoformat(timespec="seconds"),
+        "next": f"{due.hour:02d}:{due.minute:02d} {due.kind}",
+        "next_kind": next_draft_kind(),
+        "already_posted_today": posted_today(now.date()),
+        "already_fired_today": [
+            f"{hour:02d}:{minute:02d}"
+            for (day, hour, minute) in posting_scheduler.fired_slots
+            if day == now.date()
+        ],
+        "a_card_is_waiting_for_a_decision": waiting_for_a_decision(),
+    }
+
+
+@router.post("/leftovers/start-review")
+def start_leftover_review(min_score: float = 0.0, singles_only: bool = True) -> dict:
+    """Freeze the list of leftovers and number it from 1, so a number in a
+    caption still means the same photo tomorrow."""
+    from .leftovers import start_review
+
+    return {"count": len(start_review(min_score=min_score, singles_only=singles_only))}
+
+
+@router.post("/leftovers")
+def send_leftovers(min_score: float = 0.4, offset: int = 0, limit: int = 10,
+                   use_review_list: bool = False) -> dict:
+    """Send one batch of the photos curation left lying, numbered
+    continuously -- score, day and theme in every caption, no decision
+    made."""
+    from .leftovers import send_leftovers as run
+
+    batch = run(min_score=min_score, offset=offset, limit=max(1, min(limit, 10)),
+                use_review_list=use_review_list)
+    return {"sent": batch.sent, "remaining": batch.remaining, "refs": batch.refs}
+
+
+@router.get("/audit", response_model=list[InstagramAuditRecord])
+def audit(limit: int = 50) -> list[InstagramAuditRecord]:
+    return telegram_instagram_service.audit_records(limit)
+
+
+@router.post("/notify/{candidate_id}")
+def notify(candidate_id: UUID) -> dict:
+    try:
+        return {"message_id": telegram_instagram_service.notify(candidate_id)}
+    except TelegramInstagramError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+
+
+@router.post("/next", response_model=NotifyResult)
+def finalize_next_and_notify(
+    caption_draft: str | None = None, kind: str | None = None
+) -> NotifyResult:
+    """Next draft in posting order -> caption -> card on the phone.
+
+    caption_draft is optional; omitted, AURON writes it itself via a real
+    Anthropic call.
+
+    kind picks from the queue without reordering it ("reel" or "feed").
+    The schedule never passes it -- the queue's head is what is due. It is
+    here for asking by hand, which is how the Reel path gets exercised at
+    all while no Reel sits at the head.
+    """
+    try:
+        return telegram_instagram_service.finalize_next_and_notify(caption_draft, kind=kind)
+    except TelegramInstagramError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+
+
+@router.post("/webhook")
+async def webhook(request: Request) -> dict:
+    """Telegram posts every update here. Anything that is not one of this
+    module's button taps returns {"status": null} -- not an error, most
+    updates are not taps."""
+    try:
+        decided = telegram_instagram_service.handle_update(await request.json())
+    except TelegramInstagramError as exc:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
+    return {"status": decided.status.value if decided else None}

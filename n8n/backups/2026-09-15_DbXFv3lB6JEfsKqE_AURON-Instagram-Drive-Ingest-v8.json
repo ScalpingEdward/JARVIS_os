@@ -1,0 +1,466 @@
+[
+  {
+    "updatedAt": "2026-09-15T06:05:46.367Z",
+    "createdAt": "2026-09-12T09:45:42.509Z",
+    "id": "DbXFv3lB6JEfsKqE",
+    "name": "AURON - Instagram Drive Ingest v8",
+    "description": null,
+    "active": true,
+    "isArchived": false,
+    "nodes": [
+      {
+        "parameters": {
+          "batchSize": 5,
+          "options": {}
+        },
+        "id": "0eec9648-1890-4e0e-be0e-d4ea7cb0d597",
+        "name": "Loop Over Items v7",
+        "type": "n8n-nodes-base.splitInBatches",
+        "typeVersion": 3,
+        "position": [
+          2896,
+          -1216
+        ],
+        "notes": "Processes the folder in batches of 5. Keeps the Code node's base64 footprint small and, together with the batch-wide .all() lookup in 'Prepare AURON Payload1', avoids the paired-item tracing that made the task runner time out partway through a 223-file run."
+      },
+      {
+        "parameters": {
+          "rule": {
+            "interval": [
+              {
+                "triggerAtHour": 9
+              }
+            ]
+          }
+        },
+        "id": "11566b1f-1100-4fc7-b0b8-22f272e920cf",
+        "name": "Schedule: Once Daily 09: v7",
+        "type": "n8n-nodes-base.scheduleTrigger",
+        "typeVersion": 1.2,
+        "position": [
+          1872,
+          -1216
+        ]
+      },
+      {
+        "parameters": {
+          "resource": "fileFolder",
+          "returnAll": true,
+          "filter": {
+            "folderId": {
+              "__rl": true,
+              "value": "11puO-Pd3xeCG-86mtP1tFXBmeTKAoj--",
+              "mode": "id"
+            }
+          },
+          "options": {
+            "fields": [
+              "mimeType",
+              "name",
+              "id"
+            ]
+          }
+        },
+        "id": "e5f96aa0-8c55-472b-91a6-718fb01a551c",
+        "name": "Google Drive: List New Files v7",
+        "type": "n8n-nodes-base.googleDrive",
+        "typeVersion": 3,
+        "position": [
+          2272,
+          -1216
+        ],
+        "retryOnFail": true,
+        "maxTries": 3,
+        "credentials": {
+          "googleDriveOAuth2Api": {
+            "id": "sVwp500LT1RTHHDT",
+            "name": "Google Drive account"
+          }
+        },
+        "onError": "continueRegularOutput"
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "options": {
+              "caseSensitive": true,
+              "leftValue": "",
+              "typeValidation": "strict",
+              "version": 2
+            },
+            "conditions": [
+              {
+                "leftValue": "={{$json.mimeType}}",
+                "rightValue": "image/",
+                "operator": {
+                  "type": "string",
+                  "operation": "startsWith"
+                },
+                "id": "fbf0bf15-b913-4f55-951d-8846f7d0a26a"
+              }
+            ],
+            "combinator": "and"
+          },
+          "options": {}
+        },
+        "id": "0c9f6db7-2506-40c6-96d3-75275a479654",
+        "name": "Filter: Is Image v7",
+        "type": "n8n-nodes-base.filter",
+        "typeVersion": 2.2,
+        "position": [
+          2496,
+          -1216
+        ],
+        "notes": "Nur Bilder. Die video/-Bedingung ist bewusst raus: das Datenmodell verlangt duration_seconds fuer Videos, der Payload-Node schickt null -> 200 mit failed:1, nichts wird gespeichert. Videos kommen zurueck, wenn der Reels-Pfad (media_type=REELS + Status-Polling + Dauer aus der Datei) steht."
+      },
+      {
+        "parameters": {
+          "operation": "download",
+          "fileId": {
+            "__rl": true,
+            "mode": "id",
+            "value": "={{$json.id}}"
+          },
+          "options": {}
+        },
+        "id": "4f246c47-1827-4815-bb5a-c7918ab24cb8",
+        "name": "Google Drive: Download File v7",
+        "type": "n8n-nodes-base.googleDrive",
+        "typeVersion": 3,
+        "position": [
+          3104,
+          -1216
+        ],
+        "retryOnFail": true,
+        "maxTries": 3,
+        "credentials": {
+          "googleDriveOAuth2Api": {
+            "id": "sVwp500LT1RTHHDT",
+            "name": "Google Drive account"
+          }
+        },
+        "onError": "continueRegularOutput"
+      },
+      {
+        "parameters": {
+          "jsCode": "// Base64-encode the downloaded binaries for AURON's vision endpoint.\n// AURON never holds a Drive credential itself -- n8n fetches bytes,\n// AURON only ever sees the encoded image it's handed.\n//\n// Runs once for ALL items of the current batch on purpose: $('Loop Over\n// Items').all() returns just this batch's items, a plain array read. The\n// per-item form ($('Loop Over Items v7').item) makes n8n trace paired items\n// back through every previous batch, which gets slower each round and\n// eventually times the task runner out on a large folder.\nconst driveItems = $('Loop Over Items v7').all();\n\nreturn $input.all().map((item, i) => {\n  const drive = driveItems[i].json;\n  const mediaType = drive.mimeType || 'image/jpeg';\n  const isVideo = mediaType.startsWith('video/');\n\n  return {\n    json: {\n      media_ref: drive.id,\n      media_type: isVideo ? 'video' : 'image',\n      image_base64: isVideo ? null : item.json.image_b64,\n      image_media_type: isVideo ? null : mediaType,\n      // A video's own frame extraction is a separate, optional step --\n      // see the README note below the workflow. Left null here on purpose\n      // rather than guessing a duration.\n      duration_seconds: null\n    }\n  };\n});"
+        },
+        "id": "4874be72-3b98-4ca6-9ec4-29f8b3c83585",
+        "name": "Prepare AURON Payload v7",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          3520,
+          -1216
+        ]
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "http://host.docker.internal:8000/v1/instagram/media-pool/analyze-and-ingest",
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={{ { \"items\": [ $json ] } }}",
+          "options": {
+            "timeout": 60000
+          }
+        },
+        "id": "5d3858a1-2c77-45cd-bac5-060e15bceebe",
+        "name": "AURON: Analyze + Ingest v7",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          3744,
+          -1216
+        ],
+        "notes": "Replace 'auron-api' with your actual AURON api container name if different -- both containers must be on the shared 'jarvis_shared' Docker network (see docs/n8n-instagram-setup.md). Test with the real container hostname, not 'localhost'."
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "http://host.docker.internal:8000/v1/instagram/curate",
+          "options": {
+            "timeout": 60000
+          }
+        },
+        "id": "42b87884-0080-4e58-9ef4-2fdaf6912a5c",
+        "name": "AURON: Run Curation v7",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          3984,
+          -1216
+        ],
+        "executeOnce": true,
+        "notes": "Runs once per schedule trigger, after every file in this batch has been ingested -- not once per file. n8n's default 'Run Once for All Items' setting on this node is correct; do not change it to 'Run Once for Each Item'."
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "http://host.docker.internal:8000/v1/notification-hub/process-due",
+          "options": {
+            "timeout": 30000
+          }
+        },
+        "id": "1fa0d60d-eeab-4320-a8f9-c6fbbe03bb91",
+        "name": "AURON: Deliver Due Notifications v7",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          4224,
+          -1216
+        ]
+      },
+      {
+        "parameters": {
+          "operation": "binaryToPropery",
+          "destinationKey": "image_b64",
+          "options": {}
+        },
+        "type": "n8n-nodes-base.extractFromFile",
+        "typeVersion": 1.1,
+        "position": [
+          3312,
+          -1216
+        ],
+        "id": "d54ff3fa-7953-4676-888b-2724335c5b88",
+        "name": "Extract from File v7"
+      },
+      {
+        "parameters": {
+          "url": "http://host.docker.internal:8000/v1/instagram/media-pool",
+          "options": {
+            "timeout": 60000
+          }
+        },
+        "id": "0f8ab0df-1a3c-41a4-9105-36713db42c4e",
+        "name": "AURON: Load Known Refs v7",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          2064,
+          -1216
+        ],
+        "notes": "Laedt alle bereits ingesteten Eintraege. Deren media_ref ist die Drive-File-ID; 'Filter: Not Yet Ingested' wirft die bekannten Dateien raus, BEVOR sie heruntergeladen und base64-kodiert werden."
+      },
+      {
+        "parameters": {
+          "jsCode": "// Dublettenpruefung VOR dem Download.\n// Die Backend-Pruefung in analyze_and_ingest spart nur die Vision-Analyse --\n// Drive-Download, Base64 und Payload liefen trotzdem jedes Mal komplett durch.\n// Hier fliegen bekannte Dateien raus, bevor sie irgendetwas kosten.\nconst pool = $('AURON: Load Known Refs v7').first().json;\nconst items = Array.isArray(pool) ? pool : (pool.items || []);\nconst known = new Set(items.map(i => i.media_ref).filter(Boolean));\n\nconst fresh = $input.all().filter(item => !known.has(item.json.id));\n\nconsole.log(`Pool kennt ${known.size} Dateien, ${$input.all().length} im Drive, ${fresh.length} neu.`);\n\nreturn fresh;"
+        },
+        "id": "417c1413-b14a-4e4a-9d63-b94f93561194",
+        "name": "Filter: Not Yet Ingested v7",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          2704,
+          -1216
+        ]
+      },
+      {
+        "parameters": {},
+        "id": "09371f5c-2968-4769-a5b4-14de037ddd95",
+        "name": "Done: Alle Batches durch v8",
+        "type": "n8n-nodes-base.noOp",
+        "typeVersion": 1,
+        "position": [
+          4496,
+          -1200
+        ],
+        "notes": "Platzhalter am done-Ausgang des Loops. Ohne ein echtes Ziel hier ist die erste Verbindungsgruppe leer, und n8n verwirft beim Import auch die Ziele des zweiten Ausgangs (loop)."
+      }
+    ],
+    "connections": {
+      "Loop Over Items v7": {
+        "main": [
+          [
+            {
+              "node": "Done: Alle Batches durch v8",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Google Drive: Download File v7",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Schedule: Once Daily 09: v7": {
+        "main": [
+          [
+            {
+              "node": "AURON: Load Known Refs v7",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Google Drive: List New Files v7": {
+        "main": [
+          [
+            {
+              "node": "Filter: Is Image v7",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Google Drive: Download File v7": {
+        "main": [
+          [
+            {
+              "node": "Extract from File v7",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Prepare AURON Payload v7": {
+        "main": [
+          [
+            {
+              "node": "AURON: Analyze + Ingest v7",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "AURON: Analyze + Ingest v7": {
+        "main": [
+          [
+            {
+              "node": "AURON: Run Curation v7",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "AURON: Run Curation v7": {
+        "main": [
+          [
+            {
+              "node": "AURON: Deliver Due Notifications v7",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "AURON: Deliver Due Notifications v7": {
+        "main": [
+          [
+            {
+              "node": "Loop Over Items v7",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Extract from File v7": {
+        "main": [
+          [
+            {
+              "node": "Prepare AURON Payload v7",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "AURON: Load Known Refs v7": {
+        "main": [
+          [
+            {
+              "node": "Google Drive: List New Files v7",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Filter: Not Yet Ingested v7": {
+        "main": [
+          [
+            {
+              "node": "Loop Over Items v7",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Filter: Is Image v7": {
+        "main": [
+          [
+            {
+              "node": "Filter: Not Yet Ingested v7",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "settings": {
+      "executionOrder": "v1",
+      "binaryMode": "separate"
+    },
+    "staticData": {
+      "node:Schedule: Once Daily 09:00": {
+        "recurrenceRules": []
+      },
+      "node:Schedule: Once Daily 09:": {
+        "recurrenceRules": [
+          0
+        ]
+      },
+      "node:Schedule: Once Daily 09:1": {
+        "recurrenceRules": []
+      },
+      "node:Schedule: Once Daily 09: v7": {
+        "recurrenceRules": []
+      }
+    },
+    "meta": {
+      "templateCredsSetupCompleted": true
+    },
+    "pinData": {},
+    "versionId": "46c3b518-32c4-468b-9dc8-4e74a4bfd3fa",
+    "activeVersionId": "46c3b518-32c4-468b-9dc8-4e74a4bfd3fa",
+    "versionCounter": 192,
+    "triggerCount": 1,
+    "tags": [],
+    "shared": [
+      {
+        "updatedAt": "2026-09-12T09:45:42.519Z",
+        "createdAt": "2026-09-12T09:45:42.519Z",
+        "role": "workflow:owner",
+        "workflowId": "DbXFv3lB6JEfsKqE",
+        "projectId": "EoBm2OFLUHDsOqkZ",
+        "project": {
+          "updatedAt": "2026-09-10T18:11:08.471Z",
+          "createdAt": "2026-06-08T20:19:59.930Z",
+          "id": "EoBm2OFLUHDsOqkZ",
+          "name": "Branislav Gombos <branislav.gombos@gmail.com>",
+          "type": "personal",
+          "icon": null,
+          "description": null,
+          "creatorId": "928941d8-4ec2-41f5-928a-710ff6553aa4"
+        }
+      }
+    ],
+    "versionMetadata": {
+      "name": "Version 46c3b518",
+      "description": ""
+    }
+  }
+]
