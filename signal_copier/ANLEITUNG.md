@@ -87,6 +87,10 @@ Doppelklick auf `signal_copier\setup.bat`.
 | `login` | Kontonummer. `null` = keine Prüfung |
 | `allow_live` | `false` = nur Demo. Erst auf `true`, wenn du ihn wochenlang auf Demo beobachtet hast. |
 | `initial_balance` | leer = Kontostand beim ersten Start. Daran hängen die Verlustgrenzen. |
+| `strategy` | `"signals"` = normale Signale (Einstieg, SL, TPs). `"layers"` = Zonen-Signale mit mehreren Einstiegen, z. B. VIP SIGNALS Inner Circle (siehe unten). |
+| `layers` | Anzahl Einstiege je Zonen-Signal: 1 sofort, der Rest als Limit-Orders tiefer in der Zone. Standard 5. |
+| `trail_pips` | Nach „TP3 … trail your SL“ zieht er den SL so weit hinter dem Preis nach. 100 Pips Gold = 10 $. |
+| `pending_expiry_minutes` | Nicht gefüllte Limit-Orders werden nach so vielen Minuten gelöscht. Standard 120. |
 | `sizing` | `"risk_pct"` = Lotgröße aus dem Risiko in %. `"fixed_lot"` = jede Position mit genau `fixed_lot`, für Layering-Gruppen und kleine Konten. |
 | `fixed_lot` | Lotgröße bei `"fixed_lot"`, z. B. `0.01`. Die Verlustgrenzen gelten trotzdem, sofern sie an sind. |
 | `risk_per_position_pct` | Risiko **je TP-Position** in % (0,5 bei 2 TPs = insgesamt 1 %). Nur bei `"risk_pct"`. |
@@ -95,6 +99,22 @@ Doppelklick auf `signal_copier\setup.bat`.
 | `max_entry_deviation_pips` | wie weit der Preis vom Einstieg weg sein darf (Gold 60 Pips = 6 $). Ist er weiter weg, wird das Signal ausgelassen. |
 | `legs_without_tp` | Anzahl Positionen bei einem Signal ohne TP (die TPs kommen später) |
 | `symbol_overrides` | falls dein Broker ein Symbol anders nennt, z. B. `{"XAUUSD": "GOLD.pro"}` |
+
+## Layering-Gruppen (`"strategy": "layers"`)
+
+Für Gruppen wie „VIP SIGNALS Inner Circle“: Signal mit Zone statt Preis
+(`Gold Sell Zone 4192 - 4198`, `SL : 4203`, `TP1…TP3`, `TP4 : Hold`).
+
+| Nachricht der Gruppe | Was der Kopierer macht |
+|---|---|
+| Setup | Layer 1 sofort, die übrigen als Limit-Orders gleichmäßig bis ans Ende der Zone, alle mit dem SL der Gruppe |
+| Setup nachträglich bearbeitet („UPDATED“) | SL und Limit-Orders auf die neuen Werte |
+| „TP1/TP2 HIT … closing 20% … BreakEven“ oder „shakey … closing 20%“ | Limits löschen, den Layer mit dem meisten Gewinn schließen, SL der übrigen auf ihren Einstieg. Der letzte Layer bleibt immer (Runner). |
+| „TP3 HIT … trail your SL 100 pips“ | ab jetzt SL `trail_pips` hinter dem Preis nachziehen |
+| „Close all now“ / „CUT LOSS NOW“ | alles schließen |
+| „HIT SL“ | übrige Limits löschen |
+
+Für so eine Gruppe meist: `"sizing": "fixed_lot"`, `"fixed_lot": 0.01`.
 
 **Dauerhafter Stopp aufheben:** Fenster schließen. In
 `profiles\<name>\state_<konto>.json` den Wert `halt_reason` auf `""` setzen,

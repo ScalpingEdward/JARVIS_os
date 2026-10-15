@@ -27,10 +27,12 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from signal_copier import parser
-from signal_copier.book import Book, TrackedSignal, close_half_plan
-from signal_copier.parser import BREAKEVEN, CLOSE_ALL, CLOSE_HALF, EXIT_AT_BE, Command, Rejected, Signal, TakeProfits
+from signal_copier.book import REPOST_WINDOW_S, Book, TrackedSignal, close_half_plan
+from signal_copier import layers
+from signal_copier.parser import (BREAKEVEN, CLOSE_ALL, CLOSE_HALF, EXIT_AT_BE, Command, Rejected, Signal,
+                                  TakeProfits, ZoneSignal)
 from signal_copier.risk import breached, day_start, floors, may_open
-from signal_copier.sizing import RiskProfile, entry_deviation_ok, fixed_lots, lots_for_risk
+from signal_copier.sizing import RiskProfile, entry_deviation_ok, fixed_lots, lots_for_risk, pip_size
 from signal_copier.symbols import resolve
 
 HERE = Path(__file__).parent
@@ -58,6 +60,9 @@ class Copier:
             raise ValueError(f"sizing must be 'risk_pct' or 'fixed_lot', not {config.get('sizing')!r}")
         if config.get("sizing") == "fixed_lot" and not config.get("fixed_lot"):
             raise ValueError("sizing 'fixed_lot' needs \"fixed_lot\": e.g. 0.01")
+        if config.get("strategy", "signals") not in ("signals", "layers"):
+            raise ValueError(f"strategy must be 'signals' or 'layers', not {config.get('strategy')!r}")
+        self.layered = config.get("strategy") == "layers"
         self.ex, self.book, self.profile, self.config = ex, book, profile, config
         self.notify, self.state_path, self.clock, self.dry = notify, state_path, clock, dry
         self.symbols = ex.tradable_symbols()
@@ -90,15 +95,29 @@ class Copier:
 
     def on_message(self, chat_id: int, msg_id: int, reply_to: int | None, text: str) -> None:
         result = parser.parse(text)
-        if result is None:
+        event = None
+        if self.layered:
+            # A layering group's replies are its own language (layers.classify);
+            # the plain-signal commands below would read "BE" without the 20 %.
+            event = layers.classify(text) if reply_to is not None and not isinstance(result, ZoneSignal) else None
+            if event is None and not isinstance(result, (ZoneSignal, Rejected)):
+                return
+        if result is None and event is None:
             return
         where = f"#{msg_id}"
         if not self._account_ok():
             self._say(f"{where} ignored: MT5 is not on {self.book.account}\n{text[:200]}")
             return
         try:
-            if isinstance(result, Rejected):
+            if event is not None:
+                self._layer_event(msg_id, reply_to, event, text)
+            elif isinstance(result, Rejected):
                 self._say(f"{where} not traded: {result.reason}\n{text[:200]}")
+            elif isinstance(result, ZoneSignal):
+                if self.layered:
+                    self._zone_signal(chat_id, msg_id, result)
+                else:
+                    self._say(f"{where} not traded: a zone signal needs \"strategy\": \"layers\" in this profile")
             elif isinstance(result, Signal):
                 self._signal(chat_id, msg_id, result)
             elif isinstance(result, TakeProfits):
@@ -178,6 +197,199 @@ class Copier:
         if tracked.legs:
             self.book.add(tracked)
         self._say(f"{where} opened, SL {sig.sl}\n" + "\n".join(lines))
+
+    # --- layering (layers.py) ------------------------------------------
+
+    def _zone_signal(self, chat_id: int, msg_id: int, z: ZoneSignal) -> None:
+        where = f"#{msg_id} {z.side} {z.symbol} zone {z.zone[0]}-{z.zone[1]}"
+        symbol = resolve(z.symbol, self.symbols, self.overrides)
+        if symbol is None:
+            self._say(f"{where} not traded: no tradable broker symbol for {z.symbol}")
+            return
+        now = self.clock()
+        # This group posts several setups in the same direction within minutes
+        # ("1. GOLD SELL", "2. GOLD SELL" ...), and even the same zone again under
+        # a new number: only the same number with the same zone is a repost.
+        for s in self.book.signals.values():
+            if (s.chat_id == chat_id and s.symbol == symbol and s.side == z.side and s.zone == list(z.zone)
+                    and s.sl == z.sl and s.number == z.number and now - s.opened_at <= REPOST_WINDOW_S):
+                self.book.link(msg_id, s.msg_id)
+                self._say(f"{where} is a repost of #{s.msg_id} -- not opened again")
+                return
+        if self.book.halted(now):
+            self._say(f"{where} not traded: trading stopped ({self.book.halt_reason})")
+            return
+
+        near, far = z.zone
+        price = self.ex.price(symbol, z.side)
+        if (price >= z.sl) if z.side == "sell" else (price <= z.sl):
+            self._say(f"{where} not traded: price {price} is already beyond the SL {z.sl}")
+            return
+        if not entry_deviation_ok(z.symbol, z.side, near, price, self.profile):
+            self._say(f"{where} not traded: price {price} ran too far from the zone ({near})")
+            return
+
+        n = int(self.config.get("layers", 5))
+        spec = self.ex.spec(symbol)
+        state = self.ex.account_state(self.book.initial_balance)
+        lots, why = self._size(spec, state.balance, price, z.sl)
+        if not lots:
+            self._say(f"{where} not traded: {why}")
+            return
+        # Worst case as if every layer filled at today's price -- limits further
+        # into the zone are closer to the SL, so this overstates, never understates.
+        worst = n * self.ex.pnl_at_sl(symbol, z.side, lots, price, z.sl)
+        verdict = may_open(state, self.profile, worst)
+        if not verdict.ok:
+            self._say(f"{where} not traded: {verdict.reason}")
+            return
+        levels = layers.limit_levels(z.side, z.zone, price, n, self.ex.digits(symbol))
+        if self.dry:
+            self._say(f"{where} would open 1 x {lots} at ~{price} + {len(levels)} limits at "
+                      f"{', '.join(str(lv) for lv in levels)}, SL {z.sl} (worst case {worst:.2f})")
+            return
+
+        tracked = TrackedSignal(msg_id, chat_id, symbol, z.side, near, z.sl, list(z.tps), now,
+                                strategy="layers", zone=list(z.zone), canonical=z.symbol, number=z.number)
+        lines = []
+        try:
+            o = self.ex.open_position(symbol, z.side, lots, z.sl, 0.0, msg_id, 1)
+            tracked.legs["1"] = o.ticket
+            lines.append(f"layer 1: {o.volume} @ {o.price} (#{o.ticket})")
+        except Exception as e:
+            lines.append(f"layer 1 FAILED: {e}")
+        for leg, level in enumerate(levels, start=2):
+            try:
+                ticket = self.ex.place_limit(symbol, z.side, lots, level, z.sl, msg_id, leg)
+                tracked.legs[str(leg)] = ticket
+                lines.append(f"layer {leg}: limit {lots} @ {level} (#{ticket})")
+            except Exception as e:
+                lines.append(f"layer {leg}: limit @ {level} FAILED: {e}")
+        if tracked.legs:
+            self.book.add(tracked)
+        self._say(f"{where} opened, SL {z.sl}\n" + "\n".join(lines))
+
+    def _size(self, spec, balance: float, price: float, sl: float) -> tuple[float, str]:
+        if self.config.get("sizing", "risk_pct") == "fixed_lot":
+            lots = fixed_lots(self.config["fixed_lot"], spec)
+            return lots, f"fixed lot {self.config['fixed_lot']} is below the broker minimum {spec.volume_min}"
+        lots = lots_for_risk(balance, self.profile.risk_per_position_pct, price, sl, spec)
+        return lots, f"even {spec.volume_min} lots would risk more than {self.profile.risk_per_position_pct}%"
+
+    def _layer_parts(self, s: TrackedSignal) -> tuple[list, list]:
+        """Open positions and still pending orders of a layered signal."""
+        positions, orders = [], []
+        for ticket in s.legs.values():
+            pos = self.ex.position(ticket)
+            if pos is not None:
+                positions.append(pos)
+                continue
+            order = self.ex.pending_order(ticket)
+            if order is not None:
+                orders.append(order)
+        return positions, orders
+
+    def _cancel_pending(self, orders: list) -> list[str]:
+        return [self._do(f"limit #{o.ticket} @ {o.price_open} cancelled", self.ex.cancel_order, o) for o in orders]
+
+    def _layer_event(self, msg_id: int, reply_to: int, event: layers.Event, text: str) -> None:
+        sid = self.book.about.get(str(reply_to))
+        s = self.book.get(sid) if sid is not None else None
+        if s is None or s.strategy != "layers":
+            self._say(f"#{msg_id} {event} not done: reply to #{reply_to}, which is no layered signal I traded")
+            return
+        self.book.link(msg_id, s.msg_id)
+        positions, orders = self._layer_parts(s)
+        lines = []
+        if event in (layers.Event.CLOSE_ALL, layers.Event.SL_HIT):
+            lines += self._cancel_pending(orders)
+            if event == layers.Event.CLOSE_ALL:
+                lines += [self._do(f"layer #{p.ticket} closed ({p.profit:+.2f})", self.ex.close_position, p)
+                          for p in positions]
+            elif positions:
+                lines.append(f"{len(positions)} layers still open -- their SL will take them")
+        else:
+            lines += self._cancel_pending(orders)
+            if event == layers.Event.PARTIAL:
+                victim = layers.layer_to_close(positions)
+                if victim is not None:
+                    lines.append(self._do(f"layer #{victim.ticket} closed ({victim.profit:+.2f})",
+                                          self.ex.close_position, victim))
+                    positions = [p for p in positions if p.ticket != victim.ticket]
+                elif positions:
+                    lines.append("one layer left -- it is the runner, not closed")
+            else:
+                s.trailing = True
+                lines.append(f"trailing {self.config.get('trail_pips', 100)} pips behind price from now on")
+            lines += [f"#{p.ticket}: " + self._to_breakeven(s, p) for p in positions]
+        self._say(f"#{msg_id} {event} on #{s.msg_id} {s.side} {s.symbol}\n" + ("\n".join(lines) or "nothing open"))
+
+    def on_edit(self, chat_id: int, msg_id: int, text: str, posted_at: float) -> None:
+        """The group edits its setups a minute later ("UPDATED"): follow the new zone and SL."""
+        if not self.layered:
+            return
+        z = parser.parse(text)
+        if not isinstance(z, ZoneSignal):
+            return
+        s = self.book.get(msg_id)
+        try:
+            if s is None:
+                # Refused at first (price beyond the old zone, say) -- the edit may make it valid.
+                if self.clock() - posted_at <= layers.EDIT_WINDOW_S and self._account_ok():
+                    self._zone_signal(chat_id, msg_id, z)
+                return
+            if z.side != s.side:
+                self._say(f"#{msg_id} edited to the other side ({z.side}) -- not following, check by hand")
+                return
+            if not self._account_ok():
+                return
+            s.sl, s.zone, s.tps, s.entry = z.sl, list(z.zone), list(z.tps), z.zone[0]
+            positions, orders = self._layer_parts(s)
+            lines = []
+            for p in positions:
+                if p.sl == p.price_open:
+                    lines.append(f"#{p.ticket}: at breakeven already, SL left there")
+                else:
+                    lines.append(self._do(f"#{p.ticket}: SL {z.sl}", self.ex.set_sltp, p, z.sl))
+            if orders:
+                levels = layers.limit_levels(s.side, z.zone, self.ex.price(s.symbol, s.side),
+                                             len(s.legs), self.ex.digits(s.symbol))[-len(orders):]
+                for o, level in zip(sorted(orders, key=lambda o: o.ticket), levels):
+                    lines.append(self._do(f"limit #{o.ticket}: {level}, SL {z.sl}", self.ex.modify_order, o, level, z.sl))
+                for o in sorted(orders, key=lambda o: o.ticket)[len(levels):]:
+                    lines += self._cancel_pending([o])
+            self._say(f"#{msg_id} edited: zone {z.zone[0]}-{z.zone[1]}, SL {z.sl}\n" + "\n".join(lines))
+        except Exception as e:
+            log.exception("edit #%s", msg_id)
+            self._say(f"#{msg_id} edit ERROR {type(e).__name__}: {e}")
+        self._save()
+
+    def _trail_and_expire(self) -> None:
+        """Watchdog part for layers: trail SLs after TP3, drop limits nobody cancelled in time."""
+        now = self.clock()
+        expiry = float(self.config.get("pending_expiry_minutes", 120)) * 60
+        for s in self.book.signals.values():
+            if s.strategy != "layers":
+                continue
+            positions, orders = self._layer_parts(s)
+            if orders and (now - s.opened_at > expiry or (not positions and s.trailing)):
+                self._say(f"#{s.msg_id} limits expired after {expiry / 60:.0f} min\n"
+                          + "\n".join(self._cancel_pending(orders)))
+            if not s.trailing:
+                continue
+            distance = float(self.config.get("trail_pips", 100)) * pip_size(s.canonical or s.symbol)
+            close_side = "sell" if s.side == "buy" else "buy"  # the price that would close it
+            price = self.ex.price(s.symbol, close_side)
+            for p in positions:
+                new = layers.trailed_sl(s.side, price, p.sl, distance)
+                if new is None:
+                    continue
+                new = round(new, self.ex.digits(s.symbol))
+                if self.ex.stop_distance_ok(s.symbol, new, s.side, True) and not self.dry:
+                    try:
+                        self.ex.set_sltp(p, sl=new)
+                    except Exception as e:
+                        log.warning("trailing #%s to %s failed: %s", p.ticket, new, e)
 
     def _take_profits(self, chat_id: int, msg_id: int, reply_to: int | None, tp: TakeProfits) -> None:
         target = None
@@ -310,6 +522,7 @@ class Copier:
         try:
             self._guard()
             self._retry_breakeven()
+            self._trail_and_expire()
         except Exception as e:
             log.exception("watchdog")
             self._say(f"watchdog ERROR {type(e).__name__}: {e}")
@@ -333,12 +546,19 @@ class Copier:
                 self.book.halt_until = tomorrow.timestamp()
                 until = f"until {tomorrow:%Y-%m-%d %H:%M} Prague"
             self._say(f"LOSS STOP: {verdict.reason}. Closing {len(positions)} positions, no new trades {until}")
-        if positions and not self.dry:
-            for p in positions:
-                try:
-                    self.ex.close_position(p)
-                except Exception as e:
-                    self._say(f"LOSS STOP: closing #{p.ticket} FAILED: {e} -- retrying in {WATCH_EVERY_S}s")
+        if self.dry:
+            return
+        # Limits first: a layer filling after the stop would be a new trade.
+        for o in self.ex.bot_orders():
+            try:
+                self.ex.cancel_order(o)
+            except Exception as e:
+                self._say(f"LOSS STOP: cancelling limit #{o.ticket} FAILED: {e} -- retrying in {WATCH_EVERY_S}s")
+        for p in positions:
+            try:
+                self.ex.close_position(p)
+            except Exception as e:
+                self._say(f"LOSS STOP: closing #{p.ticket} FAILED: {e} -- retrying in {WATCH_EVERY_S}s")
 
     def _retry_breakeven(self) -> None:
         for ticket in list(self.book.pending_be):
@@ -460,6 +680,11 @@ async def main(profile: str | None, dry: bool) -> None:
         m = event.message
         reply_to = m.reply_to.reply_to_msg_id if m.reply_to else None
         copier.on_message(event.chat_id, m.id, reply_to, m.message or "")
+
+    @client.on(events.MessageEdited(chats=[c.id for c in chats]))
+    async def edited(event) -> None:
+        m = event.message
+        copier.on_edit(event.chat_id, m.id, m.message or "", m.date.timestamp())
 
     async def watchdog() -> None:
         while True:

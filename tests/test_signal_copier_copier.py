@@ -23,6 +23,7 @@ class FakeTerminal:
         self.too_close = False
         self.calls = []
         self.account = "1001@PUPrime-Demo"
+        self.orders = {}
 
     def account_id(self):
         return self.account
@@ -67,6 +68,36 @@ class FakeTerminal:
 
     def stop_distance_ok(self, symbol, level, side, is_sl):
         return not self.too_close
+
+    # pending orders: the order ticket becomes the position ticket when it fills, as in MT5
+    def place_limit(self, symbol, side, volume, price, sl, signal_id, leg):
+        t = self.next_ticket
+        self.next_ticket += 1
+        self.orders[t] = SimpleNamespace(ticket=t, symbol=symbol, side=side, volume_current=volume,
+                                         price_open=price, sl=sl, tp=0.0, comment=f"sig:{signal_id}:{leg}")
+        return t
+
+    def pending_order(self, ticket):
+        return self.orders.get(ticket)
+
+    def bot_orders(self):
+        return list(self.orders.values())
+
+    def cancel_order(self, order):
+        self.calls.append(("cancel", order.ticket))
+        del self.orders[order.ticket]
+
+    def modify_order(self, order, price, sl):
+        order.price_open, order.sl = price, sl
+
+    def digits(self, symbol):
+        return 2
+
+    def fill(self, ticket):
+        o = self.orders.pop(ticket)
+        self.positions[ticket] = SimpleNamespace(ticket=ticket, symbol=o.symbol, volume=o.volume_current,
+                                                 price_open=o.price_open, sl=o.sl, tp=0.0, profit=0.0,
+                                                 comment=o.comment)
 
     def close_position(self, pos, volume=None):
         self.calls.append(("close", pos.ticket, volume))

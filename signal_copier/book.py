@@ -26,7 +26,14 @@ class TrackedSignal:
     sl: float
     tps: list[float]
     opened_at: float
-    legs: dict[str, int] = field(default_factory=dict)  # leg number -> ticket
+    legs: dict[str, int] = field(default_factory=dict)  # leg number -> ticket (position, or a pending order)
+    # Layering only (layers.py): the zone as (near, far), the parser's symbol
+    # name for pip sizes, and whether the watchdog trails the remaining SLs.
+    strategy: str = "signals"
+    zone: list[float] = field(default_factory=list)
+    canonical: str = ""
+    trailing: bool = False
+    number: int | None = None  # the group's setup number, part of what makes a repost
 
 
 @dataclass

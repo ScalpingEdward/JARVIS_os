@@ -43,6 +43,23 @@ class Signal:
 
 
 @dataclass(frozen=True)
+class ZoneSignal:
+    """'GOLD SELL SETUP / Gold Sell Zone 4192 - 4198 / SL : 4203 / TP1 : 4187 ...'
+
+    An entry zone instead of a price: groups that scale in with several
+    layers across it (see layers.py). TP4 : Hold is the runner, no price.
+    """
+    symbol: str
+    side: str
+    zone: tuple[float, float]  # (near, far): near is where price is when it is posted, far the pullback end
+    sl: float
+    tps: tuple[float, ...]
+    # "3. GOLD BUY SETUP": the group numbers its setups per session, and the
+    # same zone comes back under a new number (#57146 / #57151) -- a new trade.
+    number: int | None = None
+
+
+@dataclass(frozen=True)
 class TakeProfits:
     """'Tp1@4330 / Tp2@4380' on its own -- the second half of a fast signal."""
     tps: tuple[float, ...]
@@ -106,8 +123,35 @@ def _parse_signal(text: str, side: str) -> Signal | Rejected:
     return Signal(symbol, side, e, s, tuple(tps))
 
 
-def parse(text: str) -> Signal | TakeProfits | Command | Rejected | None:
+def _parse_zone(text: str, side: str, a: float, b: float) -> ZoneSignal | Rejected:
     low = text.lower()
+    symbol = find_symbol(text)
+    sl = re.search(rf"\bsl\s*[:@]\s*{NUM}", low)
+    tps = [_num(m) for m in re.findall(rf"\btp\s*\d\s*[:@]\s*{NUM}", low)]
+    if symbol is None:
+        return Rejected("no symbol", text)
+    if sl is None:
+        return Rejected("no stop loss -- risk cannot be sized", text)
+    s = _num(sl.group(1))
+    lo, hi = min(a, b), max(a, b)
+    num = re.match(r"\s*(\d+)\s*\.", text)
+    number = int(num.group(1)) if num else None
+    # A buy is posted at the top of its zone and layers down into it; a sell the other way round.
+    if side == "buy":
+        if not (s < lo and all(tp > hi for tp in tps)):
+            return Rejected("buy zone needs sl < zone < tps", text)
+        return ZoneSignal(symbol, side, (hi, lo), s, tuple(tps), number)
+    if not (s > hi and all(tp < lo for tp in tps)):
+        return Rejected("sell zone needs sl > zone > tps", text)
+    return ZoneSignal(symbol, side, (lo, hi), s, tuple(tps), number)
+
+
+def parse(text: str) -> Signal | ZoneSignal | TakeProfits | Command | Rejected | None:
+    low = text.lower()
+
+    zone = re.search(rf"\b(buy|sell)\s+zone\s*:?\s*{NUM}\s*[-–]\s*{NUM}", low)
+    if zone:
+        return _parse_zone(text, zone.group(1), _num(zone.group(2)), _num(zone.group(3)))
 
     side = re.search(r"\b(buy|sell)\b", low)
     # Any level after buy/sell makes it a signal, so a missing SL is refused
