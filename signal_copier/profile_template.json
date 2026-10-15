@@ -1,5 +1,7 @@
 {
   "channels": ["ICT CRT PREMIUM (lifetime + monthly)"],
+  "terminal": null,
+  "login": null,
   "allow_live": false,
   "initial_balance": null,
   "risk": {

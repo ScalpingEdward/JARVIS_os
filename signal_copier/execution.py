@@ -31,10 +31,15 @@ class Opened:
     volume: float
 
 
-def connect(allow_live: bool = False) -> None:
-    if not mt5.initialize():
-        raise ExecutionError(f"MT5 initialize failed: {mt5.last_error()}")
+def connect(allow_live: bool = False, terminal: str | None = None, login: int | None = None) -> None:
+    """terminal: path to this profile's terminal64.exe (None: the one that runs).
+    login: the account that must be logged in there -- another one is refused."""
+    if not (mt5.initialize(path=terminal) if terminal else mt5.initialize()):
+        raise ExecutionError(f"MT5 initialize failed ({terminal or 'running terminal'}): {mt5.last_error()}")
     account = mt5.account_info()
+    if login and account.login != int(login):
+        mt5.shutdown()
+        raise ExecutionError(f"MT5 is logged in to {account.login}, this profile is for {login} -- log in there first")
     if account.trade_mode != mt5.ACCOUNT_TRADE_MODE_DEMO and not allow_live:
         mt5.shutdown()
         raise ExecutionError(f"{account.server} is not a demo account; pass allow_live=True deliberately")

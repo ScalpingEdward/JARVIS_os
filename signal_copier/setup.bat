@@ -1,5 +1,5 @@
 @echo off
-rem One-time setup: Python packages, .env, Telegram login. Safe to run again.
+rem One-time setup: Python packages, .env, first profile. Safe to run again.
 title Signal Copier - Setup
 cd /d "%~dp0.."
 
@@ -27,8 +27,5 @@ if not exist signal_copier\.env (
     echo [2/3] signal_copier\.env exists already.
 )
 
-echo [3/3] Telegram login: phone number, the code Telegram sends, your 2FA password if set.
-python -m signal_copier.telegram_check
-echo.
-echo Setup done. If the last lines show messages of the group, start the copier with start.bat.
-pause
+echo [3/3] First profile (one per MT5 account)...
+call "%~dp0neues_profil.bat"

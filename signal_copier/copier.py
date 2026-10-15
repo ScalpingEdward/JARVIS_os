@@ -1,7 +1,10 @@
 """Main loop: Telegram messages in, MT5 orders out, every step reported to me.
 
-    python -m signal_copier.copier          # trades (demo unless allow_live)
-    python -m signal_copier.copier --dry    # parses, checks, reports -- sends no order
+    python -m signal_copier.copier [profile]          # trades (demo unless allow_live)
+    python -m signal_copier.copier [profile] --dry    # parses, checks, reports -- sends no order
+
+The profile (see profiles.py) names the account: its MT5, groups, risk and
+files. Without a name the only profile there is runs.
 
 The decisions live in Copier, which gets the execution module passed in, so
 the tests run it against a fake terminal. Telegram and the bot only sit
@@ -31,26 +34,14 @@ from signal_copier.sizing import RiskProfile, entry_deviation_ok, lots_for_risk
 from signal_copier.symbols import resolve
 
 HERE = Path(__file__).parent
-LEGACY_STATE = HERE / "state.json"  # before one file per account
-LOG = HERE / "copier.log"
 WATCH_EVERY_S = 5
 
 log = logging.getLogger("copier")
 
 
-def state_path(account: str) -> Path:
+def state_path(folder: Path, account: str) -> Path:
     """One book per MT5 account: start balance, loss stop and tickets belong to it alone."""
-    return HERE / f"state_{re.sub(r'[^A-Za-z0-9]+', '_', account)}.json"
-
-
-def migrate_legacy_state(account: str) -> None:
-    """The old single state.json goes to the account it was written for -- or, unmarked, to this one."""
-    if not LEGACY_STATE.exists():
-        return
-    owner = Book.load(LEGACY_STATE).account or account
-    target = state_path(owner)
-    if not target.exists():
-        LEGACY_STATE.replace(target)
+    return folder / f"state_{re.sub(r'[^A-Za-z0-9]+', '_', account)}.json"
 
 
 def profile_from(config: dict) -> RiskProfile:
@@ -355,14 +346,15 @@ class Copier:
 class BotNotifier:
     """Sends through @Auronsignalbot on its own thread, so a slow Telegram never delays an order."""
 
-    def __init__(self, token: str, chat_id: str):
+    def __init__(self, token: str, chat_id: str, prefix: str = ""):
+        self.prefix = prefix  # several profiles report to the same bot
         self.url = f"https://api.telegram.org/bot{token}/sendMessage"
         self.chat_id = chat_id
         self.q: queue.Queue[str] = queue.Queue()
         threading.Thread(target=self._run, daemon=True).start()
 
     def __call__(self, text: str) -> None:
-        self.q.put(text)
+        self.q.put(self.prefix + text)
 
     def _run(self) -> None:
         while True:
@@ -377,23 +369,27 @@ class BotNotifier:
                     time.sleep(5)
 
 
-async def main(dry: bool) -> None:
+async def main(profile: str | None, dry: bool) -> None:
     from dotenv import load_dotenv
     from telethon import TelegramClient, events
 
-    from signal_copier import execution
+    from signal_copier import execution, profiles
     from signal_copier.telegram_check import _plain
 
     load_dotenv(HERE / ".env")
+    try:
+        name = profiles.pick(profile)
+    except profiles.ProfileError as e:
+        raise SystemExit(str(e))
+    folder = profiles.folder(name)
+    config = profiles.load(name)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s",
-                        handlers=[logging.FileHandler(LOG, encoding="utf-8"), logging.StreamHandler()])
-    config = json.loads((HERE / "config.json").read_text(encoding="utf-8"))
-    notify = BotNotifier(os.environ["TELEGRAM_BOT_TOKEN"], os.environ["TELEGRAM_NOTIFY_CHAT_ID"])
+                        handlers=[logging.FileHandler(folder / "copier.log", encoding="utf-8"), logging.StreamHandler()])
+    notify = BotNotifier(os.environ["TELEGRAM_BOT_TOKEN"], os.environ["TELEGRAM_NOTIFY_CHAT_ID"], f"[{name}] ")
 
-    execution.connect(allow_live=config.get("allow_live", False))
+    execution.connect(config.get("allow_live", False), config.get("terminal"), config.get("login"))
     account = execution.account_id()
-    migrate_legacy_state(account)
-    state = state_path(account)
+    state = state_path(folder, account)
     book = Book.load(state)
     if not book.account:
         book.account = account
@@ -406,7 +402,8 @@ async def main(dry: bool) -> None:
     copier = Copier(execution, book, profile_from(config), config, notify, state, dry=dry)
     copier._save()
 
-    client = TelegramClient(str(HERE / "copier"), int(os.environ["TELEGRAM_API_ID"]), os.environ["TELEGRAM_API_HASH"])
+    # Its own Telegram login per profile: the first start asks for phone and code in this window.
+    client = TelegramClient(str(folder / "telegram"), int(os.environ["TELEGRAM_API_ID"]), os.environ["TELEGRAM_API_HASH"])
     await client.start()
     dialogs = [d async for d in client.iter_dialogs()]
     chats = []
@@ -436,5 +433,7 @@ async def main(dry: bool) -> None:
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
+    ap.add_argument("profile", nargs="?", help="profile name (profiles/<name>); optional if there is only one")
     ap.add_argument("--dry", action="store_true", help="parse, check and report; send no order")
-    asyncio.run(main(ap.parse_args().dry))
+    args = ap.parse_args()
+    asyncio.run(main(args.profile, args.dry))

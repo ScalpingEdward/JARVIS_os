@@ -1,8 +1,7 @@
 from types import SimpleNamespace
 
-from signal_copier import copier as copier_mod
 from signal_copier.book import Book
-from signal_copier.copier import Copier, migrate_legacy_state, state_path
+from signal_copier.copier import Copier, state_path
 from signal_copier.execution import Opened
 from signal_copier.risk import AccountState
 from signal_copier.sizing import RiskProfile, SymbolSpec
@@ -211,12 +210,5 @@ def test_other_account_in_mt5_blocks_trades_and_loss_stop_until_it_is_back():
     assert "trading again" in said[-2] and len(t.positions) == 2
 
 
-def test_one_state_file_per_account_and_the_old_one_moves(tmp_path, monkeypatch):
-    monkeypatch.setattr(copier_mod, "HERE", tmp_path)
-    monkeypatch.setattr(copier_mod, "LEGACY_STATE", tmp_path / "state.json")
-    assert state_path("1001@PUPrime-Demo").name == "state_1001_PUPrime_Demo.json"
-    old = Book(initial_balance=9926.2)
-    old.save(tmp_path / "state.json")
-    migrate_legacy_state("1001@PUPrime-Demo")
-    moved = Book.load(state_path("1001@PUPrime-Demo"))
-    assert moved.initial_balance == 9926.2 and not (tmp_path / "state.json").exists()
+def test_one_state_file_per_account(tmp_path):
+    assert state_path(tmp_path, "1001@PUPrime-Demo") == tmp_path / "state_1001_PUPrime_Demo.json"

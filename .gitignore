@@ -237,3 +237,4 @@ signal_copier/state.tmp
 signal_copier/copier.log
 signal_copier/state_*.json
 signal_copier/state_*.tmp
+signal_copier/profiles/

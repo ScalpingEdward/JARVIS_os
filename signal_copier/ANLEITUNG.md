@@ -1,137 +1,122 @@
 # Signal-Kopierer – Anleitung
 
-Das Programm liest die Signale einer Telegram-Gruppe und eröffnet sie
-auf **deinem eigenen** MT5-Konto. Dazu gehören Einstieg, SL, TPs,
-„close half“, Breakeven und „close all“. Jede Aktion und jede Ablehnung
-meldet dir dein eigener Telegram-Bot.
+Das Programm liest die Signale von Telegram-Gruppen und eröffnet sie auf
+**deinen eigenen** MT5-Konten. Dazu gehören Einstieg, SL, TPs, „close half“,
+Breakeven und „close all“. Jede Aktion und jede Ablehnung meldet dir dein
+eigener Telegram-Bot.
 
-Es ist **kein EA**. Es läuft als eigenes Fenster neben MT5 und steuert MT5 von
-außen. Ein EA könnte die Gruppe gar nicht lesen.
+Es ist **kein EA**, sondern ein eigenes Fenster neben MT5, das MT5 von außen
+steuert. Von Haus aus handelt es **nur auf Demo-Konten**.
 
-Von Haus aus handelt es **nur auf einem Demo-Konto**. Auf einem Echtgeld-Konto
-verweigert es den Start, bis du das selbst umschaltest (siehe unten).
+**Ein Profil = ein MT5-Konto.** Jedes Profil hat ein eigenes MT5, ein
+eigenes Fenster, eigene Gruppen und ein eigenes Risiko. Es laufen so viele
+gleichzeitig, wie der Rechner Speicher hat (pro MT5 etwa 300–500 MB).
 
 ---
 
 ## Was du brauchst
 
-- Windows-Laptop, der läuft, während gehandelt wird. Schläft er, liest der
-  Kopierer nichts.
-- **MetaTrader 5** mit einem Konto bei deinem Broker, zuerst als Demo.
-- **Python** von https://www.python.org/downloads/. Setz im Installer unbedingt
-  das Häkchen bei **„Add python.exe to PATH“**.
-- Dein **eigenes Telegram-Konto**, das Mitglied der Signal-Gruppe ist.
+- Windows-Rechner, der läuft, während gehandelt wird.
+- **MetaTrader 5**, pro Konto eine eigene Installation. Im Installer unter
+  „Einstellungen“ einen anderen Zielordner wählen, z. B.
+  `C:\MT5\puprime_demo`.
+- **Python** von https://www.python.org/downloads/. Beim Installieren das
+  Häkchen **„Add python.exe to PATH“** setzen.
+- Dein **eigenes Telegram-Konto**, das Mitglied der Gruppen ist.
 
-## Einrichtung (einmal, ca. 20 Minuten)
+## Einrichtung (einmal)
 
 ### 1. Ordner entpacken
-Entpack die ZIP zum Beispiel nach `C:\SignalCopier`. Darin liegt der Ordner
-`signal_copier`, und dort ist alles Weitere.
+Zum Beispiel nach `C:\SignalCopier`. Alles Weitere liegt in
+`signal_copier`.
 
-### 2. Telegram-API-Zugang holen
-1. Öffne https://my.telegram.org und melde dich mit deiner Telefonnummer an.
-2. Klick auf **API development tools** und leg eine App an. Name und
-   Kurzname sind egal.
-3. Notier dir **api_id** (eine Zahl) und **api_hash** (eine lange
-   Buchstabenfolge).
+### 2. Telegram-API-Zugang
+https://my.telegram.org → **API development tools** → App anlegen.
+Notier dir **api_id** und **api_hash**.
 
-### 3. Eigenen Benachrichtigungs-Bot anlegen
-1. Schreib in Telegram an **@BotFather**: `/newbot`, dann Name und
-   Benutzername (muss auf `bot` enden).
-2. Er antwortet mit einem **Token** (`123456:ABC...`). Notier es dir.
-3. Öffne deinen neuen Bot und schick ihm irgendeine Nachricht, z. B. „hi“.
+### 3. Benachrichtigungs-Bot
+In Telegram an **@BotFather**: `/newbot`. Notier dir das **Token**.
+Dann deinem neuen Bot irgendetwas schreiben, z. B. „hi“.
 
-### 4. setup.bat starten
+### 4. setup.bat
 Doppelklick auf `signal_copier\setup.bat`.
-- Es installiert die Python-Pakete.
-- Es öffnet Notepad mit der Datei `.env`. Trag dort ein:
-  - `TELEGRAM_API_ID` und `TELEGRAM_API_HASH` aus Schritt 2
-  - `TELEGRAM_CHANNEL`: ein Teil des Gruppennamens, wie Telegram ihn zeigt
-  - `TELEGRAM_BOT_TOKEN` aus Schritt 3
-  - `TELEGRAM_NOTIFY_CHAT_ID` bleibt vorerst leer, das kommt in Schritt 5
-- Speichern, Notepad schließen.
-- Dann folgt der Telegram-Login: Telefonnummer (mit `+49…` bzw. `+420…`),
-  den Code, den Telegram dir schickt, und dein 2FA-Passwort, falls gesetzt.
-- Am Ende stehen die letzten Nachrichten der Gruppe auf dem Bildschirm, mit
-  `->` darunter, wie das Programm sie versteht. Dann passt alles.
+- Es installiert die Pakete.
+- Es öffnet `.env` in Notepad. Trag `TELEGRAM_API_ID`, `TELEGRAM_API_HASH` und
+  `TELEGRAM_BOT_TOKEN` ein, speichern.
+- Doppelklick auf `chat_id.bat`, die Zahl als `TELEGRAM_NOTIFY_CHAT_ID` in
+  `.env` eintragen, speichern.
+- Danach legt `setup.bat` dein erstes Profil an (siehe unten).
 
-### 5. Chat-ID eintragen
-Doppelklick auf `signal_copier\chat_id.bat`. Es zeigt eine Zeile
-`TELEGRAM_NOTIFY_CHAT_ID=...`. Trag die Zahl in `.env` ein und speichere.
+## Neues Konto = neues Profil
 
-### 6. MT5 vorbereiten
-- MT5 öffnen und beim **Demo-Konto** anmelden.
-- Oben in der Leiste **„Algo Trading“** einschalten (grün).
-- Unter Extras → Optionen → Expert Advisors muss „Algo Trading erlauben“ an sein.
+1. MT5 für dieses Konto in einen **eigenen Ordner** installieren und einmal
+   mit dem Konto anmelden. Algo Trading einschalten.
+2. Doppelklick auf `signal_copier\neues_profil.bat`, dann einen Namen
+   eingeben, z. B. `roboforex_cent`.
+3. Notepad öffnet die Einstellungen. Eintragen:
+   - `"terminal"`: Pfad zur `terminal64.exe` dieses MT5, mit **doppelten**
+     Backslashes, z. B. `"C:\\MT5\\roboforex_cent\\terminal64.exe"`
+   - `"login"`: die Kontonummer, z. B. `12345678`. Ist in MT5 ein anderes
+     Konto angemeldet, startet er nicht.
+   - `"channels"`: die Gruppen für dieses Konto
+   - Risiko (siehe Tabelle)
+4. Speichern. Auf dem Desktop liegen jetzt **„Copier roboforex_cent“** und
+   **„Copier roboforex_cent Einstellungen“**.
+5. Erster Start über „Copier roboforex_cent“: Er fragt im Fenster nach deiner
+   Telefonnummer und dem Code, den Telegram dir schickt. Ab dann nicht mehr.
 
 ## Täglicher Betrieb
 
-1. MT5 öffnen, Algo Trading an.
-2. Doppelklick auf `signal_copier\start.bat`.
-3. Dein Bot schreibt dir „copier started …“. Ab jetzt läuft er.
+- Doppelklick auf **„Copier <name>“**, für jedes Profil einmal.
+- Der Bot meldet `[name] copier started on <konto>`. Jede Meldung beginnt mit
+  dem Profilnamen.
+- **Stoppen:** Fenster schließen. Offene Trades bleiben in MT5, und nach dem
+  Neustart findet er sie wieder.
+- **Einstellungen ändern:** „Copier <name> Einstellungen“ öffnen, speichern,
+  das Fenster des Profils schließen und neu starten.
+- **Probelauf ohne Orders:** in einer Eingabeaufforderung
+  `signal_copier\start.bat <name> --dry` aufrufen.
+- In MT5 erkennst du seine Trades am Kommentar `sig:<Nachricht>:<Leg>`.
 
-**Stoppen:** Fenster schließen oder Strg+C. Offene Trades bleiben in MT5. Nach
-einem Neustart findet der Kopierer sie wieder.
-
-**Nur ein Fenster:** Zwei gleichzeitig gehen nicht, weil beide denselben
-Telegram-Login benutzen.
-
-**Probelauf ohne Orders:** `start.bat --dry` in einer Eingabeaufforderung im
-Ordner `signal_copier` aufrufen. Dann meldet er nur, was er tun würde.
-
-In MT5 erkennst du seine Trades am Kommentar `sig:<Nachrichtennummer>:<Leg>`.
-
-## Einstellungen – `config.json`
+## Einstellungen eines Profils
 
 | Feld | Bedeutung |
 |---|---|
-| `channels` | Name(n) der Gruppe(n) |
-| `allow_live` | `false` = nur Demo. Erst auf `true` stellen, wenn du ihn wochenlang auf Demo beobachtet hast. |
-| `initial_balance` | leer = Kontostand beim ersten Start **dieses Kontos**. Daran hängen die Verlustgrenzen. Ein Wert hier gilt für jedes Konto – bei mehreren Konten leer lassen. |
-| `risk_per_position_pct` | Risiko **je TP-Position** in % (0,5 = bei 2 TPs insgesamt 1 %) |
-| `daily_loss_stop_pct` | Tagesverlust in % → alles schließen, bis Mitternacht (Prag) keine neuen Trades |
+| `channels` | Gruppen, z. B. `["ICT CRT PREMIUM", "Andere Gruppe"]`. Jeder Name muss genau eine Gruppe treffen. |
+| `terminal` | Pfad zur `terminal64.exe` dieses Kontos. `null` = das MT5, das gerade offen ist (nur bei einem einzigen Konto) |
+| `login` | Kontonummer. `null` = keine Prüfung |
+| `allow_live` | `false` = nur Demo. Erst auf `true`, wenn du ihn wochenlang auf Demo beobachtet hast. |
+| `initial_balance` | leer = Kontostand beim ersten Start. Daran hängen die Verlustgrenzen. |
+| `risk_per_position_pct` | Risiko **je TP-Position** in % (0,5 bei 2 TPs = insgesamt 1 %) |
+| `daily_loss_stop_pct` | Tagesverlust in % → alles schließen, bis Mitternacht (Prag) Pause |
 | `overall_loss_stop_pct` | Gesamtverlust in % → alles schließen, dauerhaft Schluss |
-| `max_entry_deviation_pips` | wie weit der Preis schon vom Einstieg weg sein darf (Gold: 60 Pips = 6 $). Ist er weiter weg, wird das Signal ausgelassen. |
-| `legs_without_tp` | wie viele Positionen bei einem Signal ohne TP (TPs kommen später) |
+| `max_entry_deviation_pips` | wie weit der Preis vom Einstieg weg sein darf (Gold 60 Pips = 6 $). Ist er weiter weg, wird das Signal ausgelassen. |
+| `legs_without_tp` | Anzahl Positionen bei einem Signal ohne TP (die TPs kommen später) |
+| `symbol_overrides` | falls dein Broker ein Symbol anders nennt, z. B. `{"XAUUSD": "GOLD.pro"}` |
 
-Nach einer Änderung den Kopierer neu starten.
+**Dauerhafter Stopp aufheben:** Fenster schließen. In
+`profiles\<name>\state_<konto>.json` den Wert `halt_reason` auf `""` setzen,
+speichern, neu starten. Das ist absichtlich Handarbeit.
 
-## Konto wechseln
-
-Der Kopierer handelt auf dem Konto, das gerade in MT5 angemeldet ist. Jedes
-Konto bekommt eine eigene Datei `state_<Kontonummer>_<Server>.json`. Darin
-stehen das Startkapital, die Verlustsperre und welche Trades zu welchem Signal
-gehören. Wechselst du zurück, ist der alte Stand wieder da.
-
-So wechselst du:
-1. Kopierer schließen.
-2. In MT5 beim anderen Konto anmelden.
-3. Kopierer starten. Die Startmeldung nennt das Konto.
-
-Wechselst du in MT5 das Konto, **während** der Kopierer läuft, meldet er
-„ACCOUNT CHANGED“. Er handelt dann nichts mehr und prüft keine Verlustgrenze,
-bis MT5 wieder auf dem alten Konto ist oder du ihn neu startest. Sonst würde
-er das neue Konto mit den Grenzen des alten handeln.
-
-**Dauerhafter Stopp aufheben:** Kopierer schließen, die Datei `state_<Konto>.json` mit
-Notepad öffnen, `halt_reason` auf `""` setzen, speichern, neu starten. Das
-ist absichtlich Handarbeit.
+**Konto im MT5 gewechselt, während er läuft:** Er meldet „ACCOUNT CHANGED“ und
+handelt nicht mehr, bis das richtige Konto wieder angemeldet ist.
 
 ## Was du nie weitergibst
 
 - `.env`: deine Schlüssel.
-- `copier.session`: **das ist dein Telegram-Login.** Wer die Datei hat, ist
-  in Telegram du.
-- `state_*.json`: deine Konten und offenen Trades.
+- Den Ordner `profiles`: Darin liegen pro Profil `telegram.session`
+  (**das ist dein Telegram-Login**), deine Konten und deine offenen Trades.
 
 ## Wenn etwas nicht geht
 
 | Meldung | Lösung |
 |---|---|
 | `Python is missing` | Python installieren, Häkchen „Add to PATH“ |
-| `MT5 initialize failed` | MT5 ist nicht offen, oder es sind mehrere MT5 installiert. Nur eines offen haben. |
+| `no profile yet` / `several profiles` | `neues_profil.bat` ausführen bzw. über die Verknüpfung des Profils starten |
+| `MT5 initialize failed` | Der Pfad in `terminal` stimmt nicht (doppelte Backslashes?) |
+| `logged in to …, this profile is for …` | Im MT5 dieses Profils beim richtigen Konto anmelden |
 | `is not a demo account` | Gewollt, siehe `allow_live` |
-| `Algo Trading is switched off` | Den Knopf in MT5 einschalten |
-| `0 chats match` / `2 chats match` | `TELEGRAM_CHANNEL` bzw. `channels` in `config.json` genauer schreiben |
-| `no tradable broker symbol` | Dein Broker nennt das Symbol anders. In `config.json` unter `symbol_overrides` eintragen, z. B. `{"XAUUSD": "GOLD.pro"}` |
+| `Algo Trading is switched off` | Den Knopf in diesem MT5 einschalten |
+| `0 chats match` / `2 chats match` | Gruppenname in `channels` genauer schreiben |
+| `no tradable broker symbol` | Symbol unter `symbol_overrides` eintragen |
 | `ran too far from entry` | Das Signal kam zu spät, der Preis war schon weg. Das ist Absicht. |
