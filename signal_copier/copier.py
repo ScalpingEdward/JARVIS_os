@@ -30,7 +30,7 @@ from signal_copier import parser
 from signal_copier.book import Book, TrackedSignal, close_half_plan
 from signal_copier.parser import BREAKEVEN, CLOSE_ALL, CLOSE_HALF, EXIT_AT_BE, Command, Rejected, Signal, TakeProfits
 from signal_copier.risk import breached, day_start, floors, may_open
-from signal_copier.sizing import RiskProfile, entry_deviation_ok, lots_for_risk
+from signal_copier.sizing import RiskProfile, entry_deviation_ok, fixed_lots, lots_for_risk
 from signal_copier.symbols import resolve
 
 HERE = Path(__file__).parent
@@ -54,6 +54,10 @@ def profile_from(config: dict) -> RiskProfile:
 class Copier:
     def __init__(self, ex, book: Book, profile: RiskProfile, config: dict, notify,
                  state_path: Path | None = None, clock=time.time, dry: bool = False):
+        if config.get("sizing", "risk_pct") not in ("risk_pct", "fixed_lot"):
+            raise ValueError(f"sizing must be 'risk_pct' or 'fixed_lot', not {config.get('sizing')!r}")
+        if config.get("sizing") == "fixed_lot" and not config.get("fixed_lot"):
+            raise ValueError("sizing 'fixed_lot' needs \"fixed_lot\": e.g. 0.01")
         self.ex, self.book, self.profile, self.config = ex, book, profile, config
         self.notify, self.state_path, self.clock, self.dry = notify, state_path, clock, dry
         self.symbols = ex.tradable_symbols()
@@ -138,11 +142,18 @@ class Copier:
         tps = list(sig.tps) or [0.0] * self.config.get("legs_without_tp", 2)
         spec = self.ex.spec(symbol)
         state = self.ex.account_state(self.book.initial_balance)
-        lots = lots_for_risk(state.balance, self.profile.risk_per_position_pct, price, sig.sl, spec)
-        if lots <= 0:
-            self._say(f"{where} not traded: even {spec.volume_min} lots would risk more than "
-                      f"{self.profile.risk_per_position_pct}%")
-            return
+        if self.config.get("sizing", "risk_pct") == "fixed_lot":
+            lots = fixed_lots(self.config["fixed_lot"], spec)
+            if lots <= 0:
+                self._say(f"{where} not traded: fixed lot {self.config['fixed_lot']} is below "
+                          f"the broker minimum {spec.volume_min}")
+                return
+        else:
+            lots = lots_for_risk(state.balance, self.profile.risk_per_position_pct, price, sig.sl, spec)
+            if lots <= 0:
+                self._say(f"{where} not traded: even {spec.volume_min} lots would risk more than "
+                          f"{self.profile.risk_per_position_pct}%")
+                return
         worst = sum(self.ex.pnl_at_sl(symbol, sig.side, lots, price, sig.sl) for _ in tps)
         verdict = may_open(state, self.profile, worst)
         if not verdict.ok:

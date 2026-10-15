@@ -50,3 +50,12 @@ def test_entry_deviation_per_symbol():
     profile = RiskProfile(max_entry_deviation_pips={"XAUUSD": 20})
     assert entry_deviation_ok("XAUUSD", "buy", 4151, 4153.0, profile)      # 20 pips of 0.1
     assert not entry_deviation_ok("XAUUSD", "buy", 4151, 4153.5, profile)
+
+
+def test_fixed_lots_fit_the_broker_step_and_minimum():
+    from signal_copier.sizing import SymbolSpec, fixed_lots
+    spec = SymbolSpec(0.01, 1.0, 0.01, 50.0, 0.01)
+    assert fixed_lots(0.01, spec) == 0.01
+    assert fixed_lots(0.017, spec) == 0.01
+    assert fixed_lots(0.005, spec) == 0.0
+    assert fixed_lots(80, spec) == 50.0

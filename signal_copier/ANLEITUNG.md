@@ -87,7 +87,9 @@ Doppelklick auf `signal_copier\setup.bat`.
 | `login` | Kontonummer. `null` = keine Prüfung |
 | `allow_live` | `false` = nur Demo. Erst auf `true`, wenn du ihn wochenlang auf Demo beobachtet hast. |
 | `initial_balance` | leer = Kontostand beim ersten Start. Daran hängen die Verlustgrenzen. |
-| `risk_per_position_pct` | Risiko **je TP-Position** in % (0,5 bei 2 TPs = insgesamt 1 %) |
+| `sizing` | `"risk_pct"` = Lotgröße aus dem Risiko in %. `"fixed_lot"` = jede Position mit genau `fixed_lot`, für Layering-Gruppen und kleine Konten. |
+| `fixed_lot` | Lotgröße bei `"fixed_lot"`, z. B. `0.01`. Die Verlustgrenzen gelten trotzdem: Bei 100 € und 4 % Tagesgrenze lehnt er fast jeden Trade ab, also die Grenzen für so ein Konto bewusst höher setzen. |
+| `risk_per_position_pct` | Risiko **je TP-Position** in % (0,5 bei 2 TPs = insgesamt 1 %). Nur bei `"risk_pct"`. |
 | `daily_loss_stop_pct` | Tagesverlust in % → alles schließen, bis Mitternacht (Prag) Pause |
 | `overall_loss_stop_pct` | Gesamtverlust in % → alles schließen, dauerhaft Schluss |
 | `max_entry_deviation_pips` | wie weit der Preis vom Einstieg weg sein darf (Gold 60 Pips = 6 $). Ist er weiter weg, wird das Signal ausgelassen. |

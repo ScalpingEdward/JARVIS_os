@@ -42,7 +42,7 @@ class FakeTerminal:
     def account_state(self, initial):
         at_sl = tuple(-abs(p.price_open - p.sl) * 100 * p.volume for p in self.positions.values())
         eq = self.balance if self.equity is None else self.equity
-        return AccountState(initial or 10_000.0, 10_000.0, self.balance, eq, at_sl)
+        return AccountState(initial or 10_000.0, self.balance, self.balance, eq, at_sl)
 
     def open_position(self, symbol, side, volume, sl, tp, signal_id, leg):
         t = self.next_ticket
@@ -212,3 +212,30 @@ def test_other_account_in_mt5_blocks_trades_and_loss_stop_until_it_is_back():
 
 def test_one_state_file_per_account(tmp_path):
     assert state_path(tmp_path, "1001@PUPrime-Demo") == tmp_path / "state_1001_PUPrime_Demo.json"
+
+
+def test_fixed_lot_opens_every_leg_with_that_size_whatever_the_balance():
+    t, said, now = FakeTerminal(), [], [1000.0]
+    t.balance = 100.0
+    small = RiskProfile(0.5, 40.0, 80.0, {"XAUUSD": 30}, 5)
+    c = Copier(t, Book(initial_balance=100.0, account=t.account), small,
+               {**CONFIG, "sizing": "fixed_lot", "fixed_lot": 0.01}, said.append, clock=lambda: now[0])
+    c.on_message(CHAT, 10, None, SIGNAL)
+    assert [p.volume for p in t.positions.values()] == [0.01, 0.01]
+
+
+def test_fixed_lot_still_respects_the_loss_stops():
+    t, said = FakeTerminal(), []
+    t.balance = 100.0
+    c = Copier(t, Book(initial_balance=100.0, account=t.account), PROFILE,  # 4 % of 100 = 4
+               {**CONFIG, "sizing": "fixed_lot", "fixed_lot": 0.01}, said.append, clock=lambda: 1000.0)
+    c.on_message(CHAT, 10, None, SIGNAL)  # 2 x 0.01 lot x 10 points x 100 = 20 at SL
+    assert not t.positions and "daily stop" in said[-1]
+
+
+def test_unknown_sizing_is_refused_at_start():
+    import pytest
+    with pytest.raises(ValueError, match="sizing"):
+        Copier(FakeTerminal(), Book(), PROFILE, {**CONFIG, "sizing": "lots"}, print)
+    with pytest.raises(ValueError, match="fixed_lot"):
+        Copier(FakeTerminal(), Book(), PROFILE, {**CONFIG, "sizing": "fixed_lot"}, print)

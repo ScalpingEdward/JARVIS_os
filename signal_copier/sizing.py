@@ -60,6 +60,19 @@ def lots_for_risk(balance: float, risk_pct: float, entry: float, sl: float, spec
     return min(lots, spec.volume_max)
 
 
+def fixed_lots(lot: float, spec: SymbolSpec) -> float:
+    """A set lot size per position, fitted to the broker's step. 0: below its minimum -- skip.
+
+    For layering groups (several 0.01 entries, partial closes, a runner):
+    their management only works if every position has the size they assume.
+    """
+    steps = math.floor(lot / spec.volume_step + 1e-9)
+    lots = round(steps * spec.volume_step, 8)
+    if lots < spec.volume_min:
+        return 0.0
+    return min(lots, spec.volume_max)
+
+
 def entry_deviation_ok(symbol: str, side: str, signal_entry: float, price: float, profile: RiskProfile) -> bool:
     """Too late if price ran further than allowed in the trade's direction.
 

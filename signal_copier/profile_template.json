@@ -4,6 +4,8 @@
   "login": null,
   "allow_live": false,
   "initial_balance": null,
+  "sizing": "risk_pct",
+  "fixed_lot": 0.01,
   "risk": {
     "risk_per_position_pct": 0.5,
     "daily_loss_stop_pct": 4.0,
