@@ -1,138 +1,61 @@
 <!doctype html>
-<html lang="en">
+<html lang="de">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="theme-color" content="#030712" />
-  <title>PHOENIX v5.0 · Holographic Command Center</title>
+  <title>AURON · Live</title>
   <link rel="stylesheet" href="./styles.css" />
 </head>
 <body>
-  <div class="ambient ambient-a"></div>
-  <div class="ambient ambient-b"></div>
-  <div class="grid"></div>
+  <div class="aurora" aria-hidden="true"><i></i><i></i><i></i></div>
 
-  <main class="shell">
-    <header class="topbar">
-      <div class="brand">
-        <div class="brand-mark"><span></span><i></i></div>
+  <header class="top">
+    <div class="brand"><span class="mark"></span><b>AURON</b><em>live</em></div>
+    <nav class="health" id="health" aria-label="System status"></nav>
+    <time class="clock" id="clock">--:--:--</time>
+  </header>
+
+  <main class="grid">
+    <!-- Trading: the total -->
+    <section class="card hero span-8">
+      <div class="label">TRADING · ALL ACCOUNTS</div>
+      <div class="totals" id="totals"><div class="muted">Waiting for the first copier report…</div></div>
+      <svg class="chart" id="totalChart" viewBox="0 0 800 180" preserveAspectRatio="none" aria-label="Equity over the last 24 hours"></svg>
+      <div class="chart-foot"><span id="chartRange">last 24 h</span><span id="chartUpdated"></span></div>
+    </section>
+
+    <!-- Instagram -->
+    <section class="card span-4 insta">
+      <div class="label">INSTAGRAM</div>
+      <div class="next">
+        <div class="ring" id="poolRing"><svg viewBox="0 0 120 120"><circle class="track" cx="60" cy="60" r="52"/><circle class="fill" id="poolArc" cx="60" cy="60" r="52"/></svg><div><b id="poolLeft">–</b><small>in pool</small></div></div>
         <div>
-          <small>PHOENIX INTELLIGENCE OS</small>
-          <h1 id="assistantName">PHOENIX</h1>
+          <small class="muted">Next post</small>
+          <div class="countdown" id="countdown">–</div>
+          <div class="muted" id="nextKind">–</div>
         </div>
       </div>
-      <nav class="system-strip" aria-label="System status">
-        <div><span class="status-dot"></span><b>CORE</b><em id="coreStatus">ONLINE</em></div>
-        <div><b>MODE</b><em>ADVISORY</em></div>
-        <div><b>TIME</b><em id="clock">--:--:--</em></div>
-        <button class="icon-button" id="refreshButton" aria-label="Refresh data">↻</button>
-      </nav>
-    </header>
-
-    <section class="hero panel">
-      <div class="orb-wrap" aria-hidden="true">
-        <div class="orbit orbit-outer"><span></span><span></span><span></span></div>
-        <div class="orbit orbit-mid"></div>
-        <div class="orbit orbit-inner"></div>
-        <div class="core-orb"><div class="core-eye"></div></div>
-        <div class="scan-line"></div>
-      </div>
-      <div class="hero-copy">
-        <p class="eyebrow">HOLOGRAPHIC COMMAND CENTER · V5.0</p>
-        <h2>One intelligence layer.<br />Every mission visible.</h2>
-        <p>Institutional market intelligence, autonomous research, agent operations, approvals and system safety in one real-time control surface.</p>
-        <div class="hero-actions">
-          <button id="voiceButton">ACTIVATE VOICE LINK</button>
-          <button class="ghost" id="focusButton">ENTER FOCUS MODE</button>
-        </div>
-        <div class="safety-banner"><span>◆</span> Human approval required · Automatic order execution disabled</div>
-      </div>
-      <div class="hero-telemetry">
-        <div><span>CONNECTED SERVICES</span><strong id="connectedServices">0/0</strong></div>
-        <div><span>ACTIVE MARKETS</span><strong id="activeMarkets">0</strong></div>
-        <div><span>RESEARCH EVENTS</span><strong id="researchEvents">0</strong></div>
-        <div><span>PENDING APPROVALS</span><strong id="pendingApprovals">0</strong></div>
-      </div>
+      <div class="stats" id="instaStats"></div>
+      <ul class="recent" id="recent"></ul>
     </section>
 
-    <section class="metric-grid">
-      <article class="panel metric"><span>MARKET REGIME</span><strong id="marketRegime">SCANNING</strong><em id="marketBias">Multi-timeframe intelligence</em></article>
-      <article class="panel metric"><span>TRADE ANALYST</span><strong id="tradeVerdict">NO SETUP</strong><em id="tradeConfidence">Confidence unavailable</em></article>
-      <article class="panel metric"><span>ORDERFLOW</span><strong id="orderflowSignal">NEUTRAL</strong><em id="orderflowQuality">Awaiting structured feed</em></article>
-      <article class="panel metric"><span>SYSTEM RISK</span><strong id="systemRisk">CONTROLLED</strong><em>Execution remains human-gated</em></article>
+    <!-- Accounts -->
+    <section class="span-12 accounts" id="accounts"></section>
+
+    <!-- Groups -->
+    <section class="card span-5">
+      <div class="label">PROFIT PER GROUP · TOTAL</div>
+      <div class="bars" id="groups"><div class="muted">No group has traded yet.</div></div>
     </section>
 
-    <section class="command-grid">
-      <article class="panel span-12">
-        <div class="panel-title"><div><p>SIGNAL COPIER</p><h3>Accounts &amp; Groups</h3></div><span class="badge" id="copierBadge">NO DATA</span></div>
-        <div class="copier-totals" id="copierTotals"><div class="empty-state">No copier has reported yet.</div></div>
-        <table class="copier-table" id="copierAccounts"></table>
-        <table class="copier-table" id="copierGroups"></table>
-      </article>
-
-      <article class="panel market-board span-8">
-        <div class="panel-title"><div><p>INSTITUTIONAL RADAR</p><h3>Priority Watchlist</h3></div><span class="badge live-badge">LIVE INTELLIGENCE</span></div>
-        <div class="watchlist" id="watchlist">
-          <div class="watch-row header"><span>MARKET</span><span>REGIME</span><span>BIAS</span><span>OPPORTUNITY</span><span>RISK</span></div>
-          <div class="empty-state">Waiting for Market Intelligence snapshots…</div>
-        </div>
-      </article>
-
-      <article class="panel voice-card span-4">
-        <div class="panel-title"><div><p>VOICE INTERFACE</p><h3>Neural Link</h3></div><span class="badge" id="voiceBadge">STANDBY</span></div>
-        <div class="voice-sphere"><span></span><i></i><b></b></div>
-        <div class="wave" id="voiceWave"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
-        <p id="voiceStatus">Voice link is ready for the configured wake name.</p>
-      </article>
-
-      <article class="panel span-4">
-        <div class="panel-title"><div><p>AI TRADE ANALYST</p><h3 id="analystSymbol">No active thesis</h3></div><span class="badge" id="analystVerdict">WAITING</span></div>
-        <div class="confidence-ring" id="confidenceRing"><strong id="analystConfidence">0%</strong><span>CONFIDENCE</span></div>
-        <dl class="analysis-list">
-          <div><dt>Direction</dt><dd id="analystDirection">—</dd></div>
-          <div><dt>Entry zone</dt><dd id="analystEntry">—</dd></div>
-          <div><dt>Invalidation</dt><dd id="analystInvalidation">—</dd></div>
-          <div><dt>Risk / Reward</dt><dd id="analystRR">—</dd></div>
-        </dl>
-      </article>
-
-      <article class="panel span-4">
-        <div class="panel-title"><div><p>AUTONOMOUS RESEARCH</p><h3>Intelligence Brief</h3></div><span class="badge" id="researchConfidence">0% CONF.</span></div>
-        <h4 id="researchHeadline">No research brief available</h4>
-        <p class="muted" id="researchSummary">PHOENIX is waiting for verified sources and structured research events.</p>
-        <div class="tag-cloud" id="researchEntities"></div>
-        <div class="risk-opportunity"><div><span>OPPORTUNITIES</span><strong id="opportunityCount">0</strong></div><div><span>RISKS</span><strong id="riskCount">0</strong></div><div><span>CONTRADICTIONS</span><strong id="contradictionCount">0</strong></div></div>
-      </article>
-
-      <article class="panel span-4">
-        <div class="panel-title"><div><p>AGENT OPERATIONS</p><h3>Runtime Network</h3></div><span class="badge" id="agentCount">0 AVAILABLE</span></div>
-        <div id="agents" class="agent-list">
-          <div class="agent"><span>PX</span><div><b>PHOENIX CORE</b><small>Orchestration</small></div><em class="online">ONLINE</em></div>
-          <div class="agent"><span>AI</span><div><b>ANALYST</b><small>Market intelligence</small></div><em>STANDBY</em></div>
-          <div class="agent"><span>RS</span><div><b>RESEARCH</b><small>Source verification</small></div><em>STANDBY</em></div>
-          <div class="agent"><span>QA</span><div><b>GUARDIAN</b><small>Safety and approvals</small></div><em class="online">ACTIVE</em></div>
-        </div>
-      </article>
-
-      <article class="panel span-6">
-        <div class="panel-title"><div><p>MISSION CONTROL</p><h3>Strategic Execution</h3></div><span class="badge" id="missionStatus">MONITORING</span></div>
-        <div class="mission-meter"><div><span id="missionProgressBar"></span></div><strong id="missionProgress">0%</strong></div>
-        <div class="mission-stats"><div><span>Queued</span><strong id="missionsQueued">0</strong></div><div><span>Active</span><strong id="missionsActive">0</strong></div><div><span>Completed</span><strong id="missionsCompleted">0</strong></div><div><span>Blocked</span><strong id="missionsBlocked">0</strong></div></div>
-      </article>
-
-      <article class="panel span-6">
-        <div class="panel-title"><div><p>HUMAN CONTROL GATE</p><h3>Approval Center</h3></div><span class="badge warning" id="approvalBadge">0 PENDING</span></div>
-        <div id="approvalList" class="approval-list"><div class="empty-state">No pending approvals detected.</div></div>
-      </article>
-
-      <article class="panel span-12 log-panel">
-        <div class="panel-title"><div><p>SYSTEM TELEMETRY</p><h3>Live Event Stream</h3></div><span class="badge live-badge">STREAMING</span></div>
-        <pre id="log">[BOOT] PHOENIX v5.0 command center initialized
-[SAFETY] Automatic order execution disabled
-[CONTROL] Human approval gate active</pre>
-      </article>
+    <!-- Open positions -->
+    <section class="card span-7">
+      <div class="label">OPEN POSITIONS <span class="count" id="openCount">0</span></div>
+      <div class="table-wrap"><table class="positions" id="positions"></table></div>
+      <div class="muted empty" id="noPositions">Nothing open right now.</div>
     </section>
   </main>
+
   <script src="./app.js"></script>
 </body>
 </html>

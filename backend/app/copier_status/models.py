@@ -74,3 +74,9 @@ class CopierOverview(BaseModel):
     totals: list[CopierTotals]
     accounts: list[CopierStatus]
     groups: list[CopierGroupTotal]
+
+
+class CopierEquityPoint(BaseModel):
+    at: datetime
+    balance: float
+    equity: float

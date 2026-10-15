@@ -61,3 +61,19 @@ def test_bad_profile_name_is_refused_and_forget_removes_it():
     assert client.delete("/v1/copier/status/puprime_demo").status_code == 204
     assert client.delete("/v1/copier/status/puprime_demo").status_code == 404
     assert client.get("/v1/copier/status").json() == []
+
+
+def test_history_keeps_one_point_every_five_minutes_and_forgets_after_thirty_days():
+    base = NOW - timedelta(days=31)
+    copier_status_service.push(CopierStatusIn(**_status(balance=900)), now=base)
+    for minute in range(0, 12):  # a push every minute for 12 minutes
+        copier_status_service.push(CopierStatusIn(**_status(balance=1000 + minute)), now=NOW + timedelta(minutes=minute))
+    points = copier_status_service.history(hours=24, now=NOW + timedelta(minutes=12))["puprime_demo"]
+    assert [p.balance for p in points] == [1000, 1005, 1010]
+    assert copier_status_service.history(hours=24 * 40, now=NOW + timedelta(minutes=12))["puprime_demo"][0].balance == 1000
+
+
+def test_history_endpoint():
+    client.post("/v1/copier/status", json=_status())
+    body = client.get("/v1/copier/history?hours=1").json()
+    assert body["puprime_demo"][0]["equity"] == 10_020

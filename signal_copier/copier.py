@@ -37,7 +37,7 @@ from signal_copier.symbols import resolve
 
 HERE = Path(__file__).parent
 WATCH_EVERY_S = 5
-REPORT_EVERY_S = 60
+REPORT_EVERY_S = 15  # the dashboard polls every 5 s; AURON keeps a curve point every 5 min
 
 log = logging.getLogger("copier")
 

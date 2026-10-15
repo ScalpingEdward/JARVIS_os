@@ -1,9 +1,10 @@
 from datetime import datetime, timedelta, timezone
 
 from app.db import SessionLocal, refuse_reset_in_production
-from app.db_models import CopierStatusRow
+from app.db_models import CopierEquityRow, CopierStatusRow
 
 from .models import (
+    CopierEquityPoint,
     CopierGroupTotal,
     CopierOverview,
     CopierState,
@@ -26,11 +27,14 @@ class CopierStatusService:
 
     stale_after = timedelta(minutes=3)
     offline_after = timedelta(minutes=10)
+    sample_every = timedelta(minutes=5)
+    keep_history = timedelta(days=30)
 
     def reset(self) -> None:
         refuse_reset_in_production("copier_status")
         with SessionLocal() as session:
             session.query(CopierStatusRow).delete()
+            session.query(CopierEquityRow).delete()
             session.commit()
 
     def push(self, payload: CopierStatusIn, now: datetime | None = None) -> CopierStatus:
@@ -42,8 +46,33 @@ class CopierStatusService:
                 session.add(CopierStatusRow(profile=payload.profile, received_at=now, data=data))
             else:
                 row.received_at, row.data = now, data
+            self._sample(session, payload, now)
             session.commit()
         return self._status(payload, now, now)
+
+    def _sample(self, session, payload: CopierStatusIn, now: datetime) -> None:
+        """Every sample_every a point for the equity curve; older than keep_history goes."""
+        last = (session.query(CopierEquityRow.at).filter(CopierEquityRow.profile == payload.profile)
+                .order_by(CopierEquityRow.at.desc()).first())
+        if last is not None and now - self._aware(last[0]) < self.sample_every:
+            return
+        session.add(CopierEquityRow(profile=payload.profile, at=now, balance=payload.balance, equity=payload.equity))
+        session.query(CopierEquityRow).filter(CopierEquityRow.at < now - self.keep_history).delete()
+
+    def history(self, hours: float = 24, now: datetime | None = None) -> dict[str, list[CopierEquityPoint]]:
+        now = now or datetime.now(timezone.utc)
+        with SessionLocal() as session:
+            rows = (session.query(CopierEquityRow).filter(CopierEquityRow.at >= now - timedelta(hours=hours))
+                    .order_by(CopierEquityRow.at).all())
+        out: dict[str, list[CopierEquityPoint]] = {}
+        for r in rows:
+            out.setdefault(r.profile, []).append(
+                CopierEquityPoint(at=self._aware(r.at), balance=r.balance, equity=r.equity))
+        return out
+
+    @staticmethod
+    def _aware(at: datetime) -> datetime:
+        return at if at.tzinfo else at.replace(tzinfo=timezone.utc)  # SQLite returns naive
 
     def forget(self, profile: str) -> None:
         with SessionLocal() as session:

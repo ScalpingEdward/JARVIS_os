@@ -395,3 +395,19 @@ class CopierStatusRow(Base):
     profile: Mapped[str] = mapped_column(String(40), primary_key=True)
     received_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
     data: Mapped[str] = mapped_column(Text)
+
+
+class CopierEquityRow(Base):
+    """One balance/equity sample per copier profile every five minutes, kept 30 days.
+
+    The status row above is only ever the latest push; the dashboard's equity
+    curves need the line behind it. Five minutes is fine enough for a curve
+    and keeps a month at under 9,000 rows per account.
+    """
+
+    __tablename__ = "copier_equity"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    profile: Mapped[str] = mapped_column(String(40), index=True)
+    at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    balance: Mapped[float] = mapped_column(Float)
+    equity: Mapped[float] = mapped_column(Float)
