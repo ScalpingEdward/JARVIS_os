@@ -1,0 +1,4 @@
+MetaTrader5>=5.0.6147
+telethon>=1.45
+python-dotenv>=1.0
+tzdata  # Windows has no time zone data; the daily stop needs Europe/Prague
