@@ -10,6 +10,7 @@ total has to add up.
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
+import unicodedata
 from datetime import datetime, timedelta, timezone
 
 from signal_copier.book import Book
@@ -40,9 +41,18 @@ class Status:
     captured_at: str
     groups: list[GroupStatus] = field(default_factory=list)
     open_positions: list[dict] = field(default_factory=list)
+    label: str = ""  # what people call this account -- its group's name, not the folder name
 
     def to_json(self) -> dict:
         return asdict(self)
+
+
+def display_name(raw: str) -> str:
+    """A Telegram title without its decoration: emojis and symbols out, spaces tidied.
+    "✨ICT CRT PREMIUM (lifetime + monthly)✨" -> "ICT CRT PREMIUM (lifetime + monthly)"."""
+    # "So" is emojis and pictographs; "+" and other maths/currency signs stay.
+    kept = "".join(ch for ch in raw if unicodedata.category(ch) != "So" and ch not in "️‍")
+    return " ".join(kept.split())
 
 
 def week_start(now: datetime) -> datetime:
@@ -61,7 +71,7 @@ def group_of_ticket(book: Book, chat_names: dict[int, str]) -> dict[int, str]:
 
 
 def build(profile: str, account: dict, positions: list[dict], deals: list[dict],
-          book: Book, chat_names: dict[int, str], now: datetime | None = None) -> Status:
+          book: Book, chat_names: dict[int, str], now: datetime | None = None, label: str = "") -> Status:
     """account: login, server, currency, balance, equity.
     positions: ticket, symbol, side, volume, price_open, sl, tp, profit.
     deals: position_id, time (UTC epoch, real), profit, commission, swap, fee, closing (bool)."""
@@ -100,4 +110,4 @@ def build(profile: str, account: dict, positions: list[dict], deals: list[dict],
     ordered = [x for x in ordered if x.name != OTHER or x.closed_trades or x.open_positions or x.pnl_total]
     return Status(profile, account["login"], account["server"], account["currency"],
                   round(account["balance"], 2), round(account["equity"], 2),
-                  now.isoformat(), ordered, open_list)
+                  now.isoformat(), ordered, open_list, label or profile)

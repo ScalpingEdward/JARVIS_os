@@ -38,6 +38,7 @@ class CopierStatusIn(BaseModel):
     captured_at: datetime
     groups: list[CopierGroup] = Field(default_factory=list)
     open_positions: list[CopierPosition] = Field(default_factory=list)
+    label: str | None = Field(default=None, max_length=100)  # display name, e.g. the group's
 
 
 class CopierState(StrEnum):

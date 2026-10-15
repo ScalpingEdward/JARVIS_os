@@ -1,4 +1,5 @@
 {
+  "label": "",
   "channels": [
     "ICT CRT PREMIUM (lifetime + monthly)"
   ],
@@ -23,5 +24,6 @@
     }
   },
   "legs_without_tp": 2,
-  "symbol_overrides": {}
+  "symbol_overrides": {},
+  "channel_labels": {}
 }

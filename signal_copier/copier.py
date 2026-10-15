@@ -672,6 +672,7 @@ async def main(profile: str | None, dry: bool) -> None:
     from telethon import TelegramClient, events
 
     from signal_copier import execution, profiles
+    from signal_copier.report import display_name as report_display_name
     from signal_copier.telegram_check import _plain
 
     load_dotenv(HERE / ".env")
@@ -683,7 +684,9 @@ async def main(profile: str | None, dry: bool) -> None:
     config = profiles.load(name)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s",
                         handlers=[logging.FileHandler(folder / "copier.log", encoding="utf-8"), logging.StreamHandler()])
-    notify = BotNotifier(os.environ["TELEGRAM_BOT_TOKEN"], os.environ["TELEGRAM_NOTIFY_CHAT_ID"], f"[{name}] ")
+    # What people call this account: its group's name, not the folder name (Brano, 2026-10-15).
+    label = config.get("label") or name
+    notify = BotNotifier(os.environ["TELEGRAM_BOT_TOKEN"], os.environ["TELEGRAM_NOTIFY_CHAT_ID"], f"[{label}] ")
 
     execution.connect(config.get("allow_live", False), config.get("terminal"), config.get("login"))
     account = execution.account_id()
@@ -712,11 +715,14 @@ async def main(profile: str | None, dry: bool) -> None:
     await client.start()
     dialogs = [d async for d in client.iter_dialogs()]
     chats = []
+    channel_labels = config.get("channel_labels", {})
+    chat_names: dict[int, str] = {}
     for wanted in config["channels"]:
         found = [d for d in dialogs if _plain(wanted) in _plain(d.name or "")]
         if len(found) != 1:
             raise SystemExit(f"{len(found)} chats match {wanted!r}: {[d.name for d in found]}")
         chats.append(found[0])
+        chat_names[found[0].id] = channel_labels.get(wanted) or report_display_name(found[0].name or wanted)
 
     @client.on(events.NewMessage(chats=[c.id for c in chats]))
     async def handler(event) -> None:
@@ -735,21 +741,20 @@ async def main(profile: str | None, dry: bool) -> None:
             copier.watch()
             await asyncio.sleep(WATCH_EVERY_S)
 
-    chat_names = {c.id: c.name for c in chats}
     auron = AuronReporter(os.environ["AURON_URL"]) if os.environ.get("AURON_URL") else None
 
     async def report_to_auron() -> None:
         from signal_copier import report
         while True:
             try:
-                status = report.build(name, *execution.report_inputs(), book, chat_names)
+                status = report.build(name, *execution.report_inputs(), book, chat_names, label=label)
                 auron(status.to_json())
             except Exception:
                 log.exception("building the AURON status")
             await asyncio.sleep(REPORT_EVERY_S)
 
     halted = f", TRADING STOPPED: {book.halt_reason}" if book.halted(time.time()) else ""
-    copier._say(f"copier started on {account}{halted}: {', '.join(c.name for c in chats)}, "
+    copier._say(f"copier started on {account}{halted}: {', '.join(chat_names.values())}, "
                 f"initial balance {book.initial_balance}, {len(book.signals)} signals in the book")
     asyncio.create_task(watchdog())
     if auron is not None:

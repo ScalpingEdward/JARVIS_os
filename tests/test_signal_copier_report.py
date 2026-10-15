@@ -55,3 +55,15 @@ def test_empty_account_still_lists_its_groups_and_no_other_bucket():
     assert [g.name for g in s.groups] == ["ICT CRT PREMIUM", "Second Group"]
     j = s.to_json()
     assert j["account_login"] == 700167790 and j["balance"] == 10_050.0 and j["groups"][0]["pnl_total"] == 0
+
+
+def test_display_names_lose_their_emojis_and_keep_the_rest():
+    from signal_copier.report import display_name
+    assert display_name("✨ICT CRT PREMIUM (lifetime + monthly)✨") == "ICT CRT PREMIUM (lifetime + monthly)"
+    assert display_name("VIP SIGNALS 🥷 Inner Circle") == "VIP SIGNALS Inner Circle"
+
+
+def test_status_carries_the_label():
+    s = build("vip_demo", ACCOUNT, [], [], Book(), NAMES, NOW, label="VIP SIGNALS Ninja Inner Circle")
+    assert s.to_json()["label"] == "VIP SIGNALS Ninja Inner Circle"
+    assert build("vip_demo", ACCOUNT, [], [], Book(), NAMES, NOW).label == "vip_demo"
