@@ -295,3 +295,18 @@ def test_signal_without_now_keeps_the_deviation_limit():
     t.prices["EURUSD.s"] = 1.12005
     c.on_message(CHAT, 4912, None, "Sell EURUSD @1.12133\nSl @ 1.12327\nTp1@1.11800")
     assert not t.positions and "ran too far" in said[-1]
+
+
+def test_a_missed_signal_is_not_opened_late():
+    c, t, said, now = make()
+    c.on_message(CHAT, 10, None, SIGNAL, posted_at=now[0] - 15 * 60)  # handed over on reconnect
+    assert not t.positions and "missed" in said[-1]
+    c.on_message(CHAT, 11, None, SIGNAL.replace("4141", "4140"), posted_at=now[0] - 20)  # fresh
+    assert len(t.positions) == 2
+
+
+def test_replies_to_open_trades_are_followed_even_late():
+    c, t, said, now = make()
+    c.on_message(CHAT, 10, None, SIGNAL, posted_at=now[0])
+    c.on_message(CHAT, 12, 10, "Close all now", posted_at=now[0] - 15 * 60)
+    assert not t.positions

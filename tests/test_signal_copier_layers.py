@@ -227,3 +227,11 @@ def test_plain_signal_profile_does_not_trade_zone_signals_and_layer_profile_igno
     c, t2, said2, _ = make()
     c.on_message(CHAT, 300, None, "Close half and set breakeven")
     assert not said2
+
+
+def test_missed_setup_and_its_late_edit_are_not_opened():
+    c, t, said, now = make()
+    c.on_message(CHAT, 100, None, SELL, posted_at=now[0] - 10 * 60)
+    assert not t.positions and "missed" in said[-1]
+    c.on_edit(CHAT, 100, SELL.replace("SL : 4203", "SL : 4204"), now[0] - 9 * 60, now[0] - 9 * 60)
+    assert not t.positions

@@ -37,6 +37,11 @@ from signal_copier.symbols import resolve
 
 HERE = Path(__file__).parent
 WATCH_EVERY_S = 5
+# A signal older than this is not opened: it was missed (copier offline, laptop
+# asleep) and Telegram hands it over on reconnect. Price has moved on since --
+# taking it late is how a missed winner becomes a loser. Replies to trades
+# already open are still followed: they close or protect, they open nothing.
+MAX_SIGNAL_AGE_S = 120
 REPORT_EVERY_S = 15  # the dashboard polls every 5 s; AURON keeps a curve point every 5 min
 
 log = logging.getLogger("copier")
@@ -93,7 +98,8 @@ class Copier:
 
     # --- messages -------------------------------------------------------
 
-    def on_message(self, chat_id: int, msg_id: int, reply_to: int | None, text: str) -> None:
+    def on_message(self, chat_id: int, msg_id: int, reply_to: int | None, text: str,
+                   posted_at: float | None = None) -> None:
         result = parser.parse(text)
         event = None
         if self.layered:
@@ -119,6 +125,8 @@ class Copier:
                 self._layer_event(msg_id, reply_to, event, text)
             elif isinstance(result, Rejected):
                 self._say(f"{where} not traded: {result.reason}\n{text[:200]}")
+            elif isinstance(result, (Signal, ZoneSignal)) and self._missed(where, posted_at):
+                pass
             elif isinstance(result, ZoneSignal):
                 if self.layered:
                     self._zone_signal(chat_id, msg_id, result)
@@ -350,7 +358,17 @@ class Copier:
                       for n, p in sorted(open_.items())]
         self._say(f"#{msg_id} close_all (no reply: every setup)\n" + ("\n".join(lines) or "nothing open"))
 
-    def on_edit(self, chat_id: int, msg_id: int, text: str, posted_at: float) -> None:
+    def _missed(self, where: str, posted_at: float | None) -> bool:
+        """True (and reported) for a signal too old to open -- see MAX_SIGNAL_AGE_S."""
+        limit = float(self.config.get("max_signal_age_seconds", MAX_SIGNAL_AGE_S))
+        age = self.clock() - posted_at if posted_at is not None else 0.0
+        if age <= limit:
+            return False
+        self._say(f"{where} missed: posted {age / 60:.0f} min ago while the copier was offline -- not opened")
+        return True
+
+    def on_edit(self, chat_id: int, msg_id: int, text: str, posted_at: float,
+                edited_at: float | None = None) -> None:
         """The group edits its setups a minute later ("UPDATED"): follow the new SL and TPs."""
         if not self.layered:
             return
@@ -361,7 +379,9 @@ class Copier:
         try:
             if s is None:
                 # Refused at first (price beyond the old zone, say) -- the edit may make it valid.
-                if self.clock() - posted_at <= layers.EDIT_WINDOW_S and self._account_ok():
+                # An edit seen only on reconnect is as stale as a missed signal.
+                if (self.clock() - posted_at <= layers.EDIT_WINDOW_S and self._account_ok()
+                        and not self._missed(f"#{msg_id} edit", edited_at)):
                     self._zone_signal(chat_id, msg_id, z)
                 return
             if z.side != s.side:
@@ -702,12 +722,13 @@ async def main(profile: str | None, dry: bool) -> None:
     async def handler(event) -> None:
         m = event.message
         reply_to = m.reply_to.reply_to_msg_id if m.reply_to else None
-        copier.on_message(event.chat_id, m.id, reply_to, m.message or "")
+        copier.on_message(event.chat_id, m.id, reply_to, m.message or "", m.date.timestamp())
 
     @client.on(events.MessageEdited(chats=[c.id for c in chats]))
     async def edited(event) -> None:
         m = event.message
-        copier.on_edit(event.chat_id, m.id, m.message or "", m.date.timestamp())
+        copier.on_edit(event.chat_id, m.id, m.message or "", m.date.timestamp(),
+                       (m.edit_date or m.date).timestamp())
 
     async def watchdog() -> None:
         while True:

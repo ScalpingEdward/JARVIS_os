@@ -114,6 +114,7 @@ Entfernen: die Verknüpfung „Copier <name>“ im Autostart-Ordner löschen
 | `daily_loss_stop_pct` | Tagesverlust in % vom Startkapital → alles schließen, bis Mitternacht (Prag) Pause. `null` = aus. Vorlage: 30. |
 | `overall_loss_stop_pct` | Gesamtverlust in % vom Startkapital → alles schließen, dauerhaft Schluss. `null` = aus. Vorlage: 50. Für eine Prop-Firm unter deren Grenze setzen (z. B. 4 / 8). |
 | `max_entry_deviation_pips` | wie weit der Preis vom Einstieg weg sein darf (Gold 60 Pips = 6 $). Ist er weiter weg, wird das Signal ausgelassen. |
+| `max_signal_age_seconds` | Signale, die älter sind (verpasst, weil der Kopierer aus war), werden **nicht** eröffnet. Standard 120. Antworten auf offene Trades (TP Hit, BE, Close all) führt er trotzdem aus. |
 | `legs_without_tp` | Anzahl Positionen bei einem Signal ohne TP (die TPs kommen später) |
 | `symbol_overrides` | falls dein Broker ein Symbol anders nennt, z. B. `{"XAUUSD": "GOLD.pro"}` |
 
