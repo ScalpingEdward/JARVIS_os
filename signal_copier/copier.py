@@ -35,6 +35,7 @@ from signal_copier.symbols import resolve
 
 HERE = Path(__file__).parent
 WATCH_EVERY_S = 5
+REPORT_EVERY_S = 60
 
 log = logging.getLogger("copier")
 
@@ -369,6 +370,36 @@ class BotNotifier:
                     time.sleep(5)
 
 
+class AuronReporter:
+    """Posts the profile's status to AURON on its own thread. AURON down never touches trading."""
+
+    def __init__(self, base_url: str):
+        self.url = base_url.rstrip("/") + "/v1/copier/status"
+        self.q: queue.Queue[dict] = queue.Queue(maxsize=1)
+        self.failing = False
+        threading.Thread(target=self._run, daemon=True).start()
+
+    def __call__(self, status: dict) -> None:
+        try:
+            self.q.put_nowait(status)
+        except queue.Full:  # AURON slow: the older status is worth nothing anyway
+            pass
+
+    def _run(self) -> None:
+        while True:
+            body = json.dumps(self.q.get()).encode()
+            req = urllib.request.Request(self.url, body, {"Content-Type": "application/json"})
+            try:
+                urllib.request.urlopen(req, timeout=15).read()
+                if self.failing:
+                    log.info("AURON reachable again")
+                self.failing = False
+            except Exception as e:
+                if not self.failing:  # once per outage, not once a minute
+                    log.warning("AURON status push failed (%s) -- trading goes on", e)
+                self.failing = True
+
+
 async def main(profile: str | None, dry: bool) -> None:
     from dotenv import load_dotenv
     from telethon import TelegramClient, events
@@ -424,10 +455,25 @@ async def main(profile: str | None, dry: bool) -> None:
             copier.watch()
             await asyncio.sleep(WATCH_EVERY_S)
 
+    chat_names = {c.id: c.name for c in chats}
+    auron = AuronReporter(os.environ["AURON_URL"]) if os.environ.get("AURON_URL") else None
+
+    async def report_to_auron() -> None:
+        from signal_copier import report
+        while True:
+            try:
+                status = report.build(name, *execution.report_inputs(), book, chat_names)
+                auron(status.to_json())
+            except Exception:
+                log.exception("building the AURON status")
+            await asyncio.sleep(REPORT_EVERY_S)
+
     halted = f", TRADING STOPPED: {book.halt_reason}" if book.halted(time.time()) else ""
     copier._say(f"copier started on {account}{halted}: {', '.join(c.name for c in chats)}, "
                 f"initial balance {book.initial_balance}, {len(book.signals)} signals in the book")
     asyncio.create_task(watchdog())
+    if auron is not None:
+        asyncio.create_task(report_to_auron())
     await client.run_until_disconnected()
 
 

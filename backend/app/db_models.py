@@ -381,3 +381,17 @@ class InstagramContentCandidateRow(Base):
     status: Mapped[str] = mapped_column(String(30), index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
     data: Mapped[str] = mapped_column(Text)
+
+
+class CopierStatusRow(Base):
+    """Latest status of one signal copier profile, the whole payload as JSON.
+
+    Replaced on every push, like mt5_terminals: the copier itself computes
+    profit per group from MT5's own deal history, so a history table here
+    would only duplicate what the broker already keeps.
+    """
+
+    __tablename__ = "copier_status"
+    profile: Mapped[str] = mapped_column(String(40), primary_key=True)
+    received_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    data: Mapped[str] = mapped_column(Text)

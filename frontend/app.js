@@ -218,6 +218,20 @@ function renderApprovals(payload) {
   root.querySelectorAll('button').forEach((button) => button.addEventListener('click', () => log(`Approval ${button.dataset.approval || ''} opened for human review — no automatic action`, 'CONTROL')));
 }
 
+const esc = (value) => String(safe(value)).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const money = (value, currency) => `${Number(value || 0).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${currency}`;
+const pnl = (value, currency) => `<span class="${value > 0 ? 'up' : value < 0 ? 'down' : ''}">${value > 0 ? '+' : ''}${money(value, currency)}</span>`;
+
+function renderCopier(overview) {
+  const accounts = overview.accounts || [];
+  const live = accounts.filter((a) => a.state === 'live').length;
+  setText('#copierBadge', accounts.length ? `${live}/${accounts.length} LIVE` : 'NO DATA');
+  if (!accounts.length) return;
+  $('#copierTotals').innerHTML = (overview.totals || []).map((t) => `<div><span>${esc(t.currency)} · ${t.accounts} ACCOUNT${t.accounts === 1 ? '' : 'S'}</span><strong>${money(t.equity, t.currency)}</strong><em>Today ${pnl(t.pnl_today, t.currency)} · Week ${pnl(t.pnl_week, t.currency)} · Total ${pnl(t.pnl_total, t.currency)} · Open ${pnl(t.open_pnl, t.currency)}</em></div>`).join('');
+  $('#copierAccounts').innerHTML = '<tr><th>ACCOUNT</th><th>STATE</th><th>BALANCE</th><th>EQUITY</th><th>GROUP</th><th>TODAY</th><th>WEEK</th><th>TOTAL</th><th>OPEN</th></tr>' + accounts.map((a) => (a.groups.length ? a.groups : [{ name: '—' }]).map((g, i) => `<tr>${i ? '<td></td><td></td><td></td><td></td>' : `<td><b>${esc(a.profile)}</b><small>${esc(a.account_login)} · ${esc(a.server)}</small></td><td class="state-${esc(a.state)}">${esc(a.state).toUpperCase()}</td><td>${money(a.balance, a.currency)}</td><td>${money(a.equity, a.currency)}</td>`}<td>${esc(g.name)}</td><td>${pnl(g.pnl_today, a.currency)}</td><td>${pnl(g.pnl_week, a.currency)}</td><td>${pnl(g.pnl_total, a.currency)}</td><td>${g.open_positions || 0} · ${pnl(g.open_pnl, a.currency)}</td></tr>`).join('')).join('');
+  $('#copierGroups').innerHTML = '<tr><th>GROUP (ALL ACCOUNTS)</th><th>ACCOUNTS</th><th>TODAY</th><th>WEEK</th><th>TOTAL</th><th>TRADES</th></tr>' + (overview.groups || []).map((g) => `<tr><td><b>${esc(g.name)}</b></td><td>${esc(g.accounts.join(', '))}</td><td>${pnl(g.pnl_today, g.currency)}</td><td>${pnl(g.pnl_week, g.currency)}</td><td>${pnl(g.pnl_total, g.currency)}</td><td>${g.closed_trades}</td></tr>`).join('');
+}
+
 async function refresh() {
   $('#refreshButton').disabled = true;
   const services = [
@@ -232,6 +246,7 @@ async function refresh() {
     ['/v1/company-runtime/report', renderRuntime],
     ['/v1/orchestrator/status', (data) => setText('#agentCount', `${data.available_agents || data.active_agents || 0} AVAILABLE`)],
     ['/v1/approvals', renderApprovals],
+    ['/v1/copier/overview', renderCopier],
     ['/v1/voice/status', (data) => {
       const settings = data.settings || data;
       voiceSettings = { ...voiceSettings, ...settings };

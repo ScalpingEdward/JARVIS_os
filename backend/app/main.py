@@ -81,6 +81,7 @@ from .models.api import GenerateRequest, GenerateResponse, ProvidersResponse
 from .models.contracts import ModelRequest
 from .models.router import UnknownProviderError, model_router
 from .mt5_bridge.api import router as mt5_bridge_router
+from .copier_status.api import router as copier_status_router
 from .orderflow.api import router as orderflow_router
 from .orchestrator.models import (
     AgentCreate,
@@ -324,6 +325,7 @@ app.include_router(market_vision_router)
 app.include_router(mobile_router)
 app.include_router(research_provider_router)
 app.include_router(mt5_bridge_router)
+app.include_router(copier_status_router)
 app.include_router(orderflow_router)
 app.include_router(planner_router)
 app.include_router(radar_router)
