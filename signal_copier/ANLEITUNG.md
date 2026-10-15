@@ -78,6 +78,25 @@ Doppelklick auf `signal_copier\setup.bat`.
   `signal_copier\start.bat <name> --dry` aufrufen.
 - In MT5 erkennst du seine Trades am Kommentar `sig:<Nachricht>:<Leg>`.
 
+## Mit Windows starten (empfohlen)
+
+Damit nach einem Neustart (Windows-Updates machen das nachts) kein Signal
+verloren geht, einmal pro Profil in einer Eingabeaufforderung im Ordner
+über `signal_copier`:
+
+    python -m signal_copier.profiles autostart <name>
+
+Dann startet der Kopierer bei jeder Anmeldung von selbst, minimiert. Er
+wartet eine Minute aufs Netz, öffnet sein MT5 selbst (Pfad aus `terminal`)
+und startet neu, falls er einmal abbricht. Danach **nicht zusätzlich** über
+die Desktop-Verknüpfung starten – zwei Fenster für dasselbe Profil gehen
+nicht.
+
+Voraussetzungen: In MT5 ist das Passwort gespeichert und Algo Trading an,
+und Windows meldet sich nach dem Neustart an (sonst startet nichts).
+Entfernen: die Verknüpfung „Copier <name>“ im Autostart-Ordner löschen
+(`Win+R` → `shell:startup`).
+
 ## Einstellungen eines Profils
 
 | Feld | Bedeutung |

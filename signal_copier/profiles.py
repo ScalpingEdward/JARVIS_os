@@ -6,6 +6,7 @@
     profiles/<name>/telegram.session  this profile's own Telegram login
 
     python -m signal_copier.profiles new <name>   -> folder, desktop shortcuts, Notepad
+    python -m signal_copier.profiles autostart <name>   -> starts with Windows, restarts if it stops
     python -m signal_copier.profiles list
 
 Each profile runs in its own window against its own MT5 installation: the
@@ -83,7 +84,30 @@ $c.Arguments = '"{config}"'; $c.Save()
     subprocess.run(["powershell", "-NoProfile", "-Command", ps], check=True)
 
 
+def autostart_shortcut(name: str) -> Path:
+    """A shortcut in Windows' Startup folder: the profile starts at logon, minimised,
+    and autostart.bat restarts it if it ever stops. Without it, a reboot (Windows
+    updates do that at night) silently ends copying until someone notices."""
+    folder(name)  # validates the name
+    if name not in names():
+        raise ProfileError(f"no profile {name!r}")
+    bat = HERE / "autostart.bat"
+    ps = f"""
+$s = [Environment]::GetFolderPath('Startup'); $w = New-Object -ComObject WScript.Shell
+$l = $w.CreateShortcut("$s\\Copier {name}.lnk"); $l.TargetPath = '{bat}'; $l.Arguments = '{name}'
+$l.WorkingDirectory = '{HERE.parent}'; $l.WindowStyle = 7; $l.Save(); Write-Output "$s\\Copier {name}.lnk"
+"""
+    out = subprocess.run(["powershell", "-NoProfile", "-Command", ps], check=True, capture_output=True, text=True)
+    return Path(out.stdout.strip())
+
+
 def main(argv: list[str]) -> None:
+    if len(argv) == 2 and argv[0] == "autostart":
+        try:
+            print(f"Starts at logon: {autostart_shortcut(argv[1])}")
+        except ProfileError as e:
+            raise SystemExit(str(e))
+        return
     if argv[:1] == ["list"]:
         print("\n".join(names()) or "no profiles yet")
         return
@@ -96,7 +120,7 @@ def main(argv: list[str]) -> None:
         print(f"Created {config}\nDesktop: 'Copier {argv[1]}' and 'Copier {argv[1]} Einstellungen'.")
         subprocess.Popen(["notepad.exe", str(config)])
         return
-    raise SystemExit("usage: python -m signal_copier.profiles new <name> | list")
+    raise SystemExit("usage: python -m signal_copier.profiles new <name> | autostart <name> | list")
 
 
 if __name__ == "__main__":

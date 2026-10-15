@@ -15,7 +15,7 @@ from pathlib import Path
 HERE = Path(__file__).parent
 SHIP = ["__init__.py", "book.py", "chat_id.py", "copier.py", "execution.py", "parser.py", "risk.py",
         "sizing.py", "symbols.py", "telegram_check.py", "profiles.py", "profile_template.json", "report.py", "layers.py",
-        "requirements.txt", ".env.example", "setup.bat", "start.bat", "neues_profil.bat", "chat_id.bat",
+        "requirements.txt", ".env.example", "setup.bat", "start.bat", "autostart.bat", "neues_profil.bat", "chat_id.bat",
         "ANLEITUNG.md"]
 # profiles/ holds every account's state, log and Telegram login -- it never ships.
 NEVER = {".env", "copier.session", "copier.session-journal", "profiles"}
