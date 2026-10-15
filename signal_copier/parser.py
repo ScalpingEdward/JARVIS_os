@@ -7,7 +7,7 @@ real order.
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 CURRENCIES = {"EUR", "USD", "GBP", "JPY", "CHF", "CAD", "AUD", "NZD"}
 
@@ -40,6 +40,10 @@ class Signal:
     entry: float
     sl: float
     tps: tuple[float, ...]  # may be empty: fast signals send the TPs a moment later
+    # "Sell EURUSD Now@1.12133": take it at market, whatever price has done since
+    # (#4909, #4910 were refused for 34 and 13 pips of drift). Not part of equality:
+    # it changes how the copier enters, not which trade it is.
+    now: bool = field(default=False, compare=False)
 
 
 @dataclass(frozen=True)
@@ -120,7 +124,7 @@ def _parse_signal(text: str, side: str) -> Signal | Rejected:
         return Rejected("buy needs sl < entry < tps", text)
     if side == "sell" and not (s > e and all(tp < e for tp in tps)):
         return Rejected("sell needs sl > entry > tps", text)
-    return Signal(symbol, side, e, s, tuple(tps))
+    return Signal(symbol, side, e, s, tuple(tps), now=bool(re.search(r"\bnow\b", low)))
 
 
 def _parse_zone(text: str, side: str, a: float, b: float) -> ZoneSignal | Rejected:

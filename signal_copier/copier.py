@@ -158,7 +158,17 @@ class Copier:
             return
 
         price = self.ex.price(symbol, sig.side)
-        if not entry_deviation_ok(sig.symbol, sig.side, sig.entry, price, self.profile):
+        if sig.now:
+            # "Now@": the group means market. Drift since posting is accepted -- the
+            # lots come from the real price to the SL, so the risk stays the same --
+            # as long as the trade still has a SL in front and TP1 ahead of it.
+            beyond_sl = price >= sig.sl if sig.side == "sell" else price <= sig.sl
+            past_tp1 = bool(sig.tps) and (price <= sig.tps[0] if sig.side == "sell" else price >= sig.tps[0])
+            if beyond_sl or past_tp1:
+                self._say(f"{where} not traded: 'now' signal, but price {price} is already "
+                          + ("beyond the SL" if beyond_sl else f"past TP1 {sig.tps[0]}"))
+                return
+        elif not entry_deviation_ok(sig.symbol, sig.side, sig.entry, price, self.profile):
             self._say(f"{where} not traded: price {price} ran too far from entry {sig.entry}")
             return
 

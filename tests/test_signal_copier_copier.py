@@ -270,3 +270,28 @@ def test_unknown_sizing_is_refused_at_start():
         Copier(FakeTerminal(), Book(), PROFILE, {**CONFIG, "sizing": "lots"}, print)
     with pytest.raises(ValueError, match="fixed_lot"):
         Copier(FakeTerminal(), Book(), PROFILE, {**CONFIG, "sizing": "fixed_lot"}, print)
+
+
+def test_now_signal_opens_at_market_despite_drift():
+    # #4910: "Sell EURUSD Now@1.12133" arrived with price at 1.12005 -- 12.8 pips
+    c, t, said, _ = make()
+    t.prices["EURUSD.s"] = 1.12005
+    c.on_message(CHAT, 4910, None, "Sell EURUSD Now@1.12133\nSl @ 1.12327\nTp1@1.11800\nTp2@1.11128")
+    assert len(t.positions) == 2 and "opened" in said[-1]
+
+
+def test_now_signal_past_tp1_or_sl_is_still_refused():
+    c, t, said, _ = make()
+    t.prices["EURUSD.s"] = 1.11790
+    c.on_message(CHAT, 4910, None, "Sell EURUSD Now@1.12133\nSl @ 1.12327\nTp1@1.11800\nTp2@1.11128")
+    assert not t.positions and "past TP1" in said[-1]
+    t.prices["EURUSD.s"] = 1.12400
+    c.on_message(CHAT, 4911, None, "Sell EURUSD Now@1.12133\nSl @ 1.12327\nTp1@1.11800")
+    assert not t.positions and "beyond the SL" in said[-1]
+
+
+def test_signal_without_now_keeps_the_deviation_limit():
+    c, t, said, _ = make()
+    t.prices["EURUSD.s"] = 1.12005
+    c.on_message(CHAT, 4912, None, "Sell EURUSD @1.12133\nSl @ 1.12327\nTp1@1.11800")
+    assert not t.positions and "ran too far" in said[-1]
