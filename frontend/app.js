@@ -1,4 +1,6 @@
-const API = localStorage.getItem('phoenix_api') || 'http://localhost:8000';
+// Served by nginx, which proxies /api/ to the api container: same origin, no CORS.
+// Opened as a plain file there is no nginx, so it has to go to the port directly.
+const API = localStorage.getItem('phoenix_api') || (location.protocol === 'file:' ? 'http://localhost:8000' : '/api');
 const $ = (selector) => document.querySelector(selector);
 const safe = (value, fallback = '—') => value === undefined || value === null || value === '' ? fallback : value;
 const percent = (value) => `${Math.round(Number(value || 0) * 100)}%`;
