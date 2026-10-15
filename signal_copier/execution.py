@@ -31,6 +31,34 @@ class Opened:
     volume: float
 
 
+def _tick(symbol: str):
+    """The current quote. A symbol missing from Market Watch has none -- a fresh
+    MT5 install shows only a few (#57588 failed on XAUUSD.s that way) -- so it
+    is added there first instead of trusting someone did it by hand."""
+    tick = mt5.symbol_info_tick(symbol)
+    if tick is None or not tick.bid:
+        mt5.symbol_select(symbol, True)
+        for _ in range(100):  # the first quote can take seconds after selecting
+            time.sleep(0.1)
+            tick = mt5.symbol_info_tick(symbol)
+            if tick is not None and tick.bid:
+                break
+    if tick is None or not tick.bid:
+        raise ExecutionError(f"no quote for {symbol}: not in Market Watch and could not be added")
+    return tick
+
+
+def warm_up(symbols: list[str]) -> list[str]:
+    """Put the symbols signals usually name into Market Watch at start, so the
+    first signal does not wait for its first quote. Returns those added."""
+    added = []
+    for name in symbols:
+        info = mt5.symbol_info(name)
+        if info is not None and not info.visible and mt5.symbol_select(name, True):
+            added.append(name)
+    return added
+
+
 def connect(allow_live: bool = False, terminal: str | None = None, login: int | None = None) -> None:
     """terminal: path to this profile's terminal64.exe (None: the one that runs).
     login: the account that must be logged in there -- another one is refused."""
@@ -60,7 +88,7 @@ def tradable_symbols() -> list[str]:
 
 def price(symbol: str, side: str) -> float:
     """What a new position on this side would pay now: ask for a buy, bid for a sell."""
-    tick = mt5.symbol_info_tick(symbol)
+    tick = _tick(symbol)
     return tick.ask if side == "buy" else tick.bid
 
 
@@ -83,7 +111,7 @@ def _send(request: dict) -> mt5.OrderSendResult:
 
 
 def open_position(symbol: str, side: str, volume: float, sl: float, tp: float, signal_id: int, leg: int = 1) -> Opened:
-    tick = mt5.symbol_info_tick(symbol)
+    tick = _tick(symbol)
     buy = side == "buy"
     result = _send({
         "action": mt5.TRADE_ACTION_DEAL,
@@ -146,14 +174,14 @@ def move_sl_to_breakeven(position) -> None:
 
 def stop_distance_ok(symbol: str, level: float, side: str, is_sl: bool) -> bool:
     """Broker's minimum distance (stops_level, in points) between price and a new SL/TP."""
-    info, tick = mt5.symbol_info(symbol), mt5.symbol_info_tick(symbol)
+    info, tick = mt5.symbol_info(symbol), _tick(symbol)
     market = tick.bid if side == "buy" else tick.ask  # the price that would close it
     gap = (market - level) if (side == "buy") == is_sl else (level - market)
     return gap > info.trade_stops_level * info.point
 
 
 def close_position(position, volume: float | None = None) -> None:
-    tick = mt5.symbol_info_tick(position.symbol)
+    tick = _tick(position.symbol)
     buy = position.type == mt5.POSITION_TYPE_BUY
     _send({
         "action": mt5.TRADE_ACTION_DEAL,
@@ -170,7 +198,7 @@ def close_position(position, volume: float | None = None) -> None:
 
 def _server_offset_seconds(symbol: str = "EURUSD") -> int:
     """MT5 stamps deals in server time posing as UTC; this is the gap, to the hour."""
-    tick = mt5.symbol_info_tick(symbol)
+    tick = _tick(symbol)
     return round((tick.time - time.time()) / 3600) * 3600
 
 

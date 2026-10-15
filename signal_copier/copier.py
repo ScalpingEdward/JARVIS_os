@@ -667,6 +667,13 @@ async def main(profile: str | None, dry: bool) -> None:
 
     execution.connect(config.get("allow_live", False), config.get("terminal"), config.get("login"))
     account = execution.account_id()
+    from signal_copier.parser import ALIASES
+    from signal_copier.symbols import resolve as _resolve
+    tradable = execution.tradable_symbols()
+    common = {_resolve(c, tradable, config.get("symbol_overrides")) for c in set(ALIASES.values())}
+    added = execution.warm_up(sorted(n for n in common if n))
+    if added:
+        log.info("added to Market Watch: %s", ", ".join(added))
     state = state_path(folder, account)
     book = Book.load(state)
     if not book.account:
