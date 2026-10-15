@@ -1,13 +1,13 @@
 {
-  "channels": ["ICT CRT PREMIUM (lifetime + monthly)"],
+  "channels": [
+    "ICT CRT PREMIUM (lifetime + monthly)"
+  ],
   "terminal": null,
   "login": null,
   "allow_live": false,
   "initial_balance": null,
   "strategy": "signals",
-  "layers": 5,
   "trail_pips": 100,
-  "pending_expiry_minutes": null,
   "sizing": "risk_pct",
   "fixed_lot": 0.01,
   "risk": {
@@ -15,7 +15,12 @@
     "daily_loss_stop_pct": 30,
     "overall_loss_stop_pct": 50,
     "default_entry_deviation_pips": 5,
-    "max_entry_deviation_pips": {"XAUUSD": 60, "NAS100": 20, "US30": 20, "GER40": 20}
+    "max_entry_deviation_pips": {
+      "XAUUSD": 60,
+      "NAS100": 20,
+      "US30": 20,
+      "GER40": 20
+    }
   },
   "legs_without_tp": 2,
   "symbol_overrides": {}

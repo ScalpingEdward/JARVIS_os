@@ -87,10 +87,8 @@ Doppelklick auf `signal_copier\setup.bat`.
 | `login` | Kontonummer. `null` = keine Prüfung |
 | `allow_live` | `false` = nur Demo. Erst auf `true`, wenn du ihn wochenlang auf Demo beobachtet hast. |
 | `initial_balance` | leer = Kontostand beim ersten Start. Daran hängen die Verlustgrenzen. |
-| `strategy` | `"signals"` = normale Signale (Einstieg, SL, TPs). `"layers"` = Zonen-Signale mit mehreren Einstiegen, z. B. VIP SIGNALS Inner Circle (siehe unten). |
-| `layers` | Anzahl Einstiege je Zonen-Signal: 1 sofort, der Rest als Limit-Orders tiefer in der Zone. Standard 5. |
-| `trail_pips` | Nach „TP3 … trail your SL“ zieht er den SL so weit hinter dem Preis nach. 100 Pips Gold = 10 $. |
-| `pending_expiry_minutes` | `null` (Standard) = Limits bleiben, bis die Gruppe „Close all“ oder „HIT SL“ schreibt. Eine Zahl = nach so vielen Minuten löschen. |
+| `strategy` | `"signals"` = normale Signale (Einstieg, SL, TPs). `"layers"` = Zonen-Setups, je Setup 4 Positionen (TP1, TP2, TP3, Runner), z. B. VIP SIGNALS Inner Circle (siehe unten). |
+| `trail_pips` | Nach „TP3 … trail your SL“ zieht er den SL des Runners so weit hinter dem Preis nach. 100 Pips Gold = 10 $. |
 | `sizing` | `"risk_pct"` = Lotgröße aus dem Risiko in %. `"fixed_lot"` = jede Position mit genau `fixed_lot`, für Layering-Gruppen und kleine Konten. |
 | `fixed_lot` | Lotgröße bei `"fixed_lot"`, z. B. `0.01`. Die Verlustgrenzen gelten trotzdem, sofern sie an sind. |
 | `risk_per_position_pct` | Risiko **je TP-Position** in % (0,5 bei 2 TPs = insgesamt 1 %). Nur bei `"risk_pct"`. |
@@ -102,20 +100,32 @@ Doppelklick auf `signal_copier\setup.bat`.
 
 ## Layering-Gruppen (`"strategy": "layers"`)
 
-Für Gruppen wie „VIP SIGNALS Inner Circle“: Signal mit Zone statt Preis
-(`Gold Sell Zone 4192 - 4198`, `SL : 4203`, `TP1…TP3`, `TP4 : Hold`).
+Für Gruppen wie „VIP SIGNALS Inner Circle“. **Jedes nummerierte Setup ist ein
+Layer** („3. GOLD SELL SETUP“ = Layer 3), und jeder Layer eröffnet **4
+Positionen** sofort, alle mit dem SL der Gruppe:
+
+| Position | TP |
+|---|---|
+| 1 | TP1 |
+| 2 | TP2 |
+| 3 | TP3 |
+| 4 | keiner – der Runner |
+
+Eine Antwort der Gruppe gilt **nur für das Setup, auf das sie antwortet**:
 
 | Nachricht der Gruppe | Was der Kopierer macht |
 |---|---|
-| Setup | Layer 1 sofort, die übrigen als Limit-Orders gleichmäßig bis ans Ende der Zone, alle mit dem SL der Gruppe |
-| Setup nachträglich bearbeitet („UPDATED“) | SL und Limit-Orders auf die neuen Werte |
-| „TP1/TP2 HIT … closing 20% … BreakEven“ oder „shakey … closing 20%“ | den Layer mit dem meisten Gewinn schließen, SL der übrigen auf ihren Einstieg. Der letzte Layer bleibt immer (Runner). Wartende Limits bleiben – die Gruppe sagt nichts dazu. |
-| „TP3 HIT … trail your SL 100 pips“ | ab jetzt SL `trail_pips` hinter dem Preis nachziehen |
-| „Close all now“ / „CUT LOSS NOW“ | als Antwort: nur dieses Setup schließen. Ohne Antwort: alle Setups der Gruppe. |
-| Leistungsberichte („London performance …“) | nichts – auch wenn darin „HIT SL“ oder „Cut Loss“ steht |
-| „HIT SL“ | übrige Limits löschen |
+| „Trade is shakey … closing 20% … BreakEven“ | Position 1 schließen, SL der übrigen auf Einstieg |
+| „TP1 HIT … closing 20% … BreakEven“ | Position 1 ist durch ihren TP zu (sonst schließt er sie), SL der übrigen auf Einstieg |
+| „TP2 HIT …“ | genauso mit Position 2 |
+| „TP3 HIT … trail your SL 100 pips“ | Position 3 zu, ab jetzt SL des Runners `trail_pips` hinter dem Preis |
+| „Close all now“ / „CUT LOSS NOW“ | als Antwort: dieses Setup schließen. Ohne Antwort: alle Setups der Gruppe |
+| „HIT SL“ | nichts, der SL hat es erledigt |
+| Setup nachträglich bearbeitet („UPDATED“) | SL und TPs auf die neuen Werte (ein SL auf Einstieg bleibt dort) |
+| Leistungsberichte („London performance …“) | nichts |
 
-Für so eine Gruppe meist: `"sizing": "fixed_lot"`, `"fixed_lot": 0.01`.
+Andere Anweisungen ohne Antwort macht er nicht – er rät nicht, welches Setup
+gemeint ist. Für so eine Gruppe meist: `"sizing": "fixed_lot"`, `"fixed_lot": 0.01`.
 
 **Dauerhafter Stopp aufheben:** Fenster schließen. In
 `profiles\<name>\state_<konto>.json` den Wert `halt_reason` auf `""` setzen,

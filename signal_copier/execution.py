@@ -104,42 +104,6 @@ def open_position(symbol: str, side: str, volume: float, sl: float, tp: float, s
     return Opened(result.order, price, result.volume)
 
 
-def place_limit(symbol: str, side: str, volume: float, price: float, sl: float, signal_id: int, leg: int) -> int:
-    """A buy/sell limit for a later layer. Its ticket becomes the position's ticket once filled."""
-    info = mt5.symbol_info(symbol)
-    result = _send({
-        "action": mt5.TRADE_ACTION_PENDING,
-        "symbol": symbol,
-        "volume": volume,
-        "type": mt5.ORDER_TYPE_BUY_LIMIT if side == "buy" else mt5.ORDER_TYPE_SELL_LIMIT,
-        "price": round(price, info.digits),
-        "sl": sl,
-        "tp": 0.0,
-        "magic": MAGIC,
-        "comment": f"sig:{signal_id}:{leg}",
-        "type_time": mt5.ORDER_TIME_GTC,
-        "type_filling": mt5.ORDER_FILLING_RETURN,
-    })
-    return result.order
-
-
-def pending_order(ticket: int):
-    found = mt5.orders_get(ticket=ticket)
-    return found[0] if found else None
-
-
-def modify_order(order, price: float, sl: float) -> None:
-    _send({
-        "action": mt5.TRADE_ACTION_MODIFY,
-        "order": order.ticket,
-        "symbol": order.symbol,
-        "price": round(price, mt5.symbol_info(order.symbol).digits),
-        "sl": sl,
-        "tp": order.tp,
-        "type_time": mt5.ORDER_TIME_GTC,
-    })
-
-
 def cancel_order(order) -> None:
     _send({"action": mt5.TRADE_ACTION_REMOVE, "order": order.ticket})
 
