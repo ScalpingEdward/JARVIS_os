@@ -99,7 +99,11 @@ class Copier:
         if self.layered:
             # A layering group's replies are its own language (layers.classify);
             # the plain-signal commands below would read "BE" without the 20 %.
-            event = layers.classify(text) if reply_to is not None and not isinstance(result, ZoneSignal) else None
+            event = layers.classify(text) if not isinstance(result, ZoneSignal) else None
+            # Without a reply only "close all" means something: every setup of this group.
+            # Anything else unanswered ("move to BE" to whom?) is not guessed.
+            if reply_to is None and event is not None and event != layers.Event.CLOSE_ALL:
+                event = None
             if event is None and not isinstance(result, (ZoneSignal, Rejected)):
                 return
         if result is None and event is None:
@@ -109,7 +113,9 @@ class Copier:
             self._say(f"{where} ignored: MT5 is not on {self.book.account}\n{text[:200]}")
             return
         try:
-            if event is not None:
+            if event is not None and reply_to is None:
+                self._close_all_layers(chat_id, msg_id)
+            elif event is not None:
                 self._layer_event(msg_id, reply_to, event, text)
             elif isinstance(result, Rejected):
                 self._say(f"{where} not traded: {result.reason}\n{text[:200]}")
@@ -324,6 +330,22 @@ class Copier:
                 lines.append(f"trailing {self.config.get('trail_pips', 100)} pips behind price from now on")
             lines += [f"#{p.ticket}: " + self._to_breakeven(s, p) for p in positions]
         self._say(f"#{msg_id} {event} on #{s.msg_id} {s.side} {s.symbol}\n" + ("\n".join(lines) or "nothing open"))
+
+    def _close_all_layers(self, chat_id: int, msg_id: int) -> None:
+        """"Close all now" answering no setup: every open setup of this group, limits included."""
+        lines = []
+        for s in self.book.signals.values():
+            if s.chat_id != chat_id or s.strategy != "layers":
+                continue
+            positions, orders = self._layer_parts(s)
+            if not positions and not orders:
+                continue
+            self.book.link(msg_id, s.msg_id)  # the last one; replies to this message are rare
+            lines.append(f"#{s.msg_id} {s.side} {s.symbol}:")
+            lines += ["  " + x for x in self._cancel_pending(orders)]
+            lines += ["  " + self._do(f"layer #{p.ticket} closed ({p.profit:+.2f})", self.ex.close_position, p)
+                      for p in positions]
+        self._say(f"#{msg_id} close_all (no reply: every setup)\n" + ("\n".join(lines) or "nothing open"))
 
     def on_edit(self, chat_id: int, msg_id: int, text: str, posted_at: float) -> None:
         """The group edits its setups a minute later ("UPDATED"): follow the new zone and SL."""

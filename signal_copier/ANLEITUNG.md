@@ -111,7 +111,8 @@ Für Gruppen wie „VIP SIGNALS Inner Circle“: Signal mit Zone statt Preis
 | Setup nachträglich bearbeitet („UPDATED“) | SL und Limit-Orders auf die neuen Werte |
 | „TP1/TP2 HIT … closing 20% … BreakEven“ oder „shakey … closing 20%“ | den Layer mit dem meisten Gewinn schließen, SL der übrigen auf ihren Einstieg. Der letzte Layer bleibt immer (Runner). Wartende Limits bleiben – die Gruppe sagt nichts dazu. |
 | „TP3 HIT … trail your SL 100 pips“ | ab jetzt SL `trail_pips` hinter dem Preis nachziehen |
-| „Close all now“ / „CUT LOSS NOW“ | alles schließen |
+| „Close all now“ / „CUT LOSS NOW“ | als Antwort: nur dieses Setup schließen. Ohne Antwort: alle Setups der Gruppe. |
+| Leistungsberichte („London performance …“) | nichts – auch wenn darin „HIT SL“ oder „Cut Loss“ steht |
 | „HIT SL“ | übrige Limits löschen |
 
 Für so eine Gruppe meist: `"sizing": "fixed_lot"`, `"fixed_lot": 0.01`.

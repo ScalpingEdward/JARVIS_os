@@ -44,6 +44,8 @@ def make(price=4192.0, balance=1000.0):
     ("HIT SL", Event.SL_HIT),
     ("HTI SL", Event.SL_HIT),
     ("UPDATED", None),
+    ("London performance of our VIP Inner Circle Group\n\n1- GOLD BUY 60 PIPS ✅\n2- GOLD BUY HIT SL\n3- GOLD BUY Cut Loss", None),
+    ("London weekly performance of our VIP Inner Circle Group\n\nMonday\n1- GOLD SELL HIT SL\n16- GOLD BUY Cut Loss", None),
     ("Hello everyone! Sorry for being a bit late with announcing the Golden Trading Cup winners!", None),
 ])
 def test_replies_mean_what_the_group_means(text, event):
@@ -142,6 +144,25 @@ def test_close_all_and_hit_sl():
     c.on_message(CHAT, 200, None, SELL.replace("4192 - 4198", "4190 - 4196").replace("4203", "4201"))
     c.on_message(CHAT, 210, 200, "HIT SL")
     assert not t.orders
+
+
+def test_close_all_as_reply_closes_that_setup_only_without_reply_every_setup():
+    c, t, said, now = make()
+    c.on_message(CHAT, 100, None, SELL)
+    c.on_message(CHAT, 200, None, SELL.replace("1. GOLD", "2. GOLD").replace("4192 - 4198", "4190 - 4196").replace("4203", "4201"))
+    first = set(c.book.get(100).legs.values())
+    c.on_message(CHAT, 300, 100, "Close all now. If hold set BE.")
+    left = set(t.positions) | set(t.orders)
+    assert left and not (left & first)               # setup 2 untouched
+    c.on_message(CHAT, 301, None, "Close all now")
+    assert not t.positions and not t.orders and "every setup" in said[-1]
+
+
+def test_other_instructions_without_reply_are_not_guessed():
+    c, t, said, _ = make()
+    c.on_message(CHAT, 100, None, SELL)
+    c.on_message(CHAT, 110, None, "TP1 HIT ✅ Consider closing 20% of your Entry Layers + Move stop to BreakEven")
+    assert len(t.positions) == 1 and len(t.orders) == 4
 
 
 def test_edited_setup_moves_sl_and_limits():

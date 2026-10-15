@@ -43,6 +43,10 @@ class Event(StrEnum):
 def classify(text: str) -> Event | None:
     """A reply in a layering group -> what it asks for. None: commentary."""
     low = text.lower()
+    # Session recaps list past trades ("3- GOLD BUY Cut Loss", "HIT SL") -- read as an
+    # instruction, #57263 and #57357 would have closed every open setup.
+    if re.search(r"\bperformance\b|\breport\b|\bleaderboard\b|\branking\b", low):
+        return None
     if re.search(r"\bclose\s+all\b|\bcut\s+(the\s+)?loss", low):  # "CUT LOSS NOW" (#57244)
         return Event.CLOSE_ALL
     if re.search(r"\b(hit|hti)\s+sl\b|\bsl\s+hit\b|\bstopped\s+out\b", low):  # "HTI SL" (#57112)
