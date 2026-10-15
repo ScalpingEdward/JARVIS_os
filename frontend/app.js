@@ -6,6 +6,7 @@ const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '
 const fmt = (v, d = 2) => Number(v || 0).toLocaleString('de-DE', { minimumFractionDigits: d, maximumFractionDigits: d });
 const signed = (v, cur = '') => `<span class="${v > 0 ? 'up' : v < 0 ? 'down' : ''}">${v > 0 ? '+' : ''}${fmt(v)}${cur ? ' ' + esc(cur) : ''}</span>`;
 const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const nameOf = (a) => a.label || a.profile;  // what people call the account: its group's name
 
 async function get(path) {
   const r = await fetch(`${API}${path}`, { headers: { Accept: 'application/json' } });
@@ -125,7 +126,7 @@ function renderAccounts(o) {
     return `
     <article class="card account">
       <div class="head">
-        <div><div class="name">${esc(a.profile)}</div><div class="meta">${esc(a.account_login)} · ${esc(a.server)}</div></div>
+        <div><div class="name">${esc(nameOf(a))}</div><div class="meta">${esc(a.account_login)} · ${esc(a.server)}</div></div>
         <span class="state"><span class="dot ${st}"></span>${esc(a.state).toUpperCase()}</span>
       </div>
       <div class="eq"><span data-k="eq-${esc(a.profile)}" id="eq-${esc(a.profile)}"></span> <small class="muted">${esc(a.currency)}</small></div>
@@ -159,7 +160,7 @@ function renderGroups(o) {
 }
 
 function renderPositions(o) {
-  const rows = o.accounts.flatMap((a) => a.open_positions.map((p) => ({ ...p, profile: a.profile, currency: a.currency })));
+  const rows = o.accounts.flatMap((a) => a.open_positions.map((p) => ({ ...p, profile: nameOf(a), currency: a.currency })));
   $('#openCount').textContent = rows.length;
   $('#noPositions').style.display = rows.length ? 'none' : '';
   $('#positions').innerHTML = rows.length ? '<tr><th>ACCOUNT</th><th>SYMBOL</th><th></th><th>LOTS</th><th>ENTRY</th><th>SL</th><th>TP</th><th>PROFIT</th><th>GROUP</th></tr>' +
@@ -181,14 +182,36 @@ function renderTradingTile(o) {
   if (!t) return;
   tween($('#tTotal'), t.equity);
   $('#tCurrency').textContent = t.currency + (o.totals.length > 1 ? ` + ${o.totals.length - 1} more` : '');
-  $('#tToday').innerHTML = `today ${signed(t.pnl_today)} · open ${t.open_positions}`;
+  $('#tToday').innerHTML = `today ${signed(t.pnl_today, t.currency)}`;
+  const live = o.accounts.filter((a) => a.state === 'live').length;
+  $('#tLive').textContent = live === o.accounts.length ? 'live' : `${live}/${o.accounts.length} live`;
+  $('#tLive').classList.toggle('live', live === o.accounts.length);
   $('#tAccounts').innerHTML = '<div class="cap">Accounts</div>' + o.accounts.map((a) => {
     const st = a.state === 'live' ? 'ok' : a.state === 'stale' ? 'warn' : 'bad';
-    return `<div class="row"><span class="dot ${st}"></span><span>${esc(a.profile)}</span><span>${fmt(a.equity)} ${esc(a.currency)}</span></div>`;
+    return `<div class="row"><span class="dot ${st}"></span><span>${esc(nameOf(a))}</span><span>${fmt(a.equity)} ${esc(a.currency)}</span></div>`;
   }).join('');
   const groups = (o.groups || []).filter((g) => g.name !== '(not from a signal)');
-  $('#tGroups').innerHTML = groups.length ? '<div class="cap">Groups · total</div>' + groups.map((g) =>
-    `<div class="row"><span></span><span>${esc(g.name)}</span><span>${signed(g.pnl_total)}</span></div>`).join('') : '';
+  $('#tGroups').innerHTML = groups.length ? groups.map((g) =>
+    `<div class="row"><span></span><span>${esc(g.name)}</span><span>${signed(g.pnl_total)}</span></div>`).join('')
+    : '<div class="row"><span></span><span class="muted">No group has traded yet</span><span></span></div>';
+  $('#kToday').innerHTML = signed(t.pnl_today, t.currency);
+  $('#kWeek').innerHTML = signed(t.pnl_week, t.currency);
+  $('#kOpen').innerHTML = `${t.open_positions} <small class="muted">${signed(t.open_pnl)}</small>`;
+  $('#kTotal').innerHTML = signed(t.pnl_total, t.currency);
+  renderTileSpark(o, t.currency);
+}
+
+function renderTileSpark(o, currency) {
+  // The same 24 h equity line as the trading view, small and in the card.
+  const profiles = o.accounts.filter((a) => a.currency === currency).map((a) => a.profile);
+  const buckets = new Map();
+  profiles.forEach((p) => (history[p] || []).forEach((pt) => {
+    const k = Math.floor(Date.parse(pt.at) / 300000);
+    buckets.set(k, { ...(buckets.get(k) || {}), [p]: pt.equity });
+  }));
+  const last = {}, series = [...buckets.keys()].sort((a, b) => a - b).map((k) => (Object.assign(last, buckets.get(k)), { x: k, y: Object.values(last).reduce((s, v) => s + v, 0) }));
+  series.push({ x: Date.now() / 300000, y: o.accounts.filter((a) => a.currency === currency).reduce((s, a) => s + a.equity, 0) });
+  drawChart($('#tSpark'), series, series[series.length - 1].y >= series[0].y ? '#3ddc97' : '#f2647c', 60);
 }
 
 async function refreshTrading() {
@@ -235,6 +258,8 @@ async function refreshInstagram() {
     nextAt = n ? n.at : null;
     const label = n ? `next: ${n.kind || 'post'} at ${sched.next.split(' ')[0]}${sched.already_posted_today ? ' · posted today' : ''}` : (sched.next || 'nothing scheduled');
     $('#iNext').textContent = label;
+    $('#iBadge').textContent = dash.needs_your_review ? `${dash.needs_your_review} to review` : sched.running ? 'scheduled' : 'paused';
+    $('#iBadge').classList.toggle('live', !!sched.running);
     $('#nextKind').textContent = label;
     $('#iList').innerHTML = [['In pool', left], ['Drafts', dash.curated_drafts_pending], ['To review', dash.needs_your_review], ['Posted', dash.posted_total]]
       .map(([k, v]) => `<div class="row"><span></span><span>${k}</span><span>${esc(v)}</span></div>`).join('');
@@ -255,13 +280,15 @@ async function refreshHealth() {
   const svcs = [];
   try { const h = await get('/health'); svcs.push(['API', h.status === 'healthy' ? 'ok' : 'warn']); } catch { svcs.push(['API', 'bad']); }
   try { const t = await get('/v1/telegram-instagram/status'); svcs.push(['Telegram bot', t.bot_reachable ? 'ok' : 'bad']); } catch { svcs.push(['Telegram bot', 'bad']); }
-  (overview?.accounts || []).forEach((a) => svcs.push([`Copier ${a.profile}`, a.state === 'live' ? 'ok' : a.state === 'stale' ? 'warn' : 'bad']));
+  (overview?.accounts || []).forEach((a) => svcs.push([`Copier ${nameOf(a)}`, a.state === 'live' ? 'ok' : a.state === 'stale' ? 'warn' : 'bad']));
   $('#health').innerHTML = svcs.map(([n, c]) => `<span class="svc" title="${esc(n)}"><span class="dot ${c}"></span><span>${esc(n)}</span></span>`).join('');
   $('#sList').innerHTML = svcs.map(([n, c]) => `<div class="row"><span class="dot ${c}"></span><span>${esc(n)}</span><span>${c === 'ok' ? 'online' : c === 'warn' ? 'late' : 'offline'}</span></div>`).join('');
   const bad = svcs.filter(([, c]) => c !== 'ok').length;
   $('#core').classList.toggle('degraded', bad > 0);
+  $('#sBadge').textContent = bad ? `${bad} down` : 'all online';
+  $('#sBadge').classList.toggle('live', !bad);
   const copiers = (overview?.accounts || []).filter((a) => a.state === 'live').length;
-  $('#coreLine').textContent = bad ? `${bad} of ${svcs.length} systems need attention` : `all systems online · ${copiers} copier${copiers === 1 ? '' : 's'} live`;
+  $('#coreLine').textContent = bad ? `${bad} of ${svcs.length} systems need attention` : `online · ${copiers} copier${copiers === 1 ? '' : 's'} live`;
 }
 
 // --- 3D tiles: tilt toward the pointer ---------------------------------------------
@@ -291,6 +318,7 @@ function morph(panel, rect, reverse) {
 
 function open(view, fromTile, push = true) {
   openView = view; openedFrom = fromTile;
+  document.querySelectorAll('.side a').forEach((n) => n.classList.toggle('active', n.dataset.nav === view));
   $('#detailTitle').textContent = TITLES[view];
   document.querySelectorAll('.view').forEach((v) => v.classList.toggle('active', v.dataset.view === view));
   $('#detail').hidden = false;
@@ -306,6 +334,7 @@ async function close(push = true) {
   if (!openView) return;
   const tile = openedFrom;
   openView = null;
+  document.querySelectorAll('.side a').forEach((n) => n.classList.toggle('active', n.dataset.nav === 'hub'));
   if (tile && !reduced) await morph($('#detailPanel'), tile.getBoundingClientRect(), true).catch(() => {});
   $('#detail').hidden = true;
   document.body.classList.remove('locked');
@@ -324,7 +353,57 @@ addEventListener('popstate', () => {           // the phone's back button
 });
 
 // --- loops ---------------------------------------------------------------------
-setInterval(() => { $('#clock').textContent = new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }); tickCountdown(); }, 1000);
+setInterval(() => {
+  const now = new Date();
+  $('#clock').textContent = now.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+  $('#date').textContent = now.toLocaleDateString('de-DE');
+  tickCountdown();
+}, 1000);
+
+// --- the whole scene leans toward the pointer ----------------------------------------
+if (!reduced && matchMedia('(hover: hover)').matches) {
+  addEventListener('pointermove', (e) => {
+    const x = e.clientX / innerWidth - .5, y = e.clientY / innerHeight - .5;
+    $('#scene').style.setProperty('--sy', `${x * 6}deg`);
+    $('#scene').style.setProperty('--sx', `${-y * 4}deg`);
+  });
+}
+
+// --- a slow field of points behind everything, near ones linked by faint lines ------------
+(function field() {
+  const c = $('#field'), g = c.getContext('2d');
+  let w, h, pts;
+  const size = () => {
+    w = c.width = innerWidth * devicePixelRatio; h = c.height = innerHeight * devicePixelRatio;
+    pts = Array.from({ length: Math.round(innerWidth * innerHeight / 14000) }, () => ({
+      x: Math.random() * w, y: Math.random() * h, vx: (Math.random() - .5) * .15, vy: (Math.random() - .5) * .15, r: Math.random() * 1.4 + .3,
+    }));
+  };
+  size(); addEventListener('resize', size);
+  const link = 120 * devicePixelRatio;
+  const draw = () => {
+    g.clearRect(0, 0, w, h);
+    for (const p of pts) {
+      p.x = (p.x + p.vx + w) % w; p.y = (p.y + p.vy + h) % h;
+      g.fillStyle = 'rgba(120,210,255,.55)'; g.beginPath(); g.arc(p.x, p.y, p.r * devicePixelRatio, 0, 7); g.fill();
+    }
+    g.lineWidth = devicePixelRatio * .6;
+    for (let i = 0; i < pts.length; i++) for (let j = i + 1; j < pts.length; j++) {
+      const dx = pts[i].x - pts[j].x, dy = pts[i].y - pts[j].y, d = Math.hypot(dx, dy);
+      if (d < link) { g.strokeStyle = `rgba(79,216,255,${.12 * (1 - d / link)})`; g.beginPath(); g.moveTo(pts[i].x, pts[i].y); g.lineTo(pts[j].x, pts[j].y); g.stroke(); }
+    }
+    if (!reduced) requestAnimationFrame(draw);
+  };
+  draw();
+})();
+
+// --- side navigation: the same views the cards open -------------------------------------
+document.querySelectorAll('.side a').forEach((a) => a.addEventListener('click', (e) => {
+  e.preventDefault();
+  const v = a.dataset.nav;
+  if (v === 'hub') close(); else open(v, $(`.tile[data-view="${v}"]`));
+}));
+refreshHealth();  // at once: the bot check takes seconds and must not wait for the rest
 refreshHistory().then(refreshTrading).then(refreshHealth).then(() => {
   const v = location.hash.slice(1);
   if (TITLES[v]) open(v, null, false);

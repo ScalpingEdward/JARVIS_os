@@ -7,7 +7,7 @@
   --text: #e9edf5;
   --muted: #7b8496;
   --faint: #4b5262;
-  --accent: #8fb4ff;           /* the one colour AURON speaks in */
+  --accent: #4fd8ff;           /* the one colour AURON speaks in: hologram cyan */
   --up: #3ddc97;
   --down: #f2647c;
   --warn: #f2c14e;
@@ -36,7 +36,7 @@ button { font: inherit; color: inherit; }
 .backdrop {
   position: fixed; inset: 0; z-index: 0; pointer-events: none;
   background:
-    radial-gradient(60vmax 40vmax at 50% -10%, rgba(143, 180, 255, .10), transparent 70%),
+    radial-gradient(60vmax 40vmax at 50% 30%, rgba(79, 216, 255, .09), transparent 70%),
     linear-gradient(rgba(255,255,255,.025) 1px, transparent 1px) 0 0 / 64px 64px,
     linear-gradient(90deg, rgba(255,255,255,.025) 1px, transparent 1px) 0 0 / 64px 64px;
   mask-image: radial-gradient(ellipse at 50% 20%, #000 30%, transparent 75%);
@@ -49,7 +49,7 @@ button { font: inherit; color: inherit; }
   padding: 18px clamp(16px, 4vw, 48px);
 }
 .brand { display: flex; align-items: center; gap: 12px; font-weight: 600; letter-spacing: .42em; font-size: 13px; }
-.glyph { width: 14px; height: 14px; border: 1.5px solid var(--accent); border-radius: 50%; box-shadow: 0 0 12px rgba(143,180,255,.5), inset 0 0 6px rgba(143,180,255,.5); }
+.glyph { width: 14px; height: 14px; border: 1.5px solid var(--accent); border-radius: 50%; box-shadow: 0 0 12px rgba(79,216,255,.6), inset 0 0 6px rgba(79,216,255,.6); }
 .health { display: flex; gap: 14px; flex: 1; justify-content: center; flex-wrap: wrap; }
 .svc { display: inline-flex; align-items: center; gap: 7px; font-size: 12px; color: var(--muted); }
 .clock { font-family: var(--mono); color: var(--muted); font-size: 13px; }
@@ -61,83 +61,161 @@ button { font: inherit; color: inherit; }
 .dot.ok::after { content: ""; position: absolute; inset: 0; border-radius: 50%; background: var(--up); animation: ping 2.4s var(--ease) infinite; }
 @keyframes ping { from { transform: scale(1); opacity: .6; } to { transform: scale(3); opacity: 0; } }
 
-/* --- the hub ---------------------------------------------------------------------- */
-.hub { position: relative; z-index: 1; max-width: 1240px; margin: 0 auto; padding: 0 clamp(16px, 4vw, 48px) 64px; }
+/* --- header, side navigation ------------------------------------------------------- */
+.brand { gap: 12px; letter-spacing: .32em; }
+.brand div { display: grid; line-height: 1.2; }
+.brand b { font-size: 16px; font-weight: 600; }
+.brand small { font-size: 9.5px; letter-spacing: .18em; color: var(--muted); text-transform: uppercase; font-weight: 400; }
+.glyph { width: 30px; height: 30px; border-width: 2px; }
+.motto { flex: 1; text-align: center; font-size: 11px; letter-spacing: .5em; color: var(--muted); }
+.motto i { font-style: normal; color: var(--accent); margin: 0 .4em; }
+.top-right { display: flex; align-items: center; gap: 22px; }
+.top-right .health { flex: none; gap: 10px; }
+.when { display: grid; text-align: right; line-height: 1.2; }
+.when small { font-size: 11px; color: var(--faint); }
+.svc span:last-child { display: none; }  /* the dots up here; names are in the System card */
 
-/* AURON: a glass core inside three slow orbits -- depth from perspective, not from colour */
-.core-wrap { display: flex; flex-direction: column; align-items: center; padding: clamp(8px, 3vh, 36px) 0 clamp(24px, 5vh, 56px); }
-.core { --s: clamp(150px, 24vw, 230px); width: var(--s); height: var(--s); position: relative; perspective: 900px; transform-style: preserve-3d; }
-.ring {
-  position: absolute; inset: 0; border-radius: 50%;
-  border: 1px solid rgba(143,180,255,.28);
+.side { position: fixed; left: 0; top: 84px; z-index: 3; display: grid; gap: 4px; padding: 10px; width: 176px; }
+.side a { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-radius: 12px; color: var(--muted); text-decoration: none; font-size: 13.5px; transition: background .2s, color .2s; }
+.side a:hover { color: var(--text); background: rgba(255,255,255,.04); }
+.side a.active { color: var(--text); background: linear-gradient(90deg, rgba(79,216,255,.16), rgba(79,216,255,.02)); box-shadow: inset 2px 0 0 var(--accent); }
+.ic { width: 16px; height: 16px; border: 1.5px solid currentColor; border-radius: 4px; opacity: .8; position: relative; }
+.ic-grid { background: linear-gradient(currentColor, currentColor) 50% 0 / 1.5px 100% no-repeat, linear-gradient(currentColor, currentColor) 0 50% / 100% 1.5px no-repeat; }
+.ic-chart { border-width: 0 0 1.5px 1.5px; border-radius: 0; background: linear-gradient(135deg, transparent 45%, currentColor 46%, currentColor 54%, transparent 55%); }
+.ic-cam { border-radius: 5px; background: radial-gradient(circle, transparent 3px, currentColor 3.5px, currentColor 4.5px, transparent 5px); }
+@media (max-width: 1250px) { .side { display: none; } }
+
+/* --- the 3D stage ------------------------------------------------------------------ */
+.field { position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: .6; }
+.stage {
+  position: relative; z-index: 1; min-height: calc(100vh - 84px);
+  display: grid; place-items: center;
+  padding: 0 clamp(16px, 3vw, 40px) 36px clamp(16px, 3vw, 200px);
+  perspective: 1700px; perspective-origin: 50% 35%;
+}
+.scene {
+  position: relative; width: min(1300px, 100%);
+  display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr) minmax(0, 1fr);
+  grid-template-areas: "trading holo system" "insta holo groups" "strip strip strip";
+  gap: 22px 30px; align-items: center;
   transform-style: preserve-3d;
+  transform: rotateX(var(--sx, 0deg)) rotateY(var(--sy, 0deg));
+  transition: transform 1.2s var(--ease);
 }
-.ring::after { /* a single bright point travelling on each orbit */
-  content: ""; position: absolute; top: -3px; left: 50%; width: 5px; height: 5px; margin-left: -2.5px;
-  border-radius: 50%; background: var(--accent); box-shadow: 0 0 12px var(--accent);
+.holo { grid-area: holo; transform: translateZ(30px); transform-style: preserve-3d; }
+.a-trading { grid-area: trading; --base-ry: 18deg; }
+.a-insta { grid-area: insta; --base-ry: 18deg; }
+.a-system { grid-area: system; --base-ry: -18deg; }
+.a-groups { grid-area: groups; --base-ry: -18deg; }
+.strip { grid-area: strip; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 18px; transform: rotateX(16deg) translateZ(10px); transform-style: preserve-3d; margin-top: 6px; }
+
+/* AURON's core: a glass sphere with a hologram inside, three electrons on their orbits,
+   standing on a light pedestal */
+.core { --s: clamp(260px, 30vw, 440px); position: relative; width: var(--s); height: calc(var(--s) * 1.18); margin: 0 auto; transform-style: preserve-3d; }
+.sphere {
+  position: absolute; left: 21%; right: 21%; top: 10%; aspect-ratio: 1; border-radius: 50%; overflow: hidden;
+  background: radial-gradient(circle at 35% 30%, rgba(255,255,255,.35), rgba(255,255,255,0) 22%),
+              radial-gradient(circle at 50% 50%, rgba(46,120,255,.35), rgba(10,30,70,.55) 60%, rgba(4,10,24,.9) 74%);
+  box-shadow: 0 0 80px rgba(79,170,255,.45), 0 0 160px rgba(79,170,255,.18), inset 0 0 60px rgba(79,216,255,.35), inset 0 -20px 40px rgba(0,0,0,.6);
+  border: 1px solid rgba(160,220,255,.35);
+  animation: float 7s ease-in-out infinite;
 }
-.r1 { animation: orbit1 18s linear infinite; }
-.r2 { inset: 9%; border-color: rgba(143,180,255,.18); animation: orbit2 26s linear infinite; }
-.r3 { inset: -9%; border-color: rgba(143,180,255,.10); animation: orbit3 40s linear infinite; }
-.r3::after { opacity: .6; }
-@keyframes orbit1 { from { transform: rotateX(72deg) rotateZ(0); } to { transform: rotateX(72deg) rotateZ(360deg); } }
-@keyframes orbit2 { from { transform: rotateY(68deg) rotateZ(0); } to { transform: rotateY(68deg) rotateZ(-360deg); } }
-@keyframes orbit3 { from { transform: rotateX(60deg) rotateY(-30deg) rotateZ(0); } to { transform: rotateX(60deg) rotateY(-30deg) rotateZ(360deg); } }
-.orb {
-  position: absolute; inset: 31%; border-radius: 50%;
+.sphere img { position: absolute; inset: 6% 10% 0; width: 80%; opacity: .55; mix-blend-mode: screen; user-select: none;
+  -webkit-mask-image: radial-gradient(circle at 50% 42%, #000 40%, transparent 70%); mask-image: radial-gradient(circle at 50% 42%, #000 40%, transparent 70%); }
+.sphere .scan { position: absolute; inset: 0; mix-blend-mode: screen; opacity: .3;
+  background: repeating-linear-gradient(180deg, rgba(79,216,255,.25) 0 1px, transparent 1px 4px); animation: scan 6s linear infinite; }
+@keyframes float { 50% { transform: translateY(-12px); } }
+@keyframes scan { to { background-position: 0 120px; } }
+
+.orbit { position: absolute; left: 50%; top: 39%; width: 100%; aspect-ratio: 1; translate: -50% -50%;
+  border-radius: 50%; border: 1.5px solid rgba(79,216,255,.4); transform-style: preserve-3d; pointer-events: none;
+  box-shadow: 0 0 14px rgba(79,216,255,.25), inset 0 0 14px rgba(79,216,255,.15); }
+.orbit i { position: absolute; top: -6px; left: 50%; width: 12px; height: 12px; margin-left: -6px; border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #fff, #bfe9ff 40%, #4fa8ff 75%); box-shadow: 0 0 16px #8fd8ff, 0 0 32px rgba(79,216,255,.7); }
+.orbit.warm { border-color: rgba(255,170,70,.55); box-shadow: 0 0 18px rgba(255,150,40,.35), inset 0 0 14px rgba(255,150,40,.2); }
+.orbit.warm i { background: radial-gradient(circle at 35% 35%, #fff, #ffd9a0 40%, #ff9a2e 75%); box-shadow: 0 0 16px #ffb056, 0 0 32px rgba(255,150,40,.7); }
+.o1 { animation: orbit1 11s linear infinite; }
+.o2 { width: 88%; animation: orbit2 15s linear infinite; }
+.o3 { width: 112%; animation: orbit3 21s linear infinite; }
+@keyframes orbit1 { from { transform: rotateX(74deg) rotateY(-14deg) rotateZ(0); } to { transform: rotateX(74deg) rotateY(-14deg) rotateZ(360deg); } }
+@keyframes orbit2 { from { transform: rotateX(62deg) rotateY(48deg) rotateZ(0); } to { transform: rotateX(62deg) rotateY(48deg) rotateZ(-360deg); } }
+@keyframes orbit3 { from { transform: rotateX(80deg) rotateY(-42deg) rotateZ(0); } to { transform: rotateX(80deg) rotateY(-42deg) rotateZ(360deg); } }
+.beam { position: absolute; left: 30%; right: 30%; top: 58%; height: 26%;
+  background: linear-gradient(180deg, rgba(79,216,255,0), rgba(79,216,255,.35) 70%, rgba(150,230,255,.7));
+  clip-path: polygon(30% 0, 70% 0, 100% 100%, 0 100%); filter: blur(5px); animation: beam 3.6s ease-in-out infinite; }
+@keyframes beam { 50% { opacity: .55; } }
+.pedestal { position: absolute; left: 12%; right: 12%; bottom: 0; height: 22%; transform: rotateX(72deg); transform-style: preserve-3d; }
+.pedestal i { position: absolute; inset: 0; border-radius: 50%; border: 2px solid rgba(79,216,255,.55); box-shadow: 0 0 24px rgba(79,216,255,.45), inset 0 0 24px rgba(79,216,255,.3); }
+.pedestal i:nth-child(2) { inset: 16%; border-color: rgba(79,216,255,.8); background: radial-gradient(circle, rgba(150,230,255,.55), rgba(79,216,255,.12) 60%, transparent 72%); animation: pulse-ring 3s ease-in-out infinite; }
+.pedestal i:nth-child(3) { inset: -14%; border: 1px dashed rgba(79,216,255,.3); animation: spin 40s linear infinite; }
+@keyframes pulse-ring { 50% { box-shadow: 0 0 40px rgba(79,216,255,.8), inset 0 0 40px rgba(79,216,255,.5); } }
+@keyframes spin { to { transform: rotate(360deg); } }
+.core.degraded { --accent: #f2c14e; }
+.core.degraded .sphere { box-shadow: 0 0 80px rgba(242,193,78,.45), inset 0 0 60px rgba(242,193,78,.35); }
+.core-text { text-align: center; margin-top: 10px; transform: translateZ(30px); }
+.core-text p { margin: 0; color: var(--muted); font-size: 12px; letter-spacing: .18em; text-transform: uppercase; }
+
+/* --- floating glass cards ---------------------------------------------------------- */
+.tile, .mini-tile {
+  position: relative; text-align: left; min-width: 0;
+  background: linear-gradient(160deg, rgba(22,36,58,.74), rgba(8,14,26,.74));
+  border: 1px solid rgba(79,216,255,.18); border-radius: 16px;
+  backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+  box-shadow: 0 0 0 1px rgba(255,255,255,.025) inset, 0 50px 90px -40px rgba(0,0,0,.95), 0 0 46px -20px rgba(79,216,255,.45);
+  transform-style: preserve-3d;
+  animation: hover-float 8s ease-in-out infinite; animation-delay: var(--d, 0s);
+}
+.tile { cursor: pointer; padding: 20px 20px 16px;
+  transform: translateZ(var(--z, 0px)) rotateY(calc(var(--base-ry, 0deg) + var(--ry, 0deg))) rotateX(var(--rx, 0deg));
+  transition: transform .6s var(--ease), border-color .3s, box-shadow .3s; }
+.a-insta { border-color: rgba(190,110,255,.28); box-shadow: 0 0 0 1px rgba(255,255,255,.025) inset, 0 50px 90px -40px rgba(0,0,0,.95), 0 0 46px -20px rgba(190,110,255,.5); }
+.a-trading { border-color: rgba(255,170,70,.25); box-shadow: 0 0 0 1px rgba(255,255,255,.025) inset, 0 50px 90px -40px rgba(0,0,0,.95), 0 0 46px -20px rgba(255,160,60,.45); }
+@keyframes hover-float { 0%, 100% { translate: 0 0; } 50% { translate: 0 -9px; } }
+.tile .corner { position: absolute; inset: -1px; border-radius: inherit; pointer-events: none;
   background:
-    radial-gradient(circle at 34% 28%, rgba(255,255,255,.85), rgba(255,255,255,0) 22%),
-    radial-gradient(circle at 50% 55%, rgba(143,180,255,.55), rgba(40,60,110,.35) 55%, rgba(10,14,24,.9) 72%);
-  box-shadow: 0 0 60px rgba(143,180,255,.35), inset 0 -10px 30px rgba(0,0,0,.6), inset 0 0 0 1px rgba(255,255,255,.08);
-  animation: breathe 6s ease-in-out infinite;
-}
-.orb span { position: absolute; inset: -40%; border-radius: 50%; background: radial-gradient(circle, rgba(143,180,255,.16), transparent 62%); }
-@keyframes breathe { 50% { transform: scale(1.04); box-shadow: 0 0 90px rgba(143,180,255,.5), inset 0 -10px 30px rgba(0,0,0,.6), inset 0 0 0 1px rgba(255,255,255,.1); } }
-.core.degraded .orb { background:
-    radial-gradient(circle at 34% 28%, rgba(255,255,255,.8), rgba(255,255,255,0) 22%),
-    radial-gradient(circle at 50% 55%, rgba(242,193,78,.55), rgba(110,80,20,.35) 55%, rgba(10,14,24,.9) 72%); }
-.core-text { text-align: center; margin-top: 26px; }
-.core-text h1 { margin: 0; font-size: 13px; font-weight: 600; letter-spacing: .6em; color: var(--text); padding-left: .6em; }
-.core-text p { margin: 8px 0 0; color: var(--muted); font-size: 13px; }
-
-/* --- tiles: glass with depth that follows the pointer ------------------------------ */
-.tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; perspective: 1400px; }
-@media (max-width: 960px) { .tiles { grid-template-columns: minmax(0, 1fr); } }
-.tile {
-  position: relative; text-align: left; cursor: pointer;
-  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
-  padding: 22px 22px 18px; backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
-  box-shadow: 0 1px 0 rgba(255,255,255,.04) inset, 0 40px 80px -50px rgba(0,0,0,.9);
-  transform: rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg)) translateZ(0);
-  transform-style: preserve-3d;
-  transition: transform .5s var(--ease), border-color .3s, box-shadow .3s;
-  animation: enter .8s var(--ease) both;
-  min-width: 0;
-}
-.tile:nth-child(2) { animation-delay: .06s; } .tile:nth-child(3) { animation-delay: .12s; }
-@keyframes enter { from { opacity: 0; transform: translateY(18px) rotateX(8deg); } }
-.tile::before { /* light that follows the pointer */
-  content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; opacity: 0; transition: opacity .3s;
-  background: radial-gradient(420px circle at var(--mx, 50%) var(--my, 0%), rgba(143,180,255,.10), transparent 45%);
-}
-.tile:hover { border-color: var(--line-2); box-shadow: 0 1px 0 rgba(255,255,255,.06) inset, 0 50px 90px -40px rgba(0,0,0,.95); }
+    linear-gradient(var(--accent), var(--accent)) top left / 20px 1.5px no-repeat,
+    linear-gradient(var(--accent), var(--accent)) top left / 1.5px 20px no-repeat,
+    linear-gradient(var(--accent), var(--accent)) bottom right / 20px 1.5px no-repeat,
+    linear-gradient(var(--accent), var(--accent)) bottom right / 1.5px 20px no-repeat;
+  opacity: .65; filter: drop-shadow(0 0 4px var(--accent)); }
+.tile::before { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; opacity: 0; transition: opacity .3s;
+  background: radial-gradient(360px circle at var(--mx, 50%) var(--my, 0%), rgba(79,216,255,.14), transparent 45%); }
+.tile:hover { --z: 46px; border-color: rgba(79,216,255,.42); }
 .tile:hover::before { opacity: 1; }
 .tile:focus-visible { outline: 1px solid var(--accent); outline-offset: 3px; }
 .tile.static { cursor: default; }
-.tile-head { display: flex; justify-content: space-between; align-items: center; font-size: 12px; letter-spacing: .18em; text-transform: uppercase; color: var(--muted); }
-.tile .open { font-size: 11px; letter-spacing: .12em; color: var(--faint); transition: color .3s, transform .3s var(--ease); }
+.tile-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; font-size: 11.5px; letter-spacing: .22em; text-transform: uppercase; color: var(--text); }
+.badge { font-size: 10px; letter-spacing: .14em; padding: 3px 9px; border-radius: 999px; color: var(--muted); background: rgba(255,255,255,.05); border: 1px solid var(--line); }
+.badge.live { color: var(--up); border-color: rgba(61,220,151,.35); background: rgba(61,220,151,.1); }
+.tile .open { font-size: 10.5px; letter-spacing: .14em; color: var(--faint); transition: color .3s, transform .3s var(--ease); }
 .tile:hover .open { color: var(--accent); transform: translateX(3px); }
 .tile .open::after { content: " →"; }
-.tile-figure { margin-top: 16px; display: flex; align-items: baseline; gap: 8px; transform: translateZ(30px); }
+.tile-figure { margin-top: 12px; display: flex; align-items: baseline; gap: 8px; transform: translateZ(34px); }
 .tile-figure b { font-size: 30px; font-weight: 600; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
 .tile-figure small { color: var(--muted); }
-.tile-sub { color: var(--muted); font-size: 13px; min-height: 20px; transform: translateZ(20px); }
-.tile-list { margin-top: 14px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 2px; transform: translateZ(14px); }
+.tile-sub { color: var(--muted); font-size: 13px; min-height: 20px; transform: translateZ(22px); }
+.tile-spark { width: 100%; height: 46px; display: block; margin: 8px 0 2px; transform: translateZ(18px); }
+.tile-spark .line { fill: none; stroke-width: 2.4; }
+.tile-list { margin-top: 10px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 2px; transform: translateZ(14px); }
 .tile-list:empty { display: none; }
-.tile-list .row { min-width: 0; display: flex; align-items: center; gap: 10px; font-size: 13px; padding: 7px 0; border-top: 1px solid var(--line); }
+.tile-list .row { min-width: 0; display: flex; align-items: center; gap: 10px; font-size: 13px; padding: 7px 0; border-top: 1px solid rgba(79,216,255,.09); }
 .tile-list .row span:nth-child(2) { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tile-list .row span:last-child { font-family: var(--mono); font-size: 12.5px; }
-.tile-list .cap { font-size: 10.5px; letter-spacing: .16em; text-transform: uppercase; color: var(--faint); padding: 10px 0 4px; }
+.tile-list .cap { font-size: 10.5px; letter-spacing: .16em; text-transform: uppercase; color: var(--faint); padding: 8px 0 4px; }
+.mini-tile { padding: 14px 18px; display: grid; gap: 4px; }
+.mini-tile small { font-size: 10.5px; letter-spacing: .18em; text-transform: uppercase; color: var(--muted); }
+.mini-tile b { font-size: 22px; font-weight: 600; font-variant-numeric: tabular-nums; }
+
+/* narrow screens: one column, AURON on top, no tilting space */
+@media (max-width: 1000px) {
+  .motto { display: none; }
+  .stage { perspective: none; padding-left: clamp(16px, 3vw, 40px); }
+  .scene { grid-template-columns: minmax(0, 1fr); grid-template-areas: "holo" "trading" "insta" "groups" "system" "strip"; transform: none !important; gap: 16px; }
+  .tile { --base-ry: 0deg !important; }
+  .strip { transform: none; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .core { --s: min(78vw, 320px); }
+}
+
 
 /* --- the full view that opens out of a tile ---------------------------------------- */
 .detail { position: fixed; inset: 0; z-index: 10; background: rgba(4,6,10,.55); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
