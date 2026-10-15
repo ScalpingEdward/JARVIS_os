@@ -301,7 +301,7 @@ def test_a_missed_signal_is_not_opened_late():
     c, t, said, now = make()
     c.on_message(CHAT, 10, None, SIGNAL, posted_at=now[0] - 15 * 60)  # handed over on reconnect
     assert not t.positions and "missed" in said[-1]
-    c.on_message(CHAT, 11, None, SIGNAL.replace("4141", "4140"), posted_at=now[0] - 20)  # fresh
+    c.on_message(CHAT, 11, None, SIGNAL.replace("4141", "4140"), posted_at=now[0] - 20)  # fresh: within a minute
     assert len(t.positions) == 2
 
 

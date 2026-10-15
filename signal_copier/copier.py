@@ -41,7 +41,7 @@ WATCH_EVERY_S = 5
 # asleep) and Telegram hands it over on reconnect. Price has moved on since --
 # taking it late is how a missed winner becomes a loser. Replies to trades
 # already open are still followed: they close or protect, they open nothing.
-MAX_SIGNAL_AGE_S = 120
+MAX_SIGNAL_AGE_S = 60
 REPORT_EVERY_S = 15  # the dashboard polls every 5 s; AURON keeps a curve point every 5 min
 
 log = logging.getLogger("copier")
