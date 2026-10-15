@@ -177,6 +177,9 @@ Ziel der Instagram-Seite: Reichweite aufbauen fuer den Weg zum hauptberuflichen 
   Darstellung nie, nur die Zahlen darunter.
 
 ## Signal-Kopierer (signal_copier/)
+- Mögliches Geschäft daraus (Abo, Partnerschaft mit Gruppen, offene Fragen
+  an Steuerberater/Anwalt): `docs/signal-copier-business.md`. Nichts
+  entschieden; erst 2–4 Wochen Demo.
 - Telegram-Gruppe -> MT5, nur Brano's eigenes Konto (PU Prime Demo, spaeter
   RoboForex Cent). Ein Python-Prozess (`python -m signal_copier.copier`),
   kein EA: er spricht ueber das Paket MetaTrader5 mit dem laufenden Terminal.
