@@ -7,7 +7,7 @@
     "daily_loss_stop_pct": 4.0,
     "overall_loss_stop_pct": 8.0,
     "default_entry_deviation_pips": 5,
-    "max_entry_deviation_pips": {"XAUUSD": 30, "NAS100": 20, "US30": 20, "GER40": 20}
+    "max_entry_deviation_pips": {"XAUUSD": 60, "NAS100": 20, "US30": 20, "GER40": 20}
   },
   "legs_without_tp": 2,
   "symbol_overrides": {}
