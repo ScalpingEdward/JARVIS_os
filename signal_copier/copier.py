@@ -47,7 +47,7 @@ def state_path(folder: Path, account: str) -> Path:
 
 def profile_from(config: dict) -> RiskProfile:
     r = config["risk"]
-    return RiskProfile(r["risk_per_position_pct"], r["daily_loss_stop_pct"], r["overall_loss_stop_pct"],
+    return RiskProfile(r.get("risk_per_position_pct", 0.5), r.get("daily_loss_stop_pct"), r.get("overall_loss_stop_pct"),
                        r.get("max_entry_deviation_pips", {}), r.get("default_entry_deviation_pips", 3.0))
 
 

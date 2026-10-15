@@ -2,7 +2,8 @@
 
 FTMO-style: the daily floor is the balance at midnight Prague time minus a
 share of the INITIAL balance; the overall floor is the initial balance minus
-a share of it. Our stops sit below the firm's (4 / 8 instead of 5 / 10).
+a share of it. Both are set per profile, and either can be switched off
+(None or 0): a prop firm needs them, an own live account may not.
 
 The pre-trade check is worst case: every open position and the new one hit
 their stop loss. Equity is not used for that -- a winner running now can
@@ -42,8 +43,12 @@ def day_start(now: datetime) -> datetime:
 
 
 def floors(state: AccountState, profile: RiskProfile) -> tuple[float, float]:
-    daily = state.day_start_balance - state.initial_balance * profile.daily_loss_stop_pct / 100
-    overall = state.initial_balance * (1 - profile.overall_loss_stop_pct / 100)
+    """Equity floors; a stop that is switched off (None or 0) is -inf, never reached."""
+    off = float("-inf")
+    daily = (state.day_start_balance - state.initial_balance * profile.daily_loss_stop_pct / 100
+             if profile.daily_loss_stop_pct else off)
+    overall = (state.initial_balance * (1 - profile.overall_loss_stop_pct / 100)
+               if profile.overall_loss_stop_pct else off)
     return daily, overall
 
 

@@ -8,8 +8,8 @@
   "fixed_lot": 0.01,
   "risk": {
     "risk_per_position_pct": 0.5,
-    "daily_loss_stop_pct": 4.0,
-    "overall_loss_stop_pct": 8.0,
+    "daily_loss_stop_pct": 30,
+    "overall_loss_stop_pct": 50,
     "default_entry_deviation_pips": 5,
     "max_entry_deviation_pips": {"XAUUSD": 60, "NAS100": 20, "US30": 20, "GER40": 20}
   },

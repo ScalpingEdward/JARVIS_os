@@ -60,3 +60,16 @@ def test_day_starts_at_prague_midnight_summer_and_winter():
     assert day_start(summer).isoformat() == "2026-07-02T00:00:00+02:00"
     winter = datetime(2026, 1, 15, 22, 30, tzinfo=timezone.utc)  # 23:30 in Prague, same day
     assert day_start(winter).isoformat() == "2026-01-15T00:00:00+01:00"
+
+
+def test_switched_off_stops_never_block_and_never_breach():
+    off = RiskProfile(daily_loss_stop_pct=None, overall_loss_stop_pct=0)
+    assert may_open(state(balance=100, day_start_balance=10_000), off, -5_000).ok
+    assert not breached(state(equity=1), off).ok
+
+
+def test_only_the_daily_stop_switched_off_keeps_the_overall_one():
+    p = RiskProfile(daily_loss_stop_pct=None, overall_loss_stop_pct=50)
+    assert may_open(state(balance=6_000), p, -500).ok
+    assert not may_open(state(balance=5_400), p, -500).ok
+    assert breached(state(equity=4_999), p).ok

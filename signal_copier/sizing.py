@@ -13,9 +13,10 @@ from dataclasses import dataclass, field
 class RiskProfile:
     """One per account -- a challenge and a live account want different numbers."""
     risk_per_position_pct: float = 0.5
-    # Stops trading before the prop firm's limit is touched, not at it.
-    daily_loss_stop_pct: float = 4.0
-    overall_loss_stop_pct: float = 8.0
+    # Loss stops in % of the initial balance. None (or 0) switches one off --
+    # a prop firm needs both, an own live account may want neither.
+    daily_loss_stop_pct: float | None = 4.0
+    overall_loss_stop_pct: float | None = 8.0
     # How far price may be from the signal's entry, in pips per symbol.
     max_entry_deviation_pips: dict[str, float] = field(default_factory=dict)
     default_entry_deviation_pips: float = 3.0
