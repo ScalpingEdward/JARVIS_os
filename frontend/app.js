@@ -62,13 +62,13 @@ function drawChart(svg, series, color, h) {
     <path class="area" d="${d} L${w},${h} L0,${h} Z" fill="url(#${id}-fill)"/>
     <path class="line" d="${d}" stroke="${color}"/>
     <circle class="head" cx="${last[0]}" cy="${last[1]}" r="4" fill="${color}"/>
-    ${h > 100 ? `<text x="4" y="14">${fmt(hi)}</text><text x="4" y="${h - 4}">${fmt(lo)}</text>` : ''}`;
+`;
   const line = svg.querySelector('.line');
   line.style.setProperty('--len', Math.ceil(line.getTotalLength()));
 }
 
 // --- trading -----------------------------------------------------------------
-let overview = null, history = {};
+let overview = null, history = {};  // history: equity points per profile (not window.history)
 
 function renderTotals(o) {
   const totals = o.totals || [];
@@ -108,7 +108,10 @@ function renderTotalChart() {
   // the live value as the newest point
   const live = overview.accounts.filter((a) => a.currency === main).reduce((s, a) => s + a.equity, 0);
   if (live) series.push({ x: (Date.now() / 300000), y: live });
-  drawChart($('#totalChart'), series, '#7c9cff', 180);
+  drawChart($('#totalChart'), series, '#8fb4ff', 160);
+  // Range as text below the curve: SVG text in a stretched viewBox would be distorted.
+  const ys = series.map((p) => p.y);
+  $('#chartRange').textContent = ys.length ? `24 h · low ${fmt(Math.min(...ys))} · high ${fmt(Math.max(...ys))}` : 'last 24 h';
   $('#chartUpdated').textContent = `updated ${new Date().toLocaleTimeString('de-DE')}`;
 }
 
@@ -127,7 +130,7 @@ function renderAccounts(o) {
       </div>
       <div class="eq"><span data-k="eq-${esc(a.profile)}" id="eq-${esc(a.profile)}"></span> <small class="muted">${esc(a.currency)}</small></div>
       <div class="chips"><span class="chip">today<b>${signed(today)}</b></span><span class="chip">total<b>${signed(total)}</b></span><span class="chip">open<b>${open}</b></span></div>
-      <svg class="spark" id="sp-${esc(a.profile)}" viewBox="0 0 800 54" preserveAspectRatio="none"></svg>
+      <svg class="spark" id="sp-${esc(a.profile)}" viewBox="0 0 800 48" preserveAspectRatio="none"></svg>
       <div class="mini">${a.groups.map((g) => `<div><span>${esc(g.name)}</span><span>${signed(g.pnl_total)}</span></div>`).join('')}</div>
     </article>`;
   }).join('');
@@ -136,7 +139,7 @@ function renderAccounts(o) {
     const pts = (history[a.profile] || []).map((p) => ({ x: Date.parse(p.at), y: p.equity }));
     pts.push({ x: Date.now(), y: a.equity });
     const rising = pts.length < 2 || pts[pts.length - 1].y >= pts[0].y;
-    drawChart($(`#sp-${CSS.escape(a.profile)}`), pts, rising ? '#2ee59d' : '#ff5d7a', 54);
+    drawChart($(`#sp-${CSS.escape(a.profile)}`), pts, rising ? '#3ddc97' : '#f2647c', 48);
   });
 }
 
@@ -172,19 +175,36 @@ function renderPositions(o) {
   });
 }
 
+// --- the trading tile: the short list -------------------------------------------
+function renderTradingTile(o) {
+  const t = (o.totals || [])[0];
+  if (!t) return;
+  tween($('#tTotal'), t.equity);
+  $('#tCurrency').textContent = t.currency + (o.totals.length > 1 ? ` + ${o.totals.length - 1} more` : '');
+  $('#tToday').innerHTML = `today ${signed(t.pnl_today)} · open ${t.open_positions}`;
+  $('#tAccounts').innerHTML = '<div class="cap">Accounts</div>' + o.accounts.map((a) => {
+    const st = a.state === 'live' ? 'ok' : a.state === 'stale' ? 'warn' : 'bad';
+    return `<div class="row"><span class="dot ${st}"></span><span>${esc(a.profile)}</span><span>${fmt(a.equity)} ${esc(a.currency)}</span></div>`;
+  }).join('');
+  const groups = (o.groups || []).filter((g) => g.name !== '(not from a signal)');
+  $('#tGroups').innerHTML = groups.length ? '<div class="cap">Groups · total</div>' + groups.map((g) =>
+    `<div class="row"><span></span><span>${esc(g.name)}</span><span>${signed(g.pnl_total)}</span></div>`).join('') : '';
+}
+
 async function refreshTrading() {
   try {
     overview = await get('/v1/copier/overview');
-    renderTotals(overview); renderAccounts(overview); renderGroups(overview); renderPositions(overview); renderTotalChart();
+    renderTradingTile(overview);
+    if (openView === 'trading') { renderTotals(overview); renderAccounts(overview); renderGroups(overview); renderPositions(overview); renderTotalChart(); }
   } catch (e) { console.warn(e); }
 }
 
 async function refreshHistory() {
-  try { history = await get('/v1/copier/history?hours=24'); renderTotalChart(); if (overview) renderAccounts(overview); } catch (e) { console.warn(e); }
+  try { history = await get('/v1/copier/history?hours=24'); if (openView === 'trading') { renderTotalChart(); renderAccounts(overview); } } catch (e) { console.warn(e); }
 }
 
 // --- instagram ---------------------------------------------------------------
-let nextAt = null, nextLabel = '–';
+let nextAt = null;
 
 function parseNext(s) {
   // "19:00 reel" -> today (or tomorrow) at 19:00
@@ -196,46 +216,119 @@ function parseNext(s) {
 }
 
 function tickCountdown() {
-  if (!nextAt) { $('#countdown').textContent = '–'; return; }
-  let s = Math.max(0, Math.round((nextAt - new Date()) / 1000));
-  const h = Math.floor(s / 3600); s %= 3600;
-  const m = Math.floor(s / 60); s %= 60;
-  $('#countdown').textContent = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  let text = '–';
+  if (nextAt) {
+    let s = Math.max(0, Math.round((nextAt - new Date()) / 1000));
+    const h = Math.floor(s / 3600); s %= 3600;
+    const m = Math.floor(s / 60); s %= 60;
+    text = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  }
+  $('#countdown').textContent = text;
+  $('#iCountdown').textContent = text;
 }
 
 async function refreshInstagram() {
   try {
     const [dash, sched] = await Promise.all([get('/v1/instagram/dashboard'), get('/v1/telegram-instagram/schedule')]);
     const left = dash.media_pool_available, used = dash.media_pool_used, all = left + used || 1;
-    tween($('#poolLeft'), left, 0);
-    $('#poolArc').style.strokeDashoffset = 327 * (1 - left / all);
     const n = parseNext(sched.next);
     nextAt = n ? n.at : null;
-    nextLabel = n ? `${n.kind || 'post'} at ${sched.next.split(' ')[0]}${sched.already_posted_today ? ' · posted today' : ''}` : (sched.next || 'nothing scheduled');
-    $('#nextKind').textContent = nextLabel;
+    const label = n ? `next: ${n.kind || 'post'} at ${sched.next.split(' ')[0]}${sched.already_posted_today ? ' · posted today' : ''}` : (sched.next || 'nothing scheduled');
+    $('#iNext').textContent = label;
+    $('#nextKind').textContent = label;
+    $('#iList').innerHTML = [['In pool', left], ['Drafts', dash.curated_drafts_pending], ['To review', dash.needs_your_review], ['Posted', dash.posted_total]]
+      .map(([k, v]) => `<div class="row"><span></span><span>${k}</span><span>${esc(v)}</span></div>`).join('');
+    tween($('#poolLeft'), left, 0);
+    $('#poolArc').style.strokeDashoffset = 327 * (1 - left / all);
     $('#instaStats').innerHTML = [
       ['drafts', dash.curated_drafts_pending], ['to review', dash.needs_your_review], ['ready', dash.approved_ready_to_publish],
       ['posted', dash.posted_total], ['failed', dash.post_failed], ['used', used],
     ].map(([k, v]) => `<div><b>${esc(v)}</b><small>${k}</small></div>`).join('');
-    $('#recent').innerHTML = (dash.recent_candidates || []).slice(0, 4).map((c) =>
+    $('#recent').innerHTML = (dash.recent_candidates || []).slice(0, 8).map((c) =>
       `<li><span>${esc(c.post_format.replace('_', ' '))} · ${esc(c.status)}</span><span>${new Date(c.created_at).toLocaleDateString('de-DE')}</span></li>`).join('');
     tickCountdown();
   } catch (e) { console.warn(e); }
 }
 
-// --- health ------------------------------------------------------------------
+// --- health: top bar, system tile, AURON's own line ------------------------------
 async function refreshHealth() {
-  const pills = [];
-  const pill = (name, cls) => pills.push(`<span class="pill"><span class="dot ${cls}"></span>${esc(name)}</span>`);
-  try { const h = await get('/health'); pill('API', h.status === 'healthy' ? 'ok' : 'warn'); } catch { pill('API', 'bad'); }
-  try { const t = await get('/v1/telegram-instagram/status'); pill('Telegram bot', t.bot_reachable ? 'ok' : 'bad'); } catch { pill('Telegram bot', 'bad'); }
-  (overview?.accounts || []).forEach((a) => pill(`copier ${a.profile}`, a.state === 'live' ? 'ok' : a.state === 'stale' ? 'warn' : 'bad'));
-  $('#health').innerHTML = pills.join('');
+  const svcs = [];
+  try { const h = await get('/health'); svcs.push(['API', h.status === 'healthy' ? 'ok' : 'warn']); } catch { svcs.push(['API', 'bad']); }
+  try { const t = await get('/v1/telegram-instagram/status'); svcs.push(['Telegram bot', t.bot_reachable ? 'ok' : 'bad']); } catch { svcs.push(['Telegram bot', 'bad']); }
+  (overview?.accounts || []).forEach((a) => svcs.push([`Copier ${a.profile}`, a.state === 'live' ? 'ok' : a.state === 'stale' ? 'warn' : 'bad']));
+  $('#health').innerHTML = svcs.map(([n, c]) => `<span class="svc" title="${esc(n)}"><span class="dot ${c}"></span><span>${esc(n)}</span></span>`).join('');
+  $('#sList').innerHTML = svcs.map(([n, c]) => `<div class="row"><span class="dot ${c}"></span><span>${esc(n)}</span><span>${c === 'ok' ? 'online' : c === 'warn' ? 'late' : 'offline'}</span></div>`).join('');
+  const bad = svcs.filter(([, c]) => c !== 'ok').length;
+  $('#core').classList.toggle('degraded', bad > 0);
+  const copiers = (overview?.accounts || []).filter((a) => a.state === 'live').length;
+  $('#coreLine').textContent = bad ? `${bad} of ${svcs.length} systems need attention` : `all systems online · ${copiers} copier${copiers === 1 ? '' : 's'} live`;
 }
 
+// --- 3D tiles: tilt toward the pointer ---------------------------------------------
+document.querySelectorAll('.tile').forEach((tile) => {
+  if (reduced || matchMedia('(hover: none)').matches) return;
+  tile.addEventListener('pointermove', (e) => {
+    const r = tile.getBoundingClientRect();
+    const x = (e.clientX - r.left) / r.width, y = (e.clientY - r.top) / r.height;
+    tile.style.setProperty('--ry', `${(x - .5) * 8}deg`);
+    tile.style.setProperty('--rx', `${(.5 - y) * 8}deg`);
+    tile.style.setProperty('--mx', `${x * 100}%`);
+    tile.style.setProperty('--my', `${y * 100}%`);
+  });
+  tile.addEventListener('pointerleave', () => { tile.style.setProperty('--rx', '0deg'); tile.style.setProperty('--ry', '0deg'); });
+});
+
+// --- opening a tile into its full view (it grows out of the tile and back) --------
+let openView = null, openedFrom = null;
+const TITLES = { trading: 'Trading', instagram: 'Instagram' };
+
+function morph(panel, rect, reverse) {
+  const end = panel.getBoundingClientRect();
+  const from = `translate(${rect.left - end.left}px, ${rect.top - end.top}px) scale(${rect.width / end.width}, ${rect.height / end.height})`;
+  const frames = [{ transform: from, opacity: .3, borderRadius: '22px' }, { transform: 'none', opacity: 1 }];
+  return panel.animate(reverse ? frames.reverse() : frames, { duration: reduced ? 0 : 520, easing: 'cubic-bezier(.2,.8,.2,1)' }).finished;
+}
+
+function open(view, fromTile, push = true) {
+  openView = view; openedFrom = fromTile;
+  $('#detailTitle').textContent = TITLES[view];
+  document.querySelectorAll('.view').forEach((v) => v.classList.toggle('active', v.dataset.view === view));
+  $('#detail').hidden = false;
+  document.body.classList.add('locked');
+  $('#detailPanel').scrollTop = 0;
+  if (push) history_.pushState({ view }, '', `#${view}`);
+  if (view === 'trading' && overview) { renderTotals(overview); renderAccounts(overview); renderGroups(overview); renderPositions(overview); renderTotalChart(); }
+  if (fromTile) morph($('#detailPanel'), fromTile.getBoundingClientRect(), false);
+  $('#close').focus();
+}
+
+async function close(push = true) {
+  if (!openView) return;
+  const tile = openedFrom;
+  openView = null;
+  if (tile && !reduced) await morph($('#detailPanel'), tile.getBoundingClientRect(), true).catch(() => {});
+  $('#detail').hidden = true;
+  document.body.classList.remove('locked');
+  if (push && location.hash) history_.back();
+  tile?.focus();
+}
+
+const history_ = window.history;
+document.querySelectorAll('.tile[data-view]').forEach((tile) => tile.addEventListener('click', () => open(tile.dataset.view, tile)));
+$('#close').addEventListener('click', () => close());
+$('#detail').addEventListener('click', (e) => { if (e.target.id === 'detail') close(); });
+addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
+addEventListener('popstate', () => {           // the phone's back button
+  const v = location.hash.slice(1);
+  if (TITLES[v]) open(v, $(`.tile[data-view="${v}"]`), false); else close(false);
+});
+
 // --- loops ---------------------------------------------------------------------
-setInterval(() => { $('#clock').textContent = new Date().toLocaleTimeString('de-DE'); tickCountdown(); }, 1000);
-refreshHistory().then(refreshTrading).then(refreshHealth);
+setInterval(() => { $('#clock').textContent = new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }); tickCountdown(); }, 1000);
+refreshHistory().then(refreshTrading).then(refreshHealth).then(() => {
+  const v = location.hash.slice(1);
+  if (TITLES[v]) open(v, null, false);
+});
 refreshInstagram();
 setInterval(refreshTrading, 5000);
 setInterval(refreshHistory, 60000);

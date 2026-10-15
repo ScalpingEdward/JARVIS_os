@@ -3,58 +3,105 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>AURON · Live</title>
+  <meta name="theme-color" content="#06080d" />
+  <title>AURON</title>
   <link rel="stylesheet" href="./styles.css" />
 </head>
 <body>
-  <div class="aurora" aria-hidden="true"><i></i><i></i><i></i></div>
+  <div class="backdrop" aria-hidden="true"></div>
 
   <header class="top">
-    <div class="brand"><span class="mark"></span><b>AURON</b><em>live</em></div>
-    <nav class="health" id="health" aria-label="System status"></nav>
-    <time class="clock" id="clock">--:--:--</time>
+    <div class="brand"><span class="glyph"></span>AURON</div>
+    <div class="health" id="health" aria-label="System status"></div>
+    <time class="clock" id="clock">--:--</time>
   </header>
 
-  <main class="grid">
-    <!-- Trading: the total -->
-    <section class="card hero span-8">
-      <div class="label">TRADING · ALL ACCOUNTS</div>
-      <div class="totals" id="totals"><div class="muted">Waiting for the first copier report…</div></div>
-      <svg class="chart" id="totalChart" viewBox="0 0 800 180" preserveAspectRatio="none" aria-label="Equity over the last 24 hours"></svg>
-      <div class="chart-foot"><span id="chartRange">last 24 h</span><span id="chartUpdated"></span></div>
-    </section>
-
-    <!-- Instagram -->
-    <section class="card span-4 insta">
-      <div class="label">INSTAGRAM</div>
-      <div class="next">
-        <div class="ring" id="poolRing"><svg viewBox="0 0 120 120"><circle class="track" cx="60" cy="60" r="52"/><circle class="fill" id="poolArc" cx="60" cy="60" r="52"/></svg><div><b id="poolLeft">–</b><small>in pool</small></div></div>
-        <div>
-          <small class="muted">Next post</small>
-          <div class="countdown" id="countdown">–</div>
-          <div class="muted" id="nextKind">–</div>
-        </div>
+  <main class="hub">
+    <!-- AURON itself -->
+    <section class="core-wrap" aria-label="AURON">
+      <div class="core" id="core">
+        <div class="ring r1"></div><div class="ring r2"></div><div class="ring r3"></div>
+        <div class="orb"><span></span></div>
       </div>
-      <div class="stats" id="instaStats"></div>
-      <ul class="recent" id="recent"></ul>
+      <div class="core-text">
+        <h1>AURON</h1>
+        <p id="coreLine">connecting…</p>
+      </div>
     </section>
 
-    <!-- Accounts -->
-    <section class="span-12 accounts" id="accounts"></section>
+    <!-- Tiles: the short version. A click opens the full view. -->
+    <section class="tiles">
+      <button class="tile" data-view="trading" id="tileTrading">
+        <div class="tile-head"><span>Trading</span><span class="open">Open</span></div>
+        <div class="tile-figure"><b id="tTotal">–</b><small id="tCurrency"></small></div>
+        <div class="tile-sub" id="tToday"></div>
+        <div class="tile-list" id="tAccounts"></div>
+        <div class="tile-list" id="tGroups"></div>
+      </button>
 
-    <!-- Groups -->
-    <section class="card span-5">
-      <div class="label">PROFIT PER GROUP · TOTAL</div>
-      <div class="bars" id="groups"><div class="muted">No group has traded yet.</div></div>
-    </section>
+      <button class="tile" data-view="instagram" id="tileInstagram">
+        <div class="tile-head"><span>Instagram</span><span class="open">Open</span></div>
+        <div class="tile-figure"><b class="mono" id="iCountdown">–</b></div>
+        <div class="tile-sub" id="iNext">–</div>
+        <div class="tile-list" id="iList"></div>
+      </button>
 
-    <!-- Open positions -->
-    <section class="card span-7">
-      <div class="label">OPEN POSITIONS <span class="count" id="openCount">0</span></div>
-      <div class="table-wrap"><table class="positions" id="positions"></table></div>
-      <div class="muted empty" id="noPositions">Nothing open right now.</div>
+      <div class="tile static" id="tileSystem">
+        <div class="tile-head"><span>System</span></div>
+        <div class="tile-list" id="sList"></div>
+      </div>
     </section>
   </main>
+
+  <!-- Full views -->
+  <div class="detail" id="detail" hidden>
+    <div class="detail-panel" id="detailPanel" role="dialog" aria-modal="true" aria-labelledby="detailTitle">
+      <header class="detail-head">
+        <h2 id="detailTitle">Trading</h2>
+        <button class="close" id="close" aria-label="Close">✕</button>
+      </header>
+
+      <div class="view" data-view="trading">
+        <div class="grid">
+          <section class="card span-8">
+            <div class="totals" id="totals"><div class="muted">Waiting for the first copier report…</div></div>
+            <svg class="chart" id="totalChart" viewBox="0 0 800 160" preserveAspectRatio="none" aria-label="Equity over the last 24 hours"></svg>
+            <div class="chart-foot"><span id="chartRange">last 24 h</span><span id="chartUpdated"></span></div>
+          </section>
+          <section class="card span-4">
+            <div class="label">Profit per group · total</div>
+            <div class="bars" id="groups"><div class="muted">No group has traded yet.</div></div>
+          </section>
+          <section class="span-12 accounts" id="accounts"></section>
+          <section class="card span-12">
+            <div class="label">Open positions <span class="count" id="openCount">0</span></div>
+            <div class="table-wrap"><table class="positions" id="positions"></table></div>
+            <div class="muted empty" id="noPositions">Nothing open right now.</div>
+          </section>
+        </div>
+      </div>
+
+      <div class="view" data-view="instagram">
+        <div class="grid">
+          <section class="card span-5">
+            <div class="label">Next post</div>
+            <div class="next">
+              <div class="ring-meter" id="poolRing"><svg viewBox="0 0 120 120"><circle class="rm-track" cx="60" cy="60" r="52"/><circle class="rm-fill" id="poolArc" cx="60" cy="60" r="52"/></svg><div><b id="poolLeft">–</b><small>in pool</small></div></div>
+              <div><div class="countdown mono" id="countdown">–</div><div class="muted" id="nextKind">–</div></div>
+            </div>
+          </section>
+          <section class="card span-7">
+            <div class="label">Pipeline</div>
+            <div class="stats" id="instaStats"></div>
+          </section>
+          <section class="card span-12">
+            <div class="label">Latest candidates</div>
+            <ul class="recent" id="recent"></ul>
+          </section>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <script src="./app.js"></script>
 </body>
