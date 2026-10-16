@@ -17,6 +17,9 @@ from . import tools
 ANTHROPIC_MESSAGES_URL = "https://api.anthropic.com/v1/messages"
 ANTHROPIC_API_VERSION = "2023-06-01"
 MAX_ROUNDS = 6
+# The model thinks before it answers, and the thinking counts against max_tokens: at 1500 a
+# question over the whole watchlist (2026-10-17) was all thinking and no answer.
+MAX_TOKENS = 12000
 LANGUAGES = {"de": "Deutsch", "en": "English", "sk": "Slovenčina"}
 
 
@@ -64,7 +67,7 @@ def reply(history: list[dict], lang: str = "de", client: httpx.Client | None = N
         for _ in range(MAX_ROUNDS):
             r = c.post(ANTHROPIC_MESSAGES_URL, timeout=120, headers={
                 "x-api-key": key, "anthropic-version": ANTHROPIC_API_VERSION, "content-type": "application/json"},
-                json={"model": _model(), "max_tokens": 1500, "system": system_prompt(lang),
+                json={"model": _model(), "max_tokens": MAX_TOKENS, "system": system_prompt(lang),
                       "tools": [*tools.TOOLS, tools.WEB_SEARCH], "messages": messages})
             if r.status_code >= 400:
                 raise AssistantError(f"Anthropic API returned {r.status_code}: {r.text[:300]}")
@@ -78,7 +81,7 @@ def reply(history: list[dict], lang: str = "de", client: httpx.Client | None = N
             if stop != "tool_use":
                 text = "".join(b.get("text", "") for b in content if b.get("type") == "text").strip()
                 if not text:
-                    raise AssistantError("Anthropic API returned no text")
+                    raise AssistantError(f"Anthropic API returned no text (stop_reason {stop})")
                 return {"text": text, "tools": used}
             results = []
             for b in content:
