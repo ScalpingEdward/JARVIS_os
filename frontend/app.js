@@ -8,6 +8,14 @@ const signed = (v, cur = '') => `<span class="${v > 0 ? 'up' : v < 0 ? 'down' : 
 const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const nameOf = (a) => a.label || a.profile;  // what people call the account: its group's name
 
+async function send(method, path, body) {
+  const r = await fetch(`${API}${path}`, { method, headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: body === undefined ? undefined : JSON.stringify(body) });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(data.detail || `${path}: ${r.status}`);
+  return data;
+}
+
 async function get(path) {
   const r = await fetch(`${API}${path}`, { headers: { Accept: 'application/json' } });
   if (!r.ok) throw new Error(`${path}: ${r.status}`);
@@ -490,22 +498,59 @@ function renderWatch(w) {
   $('#wBadge').classList.toggle('live', !w.stale);
   if (openView === 'watchlist') renderWatchView(w);
 }
+const openRows = new Set();
 function renderWatchView(w) {
+  // Not while Brano is typing in one of the fields: a refresh would wipe what he wrote.
+  if ($('#watchGroups').contains(document.activeElement) && document.activeElement.matches('input, textarea')) return;
   const groups = {};
   w.items.forEach((i) => (groups[i.category] = groups[i.category] || []).push(i));
   const order = ['Krypto', 'Rohstoffe', 'Indizes', 'Devisen', 'Aktien'];
+  const name = (i) => `<b>${esc(i.name)}</b>${i.reason ? `<small class="why">${esc(i.reason)}</small>` : ''}`;
+  const detail = (i) => `<tr class="wdetail" data-for="${esc(i.name)}" ${openRows.has(i.name) ? '' : 'hidden'}><td colspan="8">
+      <div class="wform">
+        <label>Warum empfohlen<textarea rows="2" data-f="reason" placeholder="z. B. starkes Wachstum im Rechenzentrum, Dividende …">${esc(i.reason)}</textarea></label>
+        <label>Von wem<input data-f="by" value="${esc(i.recommended_by)}" placeholder="Name" /></label>
+        <div class="wbtns"><button class="wbtn" data-act="save">Speichern</button><button class="wbtn primary" data-act="analyse">AURON-Analyse</button><span class="wmsg"></span></div>
+      </div>
+      ${i.analysis ? `<div class="wanalysis">${esc(i.analysis)}<small>AURON · ${new Date(i.analysis_at).toLocaleString('de-DE')} · Beobachtung, keine Empfehlung</small></div>` : ''}
+    </td></tr>`;
   const row = (i) => (i.price === null || i.price === undefined
-    ? `<tr><td>${esc(i.name)}</td><td></td><td class="nodata" colspan="6">keine Daten – bei PU Prime nicht handelbar</td></tr>`
-    : `<tr><td>${esc(i.name)}</td><td>${spark(i.spark, 80, 22)}</td><td class="num">${priceTxt(i.price)}</td>`
+    ? `<tr class="wrow" data-name="${esc(i.name)}"><td>${name(i)}</td><td></td><td class="nodata" colspan="6">keine Daten – bei PU Prime nicht handelbar</td></tr>`
+    : `<tr class="wrow" data-name="${esc(i.name)}"><td>${name(i)}</td><td>${spark(i.spark, 80, 22)}</td><td class="num">${priceTxt(i.price)}</td>`
       + `<td class="num ${pctCls(i.change_pct)}">${pctTxt(i.change_pct)}</td><td class="num ${pctCls(i.from_high_pct)}">${pctTxt(i.from_high_pct)}</td>`
       + `<td class="num ${pctCls(i.vs_sma200_pct)}">${pctTxt(i.vs_sma200_pct)}</td><td class="num">${i.rsi14 ?? '–'}</td>`
-      + `<td class="notes">${(i.notes || []).map((n) => `<span class="note">${esc(n)}</span>`).join('')}</td></tr>`);
+      + `<td class="notes">${(i.notes || []).map((n) => `<span class="note">${esc(n)}</span>`).join('')}${i.analysis ? '<span class="note ai">AURON-Analyse</span>' : ''}</td></tr>`) + detail(i);
   $('#watchGroups').innerHTML = Object.keys(groups).sort((a, b) => order.indexOf(a) - order.indexOf(b)).map((g) =>
     `<section class="card"><div class="label">${esc(g)} <span class="count">${groups[g].length}</span></div><div class="table-wrap"><table class="watch-table">`
     + '<tr><th>NAME</th><th></th><th>KURS</th><th>HEUTE</th><th>VOM 52W-HOCH</th><th>VS 200 TAGE</th><th>RSI</th><th>HINWEISE</th></tr>'
     + groups[g].slice().sort((a, b) => (b.notes?.length || 0) - (a.notes?.length || 0)).map(row).join('')
     + '</table></div></section>').join('');
 }
+
+// one listener for the whole view: open a row, save its reason, ask AURON
+$('#watchGroups').addEventListener('click', async (e) => {
+  const rowEl = e.target.closest('.wrow');
+  if (rowEl) {
+    const n = rowEl.dataset.name, d = rowEl.nextElementSibling;
+    d.hidden = !d.hidden;
+    d.hidden ? openRows.delete(n) : openRows.add(n);
+    return;
+  }
+  const btn = e.target.closest('.wbtn');
+  if (!btn) return;
+  const d = btn.closest('.wdetail'), name = d.dataset.for, msg = d.querySelector('.wmsg');
+  const body = { reason: d.querySelector('[data-f=reason]').value, recommended_by: d.querySelector('[data-f=by]').value };
+  btn.disabled = true;
+  try {
+    msg.textContent = btn.dataset.act === 'save' ? 'speichere …' : 'AURON denkt nach …';
+    await send('PUT', `/v1/watchlist/reasons/${encodeURIComponent(name)}`, body);
+    if (btn.dataset.act === 'analyse') await send('POST', `/v1/watchlist/analyse/${encodeURIComponent(name)}`);
+    document.activeElement?.blur();
+    watch = await get('/v1/watchlist');
+    renderWatch(watch);
+  } catch (err) { msg.textContent = `Fehler: ${err.message}`; btn.disabled = false; }
+});
+
 async function refreshWatch() {
   try { watch = await get('/v1/watchlist'); renderWatch(watch); } catch (e) { console.warn(e); }
 }

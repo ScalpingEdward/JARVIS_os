@@ -353,3 +353,23 @@ body { background: #03060c url("./lounge.webp") center / cover no-repeat fixed; 
 .watch-table svg { width: 80px; height: 22px; display: block; }
 .note { display: inline-block; margin: 1px 4px 1px 0; padding: 1px 8px; border-radius: 999px; background: rgba(79,216,255,.1); border: 1px solid rgba(79,216,255,.25); }
 .watch-top .row span.wpx { flex: none; overflow: visible; text-overflow: clip; }  /* the card-list rule would cut prices with "…" */
+
+/* watchlist rows open into a form: the reason, who gave it, AURON's read */
+.watch-table .wrow { cursor: pointer; }
+.watch-table .wrow:hover td { background: rgba(79,216,255,.04); }
+.watch-table .why { display: block; color: var(--muted); font-size: 11px; max-width: 260px; white-space: normal; }
+.watch-table .wdetail td { background: rgba(255,255,255,.02); white-space: normal; padding: 14px 12px; }
+.wform { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 1fr); gap: 10px 14px; align-items: end; }
+.wform label { display: grid; gap: 4px; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+.wform textarea, .wform input { font: inherit; font-size: 13px; text-transform: none; letter-spacing: 0; color: var(--text);
+  background: rgba(0,0,0,.3); border: 1px solid var(--line-2); border-radius: 10px; padding: 8px 10px; resize: vertical; }
+.wbtns { grid-column: 1 / -1; display: flex; gap: 10px; align-items: center; }
+.wbtn { font-size: 12.5px; padding: 7px 14px; border-radius: 999px; border: 1px solid var(--line-2); background: rgba(255,255,255,.05); cursor: pointer; }
+.wbtn.primary { border-color: rgba(79,216,255,.5); background: rgba(79,216,255,.15); }
+.wbtn:disabled { opacity: .5; cursor: wait; }
+.wmsg { font-size: 12px; color: var(--muted); }
+.wanalysis { margin-top: 12px; white-space: pre-wrap; font-size: 13px; line-height: 1.55; padding: 12px 14px; border-radius: 12px;
+  background: rgba(79,216,255,.06); border: 1px solid rgba(79,216,255,.2); }
+.wanalysis small { display: block; margin-top: 8px; color: var(--faint); font-size: 11px; }
+.note.ai { background: rgba(190,110,255,.12); border-color: rgba(190,110,255,.35); }
+@media (max-width: 700px) { .wform { grid-template-columns: minmax(0, 1fr); } }

@@ -21,6 +21,11 @@ class WatchItem(BaseModel):
     spark: list[float] = Field(default_factory=list, max_length=60)
     notes: list[str] = Field(default_factory=list, max_length=10)
     quoted_at: datetime | None = None
+    # set by Brano and by AURON, not by the feed; merged in on read
+    reason: str = ""
+    recommended_by: str = ""
+    analysis: str = ""
+    analysis_at: datetime | None = None
 
 
 class WatchlistIn(BaseModel):
@@ -31,3 +36,8 @@ class WatchlistIn(BaseModel):
 class Watchlist(WatchlistIn):
     received_at: datetime | None = None
     stale: bool = True  # no push for 5 minutes: the feed or its laptop is down
+
+
+class ReasonIn(BaseModel):
+    reason: str = Field(default="", max_length=2000)
+    recommended_by: str = Field(default="", max_length=100)

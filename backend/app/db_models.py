@@ -420,3 +420,23 @@ class WatchlistRow(Base):
     id: Mapped[str] = mapped_column(String(20), primary_key=True)
     received_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     data: Mapped[str] = mapped_column(Text)
+
+
+class WatchlistNoteRow(Base):
+    """Per watchlist symbol: why someone recommended it, and AURON's last summary."""
+
+    __tablename__ = "watchlist_notes"
+    name: Mapped[str] = mapped_column(String(100), primary_key=True)
+    reason: Mapped[str] = mapped_column(Text, default="")
+    recommended_by: Mapped[str] = mapped_column(String(100), default="")
+    analysis: Mapped[str] = mapped_column(Text, default="")
+    analysis_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class WatchlistAlertRow(Base):
+    """One alert sent: symbol, condition, day -- so each fires once a day, not every minute."""
+
+    __tablename__ = "watchlist_alerts"
+    key: Mapped[str] = mapped_column(String(200), primary_key=True)
+    sent_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
