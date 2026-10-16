@@ -34,6 +34,7 @@ class TrackedSignal:
     canonical: str = ""
     trailing: bool = False
     number: int | None = None  # the group's setup number, part of what makes a repost
+    be_at_tp1: bool = False    # "shaky" came: move the rest to entry once price reaches TP1
 
 
 @dataclass

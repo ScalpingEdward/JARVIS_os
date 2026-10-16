@@ -329,19 +329,31 @@ class Copier:
                 lines.append(f"{len(open_)} positions still open -- their SL will take them")
         else:
             if kind == layers.Kind.SHAKY:
+                # The group's "shaky" is measured from its own entry; ours, taken at market,
+                # is often still in the red when it comes (2026-10-15/16: position 1 closed
+                # at a loss, the rest moved to entry and stopped out seconds later).
+                # Brano: close position 1 only in profit, and no breakeven before TP1 is
+                # reached -- the watchdog sets it then (_breakeven_at_tp1).
                 tp_legs = [n for n in sorted(open_) if n != runner]
-                close = tp_legs[0] if tp_legs else None
+                first = tp_legs[0] if tp_legs else None
+                if first is not None and open_[first].profit > 0:
+                    p = open_.pop(first)
+                    lines.append(self._do(f"position {first} closed ({p.profit:+.2f})", self.ex.close_position, p))
+                elif first is not None:
+                    lines.append(f"position {first} in loss ({open_[first].profit:+.2f}) -- kept")
+                s.be_at_tp1 = True
+                lines.append(f"breakeven once price reaches TP1 {s.tps[0] if s.tps else '?'}")
             else:  # TP_HIT / TRAIL: that TP's position is out; close it if the broker's TP has not fired yet
                 close = event.tp if event.tp in open_ and event.tp != runner else None
                 if event.tp not in open_:
                     lines.append(f"position {event.tp}: already closed")
-            if close is not None:
-                p = open_.pop(close)
-                lines.append(self._do(f"position {close} closed ({p.profit:+.2f})", self.ex.close_position, p))
-            if kind == layers.Kind.TRAIL:
-                s.trailing = True
-                lines.append(f"runner trails {self.config.get('trail_pips', 100)} pips behind price from now on")
-            lines += [f"position {n}: " + self._to_breakeven(s, p) for n, p in sorted(open_.items())]
+                if close is not None:
+                    p = open_.pop(close)
+                    lines.append(self._do(f"position {close} closed ({p.profit:+.2f})", self.ex.close_position, p))
+                if kind == layers.Kind.TRAIL:
+                    s.trailing = True
+                    lines.append(f"runner trails {self.config.get('trail_pips', 100)} pips behind price from now on")
+                lines += [f"position {n}: " + self._to_breakeven(s, p) for n, p in sorted(open_.items())]
         self._say(f"#{msg_id} {event} on #{s.msg_id} {s.side} {s.symbol}\n" + ("\n".join(lines) or "nothing open"))
 
     def _close_all_layers(self, chat_id: int, msg_id: int) -> None:
@@ -404,6 +416,22 @@ class Copier:
             log.exception("edit #%s", msg_id)
             self._say(f"#{msg_id} edit ERROR {type(e).__name__}: {e}")
         self._save()
+
+    def _breakeven_at_tp1(self) -> None:
+        """Watchdog part for layers: a "shaky" setup goes to breakeven once price reaches TP1."""
+        for s in self.book.signals.values():
+            if s.strategy != "layers" or not s.be_at_tp1 or not s.tps:
+                continue
+            open_ = self._open_layer(s)
+            if not open_:
+                s.be_at_tp1 = False
+                continue
+            close_side = "sell" if s.side == "buy" else "buy"  # the price that would close it
+            price = self.ex.price(s.symbol, close_side)
+            if (price >= s.tps[0]) if s.side == "buy" else (price <= s.tps[0]):
+                s.be_at_tp1 = False
+                self._say(f"#{s.msg_id} {s.symbol}: TP1 {s.tps[0]} reached after 'shaky'\n"
+                          + "\n".join(f"position {n}: " + self._to_breakeven(s, p) for n, p in sorted(open_.items())))
 
     def _trail(self) -> None:
         """Watchdog part for layers: after TP3 the runner's SL follows price (the group's instruction)."""
@@ -558,6 +586,7 @@ class Copier:
         try:
             self._guard()
             self._retry_breakeven()
+            self._breakeven_at_tp1()
             self._trail()
         except Exception as e:
             log.exception("watchdog")

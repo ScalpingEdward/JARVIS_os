@@ -87,12 +87,32 @@ def test_setup_opens_four_positions_tp1_tp2_tp3_and_a_runner():
     assert not t.orders and "opened" in said[-1]
 
 
-def test_shaky_closes_position_1_and_moves_the_rest_to_entry():
+def test_shaky_in_profit_closes_position_1_but_breakeven_waits_for_tp1():
     c, t, said, _ = make()
     c.on_message(CHAT, 100, None, SELL)
+    for p in layer(c, t).values():
+        p.profit = 2.0
     c.on_message(CHAT, 110, 100, SHAKY)
     lay = layer(c, t)
-    assert sorted(lay) == [2, 3, 4] and all(p.sl == p.price_open for p in lay.values())
+    assert sorted(lay) == [2, 3, 4] and all(p.sl == 4203.0 for p in lay.values())   # no BE yet
+    t.prices["XAUUSD.s"] = 4188.0
+    c.watch()
+    assert all(p.sl == 4203.0 for p in lay.values())                              # TP1 4187 not reached
+    t.prices["XAUUSD.s"] = 4186.9
+    c.watch()
+    assert all(p.sl == p.price_open for p in lay.values()) and "TP1 4187.0 reached" in said[-1]
+
+
+def test_shaky_in_loss_keeps_position_1():
+    # 2026-10-15/16: the group's "shaky" came while our market entry was still red;
+    # position 1 was closed at a loss and the rest stopped out at entry seconds later
+    c, t, said, _ = make()
+    c.on_message(CHAT, 100, None, SELL)
+    for p in layer(c, t).values():
+        p.profit = -1.5
+    c.on_message(CHAT, 110, 100, SHAKY)
+    lay = layer(c, t)
+    assert sorted(lay) == [1, 2, 3, 4] and all(p.sl == 4203.0 for p in lay.values()) and "kept" in said[-1]
 
 
 def test_tp1_hit_only_breakeven_when_the_broker_already_closed_position_1():
@@ -163,7 +183,7 @@ def test_a_reply_touches_only_its_own_setup():
     c, t, said, _ = make()
     c.on_message(CHAT, 100, None, SELL)
     c.on_message(CHAT, 200, None, SELL.replace("1. GOLD", "2. GOLD").replace("4192 - 4198", "4190 - 4196").replace("4203", "4201"))
-    c.on_message(CHAT, 210, 200, SHAKY)
+    c.on_message(CHAT, 210, 200, TP1)
     assert len(layer(c, t, 100)) == 4 and all(p.sl == 4203.0 for p in layer(c, t, 100).values())
     assert sorted(layer(c, t, 200)) == [2, 3, 4]
 
@@ -184,7 +204,7 @@ def test_several_setups_the_same_way_are_not_reposts():
 def test_edited_setup_moves_sl_and_tps_but_not_a_breakeven_stop():
     c, t, said, now = make()
     c.on_message(CHAT, 100, None, SELL)
-    c.on_message(CHAT, 110, 100, SHAKY)              # 2-4 at entry now
+    c.on_message(CHAT, 110, 100, TP1)                # 2-4 at entry now
     c.on_message(CHAT, 200, None, SELL.replace("1. GOLD", "2. GOLD").replace("4192 - 4198", "4190 - 4196").replace("4203", "4201"))
     now[0] += 60
     edited = SELL.replace("1. GOLD", "2. GOLD").replace("4192 - 4198", "4190 - 4196").replace("SL : 4203", "SL : 4206").replace("TP2 : 4182", "TP2 : 4180")
