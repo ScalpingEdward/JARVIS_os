@@ -109,6 +109,53 @@
   });
   document.getElementById('chatVoices').addEventListener('click', showVoices);
 
+  // ---- listening: record, stop on silence, transcribe, ask ----------------
+  const mic = document.getElementById('chatMic');
+  let rec = null;
+  async function listen() {
+    if (rec) { rec.stop(); return; }                      // second click: stop now
+    let stream;
+    try { stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } }); }
+    catch (e) { open(true); turns.push({ role: 'assistant', content: `Mikrofon nicht verfügbar: ${e.message}`, error: true }); render(); return; }
+    player.pause();                                        // don't record AURON talking
+    const chunks = [];
+    rec = new MediaRecorder(stream);
+    rec.ondataavailable = (e) => e.data.size && chunks.push(e.data);
+    // Silence detection: once he has spoken, 1.6 s of quiet ends the recording; 60 s at most.
+    const ctx = new AudioContext(), an = ctx.createAnalyser();
+    ctx.createMediaStreamSource(stream).connect(an);
+    const buf = new Uint8Array(an.fftSize);
+    let spoke = false, quietSince = performance.now();
+    const started = performance.now();
+    const tick = () => {
+      if (!rec || rec.state !== 'recording') return;
+      an.getByteTimeDomainData(buf);
+      const level = Math.sqrt(buf.reduce((a, v) => a + (v - 128) ** 2, 0) / buf.length);
+      const now = performance.now();
+      if (level > 6) { spoke = true; quietSince = now; }
+      if ((spoke && now - quietSince > 1600) || now - started > 60000 || (!spoke && now - started > 8000)) rec.stop();
+      else requestAnimationFrame(tick);
+    };
+    rec.onstop = async () => {
+      stream.getTracks().forEach((t) => t.stop()); ctx.close();
+      rec = null; mic.classList.remove('rec');
+      if (!spoke || !chunks.length) return;
+      const blob = new Blob(chunks, { type: chunks[0].type || 'audio/webm' });
+      mic.classList.add('busy');
+      try {
+        const r = await fetch(`${API}/v1/assistant/listen?lang=${lang()}`, { method: 'POST', headers: { 'Content-Type': blob.type }, body: blob });
+        const d = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(d.detail || `HTTP ${r.status}`);
+        if (d.text) { open(true); ask(d.text); }
+      } catch (e) { open(true); turns.push({ role: 'assistant', content: `Nicht verstanden: ${e.message}`, error: true }); render(); }
+      mic.classList.remove('busy');
+    };
+    rec.start();
+    mic.classList.add('rec');
+    tick();
+  }
+  mic.addEventListener('click', listen);
+
   form.addEventListener('submit', (e) => {
     e.preventDefault();
     const text = input.value.trim();

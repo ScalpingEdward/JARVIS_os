@@ -103,3 +103,33 @@ def speak(text: str, provider: str, voice: str, model: str, accent: str = "",
     while len(_cache) > 60:
         _cache.popitem(last=False)
     return r.content
+
+
+STT_URL = "https://api.elevenlabs.io/v1/speech-to-text"
+STT_LANG = {"de": "de", "en": "en", "sk": "sk"}
+MAX_AUDIO = 10 * 1024 * 1024  # about ten minutes of browser webm/opus
+
+
+def transcribe(audio: bytes, content_type: str, lang: str = "de", client: httpx.Client | None = None) -> str:
+    """What Brano said, as text (ElevenLabs Scribe)."""
+    if not audio:
+        raise VoiceError("no audio")
+    if len(audio) > MAX_AUDIO:
+        raise VoiceError("recording too long")
+    api_key = os.getenv("ELEVENLABS_API_KEY")
+    if not api_key:
+        raise VoiceError("ELEVENLABS_API_KEY is not set")
+    ext = "webm" if "webm" in content_type else "ogg" if "ogg" in content_type else "mp4" if "mp4" in content_type else "mp3"
+    c, close = (client, False) if client else (httpx.Client(), True)
+    try:
+        r = c.post(STT_URL, timeout=60, headers={"xi-api-key": api_key},
+                   data={"model_id": "scribe_v2", "language_code": STT_LANG.get(lang, "de"), "tag_audio_events": "false"},
+                   files={"file": (f"speech.{ext}", audio, content_type or "application/octet-stream")})
+        if r.status_code >= 400:
+            raise VoiceError(f"elevenlabs returned {r.status_code}: {r.text[:300]}")
+        return (r.json().get("text") or "").strip()
+    except httpx.HTTPError as exc:
+        raise VoiceError(f"Could not reach elevenlabs: {exc}") from exc
+    finally:
+        if close:
+            c.close()

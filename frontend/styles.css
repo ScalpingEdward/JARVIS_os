@@ -421,3 +421,8 @@ body { background: #03060c url("./lounge.webp") center / cover no-repeat fixed; 
 .vbtns button.loading { opacity: .5; cursor: wait; }
 .vbtns button.bad { border-color: var(--down); color: var(--down); }
 .vdone { justify-self: end; font: inherit; font-size: 13px; padding: 6px 16px; border-radius: 999px; border: 0; background: var(--accent); color: #001018; cursor: pointer; }
+
+.chat-form button.mic { background: rgba(255,255,255,.08); color: var(--text); font-size: 16px; }
+.chat-form button.mic.rec { background: var(--down); color: #fff; animation: micpulse 1.2s ease-in-out infinite; }
+.chat-form button.mic.busy { opacity: .5; cursor: wait; }
+@keyframes micpulse { 50% { box-shadow: 0 0 0 8px rgba(242,100,124,.18); } }

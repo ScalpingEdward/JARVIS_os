@@ -1,6 +1,6 @@
 from typing import Literal
 
-from fastapi import APIRouter, HTTPException, Response
+from fastapi import APIRouter, HTTPException, Request, Response
 from pydantic import BaseModel, Field
 
 from . import voice
@@ -57,3 +57,13 @@ def speak(payload: SpeakIn) -> Response:
     except voice.VoiceError as exc:
         raise HTTPException(status_code=502, detail=str(exc))
     return Response(audio, media_type="audio/mpeg")
+
+
+@router.post("/listen")
+async def listen(request: Request, lang: Literal["de", "en", "sk"] = "de") -> dict:
+    """The browser's recording (raw body, e.g. audio/webm) -> {text}."""
+    audio = await request.body()
+    try:
+        return {"text": voice.transcribe(audio, request.headers.get("content-type", ""), lang)}
+    except voice.VoiceError as exc:
+        raise HTTPException(status_code=502, detail=str(exc))

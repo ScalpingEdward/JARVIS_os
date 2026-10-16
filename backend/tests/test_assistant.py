@@ -89,3 +89,20 @@ def test_speak_endpoint_without_key_is_502(monkeypatch):
     r = client.post("/v1/assistant/speak", json={"text": "Hallo"})
     assert r.status_code == 502 and "ELEVENLABS_API_KEY" in r.json()["detail"]
     assert client.get("/v1/assistant/voices").json()["elevenlabs"]["available"] is False
+
+
+def test_listen_sends_the_recording_and_returns_the_text(monkeypatch):
+    from app.assistant import voice
+    monkeypatch.setenv("ELEVENLABS_API_KEY", "test")
+    seen = []
+    c = httpx.Client(transport=httpx.MockTransport(
+        lambda req: (seen.append(req), httpx.Response(200, json={"text": " Wie steht Gold? "}))[1]))
+    assert voice.transcribe(b"webm-bytes", "audio/webm;codecs=opus", "de", client=c) == "Wie steht Gold?"
+    body = seen[0].content
+    assert b"scribe_v2" in body and b"webm-bytes" in body and b'filename="speech.webm"' in body
+
+
+def test_listen_refuses_empty_audio(monkeypatch):
+    monkeypatch.setenv("ELEVENLABS_API_KEY", "test")
+    r = client.post("/v1/assistant/listen", content=b"", headers={"content-type": "audio/webm"})
+    assert r.status_code == 502 and "no audio" in r.json()["detail"]
