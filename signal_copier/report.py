@@ -17,6 +17,7 @@ from signal_copier.book import Book
 from signal_copier.risk import day_start
 
 OTHER = "(not from a signal)"
+CLOSED_KEEP = 150  # newest closed trades sent along -- the dashboard's history, not an archive
 
 
 @dataclass
@@ -42,6 +43,7 @@ class Status:
     groups: list[GroupStatus] = field(default_factory=list)
     open_positions: list[dict] = field(default_factory=list)
     label: str = ""  # what people call this account -- its group's name, not the folder name
+    closed: list[dict] = field(default_factory=list)  # newest first, see closed_trades()
 
     def to_json(self) -> dict:
         return asdict(self)
@@ -68,6 +70,31 @@ def group_of_ticket(book: Book, chat_names: dict[int, str]) -> dict[int, str]:
         for ticket in s.legs.values():
             out[ticket] = name
     return out
+
+
+def closed_trades(deals: list[dict], owner: dict[int, str], keep: int = CLOSED_KEEP) -> list[dict]:
+    """One row per closing deal: when, what, entry and exit, why, what it made.
+
+    A position closed in parts (close half) gives a row per part. The opening deal's
+    commission is added to the position's first closing row, so the rows add up to
+    what the account really made. side is the position's, the opposite of the
+    closing deal's own direction."""
+    opening = {d["position_id"]: d for d in deals if not d["closing"]}
+    rows, charged = [], set()
+    for d in sorted((d for d in deals if d["closing"]), key=lambda d: d["time"]):
+        pid = d["position_id"]
+        o = opening.get(pid, {})
+        amount = d["profit"] + d["commission"] + d["swap"] + d["fee"]
+        if pid not in charged:
+            amount += o.get("commission", 0) + o.get("swap", 0) + o.get("fee", 0)
+            charged.add(pid)
+        side = d.get("side")
+        rows.append({"position": pid, "group": owner.get(pid, OTHER), "symbol": d.get("symbol", ""),
+                     "side": {"buy": "sell", "sell": "buy"}.get(side, side or ""), "volume": d.get("volume", 0),
+                     "price_open": o.get("price", 0), "price_close": d.get("price", 0),
+                     "opened": o.get("time"), "closed": d["time"], "comment": d.get("comment", ""),
+                     "profit": round(amount, 2)})
+    return rows[::-1][:keep]
 
 
 def build(profile: str, account: dict, positions: list[dict], deals: list[dict],
@@ -110,4 +137,4 @@ def build(profile: str, account: dict, positions: list[dict], deals: list[dict],
     ordered = [x for x in ordered if x.name != OTHER or x.closed_trades or x.open_positions or x.pnl_total]
     return Status(profile, account["login"], account["server"], account["currency"],
                   round(account["balance"], 2), round(account["equity"], 2),
-                  now.isoformat(), ordered, open_list, label or profile)
+                  now.isoformat(), ordered, open_list, label or profile, closed_trades(deals, owner))

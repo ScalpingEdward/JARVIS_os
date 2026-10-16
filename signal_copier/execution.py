@@ -235,7 +235,9 @@ def report_inputs() -> tuple[dict, list[dict], list[dict]]:
     closing = (mt5.DEAL_ENTRY_OUT, mt5.DEAL_ENTRY_OUT_BY)
     # Deposits and withdrawals are deals too; only buy/sell is trading.
     deals = [{"position_id": d.position_id, "time": d.time - offset, "profit": d.profit,
-              "commission": d.commission, "swap": d.swap, "fee": d.fee, "closing": d.entry in closing}
+              "commission": d.commission, "swap": d.swap, "fee": d.fee, "closing": d.entry in closing,
+              "symbol": d.symbol, "side": "buy" if d.type == mt5.DEAL_TYPE_BUY else "sell",
+              "volume": d.volume, "price": d.price, "comment": d.comment}
              for d in mt5.history_deals_get(datetime(2000, 1, 1), datetime.now() + timedelta(days=1)) or ()
              if d.type in (mt5.DEAL_TYPE_BUY, mt5.DEAL_TYPE_SELL)]
     return account, positions, deals

@@ -26,6 +26,20 @@ class CopierPosition(BaseModel):
     group: str
 
 
+class CopierClosedTrade(BaseModel):
+    position: int
+    group: str
+    symbol: str = ""
+    side: str = ""
+    volume: float = 0
+    price_open: float = 0
+    price_close: float = 0
+    opened: float | None = None   # UTC epoch seconds
+    closed: float
+    comment: str = ""             # MT5's, e.g. "[tp 4182.0]" or "[sl 4150.0]"
+    profit: float                 # after commission and swap
+
+
 class CopierStatusIn(BaseModel):
     """Exactly what signal_copier/report.py sends."""
 
@@ -39,6 +53,7 @@ class CopierStatusIn(BaseModel):
     groups: list[CopierGroup] = Field(default_factory=list)
     open_positions: list[CopierPosition] = Field(default_factory=list)
     label: str | None = Field(default=None, max_length=100)  # display name, e.g. the group's
+    closed: list[CopierClosedTrade] = Field(default_factory=list, max_length=500)  # newest first
 
 
 class CopierState(StrEnum):

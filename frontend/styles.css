@@ -426,3 +426,9 @@ body { background: #03060c url("./lounge.webp") center / cover no-repeat fixed; 
 .chat-form button.mic.rec { background: var(--down); color: #fff; animation: micpulse 1.2s ease-in-out infinite; }
 .chat-form button.mic.busy { opacity: .5; cursor: wait; }
 @keyframes micpulse { 50% { box-shadow: 0 0 0 8px rgba(242,100,124,.18); } }
+
+/* trade history: group filter chips and the day's sum */
+.hist-filter { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 10px; }
+.hchip { font: inherit; font-size: 12px; padding: 4px 12px; border-radius: 999px; border: 1px solid var(--line-2); background: rgba(255,255,255,.04); color: var(--muted); cursor: pointer; }
+.hchip.on { color: var(--text); border-color: color-mix(in srgb, var(--accent) 60%, transparent); background: color-mix(in srgb, var(--accent) 14%, transparent); }
+.hist-sum { margin-left: 8px; font-family: var(--mono); font-size: 12px; letter-spacing: 0; text-transform: none; color: var(--muted); }

@@ -184,6 +184,35 @@ function renderPositions(o) {
   });
 }
 
+// --- closed trades, newest first, filterable by group -----------------------------
+let histGroup = '';
+function renderHistory(o) {
+  const all = o.accounts.flatMap((a) => (a.closed || []).map((t) => ({ ...t, profile: nameOf(a), currency: a.currency })))
+    .sort((a, b) => b.closed - a.closed);
+  const groups = [...new Set(all.map((t) => t.group))].sort();
+  if (histGroup && !groups.includes(histGroup)) histGroup = '';
+  $('#histFilter').innerHTML = groups.length > 1 ? ['', ...groups].map((g) =>
+    `<button type="button" class="hchip${g === histGroup ? ' on' : ''}" data-g="${esc(g)}">${g ? esc(g) : 'Alle'}</button>`).join('') : '';
+  const rows = histGroup ? all.filter((t) => t.group === histGroup) : all;
+  const sum = rows.reduce((s, t) => s + t.profit, 0);
+  $('#histCount').textContent = rows.length;
+  $('#histSum').innerHTML = rows.length ? `<span class="${sum >= 0 ? 'up' : 'down'}">${signed(sum)}</span> · ${rows.filter((t) => t.profit > 0).length} im Plus` : '';
+  $('#noHistory').style.display = rows.length ? 'none' : '';
+  const why = (t) => /\[tp/i.test(t.comment) ? 'TP' : /\[sl/i.test(t.comment) ? (Math.abs(t.profit) < 0.05 ? 'Break-even' : t.profit > 0 ? 'SL im Plus' : 'SL') : 'geschlossen';
+  const when = (s) => new Date(s * 1000).toLocaleString('de-DE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+  $('#history').innerHTML = rows.length ? '<tr><th>GESCHLOSSEN</th><th>ACCOUNT</th><th>SYMBOL</th><th></th><th>LOTS</th><th>ENTRY</th><th>EXIT</th><th>WIE</th><th>PROFIT</th><th>GROUP</th></tr>'
+    + rows.map((t) => `<tr><td>${when(t.closed)}</td><td>${esc(t.profile)}</td><td>${esc(t.symbol)}</td>
+      <td><span class="side ${esc(t.side)}">${esc(t.side).toUpperCase()}</span></td><td class="num">${fmt(t.volume)}</td>
+      <td class="num">${t.price_open ? fmt(t.price_open) : '–'}</td><td class="num">${fmt(t.price_close)}</td><td>${why(t)}</td>
+      <td class="num ${t.profit > 0 ? 'up' : t.profit < 0 ? 'down' : ''}">${signed(t.profit)}</td><td>${esc(t.group)}</td></tr>`).join('') : '';
+}
+$('#histFilter').addEventListener('click', (e) => {
+  const b = e.target.closest('.hchip');
+  if (!b) return;
+  histGroup = b.dataset.g;
+  if (overview) renderHistory(overview);
+});
+
 // --- the trading tile: the short list -------------------------------------------
 function renderTradingTile(o) {
   const t = (o.totals || [])[0];
@@ -231,7 +260,7 @@ async function refreshTrading() {
   try {
     overview = await get('/v1/copier/overview');
     renderTradingTile(overview);
-    if (openView === 'trading') { renderTotals(overview); renderAccounts(overview); renderGroups(overview); renderPositions(overview); renderTotalChart(); }
+    if (openView === 'trading') { renderTotals(overview); renderAccounts(overview); renderGroups(overview); renderPositions(overview); renderHistory(overview); renderTotalChart(); }
   } catch (e) { console.warn(e); }
 }
 
@@ -334,7 +363,7 @@ function open(view, fromTile, push = true) {
   $('#detailPanel').scrollTop = 0;
   if (push) history_.pushState({ view }, '', `#${view}`);
   if (view === 'watchlist' && watch) renderWatchView(watch);
-  if (view === 'trading' && overview) { renderTotals(overview); renderAccounts(overview); renderGroups(overview); renderPositions(overview); renderTotalChart(); }
+  if (view === 'trading' && overview) { renderTotals(overview); renderAccounts(overview); renderGroups(overview); renderPositions(overview); renderHistory(overview); renderTotalChart(); }
   if (fromTile) morph($('#detailPanel'), fromTile.getBoundingClientRect(), false);
   $('#close').focus();
 }
