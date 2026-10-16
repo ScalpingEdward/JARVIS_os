@@ -119,27 +119,19 @@ body { background: #03060c url("./lounge.webp") center / cover no-repeat fixed; 
   position: absolute; left: 21%; right: 21%; top: 10%; aspect-ratio: 1; border-radius: 50%;
   transform-style: preserve-3d;
   background:
-    radial-gradient(circle at 34% 28%, rgba(255,255,255,.42), rgba(255,255,255,0) 20%),
-    radial-gradient(circle at 50% 52%, rgba(90,190,255,.30), rgba(30,80,170,.32) 48%, rgba(8,20,48,.78) 70%, rgba(4,10,24,.92) 74%);
-  box-shadow: 0 0 90px rgba(79,170,255,.5), 0 0 180px rgba(79,170,255,.2),
-              inset 0 0 70px rgba(79,216,255,.4), inset -18px -24px 50px rgba(0,0,0,.55), inset 0 0 0 1px rgba(170,225,255,.35);
+    radial-gradient(circle at 32% 26%, rgba(255,255,255,.55), rgba(255,255,255,0) 18%),
+    radial-gradient(circle at 70% 78%, rgba(160,230,255,.18), rgba(160,230,255,0) 30%),
+    radial-gradient(circle at 50% 50%, rgba(70,170,255,.22), rgba(30,90,190,.26) 55%, rgba(20,60,140,.42) 70%, rgba(120,210,255,.30) 74%);
+  box-shadow: 0 0 70px rgba(79,190,255,.55), 0 0 160px rgba(79,190,255,.25),
+              inset 0 0 50px rgba(120,220,255,.45), inset -14px -20px 40px rgba(0,10,30,.45),
+              inset 0 0 0 1.5px rgba(190,240,255,.55);
   animation: float 7s ease-in-out infinite;
 }
-.globe { position: absolute; inset: 2%; transform-style: preserve-3d; animation: globe 26s linear infinite; }
-.globe i, .globe b { position: absolute; inset: 0; border-radius: 50%; pointer-events: none; }
-.globe i { border: 1px solid rgba(140,220,255,.30); transform: rotateY(var(--r)); }
-/* latitude circles: a ring lying flat, lifted to its height, shrunk to the sphere's width there */
-.globe b { border: 1px solid rgba(140,220,255,.22);
-  transform: translateY(calc(var(--y) * var(--g) * .48)) rotateX(90deg) scale(calc(sqrt(1 - var(--y) * var(--y)))); }
-.globe b:first-of-type { border-color: rgba(160,230,255,.45); box-shadow: 0 0 12px rgba(79,216,255,.4); }
-@keyframes globe { from { transform: rotateX(-14deg) rotateY(0); } to { transform: rotateX(-14deg) rotateY(360deg); } }
-.energy { position: absolute; inset: 30%; border-radius: 50%;
+.globe-map { position: absolute; inset: 0; width: 100%; height: 100%; border-radius: 50%; }
+.energy { position: absolute; inset: 34%; border-radius: 50%; opacity: .55;
   background: radial-gradient(circle, rgba(235,255,255,.95), rgba(120,220,255,.55) 35%, rgba(79,216,255,0) 70%);
   filter: blur(2px); animation: energy 3.4s ease-in-out infinite; }
 @keyframes energy { 50% { transform: scale(1.12); opacity: .8; } }
-.sphere .mark { position: absolute; inset: 0; display: grid; place-content: center; transform: translateZ(1px);
-  font-size: calc(var(--s) * .11); font-weight: 600; color: #f2fdff; letter-spacing: 0;
-  text-shadow: 0 0 12px #9fe8ff, 0 0 28px #4fd8ff, 0 0 60px #4fd8ff; }
 .sphere .scan { position: absolute; inset: 0; border-radius: 50%; mix-blend-mode: screen; opacity: .22;
   background: repeating-linear-gradient(180deg, rgba(79,216,255,.25) 0 1px, transparent 1px 4px); animation: scan 6s linear infinite; }
 @keyframes float { 50% { transform: translateY(-12px); } }
