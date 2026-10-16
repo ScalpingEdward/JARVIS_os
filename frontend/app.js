@@ -316,7 +316,6 @@ function morph(panel, rect, reverse) {
 
 function open(view, fromTile, push = true) {
   openView = view; openedFrom = fromTile;
-  document.querySelectorAll('.side a').forEach((n) => n.classList.toggle('active', n.dataset.nav === view));
   $('#detailTitle').textContent = TITLES[view];
   document.querySelectorAll('.view').forEach((v) => v.classList.toggle('active', v.dataset.view === view));
   $('#detail').hidden = false;
@@ -332,7 +331,6 @@ async function close(push = true) {
   if (!openView) return;
   const tile = openedFrom;
   openView = null;
-  document.querySelectorAll('.side a').forEach((n) => n.classList.toggle('active', n.dataset.nav === 'hub'));
   if (tile && !reduced) await morph($('#detailPanel'), tile.getBoundingClientRect(), true).catch(() => {});
   $('#detail').hidden = true;
   document.body.classList.remove('locked');
@@ -395,12 +393,6 @@ if (!reduced && matchMedia('(hover: hover)').matches) {
   draw();
 })();
 
-// --- side navigation: the same views the cards open -------------------------------------
-document.querySelectorAll('.side a').forEach((a) => a.addEventListener('click', (e) => {
-  e.preventDefault();
-  const v = a.dataset.nav;
-  if (v === 'hub') close(); else open(v, $(`.tile[data-view="${v}"]`));
-}));
 refreshHealth();  // at once: the bot check takes seconds and must not wait for the rest
 refreshHistory().then(refreshTrading).then(refreshHealth).then(() => {
   const v = location.hash.slice(1);

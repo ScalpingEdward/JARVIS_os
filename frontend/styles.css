@@ -76,22 +76,13 @@ body { background: #03060c url("./lounge.webp") center / cover no-repeat fixed; 
 .when small { font-size: 11px; color: var(--faint); }
 .svc span:last-child { display: none; }  /* the dots up here; names are in the System card */
 
-.side { position: fixed; left: 0; top: 84px; z-index: 3; display: grid; gap: 4px; padding: 10px; width: 176px; }
-.side a { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-radius: 12px; color: var(--muted); text-decoration: none; font-size: 13.5px; transition: background .2s, color .2s; }
-.side a:hover { color: var(--text); background: rgba(255,255,255,.04); }
-.side a.active { color: var(--text); background: linear-gradient(90deg, rgba(79,216,255,.16), rgba(79,216,255,.02)); box-shadow: inset 2px 0 0 var(--accent); }
-.ic { width: 16px; height: 16px; border: 1.5px solid currentColor; border-radius: 4px; opacity: .8; position: relative; }
-.ic-grid { background: linear-gradient(currentColor, currentColor) 50% 0 / 1.5px 100% no-repeat, linear-gradient(currentColor, currentColor) 0 50% / 100% 1.5px no-repeat; }
-.ic-chart { border-width: 0 0 1.5px 1.5px; border-radius: 0; background: linear-gradient(135deg, transparent 45%, currentColor 46%, currentColor 54%, transparent 55%); }
-.ic-cam { border-radius: 5px; background: radial-gradient(circle, transparent 3px, currentColor 3.5px, currentColor 4.5px, transparent 5px); }
-@media (max-width: 1250px) { .side { display: none; } }
 
 /* --- the 3D stage ------------------------------------------------------------------ */
 .field { position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: .35; }
 .stage {
   position: relative; z-index: 1; min-height: calc(100vh - 84px);
   display: grid; place-items: center;
-  padding: 0 clamp(16px, 3vw, 40px) 36px clamp(16px, 3vw, 200px);
+  padding: 22px clamp(16px, 3vw, 40px) 36px;
   perspective: 1700px; perspective-origin: 50% 35%;
 }
 .scene {
@@ -218,7 +209,7 @@ body { background: #03060c url("./lounge.webp") center / cover no-repeat fixed; 
 /* narrow screens: one column, AURON on top, no tilting space */
 @media (max-width: 1000px) {
   .motto { display: none; }
-  .stage { perspective: none; padding-left: clamp(16px, 3vw, 40px); }
+  .stage { perspective: none; }
   .scene { grid-template-columns: minmax(0, 1fr); grid-template-areas: "holo" "trading" "insta" "groups" "system" "strip"; transform: none !important; gap: 16px; }
   .tile { --base-ry: 0deg !important; }
   .strip { transform: none; grid-template-columns: repeat(2, minmax(0, 1fr)); }
