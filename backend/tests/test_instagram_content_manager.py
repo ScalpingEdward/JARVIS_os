@@ -26,6 +26,34 @@ def _operator_token(monkeypatch):
     # payload, which moderate()'s near-duplicate check would otherwise
     # catch across tests.
     InstagramContentService().reset()
+    _processed_versions()
+
+
+def _processed_versions():
+    """The media these tests post, each with an edited version in Drive.
+
+    Since 2026-10-08 publish() posts only the processed file (post_ref) and
+    refuses when there is none -- falling back to the original would undo
+    the cut and the grade. These tests predate that and posted bare refs;
+    they failed with "no processed file in Drive" ever since.
+    """
+    from app.instagram_content.media_pool_models import (
+        MediaPoolIngestRequest, MediaPoolItemCreate, ProcessedUploadedRequest)
+    from app.instagram_content.media_pool_service import media_pool_service
+
+    media_pool_service.reset()
+    media_pool_service.ingest(MediaPoolIngestRequest(items=[
+        MediaPoolItemCreate(media_ref="drive://file-123", media_type="image", theme="t", aesthetic_score=0.9),
+        MediaPoolItemCreate(media_ref="drive://clip-1", media_type="video", theme="t", aesthetic_score=0.9,
+                            duration_seconds=20.0),
+        MediaPoolItemCreate(media_ref="a", media_type="image", theme="t", aesthetic_score=0.9),
+        MediaPoolItemCreate(media_ref="b", media_type="image", theme="t", aesthetic_score=0.9),
+    ]))
+    refs = ("drive://file-123", "drive://clip-1", "a", "b")
+    for ref in refs:
+        media_pool_service.set_processed_file(ref, ref.rsplit("/", 1)[-1] + ".processed")
+    media_pool_service.record_processed_uploads(ProcessedUploadedRequest(items=[
+        {"media_ref": ref, "processed_media_ref": f"drive-processed-{ref.rsplit('/', 1)[-1]}"} for ref in refs]))
 
 
 def _image(ref="drive://file-123", score=0.9):
@@ -340,7 +368,8 @@ def test_history_search_via_the_api(monkeypatch):
     instagram_content_service.reset()
     knowledge_graph_service.reset()
 
-    def fake_publish(media_items, post_format, edit_plan, caption, request_id):
+    def fake_publish(media_items, post_format, edit_plan, caption, request_id, post_refs=None):
+        assert post_refs == {"drive://file-123": "drive-processed-file-123"}, "the edited file is what gets posted"
         return "17895695668004550"
 
     monkeypatch.setattr(instagram_content_service._publisher, "publish", fake_publish)
@@ -352,7 +381,7 @@ def test_history_search_via_the_api(monkeypatch):
     candidate_id = created.json()["id"]
     api_client.post(f"/v1/instagram/candidates/{candidate_id}/decision", json={"approved": True, "reason": "Good"}, headers=OPERATOR_HEADERS)
     publish_response = api_client.post(f"/v1/instagram/candidates/{candidate_id}/publish")
-    assert publish_response.status_code == 200
+    assert publish_response.status_code == 200, publish_response.text
 
     search_response = api_client.get("/v1/instagram/history/search", params={"query": "tradingmindset"})
     assert search_response.status_code == 200
