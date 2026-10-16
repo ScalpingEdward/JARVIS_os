@@ -82,7 +82,7 @@ body { background: #03060c url("./lounge.webp") center / cover no-repeat fixed; 
 .stage {
   position: relative; z-index: 1; min-height: calc(100vh - 84px);
   display: grid; place-items: center;
-  padding: 22px clamp(16px, 3vw, 40px) 64px;  /* room for the status bar fixed at the bottom */
+  padding: 22px clamp(16px, 3vw, 40px) 120px;  /* room for the chat pill and the status bar fixed at the bottom */
   perspective: 1700px; perspective-origin: 50% 35%;
 }
 .scene {
@@ -377,3 +377,29 @@ body { background: #03060c url("./lounge.webp") center / cover no-repeat fixed; 
 /* the watchlist card shows its sparklines only when it is wide enough for them */
 .a-watch { container-type: inline-size; }
 @container (max-width: 300px) { .watch-top svg { display: none; } }
+
+/* AURON chat: a pill above the status bar that opens into a conversation */
+.chat { position: fixed; left: 50%; bottom: 52px; transform: translateX(-50%); z-index: 6; width: min(640px, calc(100vw - 32px));
+  display: flex; flex-direction: column; gap: 8px; }
+.chat-panel { display: none; flex-direction: column; max-height: min(60vh, 560px); border-radius: var(--radius);
+  background: var(--surface); border: 1px solid var(--line-2); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
+  box-shadow: 0 20px 60px rgba(0,0,0,.45); overflow: hidden; }
+.chat.open .chat-panel { display: flex; }
+.chat-head { display: flex; justify-content: space-between; align-items: center; padding: 10px 16px; border-bottom: 1px solid var(--line);
+  font-size: 12px; letter-spacing: .14em; color: var(--accent); }
+.chat-head button { font: inherit; letter-spacing: .04em; color: var(--muted); background: none; border: 0; cursor: pointer; padding: 2px 6px; }
+.chat-head button:hover { color: var(--text); }
+.chat-log { overflow-y: auto; padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; }
+.msg { max-width: 85%; padding: 9px 13px; border-radius: 16px; white-space: pre-wrap; font-size: 14px; line-height: 1.5; overflow-wrap: anywhere; }
+.msg.user { align-self: flex-end; background: color-mix(in srgb, var(--accent) 18%, transparent); border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent); }
+.msg.assistant { align-self: flex-start; background: var(--surface-2); border: 1px solid var(--line); }
+.msg.err { border-color: rgba(242,100,124,.5); color: var(--down); }
+.msg.hint { align-self: center; color: var(--muted); font-size: 13px; text-align: center; }
+.msg small { display: block; margin-top: 6px; color: var(--faint); font-size: 11px; letter-spacing: .06em; }
+.chat-form { display: flex; gap: 8px; padding: 6px 6px 6px 18px; border-radius: 999px; background: var(--surface);
+  border: 1px solid var(--line-2); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px); }
+.chat-form:focus-within { border-color: color-mix(in srgb, var(--accent) 55%, transparent); }
+.chat-form input { flex: 1; min-width: 0; font: inherit; color: var(--text); background: none; border: 0; outline: none; }
+.chat-form button { width: 38px; height: 38px; border-radius: 50%; border: 0; cursor: pointer; color: #001018; background: var(--accent); }
+.chat-form.busy button { opacity: .4; cursor: wait; }
+.core { cursor: pointer; }

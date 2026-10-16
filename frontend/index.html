@@ -125,8 +125,19 @@
     </div>
   </div>
 
+  <section class="chat" id="chat" aria-label="AURON chat">
+    <div class="chat-panel">
+      <div class="chat-head"><b>AURON</b><span><button type="button" id="chatClear" title="Gespräch leeren">Neu</button><button type="button" id="chatClose" aria-label="Schließen">✕</button></span></div>
+      <div class="chat-log" id="chatLog" aria-live="polite"></div>
+    </div>
+    <form class="chat-form" id="chatForm" autocomplete="off">
+      <input id="chatInput" placeholder="Sprich mit AURON …" maxlength="4000" aria-label="Nachricht an AURON" />
+      <button type="submit" aria-label="Senden">➤</button>
+    </form>
+  </section>
   <footer class="sysbar" id="sysbar" aria-label="System status"></footer>
   <script src="./app.js"></script>
+  <script src="./chat.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/d3-array@3.2.4/dist/d3-array.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/d3-geo@3.1.1/dist/d3-geo.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js"></script>
