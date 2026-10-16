@@ -62,7 +62,7 @@ body { background: #03060c url("./lounge.webp") center / cover no-repeat fixed; 
 .dot.ok::after { content: ""; position: absolute; inset: 0; border-radius: 50%; background: var(--up); animation: ping 2.4s var(--ease) infinite; }
 @keyframes ping { from { transform: scale(1); opacity: .6; } to { transform: scale(3); opacity: 0; } }
 
-/* --- header, side navigation ------------------------------------------------------- */
+/* --- header ------------------------------------------------------------------------ */
 .brand { gap: 12px; letter-spacing: .32em; }
 .brand div { display: grid; line-height: 1.2; }
 .brand b { font-size: 16px; font-weight: 600; }
