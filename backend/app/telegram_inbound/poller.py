@@ -10,7 +10,8 @@ updates (getUpdates), so no port is opened and no public URL exists that
 could be probed. It is the only consumer of the bot's updates -- Telegram
 refuses getUpdates while a webhook is set, and one bot has one queue.
 
-Routing is by the action letter in callback_data, not by trying each
+Messages (typed or spoken) go to AURON (app.assistant.telegram); taps are
+routed by the action letter in callback_data, not by trying each
 module in turn. The three token alphabets are disjoint by design
 (instagram {p, d, g, n, 0-9}, setups {a, r}, live orders {x, c}), so the letter names
 exactly one module. Trying all three would work too, but every miss would
@@ -81,6 +82,7 @@ class TelegramPoller:
         self._client = client
         self._task: asyncio.Task | None = None
         self._offset: int | None = None
+        self._side: set[asyncio.Task] = set()  # AURON answers in flight
 
     def _url(self, method: str) -> str:
         return f"https://api.telegram.org/bot{self._bot_token}/{method}"
@@ -90,6 +92,17 @@ class TelegramPoller:
         chat, bad signature) is logged and swallowed: one bad update must not
         stop the loop, and must not be re-fetched forever either -- the
         offset moves past it regardless."""
+        from app.assistant.telegram import handle_message, is_for_auron
+
+        if is_for_auron(update):
+            # A message to AURON takes 10-30 s (Claude, maybe a voice note); answer it on the
+            # side so the next update -- a tap on a post card -- is not kept waiting.
+            task = asyncio.create_task(asyncio.to_thread(handle_message, update))
+            self._side.add(task)
+            task.add_done_callback(self._side.discard)
+            task.add_done_callback(lambda t: t.cancelled() or not t.exception()
+                                   or log.warning("AURON telegram answer failed: %s", t.exception()))
+            return
         handler = route_for(update)
         query = update.get("callback_query") or {}
         if handler is not None:
@@ -107,7 +120,7 @@ class TelegramPoller:
                 pass
 
     async def poll_once(self) -> int:
-        params: dict = {"timeout": _LONG_POLL_SECONDS, "allowed_updates": ["callback_query"]}
+        params: dict = {"timeout": _LONG_POLL_SECONDS, "allowed_updates": ["callback_query", "message"]}
         if self._offset is not None:
             params["offset"] = self._offset
         response = await self._client.post(self._url("getUpdates"), json=params,

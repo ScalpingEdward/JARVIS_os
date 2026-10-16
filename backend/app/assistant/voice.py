@@ -14,7 +14,8 @@ from collections import OrderedDict
 
 import httpx
 
-ELEVEN_URL = "https://api.elevenlabs.io/v1/text-to-speech/{voice}?output_format=mp3_44100_128"
+ELEVEN_URL = "https://api.elevenlabs.io/v1/text-to-speech/{voice}?output_format={fmt}"
+FORMATS = {"mp3": "mp3_44100_128", "ogg": "opus_48000_64"}  # ogg/opus: what Telegram plays as a voice note
 OPENAI_URL = "https://api.openai.com/v1/audio/speech"
 MAX_CHARS = 2500
 
@@ -62,7 +63,7 @@ def voices() -> dict:
 
 
 def speak(text: str, provider: str, voice: str, model: str, accent: str = "",
-          client: httpx.Client | None = None) -> bytes:
+          client: httpx.Client | None = None, fmt: str = "mp3") -> bytes:
     """accent: e.g. "British accent" -- put in front as a tag, so v3/v4 speak German the way the voice is from."""
     text = text.strip()[:MAX_CHARS]
     if provider == "openai" or model not in TAG_MODELS:
@@ -71,7 +72,7 @@ def speak(text: str, provider: str, voice: str, model: str, accent: str = "",
         text = f"[{accent}] {text}"
     if not text:
         raise VoiceError("nothing to say")
-    key = (text, provider, voice, model)
+    key = (text, provider, voice, model, fmt)
     if key in _cache:
         _cache.move_to_end(key)
         return _cache[key]
@@ -81,7 +82,7 @@ def speak(text: str, provider: str, voice: str, model: str, accent: str = "",
             api_key = os.getenv("ELEVENLABS_API_KEY")
             if not api_key:
                 raise VoiceError("ELEVENLABS_API_KEY is not set")
-            r = c.post(ELEVEN_URL.format(voice=voice), timeout=60, headers={"xi-api-key": api_key},
+            r = c.post(ELEVEN_URL.format(voice=voice, fmt=FORMATS[fmt]), timeout=60, headers={"xi-api-key": api_key},
                        json={"text": text, "model_id": model})
         elif provider == "openai":
             api_key = os.getenv("OPENAI_API_KEY")
@@ -89,7 +90,7 @@ def speak(text: str, provider: str, voice: str, model: str, accent: str = "",
                 raise VoiceError("OPENAI_API_KEY is not set")
             r = c.post(OPENAI_URL, timeout=60, headers={"Authorization": f"Bearer {api_key}"},
                        json={"model": model, "voice": voice, "input": text, "instructions": OPENAI_INSTRUCTIONS,
-                             "response_format": "mp3"})
+                             "response_format": "opus" if fmt == "ogg" else "mp3"})
         else:
             raise VoiceError(f"unknown provider {provider}")
         if r.status_code >= 400:
