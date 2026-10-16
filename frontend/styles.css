@@ -113,17 +113,34 @@ body { background: #03060c url("./room.svg") center / cover no-repeat fixed; }
 /* AURON's core: a glass sphere with a hologram inside, three electrons on their orbits,
    standing on a light pedestal */
 .core { --s: clamp(260px, 30vw, 440px); position: relative; width: var(--s); height: calc(var(--s) * 1.18); margin: 0 auto; transform-style: preserve-3d; }
+/* AURON's planet: a glass sphere with an energy core, a turning wireframe globe inside */
 .sphere {
-  position: absolute; left: 21%; right: 21%; top: 10%; aspect-ratio: 1; border-radius: 50%; overflow: hidden;
-  background: radial-gradient(circle at 35% 30%, rgba(255,255,255,.35), rgba(255,255,255,0) 22%),
-              radial-gradient(circle at 50% 50%, rgba(46,120,255,.35), rgba(10,30,70,.55) 60%, rgba(4,10,24,.9) 74%);
-  box-shadow: 0 0 80px rgba(79,170,255,.45), 0 0 160px rgba(79,170,255,.18), inset 0 0 60px rgba(79,216,255,.35), inset 0 -20px 40px rgba(0,0,0,.6);
-  border: 1px solid rgba(160,220,255,.35);
+  --g: calc(var(--s) * .58);
+  position: absolute; left: 21%; right: 21%; top: 10%; aspect-ratio: 1; border-radius: 50%;
+  transform-style: preserve-3d;
+  background:
+    radial-gradient(circle at 34% 28%, rgba(255,255,255,.42), rgba(255,255,255,0) 20%),
+    radial-gradient(circle at 50% 52%, rgba(90,190,255,.30), rgba(30,80,170,.32) 48%, rgba(8,20,48,.78) 70%, rgba(4,10,24,.92) 74%);
+  box-shadow: 0 0 90px rgba(79,170,255,.5), 0 0 180px rgba(79,170,255,.2),
+              inset 0 0 70px rgba(79,216,255,.4), inset -18px -24px 50px rgba(0,0,0,.55), inset 0 0 0 1px rgba(170,225,255,.35);
   animation: float 7s ease-in-out infinite;
 }
-.sphere img { position: absolute; inset: 6% 10% 0; width: 80%; opacity: .55; mix-blend-mode: screen; user-select: none;
-  -webkit-mask-image: radial-gradient(circle at 50% 42%, #000 40%, transparent 70%); mask-image: radial-gradient(circle at 50% 42%, #000 40%, transparent 70%); }
-.sphere .scan { position: absolute; inset: 0; mix-blend-mode: screen; opacity: .3;
+.globe { position: absolute; inset: 2%; transform-style: preserve-3d; animation: globe 26s linear infinite; }
+.globe i, .globe b { position: absolute; inset: 0; border-radius: 50%; pointer-events: none; }
+.globe i { border: 1px solid rgba(140,220,255,.30); transform: rotateY(var(--r)); }
+/* latitude circles: a ring lying flat, lifted to its height, shrunk to the sphere's width there */
+.globe b { border: 1px solid rgba(140,220,255,.22);
+  transform: translateY(calc(var(--y) * var(--g) * .48)) rotateX(90deg) scale(calc(sqrt(1 - var(--y) * var(--y)))); }
+.globe b:first-of-type { border-color: rgba(160,230,255,.45); box-shadow: 0 0 12px rgba(79,216,255,.4); }
+@keyframes globe { from { transform: rotateX(-14deg) rotateY(0); } to { transform: rotateX(-14deg) rotateY(360deg); } }
+.energy { position: absolute; inset: 30%; border-radius: 50%;
+  background: radial-gradient(circle, rgba(235,255,255,.95), rgba(120,220,255,.55) 35%, rgba(79,216,255,0) 70%);
+  filter: blur(2px); animation: energy 3.4s ease-in-out infinite; }
+@keyframes energy { 50% { transform: scale(1.12); opacity: .8; } }
+.sphere .mark { position: absolute; inset: 0; display: grid; place-content: center; transform: translateZ(1px);
+  font-size: calc(var(--s) * .11); font-weight: 600; color: #f2fdff; letter-spacing: 0;
+  text-shadow: 0 0 12px #9fe8ff, 0 0 28px #4fd8ff, 0 0 60px #4fd8ff; }
+.sphere .scan { position: absolute; inset: 0; border-radius: 50%; mix-blend-mode: screen; opacity: .22;
   background: repeating-linear-gradient(180deg, rgba(79,216,255,.25) 0 1px, transparent 1px 4px); animation: scan 6s linear infinite; }
 @keyframes float { 50% { transform: translateY(-12px); } }
 @keyframes scan { to { background-position: 0 120px; } }
@@ -339,10 +356,3 @@ body { background: #03060c url("./room.svg") center / cover no-repeat fixed; }
 .weather .wi { font-size: 16px; filter: drop-shadow(0 0 6px rgba(79,216,255,.5)); }
 @media (max-width: 600px) { .weather small { display: none; } }
 
-/* AURON's 3D head (head3d.js) floats where the sphere was; the sphere is the fallback */
-.head3d { position: absolute; left: -4%; right: -4%; top: -8%; aspect-ratio: 1; pointer-events: none; }
-.head3d canvas { width: 100%; height: 100%; display: block; }
-.core.has3d .sphere { opacity: 0; transition: opacity .8s; }
-.voice { background: none; border: 1px solid var(--line); border-radius: 999px; width: 32px; height: 32px; cursor: pointer; font-size: 14px; color: var(--text); }
-.voice.off { opacity: .45; }
-.credit { position: fixed; right: 12px; bottom: 8px; z-index: 2; font-size: 10px; color: var(--faint); }

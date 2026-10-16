@@ -6,11 +6,6 @@
   <meta name="theme-color" content="#06080d" />
   <title>AURON</title>
   <link rel="stylesheet" href="./styles.css" />
-  <script type="importmap">
-    { "imports": {
-        "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
-        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/" } }
-  </script>
 </head>
 <body>
   <canvas class="field" id="field" aria-hidden="true"></canvas>
@@ -19,7 +14,7 @@
   <header class="top">
     <div class="brand"><span class="glyph"></span><div><b>AURON</b><small>AI trading &amp; social agent</small></div></div>
     <div class="motto">DISCIPLINE <i>×</i> DATA <i>×</i> FREEDOM</div>
-    <div class="top-right"><div class="health" id="health" aria-label="System status"></div><button class="voice" id="voice" title="AURON spricht: an/aus" aria-label="AURON spricht an oder aus">🔊</button><div class="weather" id="weather" title="Wetter"></div><div class="when"><time class="clock" id="clock">--:--</time><small id="date"></small></div></div>
+    <div class="top-right"><div class="health" id="health" aria-label="System status"></div><div class="weather" id="weather" title="Wetter"></div><div class="when"><time class="clock" id="clock">--:--</time><small id="date"></small></div></div>
   </header>
 
   <nav class="side" aria-label="Views">
@@ -35,8 +30,11 @@
       <section class="holo" aria-label="AURON">
         <div class="core" id="core">
           <div class="orbit o1"><i></i></div><div class="orbit o2"><i></i></div><div class="orbit o3 warm"><i></i></div>
-          <div class="sphere"><img src="./auron-head.webp" alt="" draggable="false" /><i class="scan"></i></div>
-          <div class="head3d" id="head3d"></div>
+          <div class="sphere">
+            <div class="globe"><i style="--r:0deg"></i><i style="--r:30deg"></i><i style="--r:60deg"></i><i style="--r:90deg"></i><i style="--r:120deg"></i><i style="--r:150deg"></i>
+              <b style="--y:0"></b><b style="--y:-.33"></b><b style="--y:.33"></b><b style="--y:-.62"></b><b style="--y:.62"></b></div>
+            <div class="energy"></div><span class="mark">A</span><i class="scan"></i>
+          </div>
           <div class="beam"></div>
           <svg class="pedestal" viewBox="0 0 400 170" aria-hidden="true">
             <defs>
@@ -149,14 +147,6 @@
     </div>
   </div>
 
-  <div class="credit">3D head: “Infinite” scan by Lee Perry-Smith, CC BY 3.0</div>
   <script src="./app.js"></script>
-  <script type="module">
-    // AURON's 3D head. If WebGL or the model fails, the flat hologram in the sphere stays.
-    import { mountHead } from './head3d.js';
-    mountHead(document.getElementById('head3d'))
-      .then((head) => { window.auronHead = head; document.getElementById('core').classList.add('has3d'); })
-      .catch((e) => console.warn('3D head unavailable, keeping the flat one:', e));
-  </script>
 </body>
 </html>

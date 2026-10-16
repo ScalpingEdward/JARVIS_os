@@ -253,7 +253,6 @@ function tickCountdown() {
 async function refreshInstagram() {
   try {
     const [dash, sched] = await Promise.all([get('/v1/instagram/dashboard'), get('/v1/telegram-instagram/schedule')]);
-    lastInsta = { dash, sched };
     const left = dash.media_pool_available, used = dash.media_pool_used, all = left + used || 1;
     const n = parseNext(sched.next);
     nextAt = n ? n.at : null;
@@ -286,8 +285,6 @@ async function refreshHealth() {
   $('#sList').innerHTML = svcs.map(([n, c]) => `<div class="row"><span class="dot ${c}"></span><span>${esc(n)}</span><span>${c === 'ok' ? 'online' : c === 'warn' ? 'late' : 'offline'}</span></div>`).join('');
   const bad = svcs.filter(([, c]) => c !== 'ok').length;
   $('#core').classList.toggle('degraded', bad > 0);
-  window.auronHead?.setDegraded(bad > 0);
-  lastHealth = { bad, total: svcs.length, down: svcs.filter(([, c]) => c !== 'ok').map(([n]) => n) };
   $('#sBadge').textContent = bad ? `${bad} down` : 'all online';
   $('#sBadge').classList.toggle('live', !bad);
   const copiers = (overview?.accounts || []).filter((a) => a.state === 'live').length;
@@ -346,43 +343,7 @@ async function close(push = true) {
 }
 
 const history_ = window.history;
-// A click: AURON turns to the card and says what is on it, then the full view opens.
-let lastInsta = null, lastHealth = null;
-const euro = (v) => `${v < 0 ? 'minus ' : v > 0 ? 'plus ' : ''}${Math.abs(v).toLocaleString('de-DE', { maximumFractionDigits: 2 })} Euro`;
-function summary(view) {
-  if (view === 'trading' && overview?.totals?.length) {
-    const t = overview.totals[0], live = overview.accounts.filter((a) => a.state === 'live').length;
-    return `Trading. ${live} von ${overview.accounts.length} Konten live. Heute ${euro(t.pnl_today)}, diese Woche ${euro(t.pnl_week)}.`
-      + (t.open_positions ? ` ${t.open_positions} Positionen offen.` : ' Keine Position offen.');
-  }
-  if (view === 'instagram' && lastInsta) {
-    const n = parseNext(lastInsta.sched.next);
-    return `Instagram. ${n ? `Nächster Post: ${n.kind === 'reel' ? 'ein Reel' : 'ein Beitrag'} um ${lastInsta.sched.next.split(' ')[0]} Uhr.` : 'Nichts geplant.'}`
-      + ` ${lastInsta.dash.curated_drafts_pending} Entwürfe bereit, ${lastInsta.dash.media_pool_available} Medien im Pool.`;
-  }
-  if (view === 'system' && lastHealth) {
-    return lastHealth.bad ? `Achtung. ${lastHealth.down.join(', ')} ${lastHealth.bad === 1 ? 'ist' : 'sind'} nicht erreichbar.`
-      : `Alle ${lastHealth.total} Systeme online.`;
-  }
-  return '';
-}
-function present(view, tile, opensView) {
-  const head = window.auronHead;
-  head?.lookAt(tile);
-  const text = summary(view);
-  if (text) head?.speak(text);
-  if (opensView) setTimeout(() => open(view, tile), head ? 700 : 0);
-}
-document.querySelectorAll('.tile[data-view]').forEach((tile) => tile.addEventListener('click', () => present(tile.dataset.view, tile, true)));
-$('#tileSystem').addEventListener('click', () => present('system', $('#tileSystem'), false));
-const voiceBtn = $('#voice');
-const showVoice = () => { const off = localStorage.getItem('auron_voice') === 'off'; voiceBtn.textContent = off ? '🔇' : '🔊'; voiceBtn.classList.toggle('off', off); };
-voiceBtn.addEventListener('click', () => {
-  localStorage.setItem('auron_voice', localStorage.getItem('auron_voice') === 'off' ? 'on' : 'off');
-  if (localStorage.getItem('auron_voice') === 'off') speechSynthesis?.cancel();
-  showVoice();
-});
-showVoice();
+document.querySelectorAll('.tile[data-view]').forEach((tile) => tile.addEventListener('click', () => open(tile.dataset.view, tile)));
 $('#close').addEventListener('click', () => close());
 $('#detail').addEventListener('click', (e) => { if (e.target.id === 'detail') close(); });
 addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
