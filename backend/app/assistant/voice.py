@@ -1,0 +1,101 @@
+"""AURON's voice: text in, MP3 out -- ElevenLabs, or OpenAI as the alternative.
+
+ElevenLabs v3/v4 understand audio tags ([laughs], [sighs], ...): the chat prompt lets
+AURON use one now and then, the dashboard hides them in the text, and here they are
+kept for those models and stripped for the others, which would read them out.
+The key only needs "Text to Speech"; the voices are ElevenLabs' standard ones, listed
+here, so it needs no right to read the account's voice list.
+"""
+from __future__ import annotations
+
+import os
+import re
+from collections import OrderedDict
+
+import httpx
+
+ELEVEN_URL = "https://api.elevenlabs.io/v1/text-to-speech/{voice}?output_format=mp3_44100_128"
+OPENAI_URL = "https://api.openai.com/v1/audio/speech"
+MAX_CHARS = 2500
+
+# ElevenLabs' standard voices (the same IDs for every account).
+ELEVEN_VOICES = [
+    ("onwK4e9ZLuTAKqWW03F9", "Daniel", "britisch, tief, ruhig – Nachrichtensprecher"),
+    ("JBFqnCBsd6RMkjVDRZzb", "George", "britisch, warm, erzählend"),
+    ("nPczCjzI2devNBz1zQrb", "Brian", "tief, sonor, amerikanisch"),
+    ("pNInz6obpgDQGcFmaJgB", "Adam", "tief, kräftig, amerikanisch"),
+    ("N2lVS1w4EtoT3dr4eOWO", "Callum", "rau, intensiv"),
+    ("cjVigY5qzO86Huf0OWal", "Eric", "weich, vertrauensvoll"),
+    ("iP95p4xoKVk53GoZ742B", "Chris", "locker, natürlich"),
+    ("TX3LPaxmHKxFdv7VOQHJ", "Liam", "jung, energisch"),
+    ("EXAVITQu4vr4xnSDxMaL", "Sarah", "weiblich, weich, sicher"),
+    ("XrExE9yKIg1WjnnlVkGX", "Matilda", "weiblich, freundlich, warm"),
+]
+ELEVEN_MODELS = {"eleven_v4": "v4 – neu, ausdrucksstark", "eleven_v3": "v3 – ausdrucksstark",
+                 "eleven_multilingual_v2": "v2 – ruhig, stabil", "eleven_flash_v2_5": "Flash – am schnellsten"}
+TAG_MODELS = {"eleven_v3", "eleven_v4"}
+OPENAI_VOICES = ["onyx", "ash", "echo", "ballad", "verse", "sage", "coral", "nova"]
+OPENAI_INSTRUCTIONS = ("Sprich wie ein vertrauter, warmer Assistent mit trockenem Humor: natürlich, entspannt, "
+                       "nicht wie ein Ansager. Lachen, wo der Text lacht.")
+
+TAG = re.compile(r"\[[a-zA-Z ]{2,24}\]\s*")
+_cache: OrderedDict[tuple, bytes] = OrderedDict()  # the comparison plays the same lines again and again
+
+
+class VoiceError(RuntimeError):
+    pass
+
+
+def strip_tags(text: str) -> str:
+    return TAG.sub("", text).strip()
+
+
+def voices() -> dict:
+    return {
+        "elevenlabs": {"available": bool(os.getenv("ELEVENLABS_API_KEY")),
+                       "voices": [{"id": i, "name": n, "desc": d} for i, n, d in ELEVEN_VOICES],
+                       "models": [{"id": k, "name": v} for k, v in ELEVEN_MODELS.items()]},
+        "openai": {"available": bool(os.getenv("OPENAI_API_KEY")),
+                   "voices": [{"id": v, "name": v.capitalize(), "desc": ""} for v in OPENAI_VOICES],
+                   "models": [{"id": "gpt-4o-mini-tts", "name": "gpt-4o-mini-tts"}]},
+    }
+
+
+def speak(text: str, provider: str, voice: str, model: str, client: httpx.Client | None = None) -> bytes:
+    text = text.strip()[:MAX_CHARS]
+    if provider == "openai" or model not in TAG_MODELS:
+        text = strip_tags(text)
+    if not text:
+        raise VoiceError("nothing to say")
+    key = (text, provider, voice, model)
+    if key in _cache:
+        _cache.move_to_end(key)
+        return _cache[key]
+    c, close = (client, False) if client else (httpx.Client(), True)
+    try:
+        if provider == "elevenlabs":
+            api_key = os.getenv("ELEVENLABS_API_KEY")
+            if not api_key:
+                raise VoiceError("ELEVENLABS_API_KEY is not set")
+            r = c.post(ELEVEN_URL.format(voice=voice), timeout=60, headers={"xi-api-key": api_key},
+                       json={"text": text, "model_id": model})
+        elif provider == "openai":
+            api_key = os.getenv("OPENAI_API_KEY")
+            if not api_key:
+                raise VoiceError("OPENAI_API_KEY is not set")
+            r = c.post(OPENAI_URL, timeout=60, headers={"Authorization": f"Bearer {api_key}"},
+                       json={"model": model, "voice": voice, "input": text, "instructions": OPENAI_INSTRUCTIONS,
+                             "response_format": "mp3"})
+        else:
+            raise VoiceError(f"unknown provider {provider}")
+        if r.status_code >= 400:
+            raise VoiceError(f"{provider} returned {r.status_code}: {r.text[:300]}")
+    except httpx.HTTPError as exc:
+        raise VoiceError(f"Could not reach {provider}: {exc}") from exc
+    finally:
+        if close:
+            c.close()
+    _cache[key] = r.content
+    while len(_cache) > 60:
+        _cache.popitem(last=False)
+    return r.content

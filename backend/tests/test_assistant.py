@@ -67,3 +67,25 @@ def test_endpoint_reports_a_missing_key_as_502(monkeypatch):
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     r = client.post("/v1/assistant/chat", json={"messages": [{"role": "user", "content": "hi"}]})
     assert r.status_code == 502 and "ANTHROPIC_API_KEY" in r.json()["detail"]
+
+
+def test_speak_keeps_tags_only_for_models_that_play_them(monkeypatch):
+    from app.assistant import voice
+    monkeypatch.setenv("ELEVENLABS_API_KEY", "test")
+    voice._cache.clear()
+    sent: list[dict] = []
+    c = httpx.Client(transport=httpx.MockTransport(
+        lambda req: (sent.append(json.loads(req.content)), httpx.Response(200, content=b"ID3mp3"))[1]))
+    assert voice.speak("[laughs] Hallo", "elevenlabs", "v1", "eleven_v4", client=c) == b"ID3mp3"
+    voice.speak("[laughs] Hallo", "elevenlabs", "v1", "eleven_multilingual_v2", client=c)
+    voice.speak("[laughs] Hallo", "elevenlabs", "v1", "eleven_v4", client=c)   # cached, no second call
+    assert [s["text"] for s in sent] == ["[laughs] Hallo", "Hallo"]
+
+
+def test_speak_endpoint_without_key_is_502(monkeypatch):
+    monkeypatch.delenv("ELEVENLABS_API_KEY", raising=False)
+    from app.assistant import voice
+    voice._cache.clear()
+    r = client.post("/v1/assistant/speak", json={"text": "Hallo"})
+    assert r.status_code == 502 and "ELEVENLABS_API_KEY" in r.json()["detail"]
+    assert client.get("/v1/assistant/voices").json()["elevenlabs"]["available"] is False
