@@ -287,8 +287,6 @@ async function refreshHealth() {
   $('#core').classList.toggle('degraded', bad > 0);
   $('#sBadge').textContent = bad ? `${bad} down` : 'all online';
   $('#sBadge').classList.toggle('live', !bad);
-  const copiers = (overview?.accounts || []).filter((a) => a.state === 'live').length;
-  $('#coreLine').textContent = bad ? `${bad} of ${svcs.length} systems need attention` : `online · ${copiers} copier${copiers === 1 ? '' : 's'} live`;
 }
 
 // --- 3D tiles: tilt toward the pointer ---------------------------------------------
@@ -415,8 +413,9 @@ setInterval(refreshInstagram, 30000);
 setInterval(refreshHealth, 15000);
 
 // --- weather next to the clock (Open-Meteo: free, no key) ------------------------------
-// Where: the browser's location if allowed, otherwise Prague. Refreshed every 15 min.
-const WEATHER_FALLBACK = { lat: 50.08, lon: 14.43, place: 'Prag' };
+// Where: the device's location if allowed (named via OpenStreetMap), otherwise Bad Kissingen.
+// Refreshed every 15 min.
+const WEATHER_FALLBACK = { lat: 50.20, lon: 10.08, place: 'Bad Kissingen' };
 const WMO = [
   [[0], '☀', 'klar'], [[1, 2], '⛅', 'leicht bewölkt'], [[3], '☁', 'bewölkt'], [[45, 48], '〰', 'Nebel'],
   [[51, 53, 55, 56, 57], '☂', 'Niesel'], [[61, 63, 65, 66, 67, 80, 81, 82], '☔', 'Regen'],
@@ -428,7 +427,15 @@ function locate() {
   return new Promise((resolve) => {
     if (!navigator.geolocation) return resolve(WEATHER_FALLBACK);
     navigator.geolocation.getCurrentPosition(
-      (p) => resolve({ lat: p.coords.latitude, lon: p.coords.longitude, place: '' }),
+      async (p) => {
+        const at = { lat: p.coords.latitude, lon: p.coords.longitude, place: '' };
+        try {  // the town's name for the coordinates (OpenStreetMap Nominatim, once per load)
+          const r = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&zoom=10&accept-language=de&lat=${at.lat}&lon=${at.lon}`);
+          const a = (await r.json()).address || {};
+          at.place = a.city || a.town || a.village || a.municipality || a.county || '';
+        } catch { /* coordinates are enough for the weather */ }
+        resolve(at);
+      },
       () => resolve(WEATHER_FALLBACK), { timeout: 8000, maximumAge: 3600000 });
   });
 }

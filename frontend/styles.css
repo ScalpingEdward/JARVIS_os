@@ -95,8 +95,8 @@ body { background: #03060c url("./lounge.webp") center / cover no-repeat fixed; 
   perspective: 1700px; perspective-origin: 50% 35%;
 }
 .scene {
-  position: relative; width: min(1300px, 100%);
-  display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr) minmax(0, 1fr);
+  position: relative; width: min(1640px, 100%);
+  display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.75fr) minmax(0, 1fr);
   grid-template-areas: "trading holo system" "insta holo groups" "strip strip strip";
   gap: 22px 30px; align-items: center;
   transform-style: preserve-3d;
@@ -104,10 +104,10 @@ body { background: #03060c url("./lounge.webp") center / cover no-repeat fixed; 
   transition: transform 1.2s var(--ease);
 }
 .holo { grid-area: holo; transform: translateZ(30px); transform-style: preserve-3d; }
-.a-trading { grid-area: trading; --base-ry: 18deg; }
-.a-insta { grid-area: insta; --base-ry: 18deg; }
-.a-system { grid-area: system; --base-ry: -18deg; }
-.a-groups { grid-area: groups; --base-ry: -18deg; }
+.a-trading { grid-area: trading; --base-ry: 22deg; }
+.a-insta { grid-area: insta; --base-ry: 22deg; }
+.a-system { grid-area: system; --base-ry: -22deg; }
+.a-groups { grid-area: groups; --base-ry: -22deg; }
 .strip { grid-area: strip; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 18px; transform: rotateX(16deg) translateZ(10px); transform-style: preserve-3d; margin-top: 6px; }
 
 /* AURON's core: a glass sphere with a hologram inside, three electrons on their orbits,
@@ -156,8 +156,6 @@ body { background: #03060c url("./lounge.webp") center / cover no-repeat fixed; 
 @keyframes beam { 50% { opacity: .55; } }
 .core.degraded { --accent: #f2c14e; }
 .core.degraded .sphere { box-shadow: 0 0 80px rgba(242,193,78,.45), inset 0 0 60px rgba(242,193,78,.35); }
-.core-text { text-align: center; margin-top: 10px; transform: translateZ(30px); }
-.core-text p { margin: 0; color: var(--muted); font-size: 12px; letter-spacing: .18em; text-transform: uppercase; }
 
 /* --- floating glass cards ---------------------------------------------------------- */
 .tile, .mini-tile {
