@@ -40,6 +40,7 @@ class SpeakIn(BaseModel):
     provider: Literal["elevenlabs", "openai"] = "elevenlabs"
     voice: str = Field(default="onwK4e9ZLuTAKqWW03F9", pattern=r"^[A-Za-z0-9_-]{2,40}$")
     model: str = Field(default="eleven_v4", pattern=r"^[A-Za-z0-9_.-]{2,40}$")
+    accent: str = Field(default="", pattern=r"^[A-Za-z ]{0,30}$")  # Brano's pick: "British accent"
 
 
 @router.get("/voices")
@@ -52,7 +53,7 @@ def list_voices() -> dict:
 def speak(payload: SpeakIn) -> Response:
     """The text as MP3 in the chosen voice."""
     try:
-        audio = voice.speak(payload.text, payload.provider, payload.voice, payload.model)
+        audio = voice.speak(payload.text, payload.provider, payload.voice, payload.model, payload.accent)
     except voice.VoiceError as exc:
         raise HTTPException(status_code=502, detail=str(exc))
     return Response(audio, media_type="audio/mpeg")

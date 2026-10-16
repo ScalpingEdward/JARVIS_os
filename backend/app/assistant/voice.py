@@ -61,10 +61,14 @@ def voices() -> dict:
     }
 
 
-def speak(text: str, provider: str, voice: str, model: str, client: httpx.Client | None = None) -> bytes:
+def speak(text: str, provider: str, voice: str, model: str, accent: str = "",
+          client: httpx.Client | None = None) -> bytes:
+    """accent: e.g. "British accent" -- put in front as a tag, so v3/v4 speak German the way the voice is from."""
     text = text.strip()[:MAX_CHARS]
     if provider == "openai" or model not in TAG_MODELS:
         text = strip_tags(text)
+    elif accent:
+        text = f"[{accent}] {text}"
     if not text:
         raise VoiceError("nothing to say")
     key = (text, provider, voice, model)

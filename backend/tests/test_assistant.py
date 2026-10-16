@@ -76,10 +76,10 @@ def test_speak_keeps_tags_only_for_models_that_play_them(monkeypatch):
     sent: list[dict] = []
     c = httpx.Client(transport=httpx.MockTransport(
         lambda req: (sent.append(json.loads(req.content)), httpx.Response(200, content=b"ID3mp3"))[1]))
-    assert voice.speak("[laughs] Hallo", "elevenlabs", "v1", "eleven_v4", client=c) == b"ID3mp3"
-    voice.speak("[laughs] Hallo", "elevenlabs", "v1", "eleven_multilingual_v2", client=c)
-    voice.speak("[laughs] Hallo", "elevenlabs", "v1", "eleven_v4", client=c)   # cached, no second call
-    assert [s["text"] for s in sent] == ["[laughs] Hallo", "Hallo"]
+    assert voice.speak("[laughs] Hallo", "elevenlabs", "v1", "eleven_v4", "British accent", client=c) == b"ID3mp3"
+    voice.speak("[laughs] Hallo", "elevenlabs", "v1", "eleven_multilingual_v2", "British accent", client=c)
+    voice.speak("[laughs] Hallo", "elevenlabs", "v1", "eleven_v4", "British accent", client=c)   # cached, no second call
+    assert [s["text"] for s in sent] == ["[British accent] [laughs] Hallo", "Hallo"]
 
 
 def test_speak_endpoint_without_key_is_502(monkeypatch):

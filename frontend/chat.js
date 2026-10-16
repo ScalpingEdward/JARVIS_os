@@ -54,14 +54,14 @@
   const pref = (k, d) => { try { return localStorage.getItem(k) ?? d; } catch { return d; } };
   const setPref = (k, v) => { try { localStorage.setItem(k, v); } catch { /* private window */ } };
   const voiceOn = () => pref('auron_voice_on', '1') === '1';
-  const chosen = () => { try { return JSON.parse(pref('auron_voice', '')) || null; } catch { return null; } };
-  const DEFAULT_VOICE = { provider: 'elevenlabs', voice: 'JBFqnCBsd6RMkjVDRZzb', model: 'eleven_multilingual_v2', name: 'George' };
+  const chosen = () => { try { return JSON.parse(pref('auron_voice2', '')) || null; } catch { return null; } };
+  const DEFAULT_VOICE = { provider: 'elevenlabs', voice: 'JBFqnCBsd6RMkjVDRZzb', model: 'eleven_v4', name: 'George', accent: 'British accent' }  // Brano's pick, 2026-10-16;
   const player = new Audio();
   let lastUrl = '';
 
   async function say(text, v = chosen() || DEFAULT_VOICE) {
     const r = await fetch(`${API}/v1/assistant/speak`, { method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text, provider: v.provider, voice: v.voice, model: v.model }) });
+      body: JSON.stringify({ text, provider: v.provider, voice: v.voice, model: v.model, accent: v.accent ?? DEFAULT_VOICE.accent }) });
     if (!r.ok) { const d = await r.json().catch(() => ({})); throw new Error(d.detail || `HTTP ${r.status}`); }
     if (lastUrl) URL.revokeObjectURL(lastUrl);
     player.src = lastUrl = URL.createObjectURL(await r.blob());
@@ -102,7 +102,7 @@
     b.classList.add('sel', 'loading');
     try {
       await say(text, v);
-      setPref('auron_voice', JSON.stringify(v));
+      setPref('auron_voice2', JSON.stringify(v));
       log.querySelectorAll('.vrow').forEach((r) => r.classList.toggle('on', r.contains(b)));
     } catch (err) { b.title = `Fehler: ${err.message}`; b.classList.add('bad'); }
     b.classList.remove('loading');
