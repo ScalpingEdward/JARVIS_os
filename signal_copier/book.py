@@ -35,6 +35,7 @@ class TrackedSignal:
     trailing: bool = False
     number: int | None = None  # the group's setup number, part of what makes a repost
     be_at_tp1: bool = False    # "shaky" came: move the rest to entry once price reaches TP1
+    sl_at_tp1: bool = False    # TP2 reached: the rest's SL already moved up to TP1
 
 
 @dataclass

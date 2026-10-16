@@ -353,7 +353,10 @@ class Copier:
                 if kind == layers.Kind.TRAIL:
                     s.trailing = True
                     lines.append(f"runner trails {self.config.get('trail_pips', 100)} pips behind price from now on")
-                lines += [f"position {n}: " + self._to_breakeven(s, p) for n, p in sorted(open_.items())]
+                if kind == layers.Kind.TP_HIT and event.tp and event.tp >= 2 and s.tps:
+                    lines += self._lock_tp1(s, open_)
+                else:
+                    lines += [f"position {n}: " + self._to_breakeven(s, p) for n, p in sorted(open_.items())]
         self._say(f"#{msg_id} {event} on #{s.msg_id} {s.side} {s.symbol}\n" + ("\n".join(lines) or "nothing open"))
 
     def _close_all_layers(self, chat_id: int, msg_id: int) -> None:
@@ -416,6 +419,35 @@ class Copier:
             log.exception("edit #%s", msg_id)
             self._say(f"#{msg_id} edit ERROR {type(e).__name__}: {e}")
         self._save()
+
+    def _lock_tp1(self, s: TrackedSignal, open_: dict) -> list[str]:
+        """TP2 is reached: the rest's SL goes from entry up to TP1 (Brano, 2026-10-16).
+        Breakeven alone gave back the whole move whenever price turned before TP3."""
+        level = s.tps[0]
+        s.sl_at_tp1 = True
+        lines = []
+        for n, p in sorted(open_.items()):
+            better = (level > p.sl) if s.side == "buy" else (p.sl == 0 or level < p.sl)
+            if not better:
+                lines.append(f"position {n}: SL {p.sl} already past TP1 -- left")
+            elif not self.ex.stop_distance_ok(p.symbol, level, s.side, True):
+                lines.append(f"position {n}: TP1 {level} too close to price -- SL not moved")
+            else:
+                lines.append(self._do(f"position {n}: SL to TP1 {level}", self.ex.set_sltp, p, level))
+        return lines
+
+    def _tp1_lock_at_tp2(self) -> None:
+        """Watchdog part for layers: price reached TP2 without (or before) the group's message."""
+        for s in self.book.signals.values():
+            if s.strategy != "layers" or s.sl_at_tp1 or len(s.tps) < 2:
+                continue
+            open_ = self._open_layer(s)
+            if not open_:
+                continue
+            close_side = "sell" if s.side == "buy" else "buy"
+            price = self.ex.price(s.symbol, close_side)
+            if (price >= s.tps[1]) if s.side == "buy" else (price <= s.tps[1]):
+                self._say(f"#{s.msg_id} {s.symbol}: TP2 {s.tps[1]} reached\n" + "\n".join(self._lock_tp1(s, open_)))
 
     def _breakeven_at_tp1(self) -> None:
         """Watchdog part for layers: a "shaky" setup goes to breakeven once price reaches TP1."""
@@ -550,6 +582,9 @@ class Copier:
     def _to_breakeven(self, s, pos) -> str:
         if pos.sl == pos.price_open:
             return "SL already at entry"
+        # Never backwards: a stop already past entry (at TP1 after TP2, or trailed) stays.
+        if pos.sl and ((pos.sl > pos.price_open) if s.side == "buy" else (pos.sl < pos.price_open)):
+            return f"SL {pos.sl} already past entry -- left"
         if not self.ex.stop_distance_ok(pos.symbol, pos.price_open, s.side, True):
             if pos.ticket not in self.book.pending_be:
                 self.book.pending_be.append(pos.ticket)
@@ -587,6 +622,7 @@ class Copier:
             self._guard()
             self._retry_breakeven()
             self._breakeven_at_tp1()
+            self._tp1_lock_at_tp2()
             self._trail()
         except Exception as e:
             log.exception("watchdog")

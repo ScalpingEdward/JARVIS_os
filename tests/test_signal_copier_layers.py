@@ -255,3 +255,35 @@ def test_missed_setup_and_its_late_edit_are_not_opened():
     assert not t.positions and "missed" in said[-1]
     c.on_edit(CHAT, 100, SELL.replace("SL : 4203", "SL : 4204"), now[0] - 9 * 60, now[0] - 9 * 60)
     assert not t.positions
+
+
+def test_tp2_hit_moves_the_rest_up_to_tp1_and_tp3_does_not_pull_it_back():
+    c, t, said, _ = make()
+    c.on_message(CHAT, 100, None, SELL)                 # sell 4192, TP1 4187, TP2 4182
+    c.on_message(CHAT, 110, 100, TP1)
+    c.on_message(CHAT, 111, 100, TP2)
+    lay = layer(c, t)
+    assert sorted(lay) == [3, 4] and all(p.sl == 4187.0 for p in lay.values())
+    c.on_message(CHAT, 112, 100, TP3)                   # "move to BE" must not loosen it
+    assert layer(c, t)[4].sl == 4187.0
+
+
+def test_price_reaching_tp2_locks_tp1_without_a_message():
+    c, t, said, _ = make()
+    c.on_message(CHAT, 100, None, SELL)
+    t.prices["XAUUSD.s"] = 4183.0
+    c.watch()
+    assert all(p.sl == 4203.0 for p in layer(c, t).values())     # not yet at TP2 4182
+    t.prices["XAUUSD.s"] = 4181.9
+    c.watch()
+    assert all(p.sl == 4187.0 for p in layer(c, t).values()) and "TP2 4182.0 reached" in said[-1]
+    c.watch()
+    assert said[-1].count("TP2") == 1                            # once
+
+
+def test_breakeven_never_loosens_a_better_stop():
+    c, t, said, _ = make()
+    c.on_message(CHAT, 100, None, SELL)
+    p = layer(c, t)[2]; p.sl = 4185.0                            # already locked below entry 4192
+    c.on_message(CHAT, 110, 100, TP1)
+    assert layer(c, t)[2].sl == 4185.0
