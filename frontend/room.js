@@ -5,7 +5,7 @@
 // background, placed the same way.
 (() => {
   const ROOMS = window.AURON_ROOMS;
-  const KINDS = { sway: 1, water: 2, clouds: 3, stars: 4, city: 5, sun: 6, glow: 7, flicker: 8, sheen: 9 };
+  const KINDS = { sway: 1, water: 2, clouds: 3, stars: 4, city: 5, sun: 6, glow: 7, flicker: 8, sheen: 9, fall: 10 };
   const MAX_Z = 16;
   const pick = () => { try { const k = localStorage.getItem('auron_room'); return ROOMS[k] ? k : 'lounge'; } catch { return 'lounge'; } };
   let key = pick(), room = ROOMS[key], rect = [0, 0, 1, 1];
@@ -17,7 +17,7 @@
     const core = document.getElementById('core').getBoundingClientRect();
     const px = core.left + core.width / 2, py = core.top + core.height * 0.88;
     const vw = innerWidth, vh = innerHeight, [x, y, top] = room.ped;
-    let scale = Math.max(vw / room.w, vh / room.h, (core.width * 0.95) / (top * room.w));
+    let scale = Math.max(vw / room.w, vh / room.h, (core.width * 0.8) / (top * room.w));  // 0.8: less zoom, sharper room
     for (let i = 0; i < 40; i++) {
       const W = room.w * scale, H = room.h * scale, bx = px - x * W, by = py - y * H;
       if (bx <= 0 && by <= 0 && bx + W >= vw && by + H >= vh) {
@@ -38,7 +38,7 @@
 
   const FRAG = `
 precision highp float;
-uniform sampler2D img; uniform vec2 res; uniform vec4 rect; uniform vec2 texel; uniform float t;
+uniform sampler2D img; uniform vec2 res; uniform vec4 rect; uniform vec2 texel; uniform float t; uniform float sharp;
 uniform vec4 zr[${MAX_Z}]; uniform float zk[${MAX_Z}]; uniform int nz;
 float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 float noise(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3. - 2. * f);
@@ -51,7 +51,7 @@ void main() {
   vec2 p = vec2(gl_FragCoord.x, res.y - gl_FragCoord.y);
   vec2 uv = (p - rect.xy) / rect.zw;
   vec2 d = vec2(0.);
-  float wStars = 0., wCity = 0., wWater = 0., wSun = 0., wGlow = 0., wFlick = 0., wSheen = 0.; vec2 sunC = vec2(0.);
+  float wStars = 0., wCity = 0., wWater = 0., wSun = 0., wGlow = 0., wFlick = 0., wSheen = 0., wFall = 0.; vec2 sunC = vec2(0.);
   for (int i = 0; i < ${MAX_Z}; i++) {
     if (i >= nz) break;
     vec4 r = zr[i];
@@ -76,9 +76,18 @@ void main() {
     else if (k == 7.) { wGlow = max(wGlow, e); }
     else if (k == 8.) { wFlick = max(wFlick, e); }
     else if (k == 9.) { wSheen = max(wSheen, e); }
+    else if (k == 10.) {      // waterfall: the water's own texture pulled slowly downward
+      float s = noise(vec2(uv.x * 420., uv.y * 55. - t * 1.1));
+      d.y -= e * (s - .5) * .006;
+      wFall = max(wFall, e);
+    }
   }
   vec2 su = clamp(uv + d, texel, 1. - texel);
   vec3 c = texture2D(img, su).rgb;
+  vec2 o = texel * 1.4;
+  vec3 blur = .25 * (texture2D(img, su + vec2(o.x, 0)).rgb + texture2D(img, su - vec2(o.x, 0)).rgb
+                   + texture2D(img, su + vec2(0, o.y)).rgb + texture2D(img, su - vec2(0, o.y)).rgb);
+  c = clamp(c + (c - blur) * sharp, 0., 1.);
   float l = lum(c);
   if (wStars > 0. || wCity > 0.) {
     float pop = clamp((l - around(su)) * 4., 0., 1.);
@@ -93,6 +102,10 @@ void main() {
   if (wSun > 0.) c += vec3(1., .72, .42) * wSun * (.06 + .04 * sin(t * .6)) * exp(-length((uv - sunC) * vec2(1., .6)) * 22.);
   if (wGlow > 0.) c *= 1. + wGlow * smoothstep(.5, .95, l) * .09 * sin(t * .8 + uv.y * 4. + uv.x * 2.);
   if (wFlick > 0.) c *= 1. + wFlick * smoothstep(.35, .9, l) * (noise(vec2(t * 2.5, uv.x * 5. + uv.y * 3.)) - .5) * .16;
+  if (wFall > 0.) {           // streaks of foam running down
+    float f = noise(vec2(su.x * 650., su.y * 90. - t * 1.6)) * noise(vec2(su.x * 260., su.y * 40. - t * .9));
+    c += wFall * smoothstep(.45, .85, l) * (f - .25) * .45;
+  }
   if (wSheen > 0.) {
     float band = exp(-pow((uv.x * .7 + uv.y * .5 - fract(t * .02) * 2.4 + .5) * 7., 2.));
     c += c * wSheen * band * .3 * smoothstep(.06, .45, l);
@@ -101,7 +114,7 @@ void main() {
 }`;
   const VERT = 'attribute vec2 a; void main() { gl_Position = vec4(a, 0., 1.); }';
 
-  let prog, u = {}, tex, img = null, raf = 0, last = 0, dpr = 1;
+  let prog, u = {}, tex, img = null, raf = 0, last = 0, dpr = 1, texW = 1;
   function setup() {
     const sh = (type, src) => { const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s);
       if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s)); return s; };
@@ -113,7 +126,7 @@ void main() {
     gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
     const a = gl.getAttribLocation(prog, 'a'); gl.enableVertexAttribArray(a); gl.vertexAttribPointer(a, 2, gl.FLOAT, false, 0, 0);
-    for (const n of ['img', 'res', 'rect', 'texel', 't', 'zr', 'zk', 'nz']) u[n] = gl.getUniformLocation(prog, n);
+    for (const n of ['img', 'res', 'rect', 'texel', 't', 'zr', 'zk', 'nz', 'sharp']) u[n] = gl.getUniformLocation(prog, n);
     tex = gl.createTexture();
   }
 
@@ -131,6 +144,7 @@ void main() {
       [gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE], [gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE]]) gl.texParameteri(gl.TEXTURE_2D, p, v);
     gl.uniform1i(u.img, 0);
     gl.uniform2f(u.texel, 1 / src.width, 1 / src.height);
+    texW = src.width;
     const zr = new Float32Array(MAX_Z * 4), zk = new Float32Array(MAX_Z);
     room.zones.slice(0, MAX_Z).forEach(([k, x0, y0, x1, y1], i) => { zr.set([x0, y0, x1, y1], i * 4); zk[i] = KINDS[k] || 0; });
     gl.uniform4fv(u.zr, zr); gl.uniform1fv(u.zk, zk); gl.uniform1i(u.nz, Math.min(room.zones.length, MAX_Z));
@@ -151,6 +165,7 @@ void main() {
       gl.uniform2f(u.res, canvas.width, canvas.height);
       gl.uniform4f(u.rect, rect[0] * dpr, rect[1] * dpr, rect[2] * dpr, rect[3] * dpr);
       gl.uniform1f(u.t, now / 1000);
+      gl.uniform1f(u.sharp, Math.min(1.1, Math.max(.35, (rect[2] * dpr / texW - .5) * 1.2)));
       gl.drawArrays(gl.TRIANGLES, 0, 3);
       canvas.classList.add('on');
     }
