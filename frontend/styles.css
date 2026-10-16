@@ -33,9 +33,9 @@ button { font: inherit; color: inherit; }
 .up { color: var(--up); } .down { color: var(--down); }
 
 /* one quiet light source, a fine grid that fades out */
-/* the room: a glass wall onto mountains at night (room.svg, made by make_room.py),
-   darkened at the edges so the cards stay readable */
-body { background: #03060c url("./room.svg") center / cover no-repeat fixed; }
+/* the room: Brano's lounge at night (lounge.webp). app.js places it so the pedestal in
+   the picture stands right under AURON's planet, at any window size. */
+body { background: #03060c url("./lounge.webp") center / cover no-repeat fixed; }
 .backdrop {
   position: fixed; inset: 0; z-index: 0; pointer-events: none;
   background:
@@ -158,18 +158,10 @@ body { background: #03060c url("./room.svg") center / cover no-repeat fixed; }
 @keyframes orbit1 { from { transform: rotateX(74deg) rotateY(-14deg) rotateZ(0); } to { transform: rotateX(74deg) rotateY(-14deg) rotateZ(360deg); } }
 @keyframes orbit2 { from { transform: rotateX(62deg) rotateY(48deg) rotateZ(0); } to { transform: rotateX(62deg) rotateY(48deg) rotateZ(-360deg); } }
 @keyframes orbit3 { from { transform: rotateX(80deg) rotateY(-42deg) rotateZ(0); } to { transform: rotateX(80deg) rotateY(-42deg) rotateZ(360deg); } }
-.beam { position: absolute; left: 30%; right: 30%; top: 58%; height: 26%;
+.beam { position: absolute; left: 30%; right: 30%; top: 58%; height: 30%; opacity: .75;
   background: linear-gradient(180deg, rgba(79,216,255,0), rgba(79,216,255,.35) 70%, rgba(150,230,255,.7));
   clip-path: polygon(30% 0, 70% 0, 100% 100%, 0 100%); filter: blur(5px); animation: beam 3.6s ease-in-out infinite; }
 @keyframes beam { 50% { opacity: .55; } }
-.pedestal { position: absolute; left: 0; right: 0; bottom: -2%; width: 100%; overflow: visible; filter: drop-shadow(0 0 18px rgba(79,216,255,.35)); }
-.pd-ring { filter: drop-shadow(0 0 6px #4fd8ff); animation: pd-glow 3s ease-in-out infinite; }
-.pd-ring2 { filter: drop-shadow(0 0 8px #7fe6ff); }
-.pd-dash { animation: pd-run 18s linear infinite; }
-.pd-core { animation: pd-core 3s ease-in-out infinite; transform-origin: 200px 84px; }
-@keyframes pd-glow { 50% { stroke-opacity: .55; } }
-@keyframes pd-run { to { stroke-dashoffset: -240; } }
-@keyframes pd-core { 50% { opacity: .65; transform: scale(1.06, 1); } }
 .core.degraded { --accent: #f2c14e; }
 .core.degraded .sphere { box-shadow: 0 0 80px rgba(242,193,78,.45), inset 0 0 60px rgba(242,193,78,.35); }
 .core-text { text-align: center; margin-top: 10px; transform: translateZ(30px); }
