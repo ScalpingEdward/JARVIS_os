@@ -20,6 +20,14 @@ from . import voice
 from .brain import AssistantError, reply
 
 log = logging.getLogger(__name__)
+# Same reason as in posting schedule: uvicorn shows only its own INFO lines, and
+# "did AURON answer?" must be answerable from the log, not only from the phone.
+if not log.handlers:
+    _h = logging.StreamHandler()
+    _h.setFormatter(logging.Formatter("%(asctime)s %(levelname)s auron telegram: %(message)s"))
+    log.addHandler(_h)
+    log.setLevel(logging.INFO)
+    log.propagate = False
 KEEP = 20
 VOICE = {"provider": "elevenlabs", "voice": "JBFqnCBsd6RMkjVDRZzb", "model": "eleven_v4", "accent": "British accent"}
 _history: dict[str, deque] = defaultdict(lambda: deque(maxlen=KEEP))
@@ -63,12 +71,14 @@ def handle_message(update: dict, client: httpx.Client | None = None) -> str | No
             _send(c, chat, f"Mein Kopf streikt gerade, Sir: {exc}")
             return None
         hist.append({"role": "assistant", "content": answer})
+        log.info("%s message (%d chars) answered (%d chars)", "voice" if spoken else "text", len(text), len(answer))
         shown = voice.strip_tags(answer)
         _send(c, chat, f"🎙 {text}\n\n{shown}" if spoken else shown)
         if spoken:
             try:
                 audio = voice.speak(answer, VOICE["provider"], VOICE["voice"], VOICE["model"], VOICE["accent"], client=c, fmt="ogg")
-                c.post(_api("sendVoice"), data={"chat_id": chat}, files={"voice": ("auron.ogg", audio, "audio/ogg")}, timeout=60)
+                r = c.post(_api("sendVoice"), data={"chat_id": chat}, files={"voice": ("auron.ogg", audio, "audio/ogg")}, timeout=60)
+                log.info("voice reply sent: %s (%d bytes)", r.status_code, len(audio))
             except (voice.VoiceError, httpx.HTTPError) as exc:
                 log.warning("voice reply failed: %s", exc)   # the text is already there
         return answer
@@ -88,4 +98,6 @@ def _heard(c: httpx.Client, msg: dict) -> str:
 
 
 def _send(c: httpx.Client, chat: str, text: str) -> None:
-    c.post(_api("sendMessage"), json={"chat_id": chat, "text": text[:4000]}, timeout=20)
+    r = c.post(_api("sendMessage"), json={"chat_id": chat, "text": text[:4000]}, timeout=20)
+    if r.status_code >= 400:
+        log.warning("sendMessage failed: %s %s", r.status_code, r.text[:200])
