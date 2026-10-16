@@ -282,11 +282,9 @@ async function refreshHealth() {
   try { const t = await get('/v1/telegram-instagram/status'); svcs.push(['Telegram bot', t.bot_reachable ? 'ok' : 'bad']); } catch { svcs.push(['Telegram bot', 'bad']); }
   (overview?.accounts || []).forEach((a) => svcs.push([`Copier ${nameOf(a)}`, a.state === 'live' ? 'ok' : a.state === 'stale' ? 'warn' : 'bad']));
   $('#health').innerHTML = svcs.map(([n, c]) => `<span class="svc" title="${esc(n)}"><span class="dot ${c}"></span><span>${esc(n)}</span></span>`).join('');
-  $('#sList').innerHTML = svcs.map(([n, c]) => `<div class="row"><span class="dot ${c}"></span><span>${esc(n)}</span><span>${c === 'ok' ? 'online' : c === 'warn' ? 'late' : 'offline'}</span></div>`).join('');
+  $('#sysbar').innerHTML = svcs.map(([n, c]) => `<span><span class="dot ${c}"></span>${esc(n)} · ${c === 'ok' ? 'online' : c === 'warn' ? 'late' : 'offline'}</span>`).join('');
   const bad = svcs.filter(([, c]) => c !== 'ok').length;
   $('#core').classList.toggle('degraded', bad > 0);
-  $('#sBadge').textContent = bad ? `${bad} down` : 'all online';
-  $('#sBadge').classList.toggle('live', !bad);
 }
 
 // --- 3D tiles: tilt toward the pointer ---------------------------------------------
@@ -305,7 +303,7 @@ document.querySelectorAll('.tile').forEach((tile) => {
 
 // --- opening a tile into its full view (it grows out of the tile and back) --------
 let openView = null, openedFrom = null;
-const TITLES = { trading: 'Trading', instagram: 'Instagram' };
+const TITLES = { trading: 'Trading', instagram: 'Instagram', watchlist: 'Watchlist' };
 
 function morph(panel, rect, reverse) {
   const end = panel.getBoundingClientRect();
@@ -322,6 +320,7 @@ function open(view, fromTile, push = true) {
   document.body.classList.add('locked');
   $('#detailPanel').scrollTop = 0;
   if (push) history_.pushState({ view }, '', `#${view}`);
+  if (view === 'watchlist' && watch) renderWatchView(watch);
   if (view === 'trading' && overview) { renderTotals(overview); renderAccounts(overview); renderGroups(overview); renderPositions(overview); renderTotalChart(); }
   if (fromTile) morph($('#detailPanel'), fromTile.getBoundingClientRect(), false);
   $('#close').focus();
@@ -470,3 +469,45 @@ function placeRoom() {
 addEventListener('resize', placeRoom);
 new ResizeObserver(placeRoom).observe($('#core'));
 placeRoom();
+
+// --- watchlist (signal_copier/market_feed.py -> /v1/watchlist) ---------------------------
+let watch = null;
+const pctTxt = (v) => (v === null || v === undefined ? '–' : `${v > 0 ? '+' : ''}${fmt(v)} %`);
+const pctCls = (v) => (v > 0 ? 'up' : v < 0 ? 'down' : '');
+const priceTxt = (v) => (v === null || v === undefined ? '–' : fmt(v, v >= 1000 ? 0 : v >= 10 ? 2 : 4));
+function spark(values, w = 58, h = 20) {
+  if (!values || values.length < 2) return `<svg viewBox="0 0 ${w} ${h}"></svg>`;
+  const lo = Math.min(...values), hi = Math.max(...values), span = hi - lo || 1;
+  const pts = values.map((v, i) => `${(i / (values.length - 1) * w).toFixed(1)},${(h - 2 - (v - lo) / span * (h - 4)).toFixed(1)}`).join(' ');
+  const c = values[values.length - 1] >= values[0] ? '#3ddc97' : '#f2647c';
+  return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none"><polyline points="${pts}" fill="none" stroke="${c}" stroke-width="1.6"/></svg>`;
+}
+function renderWatch(w) {
+  const top = w.items.filter((i) => i.top).sort((a, b) => a.top - b.top);
+  $('#wTop').innerHTML = top.map((i) => `<div class="row"><span class="wname">${esc(i.name)}</span>`
+    + `<span class="wpx">${priceTxt(i.price)}</span><span class="wch ${pctCls(i.change_pct)}">${pctTxt(i.change_pct)}</span></div>`).join('');
+  $('#wBadge').textContent = w.stale ? 'keine Daten' : `+${w.items.length - top.length} weitere`;
+  $('#wBadge').classList.toggle('live', !w.stale);
+  if (openView === 'watchlist') renderWatchView(w);
+}
+function renderWatchView(w) {
+  const groups = {};
+  w.items.forEach((i) => (groups[i.category] = groups[i.category] || []).push(i));
+  const order = ['Krypto', 'Rohstoffe', 'Indizes', 'Devisen', 'Aktien'];
+  const row = (i) => (i.price === null || i.price === undefined
+    ? `<tr><td>${esc(i.name)}</td><td></td><td class="nodata" colspan="6">keine Daten – bei PU Prime nicht handelbar</td></tr>`
+    : `<tr><td>${esc(i.name)}</td><td>${spark(i.spark, 80, 22)}</td><td class="num">${priceTxt(i.price)}</td>`
+      + `<td class="num ${pctCls(i.change_pct)}">${pctTxt(i.change_pct)}</td><td class="num ${pctCls(i.from_high_pct)}">${pctTxt(i.from_high_pct)}</td>`
+      + `<td class="num ${pctCls(i.vs_sma200_pct)}">${pctTxt(i.vs_sma200_pct)}</td><td class="num">${i.rsi14 ?? '–'}</td>`
+      + `<td class="notes">${(i.notes || []).map((n) => `<span class="note">${esc(n)}</span>`).join('')}</td></tr>`);
+  $('#watchGroups').innerHTML = Object.keys(groups).sort((a, b) => order.indexOf(a) - order.indexOf(b)).map((g) =>
+    `<section class="card"><div class="label">${esc(g)} <span class="count">${groups[g].length}</span></div><div class="table-wrap"><table class="watch-table">`
+    + '<tr><th>NAME</th><th></th><th>KURS</th><th>HEUTE</th><th>VOM 52W-HOCH</th><th>VS 200 TAGE</th><th>RSI</th><th>HINWEISE</th></tr>'
+    + groups[g].slice().sort((a, b) => (b.notes?.length || 0) - (a.notes?.length || 0)).map(row).join('')
+    + '</table></div></section>').join('');
+}
+async function refreshWatch() {
+  try { watch = await get('/v1/watchlist'); renderWatch(watch); } catch (e) { console.warn(e); }
+}
+refreshWatch();
+setInterval(refreshWatch, 60000);

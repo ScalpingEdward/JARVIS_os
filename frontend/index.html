@@ -49,11 +49,11 @@
         <div class="tile-list" id="iList"></div>
       </button>
 
-      <div class="tile a-system static" id="tileSystem" style="--d:-4.1s">
+      <button class="tile a-watch" data-view="watchlist" id="tileWatch" style="--d:-4.1s">
         <span class="corner"></span>
-        <div class="tile-head"><span>System</span><span class="badge" id="sBadge">–</span></div>
-        <div class="tile-list" id="sList"></div>
-      </div>
+        <div class="tile-head"><span>Watchlist</span><span class="badge" id="wBadge">–</span></div>
+        <div class="tile-list watch-top" id="wTop"></div>
+      </button>
 
       <button class="tile a-groups" data-view="trading" id="tileGroups" style="--d:-1.3s">
         <span class="corner"></span>
@@ -67,6 +67,7 @@
         <div class="mini-tile" style="--d:-1.9s"><small>Open positions</small><b id="kOpen">–</b></div>
         <div class="mini-tile" style="--d:-3.4s"><small>Total profit</small><b id="kTotal">–</b></div>
       </div>
+      <footer class="sysbar" id="sysbar" aria-label="System status"></footer>
     </div>
   </main>
 
@@ -96,6 +97,11 @@
             <div class="muted empty" id="noPositions">Nothing open right now.</div>
           </section>
         </div>
+      </div>
+
+      <div class="view" data-view="watchlist">
+        <p class="watch-note">Beobachtung, keine Empfehlung: wo der Kurs gegenüber 52-Wochen-Spanne, 200-Tage-Schnitt und RSI steht. Kursdaten aus PU Prime MT5; „keine Daten“ = dort nicht handelbar.</p>
+        <div class="watch-groups" id="watchGroups"></div>
       </div>
 
       <div class="view" data-view="instagram">

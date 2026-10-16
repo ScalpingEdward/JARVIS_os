@@ -411,3 +411,12 @@ class CopierEquityRow(Base):
     at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
     balance: Mapped[float] = mapped_column(Float)
     equity: Mapped[float] = mapped_column(Float)
+
+
+class WatchlistRow(Base):
+    """The latest watchlist snapshot from the market feed, as JSON. One row."""
+
+    __tablename__ = "watchlist"
+    id: Mapped[str] = mapped_column(String(20), primary_key=True)
+    received_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    data: Mapped[str] = mapped_column(Text)

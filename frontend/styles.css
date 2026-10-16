@@ -88,7 +88,7 @@ body { background: #03060c url("./lounge.webp") center / cover no-repeat fixed; 
 .scene {
   position: relative; width: min(1640px, 100%);
   display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.75fr) minmax(0, 1fr);
-  grid-template-areas: "trading holo system" "insta holo groups" "strip strip strip";
+  grid-template-areas: "trading holo watch" "insta holo groups" "strip strip strip" "sys sys sys";
   gap: 22px 30px; align-items: center;
   transform-style: preserve-3d;
   transform: rotateX(var(--sx, 0deg)) rotateY(var(--sy, 0deg));
@@ -97,7 +97,7 @@ body { background: #03060c url("./lounge.webp") center / cover no-repeat fixed; 
 .holo { grid-area: holo; transform: translateZ(30px); transform-style: preserve-3d; }
 .a-trading { grid-area: trading; --base-ry: 22deg; }
 .a-insta { grid-area: insta; --base-ry: 22deg; }
-.a-system { grid-area: system; --base-ry: -22deg; }
+.a-watch { grid-area: watch; --base-ry: -22deg; }
 .a-groups { grid-area: groups; --base-ry: -22deg; }
 .strip { grid-area: strip; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 18px; transform: rotateX(16deg) translateZ(10px); transform-style: preserve-3d; margin-top: 6px; }
 
@@ -210,7 +210,7 @@ body { background: #03060c url("./lounge.webp") center / cover no-repeat fixed; 
 @media (max-width: 1000px) {
   .motto { display: none; }
   .stage { perspective: none; }
-  .scene { grid-template-columns: minmax(0, 1fr); grid-template-areas: "holo" "trading" "insta" "groups" "system" "strip"; transform: none !important; gap: 16px; }
+  .scene { grid-template-columns: minmax(0, 1fr); grid-template-areas: "holo" "trading" "watch" "insta" "groups" "strip" "sys"; transform: none !important; gap: 16px; }
   .tile { --base-ry: 0deg !important; }
   .strip { transform: none; grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .core { --s: min(78vw, 320px); }
@@ -329,3 +329,27 @@ body { background: #03060c url("./lounge.webp") center / cover no-repeat fixed; 
 .weather .wi { font-size: 16px; filter: drop-shadow(0 0 6px rgba(79,216,255,.5)); }
 @media (max-width: 600px) { .weather small { display: none; } }
 
+
+/* system status: one thin bar under everything */
+.sysbar { grid-area: sys; display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 22px; padding: 10px 16px;
+  border-radius: 999px; background: rgba(10,18,32,.55); border: 1px solid rgba(170,220,255,.14); backdrop-filter: blur(12px);
+  font-size: 12px; color: var(--muted); }
+.sysbar span { display: inline-flex; align-items: center; gap: 7px; }
+
+/* watchlist: top five on the card, everything in its view */
+.watch-top .row { gap: 8px; }
+.watch-top .wname { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.watch-top svg { width: 58px; height: 20px; flex: none; }
+.watch-top .wpx { font-family: var(--mono); font-size: 12.5px; text-align: right; flex: none; }
+.watch-top .wch { font-family: var(--mono); font-size: 11.5px; min-width: 54px; text-align: right; flex: none; }
+.watch-note { color: var(--muted); font-size: 12.5px; margin: 0 0 14px; }
+.watch-groups { display: grid; gap: 16px; }
+.watch-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.watch-table th { text-align: left; font-weight: 500; font-size: 10.5px; letter-spacing: .14em; color: var(--muted); padding: 6px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.watch-table td { padding: 8px; border-bottom: 1px solid rgba(255,255,255,.035); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.watch-table td.num { font-family: var(--mono); text-align: right; }
+.watch-table td.notes { white-space: normal; font-size: 12px; }
+.watch-table td.nodata { color: var(--faint); }
+.watch-table svg { width: 80px; height: 22px; display: block; }
+.note { display: inline-block; margin: 1px 4px 1px 0; padding: 1px 8px; border-radius: 999px; background: rgba(79,216,255,.1); border: 1px solid rgba(79,216,255,.25); }
+.watch-top .row span.wpx { flex: none; overflow: visible; text-overflow: clip; }  /* the card-list rule would cut prices with "…" */
