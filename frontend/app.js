@@ -199,8 +199,13 @@ function renderTradingTile(o) {
     return `<div class="row"><span class="dot ${st}"></span><span>${esc(nameOf(a))}</span><span>${fmt(a.equity)} ${esc(a.currency)}</span></div>`;
   }).join('');
   const groups = (o.groups || []).filter((g) => g.name !== '(not from a signal)');
+  const stateOf = Object.fromEntries(o.accounts.map((a) => [a.profile, a.state]));
+  const copier = (g) => {  // the group's copiers: all live -> ok, any late -> warn, else bad
+    const states = (g.accounts || []).map((p) => stateOf[p]);
+    return states.length && states.every((x) => x === 'live') ? 'ok' : states.some((x) => x === 'live' || x === 'stale') ? 'warn' : 'bad';
+  };
   $('#tGroups').innerHTML = groups.length ? groups.map((g) =>
-    `<div class="row"><span></span><span>${esc(g.name)}</span><span>${signed(g.pnl_total)}</span></div>`).join('')
+    `<div class="row"><span class="dot ${copier(g)}" title="Kopierer ${copier(g) === 'ok' ? 'online' : 'nicht online'}"></span><span>${esc(g.name)}</span><span>${signed(g.pnl_total)}</span></div>`).join('')
     : '<div class="row"><span></span><span class="muted">No group has traded yet</span><span></span></div>';
   $('#kToday').innerHTML = signed(t.pnl_today, t.currency);
   $('#kWeek').innerHTML = signed(t.pnl_week, t.currency);
@@ -290,7 +295,7 @@ async function refreshHealth() {
   try { const t = await get('/v1/telegram-instagram/status'); svcs.push(['Telegram bot', t.bot_reachable ? 'ok' : 'bad']); } catch { svcs.push(['Telegram bot', 'bad']); }
   (overview?.accounts || []).forEach((a) => svcs.push([`Copier ${nameOf(a)}`, a.state === 'live' ? 'ok' : a.state === 'stale' ? 'warn' : 'bad']));
   $('#health').innerHTML = svcs.map(([n, c]) => `<span class="svc" title="${esc(n)}"><span class="dot ${c}"></span><span>${esc(n)}</span></span>`).join('');
-  $('#sysbar').innerHTML = svcs.map(([n, c]) => `<span><span class="dot ${c}"></span>${esc(n)} · ${c === 'ok' ? 'online' : c === 'warn' ? 'late' : 'offline'}</span>`).join('');
+  $('#sysbar').innerHTML = svcs.filter(([n]) => !n.startsWith('Copier ')).map(([n, c]) => `<span><span class="dot ${c}"></span>${esc(n)} · ${c === 'ok' ? 'online' : c === 'warn' ? 'late' : 'offline'}</span>`).join('');
   const bad = svcs.filter(([, c]) => c !== 'ok').length;
   $('#core').classList.toggle('degraded', bad > 0);
 }
@@ -492,7 +497,7 @@ function spark(values, w = 58, h = 20) {
 }
 function renderWatch(w) {
   const top = w.items.filter((i) => i.top).sort((a, b) => a.top - b.top);
-  $('#wTop').innerHTML = top.map((i) => `<div class="row"><span class="wname">${esc(i.name)}</span>`
+  $('#wTop').innerHTML = top.map((i) => `<div class="row"><span class="wname">${esc(i.name)}</span>${spark(i.spark)}`
     + `<span class="wpx">${priceTxt(i.price)}</span><span class="wch ${pctCls(i.change_pct)}">${pctTxt(i.change_pct)}</span></div>`).join('');
   $('#wBadge').textContent = w.stale ? 'keine Daten' : `+${w.items.length - top.length} weitere`;
   $('#wBadge').classList.toggle('live', !w.stale);
