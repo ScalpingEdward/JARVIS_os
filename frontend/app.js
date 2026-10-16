@@ -487,30 +487,7 @@ async function refreshWeather() {
 refreshWeather();
 setInterval(refreshWeather, 15 * 60 * 1000);
 
-// --- the room: put the picture's pedestal right under the planet --------------------------
-// lounge.webp is 1672x941; its pedestal's top surface is centred at (50.1 %, 60.5 %) and is
-// 33.5 % of the picture wide. The picture is scaled so that surface is about as wide as the
-// planet's orbits, never smaller than the window, then shifted so the two line up.
-const LOUNGE = { w: 1672, h: 941, x: 0.501, y: 0.605, top: 0.335 };
-function placeRoom() {
-  const core = $('#core').getBoundingClientRect();
-  const px = core.left + core.width / 2, py = core.top + core.height * 0.88;
-  const vw = innerWidth, vh = innerHeight;
-  let scale = Math.max(vw / LOUNGE.w, vh / LOUNGE.h, (core.width * 0.95) / (LOUNGE.top * LOUNGE.w));
-  for (let i = 0; i < 30; i++) {  // grow until the shifted picture still covers the window
-    const W = LOUNGE.w * scale, H = LOUNGE.h * scale;
-    const bx = px - LOUNGE.x * W, by = py - LOUNGE.y * H;
-    if (bx <= 0 && by <= 0 && bx + W >= vw && by + H >= vh) {
-      document.body.style.backgroundSize = `${W}px ${H}px`;
-      document.body.style.backgroundPosition = `${bx}px ${by}px`;
-      return;
-    }
-    scale *= 1.05;
-  }
-}
-addEventListener('resize', placeRoom);
-new ResizeObserver(placeRoom).observe($('#core'));
-placeRoom();
+// --- the room: room.js places and animates it -------------------------------------------
 
 // --- watchlist (signal_copier/market_feed.py -> /v1/watchlist) ---------------------------
 let watch = null;

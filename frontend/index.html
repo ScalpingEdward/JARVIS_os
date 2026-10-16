@@ -8,13 +8,14 @@
   <link rel="stylesheet" href="./styles.css" />
 </head>
 <body>
+  <canvas class="room" id="room" aria-hidden="true"></canvas>
   <canvas class="field" id="field" aria-hidden="true"></canvas>
   <div class="backdrop" aria-hidden="true"></div>
 
   <header class="top">
     <div class="brand"><span class="glyph"></span><div><b>AURON</b><small>AI trading &amp; social agent</small></div></div>
     <div class="motto">DISCIPLINE <i>×</i> DATA <i>×</i> FREEDOM</div>
-    <div class="top-right"><div class="health" id="health" aria-label="System status"></div><div class="weather" id="weather" title="Wetter"></div><div class="when"><time class="clock" id="clock">--:--</time><small id="date"></small></div></div>
+    <div class="top-right"><div class="room-pick"><button type="button" class="room-btn" id="roomBtn" title="Raum wählen" aria-label="Raum wählen">◐</button><div class="room-menu" id="roomMenu" hidden></div></div><div class="health" id="health" aria-label="System status"></div><div class="weather" id="weather" title="Wetter"></div><div class="when"><time class="clock" id="clock">--:--</time><small id="date"></small></div></div>
   </header>
 
 
@@ -145,6 +146,8 @@
   <footer class="sysbar" id="sysbar" aria-label="System status"></footer>
   <script src="./app.js"></script>
   <script src="./chat.js"></script>
+  <script src="./rooms/rooms.js"></script>
+  <script src="./room.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/d3-array@3.2.4/dist/d3-array.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/d3-geo@3.1.1/dist/d3-geo.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js"></script>

@@ -432,3 +432,17 @@ body { background: #03060c url("./lounge.webp") center / cover no-repeat fixed; 
 .hchip { font: inherit; font-size: 12px; padding: 4px 12px; border-radius: 999px; border: 1px solid var(--line-2); background: rgba(255,255,255,.04); color: var(--muted); cursor: pointer; }
 .hchip.on { color: var(--text); border-color: color-mix(in srgb, var(--accent) 60%, transparent); background: color-mix(in srgb, var(--accent) 14%, transparent); }
 .hist-sum { margin-left: 8px; font-family: var(--mono); font-size: 12px; letter-spacing: 0; text-transform: none; color: var(--muted); }
+
+/* the living room: room.js paints the picture with WebGL over the plain background */
+.room { position: fixed; inset: 0; width: 100vw; height: 100vh; z-index: 0; pointer-events: none; opacity: 0; transition: opacity .6s ease; }
+.room.on { opacity: 1; }
+.room-pick { position: relative; }
+.room-btn { width: 30px; height: 30px; border-radius: 50%; border: 1px solid var(--line-2); background: rgba(255,255,255,.05); color: var(--muted); cursor: pointer; font-size: 15px; line-height: 1; }
+.room-btn:hover { color: var(--text); border-color: color-mix(in srgb, var(--accent) 50%, transparent); }
+.room-menu { position: absolute; right: 0; top: 40px; z-index: 20; display: grid; grid-template-columns: repeat(2, 150px); gap: 8px; padding: 10px;
+  border-radius: 16px; background: var(--surface); border: 1px solid var(--line-2); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px); box-shadow: 0 20px 50px rgba(0,0,0,.5); }
+.room-menu[hidden] { display: none; }
+.room-menu button { display: grid; gap: 5px; padding: 5px; border-radius: 10px; border: 1px solid transparent; background: none; color: var(--muted); font: inherit; font-size: 11.5px; text-align: left; cursor: pointer; }
+.room-menu button:hover { color: var(--text); background: rgba(255,255,255,.04); }
+.room-menu button.on { color: var(--text); border-color: color-mix(in srgb, var(--accent) 55%, transparent); }
+.room-menu i { display: block; height: 78px; border-radius: 7px; background: center / cover no-repeat; }
