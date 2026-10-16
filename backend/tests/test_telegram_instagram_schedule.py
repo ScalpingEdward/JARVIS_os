@@ -189,3 +189,38 @@ def test_the_schedule_says_whether_it_is_actually_running():
     """"Enabled" in an env file is a claim; a stopped task is the fact."""
     scheduler = PostingScheduler()
     assert scheduler.is_running is False
+
+
+@pytest.fixture(autouse=True)
+def _alerts(monkeypatch):
+    """No test may message Brano for real; every alert lands here instead."""
+    sent: list[str] = []
+    monkeypatch.setattr(schedule_module, "alert", sent.append)
+    return sent
+
+
+def test_a_slot_that_sends_nothing_says_why_on_telegram(monkeypatch, _alerts):
+    monkeypatch.setattr(schedule_module, "waiting_for_a_decision", lambda: True)
+    PostingScheduler().fire(Slot(12, 0, "feed"), _at(12, 0))
+    assert "wartet noch auf deine Entscheidung" in _alerts[-1]
+
+    monkeypatch.setattr(schedule_module, "waiting_for_a_decision", lambda: False)
+    def boom():
+        raise schedule_module.TelegramInstagramError("no pending drafts")
+    monkeypatch.setattr(schedule_module.telegram_instagram_service, "finalize_next_and_notify", boom)
+    PostingScheduler().fire(Slot(19, 0, "reel"), _at(19, 0))
+    assert "keine Karte verschickt" in _alerts[-1] and "no pending drafts" in _alerts[-1]
+
+
+def test_a_slot_slept_through_is_reported_once_and_never_fired_late():
+    scheduler = PostingScheduler()                          # nothing queued: the 12:00 feed slot
+    assert scheduler.missed(_at(12, 30)) is None            # still within the grace
+    slot = scheduler.missed(_at(13, 5))
+    assert slot is not None and slot.kind == "feed"
+    assert scheduler.missed(_at(15, 0)) is None             # reported once
+    assert scheduler.due(_at(13, 6)) is None                # and not fired late
+
+
+def test_no_missed_report_when_a_card_already_went_out_today(monkeypatch):
+    monkeypatch.setattr(schedule_module, "card_sent_today", lambda today: True)
+    assert PostingScheduler().missed(_at(13, 5)) is None
