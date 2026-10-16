@@ -55,7 +55,7 @@
   const setPref = (k, v) => { try { localStorage.setItem(k, v); } catch { /* private window */ } };
   const voiceOn = () => pref('auron_voice_on', '1') === '1';
   const chosen = () => { try { return JSON.parse(pref('auron_voice', '')) || null; } catch { return null; } };
-  const DEFAULT_VOICE = { provider: 'elevenlabs', voice: 'onwK4e9ZLuTAKqWW03F9', model: 'eleven_v4', name: 'Daniel' };
+  const DEFAULT_VOICE = { provider: 'elevenlabs', voice: 'JBFqnCBsd6RMkjVDRZzb', model: 'eleven_multilingual_v2', name: 'George' };
   const player = new Audio();
   let lastUrl = '';
 
@@ -73,7 +73,7 @@
   speakBtn.addEventListener('click', () => { setPref('auron_voice_on', voiceOn() ? '0' : '1'); if (!voiceOn()) player.pause(); paintSpeak(); });
   paintSpeak();
 
-  const SAMPLE = '[chuckles] Guten Abend, Brano. Gold steht ruhig, die Kopierer laufen, und Instagram wartet mal wieder auf dich. Soll ich weitermachen?';
+  const SAMPLE = '[chuckles] Guten Abend, Sir. Gold steht ruhig, die Kopierer laufen, und Instagram wartet mal wieder auf Sie. Soll ich weitermachen?';
   async function showVoices() {
     open(true);
     log.innerHTML = '<div class="msg hint">Lade Stimmen …</div>';
