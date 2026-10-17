@@ -246,3 +246,12 @@ h1, h2, h3 { margin: 0; line-height: 1.12; letter-spacing: -.01em; }
 .hero-mark small { font-size: clamp(14px, 1.15vw, 19px); letter-spacing: .22em; }
 .hero-mark { top: 70px; gap: 10px; }
 .hero-stage { padding-top: 200px; }
+
+/* Phoenix Life Solutions: the gold phoenix, the name in wide thin capitals */
+.company { display: inline-flex; align-items: center; gap: 12px; letter-spacing: 0; }
+.company img { width: 38px; height: auto; filter: drop-shadow(0 0 8px rgba(198,174,50,.35)); }
+.company span { display: grid; line-height: 1.1; }
+.company b { font-weight: 300; font-size: 17px; letter-spacing: .42em; color: #8ea4ff; }
+.company small { font-size: 9.5px; letter-spacing: .34em; color: #c6ae32; font-weight: 600; }
+.about-logo { width: min(320px, 70%); margin: 0 0 18px; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
