@@ -14,8 +14,6 @@
 
   <header class="top">
     <div class="brand"><span class="glyph"></span><div><b>AURON</b></div></div>
-    <div class="motto">DISCIPLINE <i>×</i> DATA <i>×</i> FREEDOM</div>
-    <div class="top-right"><div class="health" id="health" aria-label="System status"></div><div class="weather" id="weather" title="Wetter"></div><div class="when"><time class="clock" id="clock">--:--</time><small id="date"></small></div></div>
   </header>
 
 
@@ -24,6 +22,7 @@
   <main class="stage" id="stage">
     <div class="scene" id="scene">
       <section class="holo" aria-label="AURON">
+        <div class="when"><time class="clock" id="clock">--:--</time><small id="date"></small></div>
         <div class="core" id="core">
           <div class="orbit o1"><i></i></div><div class="orbit o2"><i></i></div><div class="orbit o3 warm"><i></i></div>
           <div class="sphere">
@@ -31,6 +30,7 @@
           </div>
           <div class="beam"></div>
         </div>
+        <div class="weather" id="weather" title="Wetter"></div>
       </section>
 
       <button class="tile a-trading" data-view="trading" id="tileTrading" style="--d:0s">

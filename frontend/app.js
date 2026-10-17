@@ -320,7 +320,6 @@ async function refreshHealth() {
   try { const h = await get('/health'); svcs.push(['API', h.status === 'healthy' ? 'ok' : 'warn']); } catch { svcs.push(['API', 'bad']); }
   try { const t = await get('/v1/telegram-instagram/status'); svcs.push(['Telegram bot', t.bot_reachable ? 'ok' : 'bad']); } catch { svcs.push(['Telegram bot', 'bad']); }
   (overview?.accounts || []).forEach((a) => svcs.push([`Copier ${nameOf(a)}`, a.state === 'live' ? 'ok' : a.state === 'stale' ? 'warn' : 'bad']));
-  $('#health').innerHTML = svcs.map(([n, c]) => `<span class="svc" title="${esc(n)}"><span class="dot ${c}"></span><span>${esc(n)}</span></span>`).join('');
   $('#sysbar').innerHTML = svcs.filter(([n]) => !n.startsWith('Copier ')).map(([n, c]) => `<span><span class="dot ${c}"></span>${esc(n)} · ${c === 'ok' ? 'online' : c === 'warn' ? 'late' : 'offline'}</span>`).join('');
   const bad = svcs.filter(([, c]) => c !== 'ok').length;
   $('#core').classList.toggle('degraded', bad > 0);
@@ -390,7 +389,7 @@ addEventListener('popstate', () => {           // the phone's back button
 setInterval(() => {
   const now = new Date();
   $('#clock').textContent = now.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
-  $('#date').textContent = now.toLocaleDateString('de-DE');
+  $('#date').textContent = now.toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
   tickCountdown();
 }, 1000);
 
@@ -478,7 +477,8 @@ async function refreshWeather() {
     if (!r.ok) throw new Error(`weather ${r.status}`);
     const c = (await r.json()).current;
     const [, icon, text] = WMO.find(([codes]) => codes.includes(c.weather_code)) || [[], '·', ''];
-    $('#weather').innerHTML = `<span class="wi">${icon}</span><b>${Math.round(c.temperature_2m)}°C</b><small>${esc(text)}${weatherAt.place ? ' · ' + esc(weatherAt.place) : ''}</small>`;
+    $('#weather').innerHTML = `<div class="wtop"><span class="wi">${icon}</span><b>${Math.round(c.temperature_2m)}°C</b></div>`
+      + `<span class="wtext">${esc(text)}</span>${weatherAt.place ? `<small>${esc(weatherAt.place)}</small>` : ''}`;
   } catch (e) { console.warn(e); }
 }
 refreshWeather();
