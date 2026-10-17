@@ -87,7 +87,7 @@ body { background: #03060c url("./lounge.webp") center / cover no-repeat fixed; 
 .stage {
   position: relative; z-index: 1; min-height: calc(100vh - 84px);
   display: grid; place-items: center;
-  padding: 22px clamp(16px, 3vw, 40px) 140px;  /* room for the chat pill and the status bar fixed at the bottom */
+  padding: 22px clamp(8px, 1.5vw, 20px) 140px;  /* cards closer to the edge (half of before); room for the chat pill and the status bar fixed at the bottom */
   perspective: 1700px; perspective-origin: 50% 35%;
 }
 .scene {
@@ -590,3 +590,7 @@ html[data-glass="faded"] .tile { background: linear-gradient(180deg, rgb(var(--t
    The scene lets the pointer through; its children take it themselves. */
 .scene { pointer-events: none; }
 .scene > * { pointer-events: auto; }
+/* the clock in AURON's own letters: the brand's sans, semibold, spaced -- not the code font */
+.topclock .clock { font-family: Inter, "Segoe UI", system-ui, sans-serif; font-weight: 600; font-size: 42px;
+  letter-spacing: .12em; font-variant-numeric: tabular-nums; padding-left: .12em; }
+.topclock .when small { letter-spacing: .14em; text-transform: uppercase; font-size: 11.5px; }

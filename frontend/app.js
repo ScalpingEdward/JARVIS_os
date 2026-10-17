@@ -519,7 +519,9 @@ function locate() {
 
 async function refreshWeather() {
   try {
-    weatherAt = weatherAt || await locate();
+    // An unanswered location prompt never calls back at all (its timeout only starts after
+    // a yes) -- so after 10 s the weather comes from the fallback place instead of never.
+    weatherAt = weatherAt || await Promise.race([locate(), new Promise((r) => setTimeout(() => r(WEATHER_FALLBACK), 10000))]);
     const u = `https://api.open-meteo.com/v1/forecast?latitude=${weatherAt.lat}&longitude=${weatherAt.lon}&current=temperature_2m,weather_code&timezone=auto`;
     const r = await fetch(u);
     if (!r.ok) throw new Error(`weather ${r.status}`);
@@ -527,7 +529,7 @@ async function refreshWeather() {
     const [, icon, text] = WMO.find(([codes]) => codes.includes(c.weather_code)) || [[], '·', ''];
     $('#weather').innerHTML = `<span class="wi">${icon}</span><b>${Math.round(c.temperature_2m)}°C</b>`
       + `<span class="wtext">${esc(text)}${weatherAt.place ? ` · ${esc(weatherAt.place)}` : ''}</span>`;
-  } catch (e) { console.warn(e); }
+  } catch (e) { console.warn(e); setTimeout(refreshWeather, 60000); }  // e.g. Open-Meteo 503: try again in a minute, not in 15
 }
 refreshWeather();
 setInterval(refreshWeather, 15 * 60 * 1000);
