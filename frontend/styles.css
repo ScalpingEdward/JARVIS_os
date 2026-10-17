@@ -643,3 +643,7 @@ html[data-glass="faded"] .tile { background: linear-gradient(180deg, rgb(var(--t
   animation: clockglow2 4s ease-in-out infinite; }
 @keyframes clockglow2 { 50% { text-shadow: 0 0 12px color-mix(in srgb, var(--accent) 95%, transparent), 0 0 34px color-mix(in srgb, var(--accent) 70%, transparent), 0 2px 3px rgba(0,0,0,.7); } }
 .topclock .clock { animation: none; }  /* lit, not pulsing (Brano, 2026-10-17) */
+/* cards near the screen edge on any width: the scene no longer stops at 1640 px (on a wider
+   screen that left a broad gap left and right), and the side padding is halved again */
+.scene { width: 100%; }
+.stage { padding-left: clamp(4px, .75vw, 10px); padding-right: clamp(4px, .75vw, 10px); }
