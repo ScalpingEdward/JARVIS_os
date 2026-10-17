@@ -55,14 +55,14 @@
         <div class="tile-list" id="iList"></div>
       </button>
 
-      <div class="tile a-mail static" id="tileMail" style="--d:-3.2s">
+      <div class="tile a-mail" id="tileMail" role="button" tabindex="0" title="Gmail öffnen" style="--d:-3.2s">
         <span class="corner"></span>
         <div class="tile-head"><span class="th-title"><span class="ti" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="2.5" y="5" width="19" height="14" rx="2.5" fill="#f4f6fa"/><path d="M3.2 6.2 12 13l8.8-6.8" fill="none" stroke="#ea4335" stroke-width="2.2" stroke-linejoin="round"/><path d="M2.5 7.5v9.5c0 1.1.9 2 2 2H6V10z" fill="#4285f4"/><path d="M21.5 7.5v9.5c0 1.1-.9 2-2 2H18V10z" fill="#34a853"/></svg></span>Post</span><span class="badge" id="mBadge">–</span></div>
         <div class="mail-drafts" id="mDrafts"></div>
         <div class="tile-list mail-list" id="mList"></div>
       </div>
 
-      <div class="tile a-smart static" id="tileSmart" style="--d:-1.7s">
+      <div class="tile a-smart" data-view="smart" id="tileSmart" role="button" tabindex="0" style="--d:-1.7s">
         <span class="corner"></span>
         <div class="tile-head"><span>Smart Money</span><span class="badge" id="sBadge">–</span></div>
         <div class="tile-list smart-list" id="sMacro"></div>
@@ -109,6 +109,16 @@
             <div class="table-wrap"><table class="positions" id="history"></table></div>
             <div class="muted empty" id="noHistory">No closed trades yet.</div>
           </section>
+        </div>
+      </div>
+
+      <div class="view" data-view="smart">
+        <p class="watch-note">Beobachtung, keine Empfehlung. Makro: Termine mit hoher Wirkung diese Woche. Insider: Käufe und Verkäufe
+          am offenen Markt (SEC Form 4) bei den US-Aktien deiner Watchlist, letzte 30 Tage.</p>
+        <div class="grid">
+          <section class="card span-12"><div class="label">Makro diese Woche</div><div class="table-wrap"><table class="positions" id="smMacro"></table></div></section>
+          <section class="card span-12"><div class="label">Mehrere Insider kaufen <span class="count" id="smClusterCount">0</span></div><div id="smClusters" class="muted"></div></section>
+          <section class="card span-12"><div class="label">Insider (30 Tage) <span class="count" id="smCount">0</span></div><div class="table-wrap"><table class="positions" id="smInsider"></table></div></section>
         </div>
       </div>
 

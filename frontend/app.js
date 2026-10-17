@@ -358,7 +358,7 @@ document.querySelectorAll('.tile').forEach((tile) => {
 
 // --- opening a tile into its full view (it grows out of the tile and back) --------
 let openView = null, openedFrom = null;
-const TITLES = { trading: 'Trading', instagram: 'Instagram', watchlist: 'Watchlist' };
+const TITLES = { trading: 'Trading', instagram: 'Instagram', watchlist: 'Watchlist', smart: 'Smart Money' };
 
 function morph(panel, rect, reverse) {
   const end = panel.getBoundingClientRect();
@@ -376,6 +376,7 @@ function open(view, fromTile, push = true) {
   $('#detailPanel').scrollTop = 0;
   if (push) history_.pushState({ view }, '', `#${view}`);
   if (view === 'watchlist' && watch) renderWatchView(watch);
+  if (view === 'smart') renderSmartView();
   if (view === 'trading' && overview) { renderTotals(overview); renderAccounts(overview); renderGroups(overview); renderPositions(overview); renderHistory(overview); renderTotalChart(); }
   if (fromTile) morph($('#detailPanel'), fromTile.getBoundingClientRect(), false);
   $('#close').focus();
@@ -476,7 +477,10 @@ async function refreshMail() {
 }
 $('#tileMail').addEventListener('click', async (e) => {
   const b = e.target.closest('button');
-  if (!b) return;
+  if (!b) {  // anywhere else on the card: the mailbox itself
+    if (!e.target.closest('.card-gear, .card-menu')) window.open('https://mail.google.com/mail/u/0/#inbox', '_blank', 'noopener');
+    return;
+  }
   b.disabled = true;
   try {
     if (b.dataset.send) await send('POST', `/v1/mail/drafts/${b.dataset.send}/send`);
@@ -489,9 +493,33 @@ refreshMail();
 setInterval(refreshMail, 60000);
 
 // --- smart money: macro dates and insider trades (backend/app/smartmoney) -------------------
+let smart = null;
+function renderSmartView() {
+  const s = smart;
+  if (!s) return;
+  const day = (iso) => new Date(iso).toLocaleString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+  $('#smMacro').innerHTML = s.macro.length ? '<tr><th>WANN</th><th></th><th>TERMIN</th><th>PROGNOSE</th><th>VORHER</th></tr>'
+    + s.macro.map((e) => `<tr><td>${esc(day(e.at))}</td><td>${esc(e.currency)}</td><td>${esc(e.title_de ? `${e.title_de} (${e.title})` : e.title)}</td>`
+      + `<td class="num">${esc(e.forecast || '–')}</td><td class="num">${esc(e.previous || '–')}</td></tr>`).join('')
+    : '<tr><td class="muted">Keine großen Termine mehr diese Woche – der neue Kalender kommt sonntags.</td></tr>';
+  const cl = Object.entries(s.clusters || {});
+  $('#smClusterCount').textContent = cl.length;
+  $('#smClusters').innerHTML = cl.length ? cl.map(([t, o]) => `<div><b>${esc(t)}</b>: ${o.map(esc).join(', ')}</div>`).join('') : 'Keine Häufung in den letzten 14 Tagen.';
+  $('#smCount').textContent = s.insider.length;
+  const money = (v) => (v >= 1e6 ? `${(v / 1e6).toFixed(2)} Mio $` : `${Math.round(v).toLocaleString('de-DE')} $`);
+  $('#smInsider').innerHTML = !s.insider_connected ? '<tr><td class="muted">SEC-Kontakt fehlt.</td></tr>'
+    : '<tr><th>DATUM</th><th>AKTIE</th><th>INSIDER</th><th>FUNKTION</th><th></th><th>STÜCK</th><th>KURS</th><th>WERT</th><th></th></tr>'
+      + s.insider.map((t) => `<tr><td>${esc(new Date(t.traded_on).toLocaleDateString('de-DE'))}</td><td><b>${esc(t.name)}</b> <span class="muted">${esc(t.ticker)}</span></td>`
+        + `<td>${esc(t.owner)}</td><td class="muted">${esc(t.title || '')}</td><td><span class="side ${t.code === 'P' ? 'buy' : 'sell'}">${t.code === 'P' ? 'KAUF' : 'VERKAUF'}</span></td>`
+        + `<td class="num">${Math.round(t.shares || 0).toLocaleString('de-DE')}</td><td class="num">${fmt(t.price || 0)}</td><td class="num">${money(t.value)}</td>`
+        + `<td>${t.url ? `<a href="${esc(t.url)}" target="_blank" rel="noopener">SEC</a>` : ''}</td></tr>`).join('');
+}
+
 async function refreshSmart() {
   try {
     const s = await get('/v1/smartmoney');
+    smart = s;
+    if (openView === 'smart') renderSmartView();
     const now = Date.now();
     const when = (iso) => new Date(iso).toLocaleString('de-DE', { weekday: 'short', hour: '2-digit', minute: '2-digit' });
     const ev = s.macro.slice(0, 3).map((e) => {
