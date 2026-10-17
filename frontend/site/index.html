@@ -23,26 +23,36 @@
   </header>
 
   <section class="hero" id="top">
-    <div class="hero-bg" id="bgA" style="background-image:url('../rooms/earth.webp')"></div>
+    <div class="hero-bg" id="bgA"></div>
     <div class="hero-bg next" id="bgB"></div>
-    <div class="hero-inner">
-      <div class="hero-text">
-      <p class="eyebrow">Dein persönliches Büro</p>
-      <h1>Dein Büro.<br /><span>Wo immer du willst.</span></h1>
-      <p class="where" id="where">Über der Erde</p>
-      <p class="lead">Über den Wolken, in den Alpen, am Wasserfall – AURON ist dein Büro, das dir die digitale Arbeit
-        abnimmt. Trading, Instagram, Post und Märkte laufen automatisch; du entscheidest, er erledigt den Rest.
-        Und wenn du fragst, antwortet er. Mit Stimme.</p>
-      <div class="cta">
-        <a class="btn" href="#funktionen">Was AURON kann</a>
-        <a class="btn ghost" href="#einblick">Einblick ansehen</a>
-      </div>
-      </div>
-      <div class="core" aria-hidden="true">
+    <div class="hero-stage">
+      <article class="glass g-left">
+        <p class="eyebrow">Dein persönliches Büro</p>
+        <h1>Dein Büro.<br /><span>Wo immer du willst.</span></h1>
+        <p class="where" id="where">Über der Erde</p>
+        <p class="lead">Über den Wolken, in den Alpen, am Wasserfall – AURON nimmt dir die digitale Arbeit ab.
+          Trading, Instagram, Post und Märkte laufen automatisch; du entscheidest, er erledigt den Rest.
+          Und wenn du fragst, antwortet er. Mit Stimme.</p>
+        <div class="cta">
+          <a class="btn" href="#funktionen">Was AURON kann</a>
+          <a class="btn ghost" href="#einblick">Einblick</a>
+        </div>
+      </article>
+      <div class="core" id="core" aria-hidden="true">
         <div class="orbit o1"><i></i></div><div class="orbit o2"><i></i></div><div class="orbit o3 warm"><i></i></div>
         <div class="sphere"><div class="energy"></div><i class="scan"></i></div>
         <div class="beam"></div>
       </div>
+      <article class="glass g-right">
+        <p class="eyebrow">Heute für dich erledigt</p>
+        <ul class="done">
+          <li><b>12</b><span>Signale kopiert, Stops nachgezogen</span></li>
+          <li><b>3</b><span>wichtige Mails erkannt, 41 Werbung aussortiert</span></li>
+          <li><b>1</b><span>Reel geplant für 19:00</span></li>
+          <li><b>14:30</b><span>Inflationsdaten: du wirst 30 Min vorher gewarnt</span></li>
+        </ul>
+        <p class="saved">≈ 2,5 Stunden gespart</p>
+      </article>
     </div>
     <ul class="trust">
       <li>Spart dir Stunden pro Woche</li>
@@ -182,23 +192,7 @@
   <script src="https://cdn.jsdelivr.net/npm/d3-geo@3.1.1/dist/d3-geo.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js"></script>
   <script src="../globe.js"></script>
-  <script>
-    // the office moves through the rooms: crossfade every 6 s
-    (() => {
-      const rooms = [['earth', 'Über der Erde'], ['alps', 'In den Alpen'], ['forest', 'Am Wasserfall'], ['gold', 'Im eigenen Turm'], ['orbit', 'Im Orbit']];
-      const a = document.getElementById('bgA'), b = document.getElementById('bgB'), where = document.getElementById('where');
-      rooms.forEach(([k]) => { const i = new Image(); i.src = `../rooms/${k}.webp`; });
-      let n = 0, front = a, back = b;
-      if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-      setInterval(() => {
-        n = (n + 1) % rooms.length;
-        back.style.backgroundImage = `url('../rooms/${rooms[n][0]}.webp')`;
-        back.classList.remove('next'); front.classList.add('next');
-        [front, back] = [back, front];
-        where.style.opacity = 0;
-        setTimeout(() => { where.textContent = rooms[n][1]; where.style.opacity = 1; }, 600);
-      }, 6000);
-    })();
-  </script>
+  <script src="../rooms/rooms.js"></script>
+  <script src="./hero.js"></script>
 </body>
 </html>
