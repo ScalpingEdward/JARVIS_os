@@ -635,3 +635,10 @@ html[data-glass="faded"] .tile { background: linear-gradient(180deg, rgb(var(--t
 .wx-wind { fill: none; stroke: #bfe6ff; stroke-width: 2; stroke-linecap: round; stroke-dasharray: 34 40; animation: gust 2.2s linear infinite; }
 .wx-wind.w2 { animation-delay: 1.1s; }
 @keyframes gust { from { stroke-dashoffset: 74; } to { stroke-dashoffset: 0; } }
+/* Gradient text (background-clip) together with a filter rendered black in Brano's Edge window
+   (2026-10-17) while it looked right here -- plain white with a glow works everywhere. */
+.topclock .clock { background: none; -webkit-background-clip: border-box; background-clip: border-box;
+  -webkit-text-fill-color: currentColor; color: #fff; filter: none;
+  text-shadow: 0 0 8px color-mix(in srgb, var(--accent) 80%, transparent), 0 0 22px color-mix(in srgb, var(--accent) 55%, transparent), 0 2px 3px rgba(0,0,0,.7);
+  animation: clockglow2 4s ease-in-out infinite; }
+@keyframes clockglow2 { 50% { text-shadow: 0 0 12px color-mix(in srgb, var(--accent) 95%, transparent), 0 0 34px color-mix(in srgb, var(--accent) 70%, transparent), 0 2px 3px rgba(0,0,0,.7); } }
