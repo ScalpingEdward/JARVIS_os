@@ -594,3 +594,44 @@ html[data-glass="faded"] .tile { background: linear-gradient(180deg, rgb(var(--t
 .topclock .clock { font-family: Inter, "Segoe UI", system-ui, sans-serif; font-weight: 600; font-size: 42px;
   letter-spacing: .12em; font-variant-numeric: tabular-nums; padding-left: .12em; }
 .topclock .when small { letter-spacing: .14em; text-transform: uppercase; font-size: 11.5px; }
+
+/* the clock, twice the size, bold and lit from within; the weather under it, centred */
+.topclock { top: 6px; gap: 0; }
+.topclock .clock { font-size: 84px; font-weight: 800; letter-spacing: .08em; line-height: 1; padding-left: .08em;
+  color: #fff; background: linear-gradient(180deg, #ffffff 30%, color-mix(in srgb, var(--accent) 55%, #ffffff) 100%);
+  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 0 10px color-mix(in srgb, var(--accent) 55%, transparent)) drop-shadow(0 2px 3px rgba(0,0,0,.7));
+  animation: clockglow 4s ease-in-out infinite; text-shadow: none; }
+@keyframes clockglow { 50% { filter: drop-shadow(0 0 18px color-mix(in srgb, var(--accent) 75%, transparent)) drop-shadow(0 2px 3px rgba(0,0,0,.7)); } }
+.topclock .when small { margin-top: 2px; }
+.topclock .weather { display: grid; justify-items: center; gap: 0; margin-top: 4px; }
+.topclock .weather .wtop { display: flex; align-items: center; gap: 8px; }
+.topclock .weather b { font-size: 26px; font-weight: 700; }
+.topclock .weather .wtext { font-size: 13px; }
+
+/* animated weather icons (weatherIcon in app.js) */
+.wx { width: 46px; height: 46px; overflow: visible; filter: drop-shadow(0 0 6px rgba(0,0,0,.5)); }
+.wx * { vector-effect: non-scaling-stroke; }
+.wx-sun circle { fill: #ffd25a; filter: drop-shadow(0 0 6px #ffb52e); }
+.wx-sun line { stroke: #ffd25a; stroke-width: 2.6; stroke-linecap: round; }
+.wx-sun { animation: sunspin 24s linear infinite, sunpulse 3s ease-in-out infinite; }
+@keyframes sunspin { to { rotate: 360deg; } }
+@keyframes sunpulse { 50% { scale: 1.08; filter: drop-shadow(0 0 10px #ffc94a); } }
+.wx-moon { fill: #f3f0d7; filter: drop-shadow(0 0 6px rgba(255,250,210,.7)); animation: moonglow 4s ease-in-out infinite; }
+@keyframes moonglow { 50% { filter: drop-shadow(0 0 12px rgba(255,250,210,.95)); } }
+.wx-cloud { fill: #e4ecf7; stroke: rgba(255,255,255,.6); stroke-width: 1; }
+.wx-cloud.dark { fill: #8a96a8; }
+.wx-cloud.drift, .wx-cloud.front { animation: drift 6s ease-in-out infinite; }
+@keyframes drift { 50% { translate: 3px 0; } }
+.wx-drop { stroke: #7cc8ff; stroke-width: 2.4; stroke-linecap: round; animation: drop .9s linear infinite; opacity: 0; }
+.wx-drop.slow { stroke-width: 1.8; animation-duration: 1.4s; }
+@keyframes drop { 0% { translate: 0 -4px; opacity: 0; } 20% { opacity: 1; } 100% { translate: -2px 9px; opacity: 0; } }
+.wx-flake { fill: #fff; animation: flake 2s ease-in-out infinite; opacity: 0; }
+@keyframes flake { 0% { translate: 0 -4px; opacity: 0; } 30% { opacity: 1; } 50% { translate: 2px 3px; } 100% { translate: -1px 10px; opacity: 0; } }
+.wx-bolt { fill: #ffe066; animation: bolt 2.6s steps(1) infinite; filter: drop-shadow(0 0 6px #ffd000); }
+@keyframes bolt { 0%, 70%, 78%, 100% { opacity: 0; } 72%, 82% { opacity: 1; } }
+.wx-fog { stroke: #cfd8e6; stroke-width: 3; stroke-linecap: round; animation: fog 4s ease-in-out infinite; }
+@keyframes fog { 50% { translate: 5px 0; opacity: .5; } }
+.wx-wind { fill: none; stroke: #bfe6ff; stroke-width: 2; stroke-linecap: round; stroke-dasharray: 34 40; animation: gust 2.2s linear infinite; }
+.wx-wind.w2 { animation-delay: 1.1s; }
+@keyframes gust { from { stroke-dashoffset: 74; } to { stroke-dashoffset: 0; } }

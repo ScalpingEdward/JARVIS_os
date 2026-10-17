@@ -494,10 +494,34 @@ setInterval(refreshHealth, 15000);
 // Refreshed every 15 min.
 const WEATHER_FALLBACK = { lat: 50.20, lon: 10.08, place: 'Bad Kissingen' };
 const WMO = [
-  [[0], '☀', 'klar'], [[1, 2], '⛅', 'leicht bewölkt'], [[3], '☁', 'bewölkt'], [[45, 48], '〰', 'Nebel'],
-  [[51, 53, 55, 56, 57], '☂', 'Niesel'], [[61, 63, 65, 66, 67, 80, 81, 82], '☔', 'Regen'],
-  [[71, 73, 75, 77, 85, 86], '❄', 'Schnee'], [[95, 96, 99], '⚡', 'Gewitter'],
+  [[0], 'sun', 'klar'], [[1, 2], 'partly', 'leicht bewölkt'], [[3], 'cloud', 'bewölkt'], [[45, 48], 'fog', 'Nebel'],
+  [[51, 53, 55, 56, 57], 'drizzle', 'Niesel'], [[61, 63, 65, 66, 67, 80, 81, 82], 'rain', 'Regen'],
+  [[71, 73, 75, 77, 85, 86], 'snow', 'Schnee'], [[95, 96, 99], 'storm', 'Gewitter'],
 ];
+
+// Animated weather icons, drawn here (styles.css moves them): the sun pulses, rain and snow
+// fall out of the cloud, lightning flashes, fog drifts; strong wind adds sliding gusts.
+function weatherIcon(kind, day, windy) {
+  const cloud = (cls = '') => `<path class="wx-cloud ${cls}" d="M19 46h28a11 11 0 0 0 0-22 15 15 0 0 0-29-3A10 10 0 0 0 19 46z"/>`;
+  const sun = (x = 32, y = 30, r = 10) => `<g class="wx-sun" style="transform-origin:${x}px ${y}px">`
+    + [0, 45, 90, 135, 180, 225, 270, 315].map((a) => `<line x1="${x}" y1="${y - r - 4}" x2="${x}" y2="${y - r - 9}" transform="rotate(${a} ${x} ${y})"/>`).join('')
+    + `<circle cx="${x}" cy="${y}" r="${r}"/></g>`;
+  const moon = (x = 32, y = 30) => `<path class="wx-moon" d="M${x + 6} ${y - 13}a14 14 0 1 0 8 22 11 11 0 1 1-8-22z"/>`;
+  const fall = (cls, n) => Array.from({ length: n }, (_, i) => `<line class="${cls}" x1="${22 + i * 9}" y1="49" x2="${20 + i * 9}" y2="55" style="animation-delay:${(i * 0.33).toFixed(2)}s"/>`).join('');
+  const flakes = () => [0, 1, 2].map((i) => `<circle class="wx-flake" cx="${23 + i * 9}" cy="51" r="2" style="animation-delay:${i * 0.6}s"/>`).join('');
+  const parts = {
+    sun: () => (day ? sun() : moon()),
+    partly: () => (day ? sun(24, 22, 8) : moon(22, 22)) + cloud('front'),
+    cloud: () => cloud('drift'),
+    fog: () => [0, 1, 2].map((i) => `<line class="wx-fog" x1="12" y1="${26 + i * 9}" x2="52" y2="${26 + i * 9}" style="animation-delay:${i * 0.8}s"/>`).join(''),
+    drizzle: () => cloud() + fall('wx-drop slow', 3),
+    rain: () => cloud() + fall('wx-drop', 4),
+    snow: () => cloud() + flakes(),
+    storm: () => cloud('dark') + '<path class="wx-bolt" d="M33 40l-6 10h6l-3 9 9-12h-6l4-7z"/>' + fall('wx-drop', 2),
+  };
+  const gust = windy ? '<path class="wx-wind" d="M6 20h22a4 4 0 1 0-4-4"/><path class="wx-wind w2" d="M10 58h26a4 4 0 1 1-4 4"/>' : '';
+  return `<svg class="wx wx-${kind}" viewBox="0 0 64 64" aria-hidden="true">${(parts[kind] || parts.cloud)()}${gust}</svg>`;
+}
 let weatherAt = null;
 
 function locate() {
@@ -522,13 +546,14 @@ async function refreshWeather() {
     // An unanswered location prompt never calls back at all (its timeout only starts after
     // a yes) -- so after 10 s the weather comes from the fallback place instead of never.
     weatherAt = weatherAt || await Promise.race([locate(), new Promise((r) => setTimeout(() => r(WEATHER_FALLBACK), 10000))]);
-    const u = `https://api.open-meteo.com/v1/forecast?latitude=${weatherAt.lat}&longitude=${weatherAt.lon}&current=temperature_2m,weather_code&timezone=auto`;
+    const u = `https://api.open-meteo.com/v1/forecast?latitude=${weatherAt.lat}&longitude=${weatherAt.lon}&current=temperature_2m,weather_code,is_day,wind_speed_10m&timezone=auto`;
     const r = await fetch(u);
     if (!r.ok) throw new Error(`weather ${r.status}`);
     const c = (await r.json()).current;
-    const [, icon, text] = WMO.find(([codes]) => codes.includes(c.weather_code)) || [[], '·', ''];
-    $('#weather').innerHTML = `<span class="wi">${icon}</span><b>${Math.round(c.temperature_2m)}°C</b>`
-      + `<span class="wtext">${esc(text)}${weatherAt.place ? ` · ${esc(weatherAt.place)}` : ''}</span>`;
+    const [, kind, text] = WMO.find(([codes]) => codes.includes(c.weather_code)) || [[], 'cloud', ''];
+    const windy = (c.wind_speed_10m || 0) >= 30;  // km/h: a fresh breeze and up gets gusts in the icon
+    $('#weather').innerHTML = `<div class="wtop">${weatherIcon(kind, c.is_day !== 0, windy)}<b>${Math.round(c.temperature_2m)}°C</b></div>`
+      + `<span class="wtext">${esc(text)}${windy ? ', windig' : ''}${weatherAt.place ? ` · ${esc(weatherAt.place)}` : ''}</span>`;
   } catch (e) { console.warn(e); setTimeout(refreshWeather, 60000); }  // e.g. Open-Meteo 503: try again in a minute, not in 15
 }
 refreshWeather();
