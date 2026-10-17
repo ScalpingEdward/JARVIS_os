@@ -219,23 +219,20 @@ function renderTradingTile(o) {
   if (!t) return;
   tween($('#tTotal'), t.equity);
   $('#tCurrency').textContent = t.currency + (o.totals.length > 1 ? ` + ${o.totals.length - 1} more` : '');
-  $('#tToday').innerHTML = `today ${signed(t.pnl_today, t.currency)}`;
+  $('#tToday').innerHTML = `heute ${signed(t.pnl_today, t.currency)}`;
   const live = o.accounts.filter((a) => a.state === 'live').length;
   $('#tLive').textContent = live === o.accounts.length ? 'live' : `${live}/${o.accounts.length} live`;
   $('#tLive').classList.toggle('live', live === o.accounts.length);
-  $('#tAccounts').innerHTML = '<div class="cap">Accounts</div>' + o.accounts.map((a) => {
-    const st = a.state === 'live' ? 'ok' : a.state === 'stale' ? 'warn' : 'bad';
-    return `<div class="row"><span class="dot ${st}"></span><span>${esc(nameOf(a))}</span><span>${fmt(a.equity)} ${esc(a.currency)}</span></div>`;
-  }).join('');
   const groups = (o.groups || []).filter((g) => g.name !== '(not from a signal)');
   const stateOf = Object.fromEntries(o.accounts.map((a) => [a.profile, a.state]));
   const copier = (g) => {  // the group's copiers: all live -> ok, any late -> warn, else bad
     const states = (g.accounts || []).map((p) => stateOf[p]);
     return states.length && states.every((x) => x === 'live') ? 'ok' : states.some((x) => x === 'live' || x === 'stale') ? 'warn' : 'bad';
   };
-  $('#tGroups').innerHTML = groups.length ? groups.map((g) =>
-    `<div class="row"><span class="dot ${copier(g)}" title="Kopierer ${copier(g) === 'ok' ? 'online' : 'nicht online'}"></span><span>${esc(g.name)}</span><span>${signed(g.pnl_total)}</span></div>`).join('')
-    : '<div class="row"><span></span><span class="muted">No group has traded yet</span><span></span></div>';
+  $('#tGroups').innerHTML = '<div class="cap"><span>Gruppen</span><span>heute</span><span>gesamt</span></div>' + (groups.length ? groups.map((g) =>
+    `<div class="row grp"><span class="dot ${copier(g)}" title="Kopierer ${copier(g) === 'ok' ? 'online' : 'nicht online'}"></span><span>${esc(g.name)}</span>`
+    + `<span class="mono">${signed(g.pnl_today)}</span><span>${signed(g.pnl_total)}</span></div>`).join('')
+    : '<div class="row"><span></span><span class="muted">Noch keine Gruppe hat gehandelt</span><span></span></div>');
   $('#kToday').innerHTML = signed(t.pnl_today, t.currency);
   $('#kWeek').innerHTML = signed(t.pnl_week, t.currency);
   $('#kOpen').innerHTML = `${t.open_positions} <small class="muted">${signed(t.open_pnl)}</small>`;
