@@ -669,3 +669,16 @@ html[data-glass="faded"] .tile { background: linear-gradient(180deg, rgb(var(--t
 .smart-list .bs.S { color: var(--down); background: rgba(242,100,124,.12); }
 .smart-list .row.cluster span:nth-child(2) { color: var(--up); }
 @media (max-width: 1000px) { .scene { grid-template-areas: "holo" "trading" "watch" "insta" "mail" "smart"; } }
+
+/* clock designs (settings.js sets data-clock and --clock-size on <html>); default "clean" is lighter than before */
+:root { --clock-size: 72px; }
+.topclock .clock { font-size: var(--clock-size); font-weight: 500; letter-spacing: .06em; }
+html[data-clock="thin"] .topclock .clock { font-weight: 200; letter-spacing: .14em; }
+html[data-clock="mono"] .topclock .clock { font-family: var(--mono); font-weight: 400; letter-spacing: .02em; }
+html[data-clock="elegant"] .topclock .clock { font-family: "Georgia", "Times New Roman", serif; font-weight: 400; letter-spacing: .04em;
+  text-shadow: 0 0 6px rgba(255,236,200,.45), 0 2px 3px rgba(0,0,0,.7); }
+html[data-clock="neon"] .topclock .clock { font-weight: 300; color: var(--accent);
+  text-shadow: 0 0 6px var(--accent), 0 0 18px var(--accent), 0 0 38px color-mix(in srgb, var(--accent) 70%, transparent); }
+html[data-clock="bold"] .topclock .clock { font-weight: 800; letter-spacing: .08em; }
+.theme-panel .seg.seg3 { grid-template-columns: repeat(3, 1fr); }
+.theme-panel { max-height: calc(100vh - 80px); overflow-y: auto; }

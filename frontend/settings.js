@@ -6,7 +6,8 @@
   const TINTS = [['#96c8ff', 'Eisblau'], ['#ffd28c', 'Champagner'], ['#ffb4d2', 'Rosé'], ['#b4ffd2', 'Mint'], ['#d2b4ff', 'Flieder'], ['#e6e6e6', 'Neutral']];
   const STYLES = { clear: ['Klar', { blur: 4, glass: 0.6, solid: 0 }], frosted: ['Matt', { blur: 18, glass: 1, solid: 0 }],
     faded: ['Verblasst', { blur: 24, glass: 1, solid: 0 }], solid: ['Massiv', { blur: 18, glass: 1, solid: 1 }] };
-  const DEFAULT = { accent: '#4fd8ff', tint: '#96c8ff', style: 'frosted', strength: 100 };
+  const CLOCKS = { clean: 'Klar', thin: 'Dünn', mono: 'Digital', elegant: 'Elegant', neon: 'Neon', bold: 'Fett' };
+  const DEFAULT = { accent: '#4fd8ff', tint: '#96c8ff', style: 'frosted', strength: 100, clock: 'clean', clockSize: 72 };
   let t = { ...DEFAULT };
   try { t = { ...DEFAULT, ...JSON.parse(localStorage.getItem(KEY) || '{}') }; } catch { /* private window */ }
 
@@ -19,6 +20,8 @@
     r.setProperty('--glass', String(st[1].glass * t.strength / 100));
     r.setProperty('--solid', String(st[1].solid));
     document.documentElement.dataset.glass = t.style;
+    document.documentElement.dataset.clock = t.clock;
+    r.setProperty('--clock-size', `${t.clockSize}px`);
   }
   const save = () => { try { localStorage.setItem(KEY, JSON.stringify(t)); } catch { /* private window */ } };
 
@@ -34,18 +37,22 @@
       <div><span class="th-label">Glas</span><div class="seg">${Object.entries(STYLES).map(([k, [n]]) =>
         `<button type="button" data-k="style" data-v="${k}" class="${k === t.style ? 'on' : ''}">${n}</button>`).join('')}</div></div>
       <div><span class="th-label">Farbstärke ${t.strength} %</span><input type="range" min="20" max="200" step="10" data-k="strength" value="${t.strength}" /></div>
+      <div><span class="th-label">Uhr</span><div class="seg seg3">${Object.entries(CLOCKS).map(([k, n]) =>
+        `<button type="button" data-k="clock" data-v="${k}" class="${k === t.clock ? 'on' : ''}">${n}</button>`).join('')}</div></div>
+      <div><span class="th-label" id="thClockSize">Uhr-Größe ${t.clockSize} px</span><input type="range" min="40" max="120" step="4" data-k="clockSize" value="${t.clockSize}" /></div>
       <button type="button" class="th-reset" data-k="reset">Zurücksetzen</button>`;
   }
   function set(k, v) {
     if (k === 'reset') t = { ...DEFAULT };
-    else t[k] = k === 'strength' ? Number(v) : v;
+    else t[k] = k === 'strength' || k === 'clockSize' ? Number(v) : v;
     apply(); save();
   }
   panel.addEventListener('click', (e) => { const b = e.target.closest('button[data-k]'); if (!b) return;
     if (b.dataset.k === 'close') { panel.hidden = true; return; }
     set(b.dataset.k, b.dataset.v); paint(); });
   panel.addEventListener('input', (e) => { const i = e.target.closest('input[data-k]'); if (!i) return; set(i.dataset.k, i.value);
-    if (i.type === 'range') panel.querySelector('[data-k=strength]').previousElementSibling.textContent = `Farbstärke ${t.strength} %`; });
+    if (i.dataset.k === 'strength') i.previousElementSibling.textContent = `Farbstärke ${t.strength} %`;
+    if (i.dataset.k === 'clockSize') i.previousElementSibling.textContent = `Uhr-Größe ${t.clockSize} px`; });
   panel.addEventListener('change', paint);
   btn.addEventListener('click', (e) => { e.stopPropagation(); paint(); panel.hidden = !panel.hidden; });
   apply();
