@@ -647,3 +647,7 @@ html[data-glass="faded"] .tile { background: linear-gradient(180deg, rgb(var(--t
    screen that left a broad gap left and right), and the side padding is halved again */
 .scene { width: 100%; }
 .stage { padding-left: clamp(6px, 1.8vw, 40px); padding-right: clamp(6px, 1.8vw, 40px); }  /* the turned cards reach ~10 px from the edge */
+/* Brano's screen is 1920 wide. Cards keep the width they had with the 1640 px scene (421 px),
+   and move outward to about half their old distance from the edge -- not to the edge itself. */
+.scene { width: 100%; grid-template-columns: min(421px, 25vw) minmax(0, 1fr) min(421px, 25vw); }
+.stage { padding-left: clamp(10px, 5vw, 100px); padding-right: clamp(10px, 5vw, 100px); }
