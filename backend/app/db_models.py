@@ -476,3 +476,29 @@ class MailDraftRow(Base):
     status: Mapped[str] = mapped_column(String(20), default="pending")       # pending / sent / discarded
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class InsiderTradeRow(Base):
+    """One open-market insider buy or sale from an SEC Form 4, for a watchlist stock."""
+
+    __tablename__ = "insider_trades"
+    key: Mapped[str] = mapped_column(String(120), primary_key=True)        # accession number + line
+    ticker: Mapped[str] = mapped_column(String(12), index=True)
+    owner: Mapped[str] = mapped_column(String(200))
+    title: Mapped[str] = mapped_column(String(200), default="")
+    code: Mapped[str] = mapped_column(String(2))                            # P = bought, S = sold
+    shares: Mapped[float] = mapped_column(Float)
+    price: Mapped[float] = mapped_column(Float)
+    value: Mapped[float] = mapped_column(Float)
+    traded_on: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    filed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    url: Mapped[str] = mapped_column(String(300), default="")
+    alerted: Mapped[int] = mapped_column(Integer, default=0)
+
+
+class SmartAlertRow(Base):
+    """An alert already sent (macro event, insider cluster) -- each goes out once."""
+
+    __tablename__ = "smart_alerts"
+    key: Mapped[str] = mapped_column(String(200), primary_key=True)
+    sent_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))

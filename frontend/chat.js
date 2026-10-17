@@ -10,7 +10,7 @@
   const input = document.getElementById('chatInput');
   const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const TAGS = /\[[a-zA-Z ]{2,24}\]\s*/g;  // [laughs] etc.: for the voice, not for the eyes
-  const TOOL_NAMES = { trading_status: 'Trading', watchlist: 'Watchlist', instagram_status: 'Instagram', web_search: 'Web', mail_inbox: 'Post', mail_read: 'Post', mail_draft_reply: 'Entwurf' };
+  const TOOL_NAMES = { trading_status: 'Trading', watchlist: 'Watchlist', instagram_status: 'Instagram', web_search: 'Web', mail_inbox: 'Post', mail_read: 'Post', mail_draft_reply: 'Entwurf', smart_money: 'Smart Money' };
 
   let turns = [];
   try { turns = JSON.parse(localStorage.getItem(KEY) || '[]'); } catch { turns = []; }

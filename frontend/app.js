@@ -487,6 +487,33 @@ $('#tileMail').addEventListener('click', async (e) => {
 });
 refreshMail();
 setInterval(refreshMail, 60000);
+
+// --- smart money: macro dates and insider trades (backend/app/smartmoney) -------------------
+async function refreshSmart() {
+  try {
+    const s = await get('/v1/smartmoney');
+    const now = Date.now();
+    const when = (iso) => new Date(iso).toLocaleString('de-DE', { weekday: 'short', hour: '2-digit', minute: '2-digit' });
+    const ev = s.macro.slice(0, 3).map((e) => {
+      const soon = Date.parse(e.at) - now < 3 * 3600e3;
+      return `<div class="row ev"><span class="when ${soon ? 'soon' : ''}">${esc(when(e.at))}</span>`
+        + `<span title="${esc(e.title)}">${esc(e.currency)} ${esc(e.title_de || e.title)}</span><span class="muted">${esc(e.forecast || '')}</span></div>`;
+    }).join('');
+    $('#sMacro').innerHTML = '<div class="cap"><span>Makro diese Woche</span></div>' + (ev || '<div class="row"><span class="muted">Keine großen Termine mehr</span></div>');
+    const cl = Object.entries(s.clusters || {}).map(([t, o]) => `<div class="row ins cluster"><span class="bs P">${o.length}× KAUF</span><span>${esc(t)} – mehrere Insider</span><span></span></div>`);
+    const big = (v) => (v >= 1e6 ? `${(v / 1e6).toFixed(1)} Mio $` : `${Math.round(v / 1e3)}k $`);
+    const ins = s.insider.filter((t) => t.code === 'P' || t.value >= 1e6).slice(0, 3).map((t) =>
+      `<div class="row ins"><span class="bs ${t.code}">${t.code === 'P' ? 'KAUF' : 'VERKAUF'}</span>`
+      + `<span title="${esc(t.owner)} · ${esc(t.title)}">${esc(t.name)} · ${esc(t.owner.split(' ').slice(0, 2).join(' '))}</span><span class="mono">${big(t.value)}</span></div>`);
+    $('#sInsider').innerHTML = '<div class="cap"><span>Insider (30 Tage)</span></div>'
+      + (!s.insider_connected ? '<div class="row"><span class="muted">SEC-Kontakt fehlt noch</span></div>'
+        : [...cl, ...ins].join('') || '<div class="row"><span class="muted">Keine Käufe auf deiner Watchlist</span></div>');
+    $('#sBadge').textContent = Object.keys(s.clusters || {}).length ? 'Cluster!' : s.macro.length ? `${s.macro.length} Termine` : 'ruhig';
+    $('#sBadge').classList.toggle('live', !s.macro_error);
+  } catch (e) { console.warn(e); $('#sBadge').textContent = 'offline'; }
+}
+refreshSmart();
+setInterval(refreshSmart, 120000);
 setInterval(refreshHealth, 15000);
 
 // --- weather next to the clock (Open-Meteo: free, no key) ------------------------------

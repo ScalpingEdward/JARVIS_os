@@ -651,3 +651,21 @@ html[data-glass="faded"] .tile { background: linear-gradient(180deg, rgb(var(--t
    and move outward to about half their old distance from the edge -- not to the edge itself. */
 .scene { width: 100%; grid-template-columns: min(421px, 25vw) minmax(0, 1fr) min(421px, 25vw); }
 .stage { padding-left: clamp(10px, 5vw, 100px); padding-right: clamp(10px, 5vw, 100px); }
+
+/* right column: Instagram, Post, Smart Money -- a little tighter so three fit */
+.scene { grid-template-areas: "trading holo insta" "trading holo mail" "watch holo smart"; }
+.a-smart { grid-area: smart; --base-ry: -22deg; }
+.a-insta, .a-mail, .a-smart { padding: 14px 16px 12px; }
+.a-insta .tile-figure b { font-size: 24px; }
+.a-insta .tile-figure { margin-top: 6px; }
+.a-insta .tile-list .row, .a-mail .tile-list .row, .a-smart .tile-list .row { padding: 5px 0; }
+.smart-list .cap { display: flex; justify-content: space-between; }
+.smart-list .row.ev, .smart-list .row.ins { display: grid; grid-template-columns: 58px minmax(0, 1fr) auto; gap: 8px; font-size: 12px; }
+.smart-list .row span:nth-child(2) { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.smart-list .when { color: var(--muted); font-family: var(--mono); font-size: 11px; }
+.smart-list .soon { color: var(--warn); }
+.smart-list .bs { font-size: 10px; font-weight: 700; letter-spacing: .08em; padding: 1px 6px; border-radius: 5px; justify-self: start; }
+.smart-list .bs.P { color: var(--up); background: rgba(61,220,151,.12); }
+.smart-list .bs.S { color: var(--down); background: rgba(242,100,124,.12); }
+.smart-list .row.cluster span:nth-child(2) { color: var(--up); }
+@media (max-width: 1000px) { .scene { grid-template-areas: "holo" "trading" "watch" "insta" "mail" "smart"; } }

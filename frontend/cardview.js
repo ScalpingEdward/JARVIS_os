@@ -2,7 +2,7 @@
 // Kept per card in this browser.
 (() => {
   const KEY = 'auron_cardview';
-  const CARDS = { tileTrading: '#tGroups', tileWatch: '#wTop', tileInstagram: '#iList', tileMail: '#mList' };
+  const CARDS = { tileTrading: '#tGroups', tileWatch: '#wTop', tileInstagram: '#iList', tileMail: '#mList', tileSmart: '#sInsider' };
   let views = {};
   try { views = JSON.parse(localStorage.getItem(KEY) || '{}'); } catch { views = {}; }
   const save = () => { try { localStorage.setItem(KEY, JSON.stringify(views)); } catch { /* private window */ } };

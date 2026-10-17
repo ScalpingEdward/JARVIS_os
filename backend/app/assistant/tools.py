@@ -70,6 +70,15 @@ def _mail_draft(mail_id: str, body: str) -> dict:
     return {"draft": d, "note": "Entwurf liegt bereit. Gesendet wird nur, wenn Sir im Dashboard oder in Telegram auf Senden tippt."}
 
 
+def _smart_money(ticker: str | None = None) -> dict:
+    from app.smartmoney.service import smart_money_service
+    o = smart_money_service.overview()
+    if ticker:
+        o["insider"] = [t for t in o["insider"] if t["ticker"] == ticker.upper() or t["name"].lower() == ticker.lower()]
+    o["insider"] = o["insider"][:40]
+    return o
+
+
 TOOLS: list[dict] = [
     {"name": "trading_status",
      "description": "Brano's copier accounts right now: balance, equity, open positions, P&L per signal group "
@@ -92,6 +101,11 @@ TOOLS: list[dict] = [
                     "polite, signed 'Branislav Gombos'.",
      "input_schema": {"type": "object", "properties": {"mail_id": {"type": "string"}, "body": {"type": "string"}},
                       "required": ["mail_id", "body"]}},
+    {"name": "smart_money",
+     "description": "Insider buys/sales (SEC Form 4, open market, last 30 days) for the US stocks on the watchlist, "
+                    "clusters where several insiders bought, and this week's high-impact macro dates (CPI, NFP, central "
+                    "banks). Optional ticker or name filter. Observation only.",
+     "input_schema": {"type": "object", "properties": {"ticker": {"type": "string"}}}},
     {"name": "instagram_status",
      "description": "Instagram pipeline: posts waiting for review, ready, posted, failed, media pool, the next "
                     "posting slot and the latest captions.",
@@ -102,6 +116,7 @@ _RUN: dict[str, Callable[..., dict]] = {
     "trading_status": lambda **_: _trading(),
     "watchlist": lambda name=None, **_: _watchlist(name),
     "instagram_status": lambda **_: _instagram(),
+    "smart_money": lambda ticker=None, **_: _smart_money(ticker),
     "mail_inbox": lambda important_only=True, days=7, **_: _mail_inbox(important_only, days),
     "mail_read": lambda mail_id, **_: _mail_read(mail_id),
     "mail_draft_reply": lambda mail_id, body, **_: _mail_draft(mail_id, body),
