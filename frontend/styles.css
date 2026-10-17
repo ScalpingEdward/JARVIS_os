@@ -642,3 +642,4 @@ html[data-glass="faded"] .tile { background: linear-gradient(180deg, rgb(var(--t
   text-shadow: 0 0 8px color-mix(in srgb, var(--accent) 80%, transparent), 0 0 22px color-mix(in srgb, var(--accent) 55%, transparent), 0 2px 3px rgba(0,0,0,.7);
   animation: clockglow2 4s ease-in-out infinite; }
 @keyframes clockglow2 { 50% { text-shadow: 0 0 12px color-mix(in srgb, var(--accent) 95%, transparent), 0 0 34px color-mix(in srgb, var(--accent) 70%, transparent), 0 2px 3px rgba(0,0,0,.7); } }
+.topclock .clock { animation: none; }  /* lit, not pulsing (Brano, 2026-10-17) */
