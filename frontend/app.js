@@ -478,7 +478,12 @@ async function refreshMail() {
 $('#tileMail').addEventListener('click', async (e) => {
   const b = e.target.closest('button');
   if (!b) {  // anywhere else on the card: the mailbox itself
-    if (!e.target.closest('.card-gear, .card-menu')) window.open('https://mail.google.com/mail/u/0/#inbox', '_blank', 'noopener');
+    // A plain link, not window.open(url, '_blank', 'noopener'): that third argument makes Edge open a
+    // borderless popup from the fullscreen app window -- blank, and with no way to close it (2026-10-17).
+    if (!e.target.closest('.card-gear, .card-menu')) {
+      const a = Object.assign(document.createElement('a'), { href: 'https://mail.google.com/mail/u/0/#inbox', target: '_blank', rel: 'noopener noreferrer' });
+      a.click();
+    }
     return;
   }
   b.disabled = true;
