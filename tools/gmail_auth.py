@@ -27,7 +27,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 CLIENT = ROOT / "secrets" / "gmail_client.json"
 ENV = ROOT / ".env"
-SCOPES = "https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.send"
+SCOPES = ("https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.send"
+          " https://www.googleapis.com/auth/drive.file")  # drive.file: only the backups AURON uploads itself
 
 
 def _free_port() -> int:
@@ -74,7 +75,7 @@ def main() -> int:
             self.send_header("Content-Type", "text/html; charset=utf-8")
             self.end_headers()
             ok = "code" in got
-            self.wfile.write(("<h2 style='font-family:sans-serif'>" + ("AURON hat Zugriff auf Gmail. Du kannst dieses Fenster schliessen."
+            self.wfile.write(("<h2 style='font-family:sans-serif'>" + ("AURON hat Zugriff auf Gmail und seinen Backup-Ordner in Drive. Du kannst dieses Fenster schliessen."
                               if ok else "Abgebrochen oder abgelehnt.") + "</h2>").encode())
 
         def log_message(self, *a):

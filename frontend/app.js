@@ -336,8 +336,14 @@ async function refreshHealth() {
   const svcs = [];
   try { const h = await get('/health'); svcs.push(['API', h.status === 'healthy' ? 'ok' : 'warn']); } catch { svcs.push(['API', 'bad']); }
   try { const t = await get('/v1/telegram-instagram/status'); svcs.push(['Telegram bot', t.bot_reachable ? 'ok' : 'bad']); } catch { svcs.push(['Telegram bot', 'bad']); }
+  try {  // the last good backup: green under 30 h, amber under 48 h, red after
+    const b = await get('/v1/backup/status');
+    const h = b.age_hours;
+    svcs.push([h == null ? 'Backup · nie' : `Backup · vor ${h < 1 ? '<1' : Math.round(h)} h`, h == null ? 'bad' : h < 30 ? 'ok' : h < 48 ? 'warn' : 'bad']);
+  } catch { /* the API is down; that shows already */ }
   (overview?.accounts || []).forEach((a) => svcs.push([`Copier ${nameOf(a)}`, a.state === 'live' ? 'ok' : a.state === 'stale' ? 'warn' : 'bad']));
-  $('#sysbar').innerHTML = svcs.filter(([n]) => !n.startsWith('Copier ')).map(([n, c]) => `<span><span class="dot ${c}"></span>${esc(n)} · ${c === 'ok' ? 'online' : c === 'warn' ? 'late' : 'offline'}</span>`).join('');
+  $('#sysbar').innerHTML = svcs.filter(([n]) => !n.startsWith('Copier ')).map(([n, c]) =>
+    `<span><span class="dot ${c}"></span>${esc(n)}${n.startsWith('Backup') ? '' : ` · ${c === 'ok' ? 'online' : c === 'warn' ? 'late' : 'offline'}`}</span>`).join('');
   const bad = svcs.filter(([, c]) => c !== 'ok').length;
   $('#core').classList.toggle('degraded', bad > 0);
 }

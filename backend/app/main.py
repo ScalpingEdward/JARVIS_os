@@ -86,6 +86,7 @@ from .watchlist.api import router as watchlist_router
 from .assistant.api import router as assistant_router
 from .mail.api import router as mail_router
 from .smartmoney.api import router as smartmoney_router
+from .backup.api import router as backup_router
 from .orderflow.api import router as orderflow_router
 from .orchestrator.models import (
     AgentCreate,
@@ -237,7 +238,14 @@ async def lifespan(app: FastAPI):
     if os.getenv("SMART_MONEY_ENABLED", "false").lower() in ("1", "true", "yes"):
         from .smartmoney.service import smart_money_poller
         smart_money_poller.start()
+    # Same opt-in rule: a Telegram nudge when the last backup is too old.
+    if os.getenv("BACKUP_WATCH_ENABLED", "false").lower() in ("1", "true", "yes"):
+        from .backup.service import backup_watch
+        backup_watch.start()
     yield
+    if os.getenv("BACKUP_WATCH_ENABLED", "false").lower() in ("1", "true", "yes"):
+        from .backup.service import backup_watch
+        await backup_watch.stop()
     if os.getenv("SMART_MONEY_ENABLED", "false").lower() in ("1", "true", "yes"):
         from .smartmoney.service import smart_money_poller
         await smart_money_poller.stop()
@@ -348,6 +356,7 @@ app.include_router(watchlist_router)
 app.include_router(assistant_router)
 app.include_router(mail_router)
 app.include_router(smartmoney_router)
+app.include_router(backup_router)
 app.include_router(orderflow_router)
 app.include_router(planner_router)
 app.include_router(radar_router)
