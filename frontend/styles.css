@@ -585,3 +585,8 @@ html[data-glass="faded"] .tile { background: linear-gradient(180deg, rgb(var(--t
 #tGroups.as-tiles .cap { display: none; }
 /* tiles take more room: fewer of them, so the cards stay on the screen */
 #wTop.as-tiles .row:nth-child(n+5), #mList.as-tiles .row:nth-child(n+3) { display: none; }
+/* The cards are turned into the room, so their inner half lies behind the scene's own flat
+   box -- and that box caught the pointer: a card reacted only on its outer half (2026-10-17).
+   The scene lets the pointer through; its children take it themselves. */
+.scene { pointer-events: none; }
+.scene > * { pointer-events: auto; }
