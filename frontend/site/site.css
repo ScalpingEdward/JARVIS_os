@@ -240,3 +240,9 @@ h1, h2, h3 { margin: 0; line-height: 1.12; letter-spacing: -.01em; }
 .glass-sm b { font-size: 15px; } .glass-sm span { color: var(--muted); font-size: 14px; }
 @media (max-width: 1000px) { .hero-mark { position: static; padding-top: 90px; } .hero-stage { padding-top: 20px; } .about { grid-template-columns: 1fr; } .about-grid { grid-template-columns: 1fr; } }
 .glass { background: linear-gradient(155deg, rgba(150,200,255,.12), rgba(30,60,110,.18) 45%, rgba(8,14,26,.55)); }  /* a touch denser: bright spots behind it no longer wash out the text */
+/* the AURON mark and its line, larger */
+.mark { font-size: clamp(40px, 4.2vw, 68px); gap: 22px; }
+.glyph.big { width: 38px; height: 38px; border-width: 2.5px; }
+.hero-mark small { font-size: clamp(14px, 1.15vw, 19px); letter-spacing: .22em; }
+.hero-mark { top: 70px; gap: 10px; }
+.hero-stage { padding-top: 200px; }
