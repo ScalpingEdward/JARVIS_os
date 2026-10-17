@@ -490,22 +490,28 @@ html[data-glass="faded"] .tile { background: linear-gradient(180deg, rgb(var(--t
   border-bottom-color: transparent; border-left-color: rgb(var(--tint) / .1); border-right-color: rgb(var(--tint) / .1);
   box-shadow: inset 0 1px 0 rgba(255,255,255,.18), 0 0 46px -24px color-mix(in srgb, var(--accent) 40%, transparent); }
 
-/* time above the planet, weather below it (2026-10-17). Fixed heights, so filling them in
-   later does not move the planet -- room.js has placed the pedestal under it by then. */
-.holo { display: grid; justify-items: center; align-content: center; gap: 4px; }
-.holo .when { display: grid; justify-items: center; text-align: center; min-height: 64px; line-height: 1.15; }
-.holo .clock { font-family: var(--mono); font-size: 40px; font-weight: 300; color: var(--text); letter-spacing: .04em;
-  text-shadow: 0 0 18px color-mix(in srgb, var(--accent) 45%, transparent); }
-.holo .when small { font-size: 13px; color: var(--muted); letter-spacing: .06em; }
-.holo .weather { display: grid; justify-items: center; text-align: center; gap: 2px; min-height: 86px; margin-top: 4px; font-size: 14px; color: var(--text); }
-.holo .weather .wtop { display: flex; align-items: center; gap: 10px; }
-.holo .weather .wi { font-size: 30px; filter: drop-shadow(0 0 8px color-mix(in srgb, var(--accent) 55%, transparent)); }
-.holo .weather b { font-size: 30px; font-weight: 500; font-variant-numeric: tabular-nums; }
-.holo .weather .wtext { font-size: 14px; }
-.holo .weather small { font-size: 12px; color: var(--muted); letter-spacing: .08em; }
+/* time, date and weather centred at the very top (2026-10-17) */
+.topclock { position: absolute; left: 50%; top: 10px; translate: -50% 0; display: grid; justify-items: center; gap: 2px; text-align: center;
+  text-shadow: 0 1px 2px rgba(0,0,0,.8), 0 0 14px rgba(0,0,0,.55); pointer-events: none; }
+.topclock .when { display: grid; justify-items: center; line-height: 1.1; }
+.topclock .clock { font-family: var(--mono); font-size: 40px; font-weight: 700; color: var(--text); letter-spacing: .03em;
+  text-shadow: 0 1px 2px rgba(0,0,0,.8), 0 0 20px color-mix(in srgb, var(--accent) 50%, transparent); }
+.topclock .when small { font-size: 13px; color: var(--text); opacity: .85; letter-spacing: .06em; }
+.topclock .weather { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--text); }
+.topclock .weather .wi { font-size: 20px; filter: drop-shadow(0 0 6px color-mix(in srgb, var(--accent) 55%, transparent)); }
+.topclock .weather b { font-size: 18px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.topclock .weather .wtext { color: var(--text); opacity: .85; }
 /* the chat pill keeps its distance from the status bar */
 .chat { bottom: 70px; }
-/* the weather sits on the beam under the planet, clear of the chat pill; both lines readable over bright rooms */
-.holo .weather { margin-top: -150px; position: relative; z-index: 2; }
-.holo .weather, .holo .when { text-shadow: 0 1px 2px rgba(0,0,0,.8), 0 0 14px rgba(0,0,0,.55); }
-.holo .when small { color: var(--text); opacity: .8; }
+.th-head { display: flex; justify-content: space-between; align-items: center; }
+.th-head b { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--accent); font-weight: 600; }
+.th-close { background: none; border: 0; color: var(--muted); cursor: pointer; font-size: 14px; padding: 2px 6px; }
+.th-close:hover { color: var(--text); }
+
+/* the planet's rings tell something: ring 1 one light per Telegram group (green up today,
+   red down, white flat), ring 2 Instagram (green posted today, orange waiting, red trouble) */
+.orbit i.g { background: radial-gradient(circle at 35% 35%, #fff, #b6ffd9 40%, #2fd58a 75%); box-shadow: 0 0 16px #6dffb4, 0 0 32px rgba(61,220,151,.75); }
+.orbit i.r { background: radial-gradient(circle at 35% 35%, #fff, #ffc2cc 40%, #f2647c 75%); box-shadow: 0 0 16px #ff8da0, 0 0 32px rgba(242,100,124,.75); }
+.orbit i.o { background: radial-gradient(circle at 35% 35%, #fff, #ffd9a0 40%, #ff9a2e 75%); box-shadow: 0 0 16px #ffb056, 0 0 32px rgba(255,150,40,.75); }
+.orbit i.w { background: radial-gradient(circle at 35% 35%, #fff, #f4f6fa 50%, #c9d2e0 80%); box-shadow: 0 0 16px #fff, 0 0 30px rgba(255,255,255,.55); }
+.sysbar { z-index: 7; }  /* its panels open over the chat pill */

@@ -28,6 +28,7 @@
     <input type="color" data-k="${key}" value="${cur}" title="eigene Farbe" /></div>`;
   function paint() {
     panel.innerHTML = `
+      <div class="th-head"><b>Einstellungen</b><button type="button" class="th-close" data-k="close" aria-label="Schließen">✕</button></div>
       <div><span class="th-label">Akzentfarbe</span>${swatches(ACCENTS, t.accent, 'accent')}</div>
       <div><span class="th-label">Glasfarbe der Karten</span>${swatches(TINTS, t.tint, 'tint')}</div>
       <div><span class="th-label">Glas</span><div class="seg">${Object.entries(STYLES).map(([k, [n]]) =>
@@ -40,11 +41,12 @@
     else t[k] = k === 'strength' ? Number(v) : v;
     apply(); save();
   }
-  panel.addEventListener('click', (e) => { const b = e.target.closest('button[data-k]'); if (!b) return; set(b.dataset.k, b.dataset.v); paint(); });
+  panel.addEventListener('click', (e) => { const b = e.target.closest('button[data-k]'); if (!b) return;
+    if (b.dataset.k === 'close') { panel.hidden = true; return; }
+    set(b.dataset.k, b.dataset.v); paint(); });
   panel.addEventListener('input', (e) => { const i = e.target.closest('input[data-k]'); if (!i) return; set(i.dataset.k, i.value);
     if (i.type === 'range') panel.querySelector('[data-k=strength]').previousElementSibling.textContent = `Farbstärke ${t.strength} %`; });
   panel.addEventListener('change', paint);
   btn.addEventListener('click', (e) => { e.stopPropagation(); paint(); panel.hidden = !panel.hidden; });
-  document.addEventListener('click', (e) => { if (!panel.hidden && !panel.contains(e.target) && e.target !== btn) panel.hidden = true; });
   apply();
 })();

@@ -202,5 +202,5 @@ void main() {
   };
   btn.addEventListener('click', (e) => { e.stopPropagation(); paint(); menu.hidden = !menu.hidden; });
   menu.addEventListener('click', (e) => { const b = e.target.closest('button[data-k]'); if (b) { setRoom(b.dataset.k); paint(); } });
-  document.addEventListener('click', (e) => { if (!menu.hidden && !menu.contains(e.target) && e.target !== btn) menu.hidden = true; });
+  document.addEventListener('click', (e) => { if (!menu.hidden && !e.composedPath().includes(menu) && e.target !== btn) menu.hidden = true; });
 })();

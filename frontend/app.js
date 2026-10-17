@@ -238,6 +238,21 @@ function renderTradingTile(o) {
   $('#kOpen').innerHTML = `${t.open_positions} <small class="muted">${signed(t.open_pnl)}</small>`;
   $('#kTotal').innerHTML = signed(t.pnl_total, t.currency);
   renderTileSpark(o, t.currency);
+  // ring 1: one light per group -- green when up today (open trades included), red when down, white when flat
+  ringLights('.o1', groups.map((g) => { const v = (g.pnl_today || 0) + (g.open_pnl || 0); return v > 0.005 ? 'g' : v < -0.005 ? 'r' : 'w'; }));
+}
+
+// The lights on one of the planet's rings, spread evenly around it.
+function ringLights(sel, states) {
+  const ring = document.querySelector(sel);
+  if (!ring) return;
+  const key = states.join(',');
+  if (ring.dataset.lights === key) return;
+  ring.dataset.lights = key;
+  ring.innerHTML = (states.length ? states : ['w']).map((c, i, all) => {
+    const a = (i / all.length) * 2 * Math.PI;
+    return `<i class="${c}" style="left:calc(${50 + 50 * Math.sin(a)}% );top:calc(${50 - 50 * Math.cos(a)}% - 6px)"></i>`;
+  }).join('');
 }
 
 function renderTileSpark(o, currency) {
@@ -299,6 +314,8 @@ async function refreshInstagram() {
     $('#iNext').textContent = label;
     $('#iBadge').textContent = dash.needs_your_review ? `${dash.needs_your_review} to review` : sched.running ? 'scheduled' : 'paused';
     $('#iBadge').classList.toggle('live', !!sched.running);
+    // ring 2: Instagram -- green posted today, orange waiting for the slot or a decision, red when the schedule is not running
+    ringLights('.o2', [!sched.running ? 'r' : sched.already_posted_today ? 'g' : 'o']);
     $('#nextKind').textContent = label;
     $('#iList').innerHTML = [['In pool', left], ['Drafts', dash.curated_drafts_pending], ['To review', dash.needs_your_review], ['Posted', dash.posted_total]]
       .map(([k, v]) => `<div class="row"><span></span><span>${k}</span><span>${esc(v)}</span></div>`).join('');
@@ -311,7 +328,7 @@ async function refreshInstagram() {
     $('#recent').innerHTML = (dash.recent_candidates || []).slice(0, 8).map((c) =>
       `<li><span>${esc(c.post_format.replace('_', ' '))} · ${esc(c.status)}</span><span>${new Date(c.created_at).toLocaleDateString('de-DE')}</span></li>`).join('');
     tickCountdown();
-  } catch (e) { console.warn(e); }
+  } catch (e) { console.warn(e); ringLights('.o2', ['r']); }  // no answer from the API: trouble
 }
 
 // --- health: top bar, system tile, AURON's own line ------------------------------
@@ -477,8 +494,8 @@ async function refreshWeather() {
     if (!r.ok) throw new Error(`weather ${r.status}`);
     const c = (await r.json()).current;
     const [, icon, text] = WMO.find(([codes]) => codes.includes(c.weather_code)) || [[], '·', ''];
-    $('#weather').innerHTML = `<div class="wtop"><span class="wi">${icon}</span><b>${Math.round(c.temperature_2m)}°C</b></div>`
-      + `<span class="wtext">${esc(text)}</span>${weatherAt.place ? `<small>${esc(weatherAt.place)}</small>` : ''}`;
+    $('#weather').innerHTML = `<span class="wi">${icon}</span><b>${Math.round(c.temperature_2m)}°C</b>`
+      + `<span class="wtext">${esc(text)}${weatherAt.place ? ` · ${esc(weatherAt.place)}` : ''}</span>`;
   } catch (e) { console.warn(e); }
 }
 refreshWeather();
