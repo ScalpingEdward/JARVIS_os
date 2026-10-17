@@ -64,10 +64,12 @@ def test_track_record_sentence_needs_three_cases():
 def test_by_insider_rates_buys_and_sales_and_needs_three_trades():
     from app.smartmoney.backtest import by_insider
     mk = lambda o, code, r: {"owner": o, "ticker": "T", "code": code, "role": "Director", "ret": {"60": r}}  # noqa: E731
-    ev = [mk("Good", "P", .05), mk("Good", "S", -.04), mk("Good", "P", .02),        # all right
-          mk("Bad", "P", -.05), mk("Bad", "S", .04), mk("Bad", "P", -.01),          # all wrong
-          mk("Few", "P", .5), mk("Few", "P", .5)]                                  # only two
-    res = {x["owner"]: x for x in by_insider(ev)}
-    assert set(res) == {"Good", "Bad"}
-    assert res["Good"]["verdict"] == "folgen" and res["Good"]["right"] == 1.0 and res["Good"]["edge"] > 0
-    assert res["Bad"]["verdict"] == "aussortieren"
+    ev = [mk("Good", "P", .05), mk("Good", "P", .04), mk("Good", "P", .02),        # buys, all right
+          mk("Bad", "P", -.05), mk("Bad", "P", .04), mk("Bad", "P", -.01),         # buys, mostly wrong
+          mk("Seller", "S", -.05), mk("Seller", "S", -.03), mk("Seller", "S", .01),  # sales that warned
+          mk("Few", "P", .5), mk("Few", "S", -.5), mk("Few", "S", -.5)]           # two and two: no record
+    res = {(x["owner"], x["side"]): x for x in by_insider(ev)}
+    assert set(res) == {("Good", "buy"), ("Bad", "buy"), ("Seller", "sell")}
+    assert res[("Good", "buy")]["verdict"] == "folgen" and res[("Good", "buy")]["right"] == 1.0
+    assert res[("Bad", "buy")]["verdict"] == "aussortieren"
+    assert res[("Seller", "sell")]["verdict"] == "warnung" and res[("Seller", "sell")]["edge"] > 0

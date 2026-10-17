@@ -544,29 +544,42 @@ function renderBacktest(bt) {
     + block('Wie viel', bt.by_size, ['≥ 1 Mio $', '100k–1 Mio $', '< 100k $']);
 }
 
-let biFilter = 'folgen';
-function renderInsiders(list) {
-  list = list || [];
-  const counts = { folgen: 0, aussortieren: 0, offen: 0 };
-  list.forEach((x) => counts[x.verdict]++);
-  $('#biCount').textContent = list.length ? `${counts.folgen} folgen · ${counts.aussortieren} aussortieren · ${counts.offen} offen` : '';
-  $('#biFilter').innerHTML = [['folgen', 'Folgen'], ['aussortieren', 'Aussortieren'], ['offen', 'Offen'], ['', 'Alle']].map(([k, n]) =>
-    `<button type="button" class="hchip${k === biFilter ? ' on' : ''}" data-bi="${k}">${n}</button>`).join('');
-  const rows = list.filter((x) => !biFilter || x.verdict === biFilter);
-  $('#biTable').innerHTML = rows.length ? '<tr><th>INSIDER</th><th>AKTIE</th><th>ROLLE</th><th>KÄUFE</th><th>VERKÄUFE</th><th>RICHTIG</th><th>VORSPRUNG 60T</th><th>URTEIL</th></tr>'
-    + rows.map((x) => `<tr><td>${esc(x.owner)}</td><td><b>${esc(x.ticker)}</b></td><td class="muted">${esc(x.role)}</td><td class="num">${x.buys}</td><td class="num">${x.sales}</td>`
-      + `<td class="num">${Math.round(x.right * 100)} %</td><td class="num ${x.edge > 0 ? 'up' : 'down'}">${x.edge > 0 ? '+' : ''}${(x.edge * 100).toFixed(1)} %</td>`
-      + `<td><span class="verdict ${x.verdict}">${x.verdict}</span></td></tr>`).join('')
-    : '<tr><td class="muted">Noch keine Bilanz – erst der Backtest.</td></tr>';
+const biFilter = { buy: 'folgen', sell: 'warnung' };
+const BI = {
+  buy: { el: '#biBuy', count: '#biBuyCount', chips: [['folgen', 'Folgen'], ['aussortieren', 'Aussortieren'], ['offen', 'Offen'], ['', 'Alle']] },
+  sell: { el: '#biSell', count: '#biSellCount', chips: [['warnung', 'Warnung'], ['ignorieren', 'Ignorieren'], ['offen', 'Offen'], ['', 'Alle']] },
+};
+function renderInsiders(all) {
+  all = all || [];
+  for (const side of ['buy', 'sell']) {
+    const list = all.filter((x) => (x.side || 'buy') === side), cfg = BI[side];
+    const counts = Object.fromEntries(cfg.chips.map(([k]) => [k, list.filter((x) => !k || x.verdict === k).length]));
+    $(cfg.count).textContent = list.length ? cfg.chips.slice(0, 3).map(([k, n]) => `${counts[k]} ${n.toLowerCase()}`).join(' · ') : '';
+    document.querySelector(`.hist-filter[data-side="${side}"]`).innerHTML = cfg.chips.map(([k, n]) =>
+      `<button type="button" class="hchip${k === biFilter[side] ? ' on' : ''}" data-bi="${k}">${n} <small>${counts[k]}</small></button>`).join('');
+    const rows = list.filter((x) => !biFilter[side] || x.verdict === biFilter[side]);
+    $(cfg.el).innerHTML = rows.length
+      ? `<tr><th>INSIDER</th><th>AKTIE</th><th>ROLLE</th><th>${side === 'buy' ? 'KÄUFE' : 'VERKÄUFE'}</th><th>RICHTIG</th><th>${side === 'buy' ? 'VORSPRUNG' : 'AKTIE DANACH'}</th><th>URTEIL</th></tr>`
+        + rows.map((x) => `<tr><td>${esc(x.owner)}</td><td><b>${esc(x.ticker)}</b></td><td class="muted">${esc(x.role)}</td><td class="num">${x.n}</td>`
+          + `<td class="num">${Math.round(x.right * 100)} %</td>`
+          + `<td class="num ${x.edge > 0 ? 'up' : 'down'}">${side === 'buy' ? (x.edge > 0 ? '+' : '') + (x.edge * 100).toFixed(1) : (-x.edge > 0 ? '+' : '') + (-x.edge * 100).toFixed(1)} %</td>`
+          + `<td><span class="verdict ${x.verdict}">${x.verdict}</span></td></tr>`).join('')
+      : '<tr><td class="muted">Niemand in dieser Gruppe.</td></tr>';
+  }
 }
-$('#biFilter').addEventListener('click', (e) => { const b = e.target.closest('[data-bi]'); if (!b) return; biFilter = b.dataset.bi; renderInsiders(smart?.backtest?.by_insider); });
+document.querySelectorAll('.hist-filter[data-side]').forEach((f) => f.addEventListener('click', (e) => {
+  const b = e.target.closest('[data-bi]');
+  if (!b) return;
+  biFilter[f.dataset.side] = b.dataset.bi;
+  renderInsiders(smart?.backtest?.by_insider);
+}));
 
 function renderSmartView() {
   const s = smart;
   if (!s) return;
   renderBacktest(s.backtest);
   renderInsiders(s.backtest?.by_insider);
-  const verdictOf = Object.fromEntries((s.backtest?.by_insider || []).map((x) => [`${x.owner.toLowerCase()}|${x.ticker}`, x]));
+  const verdictOf = Object.fromEntries((s.backtest?.by_insider || []).map((x) => [`${x.owner.toLowerCase()}|${x.ticker}|${x.side || 'buy'}`, x]));
   const day = (iso) => new Date(iso).toLocaleString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
   $('#smMacro').innerHTML = s.macro.length ? '<tr><th>WANN</th><th></th><th>TERMIN</th><th>PROGNOSE</th><th>VORHER</th></tr>'
     + s.macro.map((e) => `<tr><td>${esc(day(e.at))}</td><td>${esc(e.currency)}</td><td>${esc(e.title_de ? `${e.title_de} (${e.title})` : e.title)}</td>`
@@ -582,7 +595,7 @@ function renderSmartView() {
       + s.insider.map((t) => `<tr><td>${esc(new Date(t.traded_on).toLocaleDateString('de-DE'))}</td><td><b>${esc(t.name)}</b> <span class="muted">${esc(t.ticker)}</span></td>`
         + `<td>${esc(t.owner)}</td><td class="muted">${esc(t.title || '')}</td><td><span class="side ${t.code === 'P' ? 'buy' : 'sell'}">${t.code === 'P' ? 'KAUF' : 'VERKAUF'}</span></td>`
         + `<td class="num">${Math.round(t.shares || 0).toLocaleString('de-DE')}</td><td class="num">${fmt(t.price || 0)}</td><td class="num">${money(t.value)}</td>`
-        + `<td>${(() => { const v = verdictOf[`${t.owner.toLowerCase()}|${t.ticker}`]; return v ? `<span class="verdict ${v.verdict}" title="${Math.round(v.right * 100)} % richtig in ${v.n} Trades">${v.verdict}</span>` : '<span class="muted">–</span>'; })()}</td>`
+        + `<td>${(() => { const v = verdictOf[`${t.owner.toLowerCase()}|${t.ticker}|${t.code === 'P' ? 'buy' : 'sell'}`]; return v ? `<span class="verdict ${v.verdict}" title="${Math.round(v.right * 100)} % richtig in ${v.n} Trades">${v.verdict}</span>` : '<span class="muted">–</span>'; })()}</td>`
         + `<td>${t.url ? `<a href="${esc(t.url)}" target="_blank" rel="noopener">SEC</a>` : ''}</td></tr>`).join('');
 }
 

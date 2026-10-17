@@ -95,9 +95,9 @@ class SmartMoneyService:
                             new += 1
                             if tr["code"] == "P" and tr["value"] >= BIG_BUY:
                                 note = self.track_record(ticker, role_of("Officer" if tr["title"] else "", tr["title"]))
-                                v = self.insider_verdict(tr["owner"], ticker)
+                                v = self.insider_verdict(tr["owner"], ticker, "buy")
                                 if v:
-                                    note = (f"Bilanz dieses Insiders: {v['right'] * 100:.0f} % richtig in {v['n']} Trades -> {v['verdict']}. " + note).strip()
+                                    note = (f"Bilanz dieses Käufers: {v['right'] * 100:.0f} % richtig in {v['n']} Käufen -> {v['verdict']}. " + note).strip()
                                 self._telegram("Insider-Kauf", f"{name} ({ticker}): {tr['owner']}{', ' + tr['title'] if tr['title'] else ''} "
                                                f"kauft {tr['shares']:,.0f} Aktien zu {tr['price']:,.2f} $ = {tr['value']:,.0f} $."
                                                + (f"\n{note}" if note else "") + "\n\nBeobachtung, keine Empfehlung.")
@@ -159,11 +159,12 @@ class SmartMoneyService:
                 parts.append(f"{label}: {st['avg'] * 100:+.1f} % ggü. S&P nach {horizon} Tagen, {st['hit'] * 100:.0f} % im Plus ({st['n']} Fälle)")
         return "Frühere Käufe – " + "; ".join(parts) if parts else ""
 
-    def insider_verdict(self, owner: str, ticker: str) -> dict | None:
+    def insider_verdict(self, owner: str, ticker: str, side: str = "buy") -> dict | None:
         bt = self.backtest()
         if not bt:
             return None
-        return next((x for x in bt["summary"].get("by_insider", []) if x["owner"].lower() == owner.lower() and x["ticker"] == ticker), None)
+        return next((x for x in bt["summary"].get("by_insider", []) if x["owner"].lower() == owner.lower()
+                     and x["ticker"] == ticker and x.get("side", "buy") == side), None)
 
     # ------------------------------------------------------------ macro
     def macro_tick(self, now: datetime | None = None) -> int:

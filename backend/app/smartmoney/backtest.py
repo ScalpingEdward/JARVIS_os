@@ -118,25 +118,28 @@ def _r(ret: dict, h: int):
 
 
 def by_insider(evts: list[dict], horizon: int = 60, min_n: int = 3) -> list[dict]:
-    """Each insider's record at one company: was he right? A buy is right when the stock then
-    beat the S&P 500, a sale when it lagged. edge: the average of (+excess for buys, -excess for
-    sales). verdict: 'folgen' (n >= 3, right >= 60 %, edge > 0), 'aussortieren' (right <= 40 % or
-    edge < 0), otherwise 'offen'."""
-    groups: dict[tuple[str, str], list[dict]] = defaultdict(list)
+    """Each insider's record at one company, buys and sales apart.
+
+    Buyers: a buy was right when the stock then beat the S&P 500 -> 'folgen' (>= 60 % right
+    and ahead on average) or 'aussortieren' (<= 40 % right or behind on average).
+    Sellers: a sale was right when the stock then lagged -> 'warnung' (his sales were a real
+    warning) or 'ignorieren' (they said nothing). In between: 'offen'.
+    edge: average of +excess for buys and -excess for sales, so positive is always good."""
+    groups: dict[tuple[str, str, str], list[dict]] = defaultdict(list)
     for e in evts:
         if _r(e.get("ret") or {}, horizon) is not None and e.get("owner"):
-            groups[(e["owner"], e["ticker"])].append(e)
+            groups[(e["owner"], e["ticker"], e["code"])].append(e)
     out = []
-    for (owner, ticker), lst in groups.items():
+    for (owner, ticker, code), lst in groups.items():
         if len(lst) < min_n:
             continue
-        signed = [(_r(e["ret"], horizon) if e["code"] == "P" else -_r(e["ret"], horizon)) for e in lst]
+        signed = [(_r(e["ret"], horizon) if code == "P" else -_r(e["ret"], horizon)) for e in lst]
         right = sum(v > 0 for v in signed) / len(signed)
         edge = statistics.fmean(signed)
-        verdict = "folgen" if right >= 0.6 and edge > 0 else "aussortieren" if right <= 0.4 or edge < 0 else "offen"
-        out.append({"owner": owner, "ticker": ticker, "role": lst[0].get("role", ""), "n": len(lst),
-                    "buys": sum(e["code"] == "P" for e in lst), "sales": sum(e["code"] == "S" for e in lst),
-                    "right": round(right, 3), "edge": round(edge, 4), "verdict": verdict})
+        good, bad = ("folgen", "aussortieren") if code == "P" else ("warnung", "ignorieren")
+        verdict = good if right >= 0.6 and edge > 0 else bad if right <= 0.4 or edge < 0 else "offen"
+        out.append({"owner": owner, "ticker": ticker, "role": lst[0].get("role", ""), "side": "buy" if code == "P" else "sell",
+                    "n": len(lst), "right": round(right, 3), "edge": round(edge, 4), "verdict": verdict})
     out.sort(key=lambda x: (-x["edge"], -x["n"]))
     return out
 

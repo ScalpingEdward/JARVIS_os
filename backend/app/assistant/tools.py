@@ -126,8 +126,9 @@ TOOLS: list[dict] = [
                     "clusters where several insiders bought, and this week's high-impact macro dates (CPI, NFP, central "
                     "banks), plus the backtest: how insider buys (and big sales) did over 5/20/60/120 trading days against the "
                     "S&P 500, by role, size, cluster and company -- avg excess return, median, hit rate, n. Use it to say "
-                    "whether following such buys has paid off, with the numbers and n. backtest.by_insider rates each insider "
-                    "(right %, edge, verdict folgen/aussortieren/offen) -- use it for 'which insiders to follow or drop'. "
+                    "whether following such buys has paid off, with the numbers and n. backtest.by_insider rates each insider per "
+                    "side: buyers folgen/aussortieren/offen, sellers warnung (his sales foreshadowed a lag)/ignorieren/offen "
+                    "-- use it for 'which insiders to follow, drop, or take seriously'. "
                     "Optional ticker. Observation only.",
      "input_schema": {"type": "object", "properties": {"ticker": {"type": "string"}}}},
     {"name": "copier_command",
