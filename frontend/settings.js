@@ -3,7 +3,7 @@
 (() => {
   const KEY = 'auron_theme';
   const ACCENTS = [['#4fd8ff', 'Cyan'], ['#f5b84a', 'Gold'], ['#ff7eb6', 'Rosa'], ['#3ddc97', 'Grün'], ['#b88cff', 'Lila'], ['#f2f4f8', 'Weiß']];
-  const TINTS = [['#96c8ff', 'Eisblau'], ['#ffd28c', 'Champagner'], ['#ffb4d2', 'Rosé'], ['#b4ffd2', 'Mint'], ['#d2b4ff', 'Flieder'], ['#e6e6e6', 'Neutral']];
+  const TINTS = [['#96c8ff', 'Eisblau'], ['#ffd28c', 'Champagner'], ['#ffb4d2', 'Rosé'], ['#b4ffd2', 'Mint'], ['#d2b4ff', 'Flieder'], ['#e6e6e6', 'Neutral'], ['#000000', 'Schwarz'], ['#26292f', 'Graphit'], ['#0b1630', 'Nachtblau']];
   const STYLES = { clear: ['Klar', { blur: 4, glass: 0.6, solid: 0 }], frosted: ['Matt', { blur: 18, glass: 1, solid: 0 }],
     faded: ['Verblasst', { blur: 24, glass: 1, solid: 0 }], solid: ['Massiv', { blur: 18, glass: 1, solid: 1 }] };
   const CLOCKS = { clean: 'Klar', thin: 'Dünn', mono: 'Digital', elegant: 'Elegant', neon: 'Neon', bold: 'Fett' };
@@ -27,6 +27,9 @@
     r.setProperty('--solid', String(st[1].solid));
     r.setProperty('--clock-size', `${t.clockSize}px`);
     document.documentElement.dataset.glass = t.style;
+    // a dark glass colour means a dark card: the colour has to cover, not just tint
+    const [cr, cg, cb] = rgb(t.tint).split(' ').map(Number);
+    document.documentElement.dataset.cards = (0.2126 * cr + 0.7152 * cg + 0.0722 * cb) / 255 < 0.25 ? 'dark' : 'glass';
     document.documentElement.dataset.clock = t.clock;
   }
   const save = () => { try { localStorage.setItem(KEY, JSON.stringify(t)); } catch { /* private window */ } };

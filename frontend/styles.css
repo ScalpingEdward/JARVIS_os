@@ -717,3 +717,9 @@ html[data-clock="bold"] .topclock .clock { font-weight: 800; letter-spacing: .08
 .th-clocks .ck-bold { font-weight: 800; }
 .th-text { margin: 0; font-size: 12.5px; line-height: 1.5; color: var(--muted); }
 .th-reset { justify-self: end; }
+
+/* dark cards (a black, graphite or night-blue glass colour): the colour covers, the room shows only faintly */
+html[data-cards="dark"] .tile { background: linear-gradient(160deg, rgb(var(--tint) / calc(.55 + .3 * var(--glass) / 2)), rgb(var(--tint) / calc(.7 + .25 * var(--glass) / 2)));
+  border-color: rgba(255,255,255,.09); border-top-color: rgba(255,255,255,.16);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.08), 0 30px 70px -30px rgba(0,0,0,.9), 0 0 40px -22px color-mix(in srgb, var(--accent) 40%, transparent); }
+html[data-cards="dark"] .kpis div, html[data-cards="dark"] .tile-list.as-tiles .row { background: rgba(255,255,255,.04); }
