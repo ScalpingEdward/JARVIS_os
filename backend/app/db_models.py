@@ -502,3 +502,12 @@ class SmartAlertRow(Base):
     __tablename__ = "smart_alerts"
     key: Mapped[str] = mapped_column(String(200), primary_key=True)
     sent_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class SmartBacktestRow(Base):
+    """The latest insider backtest (tools/insider_backtest.py): summary and per-event results as JSON."""
+
+    __tablename__ = "smart_backtest"
+    key: Mapped[str] = mapped_column(String(20), primary_key=True)          # "latest"
+    generated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    data: Mapped[str] = mapped_column(Text)

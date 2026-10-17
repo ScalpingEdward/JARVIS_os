@@ -499,9 +499,28 @@ setInterval(refreshMail, 60000);
 
 // --- smart money: macro dates and insider trades (backend/app/smartmoney) -------------------
 let smart = null;
+function renderBacktest(bt) {
+  if (!bt) { $('#btTable').innerHTML = '<tr><td class="muted">Noch kein Test gelaufen (tools/insider_backtest.py).</td></tr>'; $('#btMeta').textContent = ''; return; }
+  $('#btMeta').textContent = `${bt.with_prices} Fälle · ${bt.quarters[0] || ''}–${bt.quarters[bt.quarters.length - 1] || ''}`;
+  const H = ['5', '20', '60', '120'];
+  const cell = (st) => (!st || !st.n ? '<td class="num muted">–</td>'
+    : `<td class="num"><span class="${st.avg > 0 ? 'up' : st.avg < 0 ? 'down' : ''}">${st.avg > 0 ? '+' : ''}${(st.avg * 100).toFixed(1)} %</span>`
+      + `<small class="bt-hit">${Math.round(st.hit * 100)} % · ${st.n}</small></td>`);
+  const block = (title, table, order) => {
+    const keys = order ? order.filter((k) => table[k]) : Object.keys(table);
+    return `<tr class="bt-sec"><td colspan="5">${title}</td></tr>` + keys.map((k) => `<tr><td>${esc(k)}</td>${H.map((h) => cell(table[k][h])).join('')}</tr>`).join('');
+  };
+  $('#btTable').innerHTML = '<tr><th></th><th>5 TAGE</th><th>20 TAGE</th><th>60 TAGE</th><th>120 TAGE</th></tr>'
+    + block('Gesamt', bt.overall, ['Käufe', 'Große Verkäufe'])
+    + block('Wer kauft', bt.by_role, ['CEO/CFO', 'Officer', 'Director', '10%-Owner', 'Other'])
+    + block('Einzeln oder Cluster', bt.by_cluster, ['Cluster', 'Einzeln'])
+    + block('Wie viel', bt.by_size, ['≥ 1 Mio $', '100k–1 Mio $', '< 100k $']);
+}
+
 function renderSmartView() {
   const s = smart;
   if (!s) return;
+  renderBacktest(s.backtest);
   const day = (iso) => new Date(iso).toLocaleString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
   $('#smMacro').innerHTML = s.macro.length ? '<tr><th>WANN</th><th></th><th>TERMIN</th><th>PROGNOSE</th><th>VORHER</th></tr>'
     + s.macro.map((e) => `<tr><td>${esc(day(e.at))}</td><td>${esc(e.currency)}</td><td>${esc(e.title_de ? `${e.title_de} (${e.title})` : e.title)}</td>`

@@ -7,14 +7,16 @@ alert once. Observation, not advice -- the dashboard and AURON say so.
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import os
 from datetime import datetime, timedelta, timezone
 
 from app.db import SessionLocal, refuse_reset_in_production
-from app.db_models import InsiderTradeRow, SmartAlertRow
+from app.db_models import InsiderTradeRow, SmartAlertRow, SmartBacktestRow
 
 from . import macro
+from .backtest import role_of
 from .insider import TICKERS, SecClient, clusters, parse_form4
 
 log = logging.getLogger(__name__)
@@ -45,7 +47,9 @@ class SmartMoneyService:
         with SessionLocal() as s:
             s.query(InsiderTradeRow).delete()
             s.query(SmartAlertRow).delete()
+            s.query(SmartBacktestRow).delete()
             s.commit()
+        self._bt_cache = None
 
     # ------------------------------------------------------------ alerts
     def _once(self, key: str) -> bool:
@@ -90,9 +94,10 @@ class SmartMoneyService:
                                                     url=f"https://www.sec.gov/Archives/edgar/data/{cik}/{f['acc'].replace('-', '')}/"))
                             new += 1
                             if tr["code"] == "P" and tr["value"] >= BIG_BUY:
+                                note = self.track_record(ticker, role_of("Officer" if tr["title"] else "", tr["title"]))
                                 self._telegram("Insider-Kauf", f"{name} ({ticker}): {tr['owner']}{', ' + tr['title'] if tr['title'] else ''} "
                                                f"kauft {tr['shares']:,.0f} Aktien zu {tr['price']:,.2f} $ = {tr['value']:,.0f} $."
-                                               "\n\nBeobachtung, keine Empfehlung.")
+                                               + (f"\n{note}" if note else "") + "\n\nBeobachtung, keine Empfehlung.")
                         s.commit()
         except Exception as exc:  # noqa: BLE001 -- SEC hiccup or an odd filing: logged, retried next run
             self.insider_error = str(exc)
@@ -119,6 +124,37 @@ class SmartMoneyService:
                      "code": r.code, "shares": r.shares, "price": r.price, "value": r.value,
                      "traded_on": _aware(r.traded_on), "url": r.url}
                     for r in q.order_by(InsiderTradeRow.traded_on.desc()).limit(200).all()]
+
+    # ------------------------------------------------------------ backtest
+    def save_backtest(self, payload: dict) -> dict:
+        at = datetime.fromisoformat(payload["generated_at"])
+        with SessionLocal() as s:
+            s.merge(SmartBacktestRow(key="latest", generated_at=at, data=json.dumps(payload)))
+            s.commit()
+        self._bt_cache = None
+        return {"events": len(payload.get("events", [])), "generated_at": payload["generated_at"]}
+
+    def backtest(self) -> dict | None:
+        if getattr(self, "_bt_cache", None) is not None:
+            return self._bt_cache
+        with SessionLocal() as s:
+            r = s.get(SmartBacktestRow, "latest")
+            self._bt_cache = json.loads(r.data) if r else None
+        return self._bt_cache
+
+    def track_record(self, ticker: str, role: str = "", cluster: bool = False, horizon: str = "60") -> str:
+        """One sentence: how earlier buys like this one did -- for alerts and AURON."""
+        bt = self.backtest()
+        if not bt:
+            return ""
+        sm = bt["summary"]
+        parts = []
+        for label, table, key in ((ticker, "by_ticker", ticker), (role, "by_role", role),
+                                  ("Cluster" if cluster else "", "by_cluster", "Cluster")):
+            st = (sm.get(table, {}).get(key) or {}).get(horizon) if label else None
+            if st and st.get("n", 0) >= 3:
+                parts.append(f"{label}: {st['avg'] * 100:+.1f} % ggü. S&P nach {horizon} Tagen, {st['hit'] * 100:.0f} % im Plus ({st['n']} Fälle)")
+        return "Frühere Käufe – " + "; ".join(parts) if parts else ""
 
     # ------------------------------------------------------------ macro
     def macro_tick(self, now: datetime | None = None) -> int:
@@ -148,7 +184,16 @@ class SmartMoneyService:
                 "insider": [{**t, "traded_on": t["traded_on"].isoformat()} for t in trades],
                 "clusters": clusters(trades), "insider_connected": self.sec.configured(),
                 "insider_error": self.insider_error,
-                "last_insider_poll": self.last_insider_poll.isoformat() if self.last_insider_poll else None}
+                "last_insider_poll": self.last_insider_poll.isoformat() if self.last_insider_poll else None,
+                "backtest": self._backtest_brief()}
+
+    def _backtest_brief(self) -> dict | None:
+        bt = self.backtest()
+        if not bt:
+            return None
+        sm = bt["summary"]
+        return {"generated_at": bt["generated_at"], "quarters": bt.get("quarters", []),
+                **{k: sm[k] for k in ("overall", "by_role", "by_size", "by_cluster", "events", "buys", "with_prices")}}
 
 
 def _berlin():

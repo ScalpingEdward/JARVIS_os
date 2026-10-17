@@ -76,6 +76,10 @@ def _smart_money(ticker: str | None = None) -> dict:
     if ticker:
         o["insider"] = [t for t in o["insider"] if t["ticker"] == ticker.upper() or t["name"].lower() == ticker.lower()]
     o["insider"] = o["insider"][:40]
+    bt = smart_money_service.backtest()
+    if bt and ticker:
+        o["backtest_ticker"] = {"stats": bt["summary"]["by_ticker"].get(ticker.upper()),
+                                "events": [e for e in bt["events"] if e["ticker"] == ticker.upper()][:30]}
     return o
 
 
@@ -104,7 +108,9 @@ TOOLS: list[dict] = [
     {"name": "smart_money",
      "description": "Insider buys/sales (SEC Form 4, open market, last 30 days) for the US stocks on the watchlist, "
                     "clusters where several insiders bought, and this week's high-impact macro dates (CPI, NFP, central "
-                    "banks). Optional ticker or name filter. Observation only.",
+                    "banks), plus the backtest: how insider buys (and big sales) did over 5/20/60/120 trading days against the "
+                    "S&P 500, by role, size, cluster and company -- avg excess return, median, hit rate, n. Use it to say "
+                    "whether following such buys has paid off, with the numbers and n. Optional ticker. Observation only.",
      "input_schema": {"type": "object", "properties": {"ticker": {"type": "string"}}}},
     {"name": "instagram_status",
      "description": "Instagram pipeline: posts waiting for review, ready, posted, failed, media pool, the next "
