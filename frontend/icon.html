@@ -1,0 +1,61 @@
+<!doctype html><html><head><meta charset="utf-8"><style>
+:root { --accent: #4fd8ff; }
+html, body { margin: 0; width: 512px; height: 512px; background: transparent; overflow: hidden; }
+.wrap { position: absolute; left: 50%; top: 50%; translate: -50% -50%; perspective: 1400px; }
+.core { --s: clamp(260px, 30vw, 440px); position: relative; width: var(--s); height: calc(var(--s) * 1.18); margin: 0 auto; transform-style: preserve-3d; }
+/* AURON's planet: a glass sphere with an energy core, a turning wireframe globe inside */
+.sphere {
+  --g: calc(var(--s) * .58);
+  position: absolute; left: 21%; right: 21%; top: 10%; aspect-ratio: 1; border-radius: 50%;
+  transform-style: preserve-3d;
+  background:
+    radial-gradient(circle at 32% 26%, rgba(255,255,255,.55), rgba(255,255,255,0) 18%),
+    radial-gradient(circle at 70% 78%, rgba(160,230,255,.18), rgba(160,230,255,0) 30%),
+    radial-gradient(circle at 50% 50%, rgba(70,170,255,.22), rgba(30,90,190,.26) 55%, rgba(20,60,140,.42) 70%, rgba(120,210,255,.30) 74%);
+  box-shadow: 0 0 70px rgba(79,190,255,.55), 0 0 160px rgba(79,190,255,.25),
+              inset 0 0 50px rgba(120,220,255,.45), inset -14px -20px 40px rgba(0,10,30,.45),
+              inset 0 0 0 1.5px rgba(190,240,255,.55);
+  animation: float 7s ease-in-out infinite;
+}
+.globe-map { position: absolute; inset: 0; width: 100%; height: 100%; border-radius: 50%; }
+.energy { position: absolute; inset: 34%; border-radius: 50%; opacity: .55;
+  background: radial-gradient(circle, rgba(235,255,255,.95), rgba(120,220,255,.55) 35%, rgba(79,216,255,0) 70%);
+  filter: blur(2px); animation: energy 3.4s ease-in-out infinite; }
+@keyframes energy { 50% { transform: scale(1.12); opacity: .8; } }
+.sphere .scan { position: absolute; inset: 0; border-radius: 50%; mix-blend-mode: screen; opacity: .22;
+  background: repeating-linear-gradient(180deg, color-mix(in srgb, var(--accent) 25%, transparent) 0 1px, transparent 1px 4px); animation: scan 6s linear infinite; }
+@keyframes float { 50% { transform: translateY(-12px); } }
+@keyframes scan { to { background-position: 0 120px; } }
+
+.orbit { position: absolute; left: 50%; top: 39%; width: 100%; aspect-ratio: 1; translate: -50% -50%;
+  border-radius: 50%; border: 1.5px solid color-mix(in srgb, var(--accent) 40%, transparent); transform-style: preserve-3d; pointer-events: none;
+  box-shadow: 0 0 14px color-mix(in srgb, var(--accent) 25%, transparent), inset 0 0 14px color-mix(in srgb, var(--accent) 15%, transparent); }
+.orbit i { position: absolute; top: -6px; left: 50%; width: 12px; height: 12px; margin-left: -6px; border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #fff, #bfe9ff 40%, #4fa8ff 75%); box-shadow: 0 0 16px #8fd8ff, 0 0 32px color-mix(in srgb, var(--accent) 70%, transparent); }
+.orbit.warm { border-color: rgba(255,170,70,.55); box-shadow: 0 0 18px rgba(255,150,40,.35), inset 0 0 14px rgba(255,150,40,.2); }
+.orbit.warm i { background: radial-gradient(circle at 35% 35%, #fff, #ffd9a0 40%, #ff9a2e 75%); box-shadow: 0 0 16px #ffb056, 0 0 32px rgba(255,150,40,.7); }
+.o1 { animation: orbit1 11s linear infinite; }
+.o2 { width: 88%; animation: orbit2 15s linear infinite; }
+.o3 { width: 112%; animation: orbit3 21s linear infinite; }
+@keyframes orbit1 { from { transform: rotateX(74deg) rotateY(-14deg) rotateZ(0); } to { transform: rotateX(74deg) rotateY(-14deg) rotateZ(360deg); } }
+@keyframes orbit2 { from { transform: rotateX(62deg) rotateY(48deg) rotateZ(0); } to { transform: rotateX(62deg) rotateY(48deg) rotateZ(-360deg); } }
+@keyframes orbit3 { from { transform: rotateX(80deg) rotateY(-42deg) rotateZ(0); } to { transform: rotateX(80deg) rotateY(-42deg) rotateZ(360deg); } }
+.beam { position: absolute; left: 30%; right: 30%; top: 58%; height: 30%; opacity: .75;
+  background: linear-gradient(180deg, rgba(79,216,255,0), color-mix(in srgb, var(--accent) 35%, transparent) 70%, rgba(150,230,255,.7));
+  clip-path: polygon(30% 0, 70% 0, 100% 100%, 0 100%); filter: blur(5px); animation: beam 3.6s ease-in-out infinite; }
+@keyframes beam { 50% { opacity: .55; } }
+.core { --s: 470px; height: 470px; }
+.sphere { top: 21%; animation: none; box-shadow: 0 0 40px rgba(79,190,255,.7), inset 0 0 50px rgba(120,220,255,.45), inset -14px -20px 40px rgba(0,10,30,.45), inset 0 0 0 2.5px rgba(190,240,255,.7); }
+.orbit { top: 50%; border-width: 6px; }
+.orbit i { width: 30px; height: 30px; top: -18px; margin-left: -15px; }
+.o1, .o2, .o3 { animation-play-state: paused; }
+.o1 { animation-delay: -2s; } .o2 { animation-delay: -9s; } .o3 { animation-delay: -15s; }
+.beam, .scan { display: none; }
+.energy { animation: none; }
+</style></head><body><div class="wrap"><div class="core">
+<div class="orbit o1"><i></i></div><div class="orbit o2"><i></i></div><div class="orbit o3 warm"><i></i></div>
+<div class="sphere"><div class="energy"></div><i class="scan"></i></div></div></div>
+<script src="https://cdn.jsdelivr.net/npm/d3-array@3.2.4/dist/d3-array.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/d3-geo@3.1.1/dist/d3-geo.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js"></script>
+<script src="./globe.js"></script></body></html>
