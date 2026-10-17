@@ -1,8 +1,8 @@
 """What AURON can look at while he answers.
 
-Every tool here only reads. Nothing in this file opens, closes or posts anything --
-when an acting tool comes (answering a mail, closing a trade), it gets its own
-confirmation step, not a line in this list.
+Every tool here only reads -- except mail_draft_reply, which writes a draft and
+stops there. Sending is Brano's button (mail/api.py, Telegram), never a tool:
+whatever AURON is talked into, it cannot send a mail by itself.
 """
 from __future__ import annotations
 
@@ -52,6 +52,24 @@ def _instagram() -> dict:
     }
 
 
+def _mail_inbox(important_only: bool = True, days: int = 7) -> dict:
+    from app.mail.service import mail_service
+    return {**mail_service.status(), "items": mail_service.items(important_only, days, 30), "pending_drafts": mail_service.drafts()}
+
+
+def _mail_read(mail_id: str) -> dict:
+    from app.mail.service import mail_service
+    m = mail_service.read(mail_id)
+    return {**m, "body": m["body"][:8000]}
+
+
+def _mail_draft(mail_id: str, body: str) -> dict:
+    """Writes a draft only. Sending is Brano's button -- there is no tool for it."""
+    from app.mail.service import mail_service
+    d = mail_service.draft(mail_id, body)
+    return {"draft": d, "note": "Entwurf liegt bereit. Gesendet wird nur, wenn Sir im Dashboard oder in Telegram auf Senden tippt."}
+
+
 TOOLS: list[dict] = [
     {"name": "trading_status",
      "description": "Brano's copier accounts right now: balance, equity, open positions, P&L per signal group "
@@ -61,6 +79,19 @@ TOOLS: list[dict] = [
      "description": "The watchlist: price, change today, distance from the 52-week high, against the 200-day "
                     "average, RSI, alert notes, why someone recommended it. Optional name filter.",
      "input_schema": {"type": "object", "properties": {"name": {"type": "string"}}}},
+    {"name": "mail_inbox",
+     "description": "Brano's sorted Gmail: important mail (authorities, tax, bank, insurance, contracts, deadlines, "
+                    "real people) with a one-line summary, or all recent mail; plus reply drafts waiting for him.",
+     "input_schema": {"type": "object", "properties": {"important_only": {"type": "boolean"}, "days": {"type": "integer"}}}},
+    {"name": "mail_read",
+     "description": "The full text of one mail (id from mail_inbox).",
+     "input_schema": {"type": "object", "properties": {"mail_id": {"type": "string"}}, "required": ["mail_id"]}},
+    {"name": "mail_draft_reply",
+     "description": "Write a reply to one mail as a DRAFT. It is not sent: Brano sees it with a Send button on the "
+                    "dashboard and in Telegram. Only when Brano asked for a reply. Write in the mail's language, "
+                    "polite, signed 'Branislav Gombos'.",
+     "input_schema": {"type": "object", "properties": {"mail_id": {"type": "string"}, "body": {"type": "string"}},
+                      "required": ["mail_id", "body"]}},
     {"name": "instagram_status",
      "description": "Instagram pipeline: posts waiting for review, ready, posted, failed, media pool, the next "
                     "posting slot and the latest captions.",
@@ -71,6 +102,9 @@ _RUN: dict[str, Callable[..., dict]] = {
     "trading_status": lambda **_: _trading(),
     "watchlist": lambda name=None, **_: _watchlist(name),
     "instagram_status": lambda **_: _instagram(),
+    "mail_inbox": lambda important_only=True, days=7, **_: _mail_inbox(important_only, days),
+    "mail_read": lambda mail_id, **_: _mail_read(mail_id),
+    "mail_draft_reply": lambda mail_id, body, **_: _mail_draft(mail_id, body),
 }
 
 

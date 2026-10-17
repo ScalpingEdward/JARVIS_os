@@ -456,6 +456,37 @@ refreshInstagram();
 setInterval(refreshTrading, 5000);
 setInterval(refreshHistory, 60000);
 setInterval(refreshInstagram, 30000);
+
+// --- post: important mail and reply drafts (backend/app/mail) ---------------------------
+async function refreshMail() {
+  try {
+    const m = await get('/v1/mail?important_only=true&days=14');
+    const open = m.items.filter((i) => !i.done);
+    $('#mBadge').textContent = !m.connected ? 'nicht verbunden' : m.error ? 'Fehler' : open.length ? `${open.length} wichtig` : 'alles ruhig';
+    $('#mBadge').classList.toggle('live', m.connected && !m.error);
+    $('#mBadge').title = m.error || '';
+    const who = (f) => esc((f.split('<')[0].trim().replace(/"/g, '') || f).slice(0, 40));
+    $('#mList').innerHTML = open.slice(0, 3).map((i) => `<div class="row mail"><b title="${esc(i.subject)}">${who(i.from)} · ${esc(i.subject)}</b>`
+      + `<button type="button" class="ok" data-done="${esc(i.id)}" title="Erledigt">✓</button><small>${esc(i.summary)}</small></div>`).join('')
+      || '<div class="row"><span class="muted">Keine wichtige Post.</span></div>';
+    $('#mDrafts').innerHTML = m.drafts.map((d) => `<div class="mail-draft"><b>Entwurf an ${who(d.to)}</b> · ${esc(d.subject)}`
+      + `<p>${esc(d.body)}</p><div class="btns"><button type="button" class="go" data-send="${esc(d.id)}">Senden</button>`
+      + `<button type="button" data-discard="${esc(d.id)}">Verwerfen</button></div></div>`).join('');
+  } catch (e) { console.warn(e); $('#mBadge').textContent = 'offline'; }
+}
+$('#tileMail').addEventListener('click', async (e) => {
+  const b = e.target.closest('button');
+  if (!b) return;
+  b.disabled = true;
+  try {
+    if (b.dataset.send) await send('POST', `/v1/mail/drafts/${b.dataset.send}/send`);
+    else if (b.dataset.discard) await send('POST', `/v1/mail/drafts/${b.dataset.discard}/discard`);
+    else if (b.dataset.done) await send('POST', `/v1/mail/${b.dataset.done}/done`, { done: true });
+  } catch (err) { alert(`Fehler: ${err.message}`); }
+  refreshMail();
+});
+refreshMail();
+setInterval(refreshMail, 60000);
 setInterval(refreshHealth, 15000);
 
 // --- weather next to the clock (Open-Meteo: free, no key) ------------------------------

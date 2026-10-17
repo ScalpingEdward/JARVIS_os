@@ -84,6 +84,7 @@ from .mt5_bridge.api import router as mt5_bridge_router
 from .copier_status.api import router as copier_status_router
 from .watchlist.api import router as watchlist_router
 from .assistant.api import router as assistant_router
+from .mail.api import router as mail_router
 from .orderflow.api import router as orderflow_router
 from .orchestrator.models import (
     AgentCreate,
@@ -227,7 +228,14 @@ async def lifespan(app: FastAPI):
     # Same opt-in rule again: this one sends real cards to a real phone.
     if os.getenv("AURON_POSTING_SCHEDULE_ENABLED", "false").lower() in ("1", "true", "yes"):
         posting_scheduler.start()
+    # Same opt-in rule: reads a real mailbox and sends real Telegram alerts.
+    if os.getenv("MAIL_POLL_ENABLED", "false").lower() in ("1", "true", "yes"):
+        from .mail.service import mail_poller
+        mail_poller.start()
     yield
+    if os.getenv("MAIL_POLL_ENABLED", "false").lower() in ("1", "true", "yes"):
+        from .mail.service import mail_poller
+        await mail_poller.stop()
     await posting_scheduler.stop()
     await telegram_poller.stop()
     await position_monitor_service.stop()
@@ -330,6 +338,7 @@ app.include_router(mt5_bridge_router)
 app.include_router(copier_status_router)
 app.include_router(watchlist_router)
 app.include_router(assistant_router)
+app.include_router(mail_router)
 app.include_router(orderflow_router)
 app.include_router(planner_router)
 app.include_router(radar_router)

@@ -10,7 +10,7 @@
   const input = document.getElementById('chatInput');
   const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const TAGS = /\[[a-zA-Z ]{2,24}\]\s*/g;  // [laughs] etc.: for the voice, not for the eyes
-  const TOOL_NAMES = { trading_status: 'Trading', watchlist: 'Watchlist', instagram_status: 'Instagram', web_search: 'Web' };
+  const TOOL_NAMES = { trading_status: 'Trading', watchlist: 'Watchlist', instagram_status: 'Instagram', web_search: 'Web', mail_inbox: 'Post', mail_read: 'Post', mail_draft_reply: 'Entwurf' };
 
   let turns = [];
   try { turns = JSON.parse(localStorage.getItem(KEY) || '[]'); } catch { turns = []; }
@@ -42,6 +42,7 @@
       const data = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(typeof data.detail === 'string' ? data.detail : `HTTP ${r.status}`);
       Object.assign(thinking, { content: data.text, tools: data.tools, pending: false });
+      if ((data.tools || []).includes('mail_draft_reply') && typeof refreshMail === 'function') refreshMail();  // the draft shows up on the Post card
       if (voiceOn()) say(data.text).catch((err) => console.warn('voice:', err.message));
     } catch (e) {
       Object.assign(thinking, { content: `Fehler: ${e.message}`, error: true, pending: false });

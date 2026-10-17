@@ -440,3 +440,39 @@ class WatchlistAlertRow(Base):
     __tablename__ = "watchlist_alerts"
     key: Mapped[str] = mapped_column(String(200), primary_key=True)
     sent_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class MailItemRow(Base):
+    """One Gmail message AURON has looked at: who, what, and whether it matters.
+
+    Only what the dashboard and the alert need -- the body stays in Gmail and is
+    fetched again when Brano asks AURON to read it."""
+
+    __tablename__ = "mail_items"
+    id: Mapped[str] = mapped_column(String(40), primary_key=True)          # Gmail message id
+    thread_id: Mapped[str] = mapped_column(String(40))
+    sender: Mapped[str] = mapped_column(String(300))
+    subject: Mapped[str] = mapped_column(String(500), default="")
+    received_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    snippet: Mapped[str] = mapped_column(Text, default="")
+    important: Mapped[int] = mapped_column(Integer, default=0)              # 1 = Behörde, Bank, Frist ...
+    category: Mapped[str] = mapped_column(String(40), default="")
+    summary: Mapped[str] = mapped_column(Text, default="")
+    alerted: Mapped[int] = mapped_column(Integer, default=0)
+    done: Mapped[int] = mapped_column(Integer, default=0)                   # Brano marked it as handled
+
+
+class MailDraftRow(Base):
+    """A reply AURON wrote. It is sent only when Brano presses Send -- never by AURON itself."""
+
+    __tablename__ = "mail_drafts"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    mail_id: Mapped[str] = mapped_column(String(40), index=True)
+    thread_id: Mapped[str] = mapped_column(String(40))
+    to: Mapped[str] = mapped_column(String(300))
+    subject: Mapped[str] = mapped_column(String(500))
+    body: Mapped[str] = mapped_column(Text)
+    in_reply_to: Mapped[str] = mapped_column(String(500), default="")
+    status: Mapped[str] = mapped_column(String(20), default="pending")       # pending / sent / discarded
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
