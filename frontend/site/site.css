@@ -42,7 +42,51 @@ h1, h2, h3 { margin: 0; line-height: 1.12; letter-spacing: -.01em; }
 .hero h1 span { background: linear-gradient(90deg, #fff, var(--accent)); -webkit-background-clip: text; background-clip: text; color: transparent; }
 .lead { font-size: clamp(16px, 2vw, 20px); color: #c8d2e2; max-width: 640px; margin: 22px auto 30px; }
 .cta { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
-.orb { position: relative; width: 180px; height: 180px; margin: 54px auto 0; }
+/* AURON's planet, the same as on the dashboard (styles copied from ../styles.css, globe from ../globe.js) */
+.hero .core { margin-top: 40px; }
+.core { --s: clamp(240px, 26vw, 380px); position: relative; width: var(--s); height: calc(var(--s) * 1.18); margin: 0 auto; transform-style: preserve-3d; }
+/* AURON's planet: a glass sphere with an energy core, a turning wireframe globe inside */
+.sphere {
+  --g: calc(var(--s) * .58);
+  position: absolute; left: 21%; right: 21%; top: 10%; aspect-ratio: 1; border-radius: 50%;
+  transform-style: preserve-3d;
+  background:
+    radial-gradient(circle at 32% 26%, rgba(255,255,255,.55), rgba(255,255,255,0) 18%),
+    radial-gradient(circle at 70% 78%, rgba(160,230,255,.18), rgba(160,230,255,0) 30%),
+    radial-gradient(circle at 50% 50%, rgba(70,170,255,.22), rgba(30,90,190,.26) 55%, rgba(20,60,140,.42) 70%, rgba(120,210,255,.30) 74%);
+  box-shadow: 0 0 70px rgba(79,190,255,.55), 0 0 160px rgba(79,190,255,.25),
+              inset 0 0 50px rgba(120,220,255,.45), inset -14px -20px 40px rgba(0,10,30,.45),
+              inset 0 0 0 1.5px rgba(190,240,255,.55);
+  animation: float 7s ease-in-out infinite;
+}
+.globe-map { position: absolute; inset: 0; width: 100%; height: 100%; border-radius: 50%; }
+.energy { position: absolute; inset: 34%; border-radius: 50%; opacity: .55;
+  background: radial-gradient(circle, rgba(235,255,255,.95), rgba(120,220,255,.55) 35%, rgba(79,216,255,0) 70%);
+  filter: blur(2px); animation: energy 3.4s ease-in-out infinite; }
+@keyframes energy { 50% { transform: scale(1.12); opacity: .8; } }
+.sphere .scan { position: absolute; inset: 0; border-radius: 50%; mix-blend-mode: screen; opacity: .22;
+  background: repeating-linear-gradient(180deg, color-mix(in srgb, var(--accent) 25%, transparent) 0 1px, transparent 1px 4px); animation: scan 6s linear infinite; }
+@keyframes float { 50% { transform: translateY(-12px); } }
+@keyframes scan { to { background-position: 0 120px; } }
+
+.orbit { position: absolute; left: 50%; top: 39%; width: 100%; aspect-ratio: 1; translate: -50% -50%;
+  border-radius: 50%; border: 1.5px solid color-mix(in srgb, var(--accent) 40%, transparent); transform-style: preserve-3d; pointer-events: none;
+  box-shadow: 0 0 14px color-mix(in srgb, var(--accent) 25%, transparent), inset 0 0 14px color-mix(in srgb, var(--accent) 15%, transparent); }
+.orbit i { position: absolute; top: -6px; left: 50%; width: 12px; height: 12px; margin-left: -6px; border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #fff, #bfe9ff 40%, #4fa8ff 75%); box-shadow: 0 0 16px #8fd8ff, 0 0 32px color-mix(in srgb, var(--accent) 70%, transparent); }
+.orbit.warm { border-color: rgba(255,170,70,.55); box-shadow: 0 0 18px rgba(255,150,40,.35), inset 0 0 14px rgba(255,150,40,.2); }
+.orbit.warm i { background: radial-gradient(circle at 35% 35%, #fff, #ffd9a0 40%, #ff9a2e 75%); box-shadow: 0 0 16px #ffb056, 0 0 32px rgba(255,150,40,.7); }
+.o1 { animation: orbit1 11s linear infinite; }
+.o2 { width: 88%; animation: orbit2 15s linear infinite; }
+.o3 { width: 112%; animation: orbit3 21s linear infinite; }
+@keyframes orbit1 { from { transform: rotateX(74deg) rotateY(-14deg) rotateZ(0); } to { transform: rotateX(74deg) rotateY(-14deg) rotateZ(360deg); } }
+@keyframes orbit2 { from { transform: rotateX(62deg) rotateY(48deg) rotateZ(0); } to { transform: rotateX(62deg) rotateY(48deg) rotateZ(-360deg); } }
+@keyframes orbit3 { from { transform: rotateX(80deg) rotateY(-42deg) rotateZ(0); } to { transform: rotateX(80deg) rotateY(-42deg) rotateZ(360deg); } }
+.beam { position: absolute; left: 30%; right: 30%; top: 58%; height: 30%; opacity: .75;
+  background: linear-gradient(180deg, rgba(79,216,255,0), color-mix(in srgb, var(--accent) 35%, transparent) 70%, rgba(150,230,255,.7));
+  clip-path: polygon(30% 0, 70% 0, 100% 100%, 0 100%); filter: blur(5px); animation: beam 3.6s ease-in-out infinite; }
+@keyframes beam { 50% { opacity: .55; } }
+.orb-old { position: relative; width: 180px; height: 180px; margin: 54px auto 0; }
 .orb b { position: absolute; inset: 40px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #bff1ff, #2b8fd0 45%, #0a2a4a 80%);
   box-shadow: 0 0 60px rgba(79,216,255,.55), inset 0 0 30px rgba(255,255,255,.2); }
 .orb i { position: absolute; inset: 0; border-radius: 50%; border: 1.5px solid rgba(79,216,255,.45); animation: spin 9s linear infinite; }
@@ -127,4 +171,18 @@ h1, h2, h3 { margin: 0; line-height: 1.12; letter-spacing: -.01em; }
   .room-row { grid-template-columns: repeat(2, 1fr); }
   .steps ol { grid-template-columns: 1fr; }
   .trust { position: static; margin-top: 40px; }
+}
+
+/* the office moves: the hero room changes every few seconds */
+.hero-bg { transition: opacity 1.6s ease; }
+.hero-bg.next { opacity: 0; }
+.where { margin: 0 0 6px; font-size: 13px; letter-spacing: .14em; color: #c8d2e2; min-height: 20px; transition: opacity .6s; }
+.hero-inner { perspective: 1400px; }
+
+/* hero in two columns: the words left, AURON's planet right -- both above the fold */
+@media (min-width: 901px) {
+  .hero-inner { max-width: 1240px; width: 100%; display: grid; grid-template-columns: 1.15fr 1fr; align-items: center; gap: 40px; text-align: left; }
+  .hero-text .lead { margin-left: 0; }
+  .hero-text .cta { justify-content: flex-start; }
+  .hero .core { margin: 0 auto; --s: clamp(260px, 28vw, 420px); }
 }
