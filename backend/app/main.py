@@ -238,6 +238,10 @@ async def lifespan(app: FastAPI):
     if os.getenv("SMART_MONEY_ENABLED", "false").lower() in ("1", "true", "yes"):
         from .smartmoney.service import smart_money_poller
         smart_money_poller.start()
+    # Same opt-in rule: Telegram when a copier stops reporting, and when it is back.
+    if os.getenv("COPIER_WATCH_ENABLED", "false").lower() in ("1", "true", "yes"):
+        from .copier_status.watch import copier_watch
+        copier_watch.start()
     # Same opt-in rule: a Telegram nudge when the last backup is too old.
     if os.getenv("BACKUP_WATCH_ENABLED", "false").lower() in ("1", "true", "yes"):
         from .backup.service import backup_watch

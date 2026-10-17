@@ -1,6 +1,8 @@
 from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
 
 from .models import CopierEquityPoint, CopierOverview, CopierStatus, CopierStatusIn
+from . import commands
 from .service import CopierStatusError, copier_status_service
 
 router = APIRouter(prefix="/v1/copier", tags=["copier"])
@@ -8,8 +10,10 @@ router = APIRouter(prefix="/v1/copier", tags=["copier"])
 
 @router.post("/status", response_model=CopierStatus)
 def push_status(payload: CopierStatusIn) -> CopierStatus:
-    """Called by each copier profile every 15 seconds."""
-    return copier_status_service.push(payload)
+    """Called by each copier profile every 15 seconds; the answer carries its pending commands."""
+    st = copier_status_service.push(payload)
+    st.commands = commands.pending_for(payload.profile)
+    return st
 
 
 @router.get("/status", response_model=list[CopierStatus])
@@ -36,3 +40,53 @@ def forget(profile: str) -> None:
         copier_status_service.forget(profile)
     except CopierStatusError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+class CommandIn(BaseModel):
+    profile: str
+    action: str
+    confirmed: bool = False   # the dashboard sets it after its own confirmation dialog
+
+
+@router.post("/commands")
+def create_command(payload: CommandIn) -> dict:
+    """pause / resume run with the next push; close_all waits for a confirmation unless confirmed."""
+    try:
+        return commands.create(payload.profile, payload.action, "dashboard", payload.confirmed)
+    except commands.CommandError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+
+
+@router.get("/commands")
+def list_commands() -> list[dict]:
+    return commands.recent()
+
+
+@router.post("/commands/{command_id}/confirm")
+def confirm_command(command_id: str) -> dict:
+    try:
+        return commands.confirm(command_id)
+    except commands.CommandError as exc:
+        raise HTTPException(status_code=409, detail=str(exc))
+
+
+@router.post("/commands/{command_id}/cancel")
+def cancel_command(command_id: str) -> dict:
+    try:
+        return commands.cancel(command_id)
+    except commands.CommandError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+
+
+class DoneIn(BaseModel):
+    ok: bool
+    result: str = ""
+
+
+@router.post("/commands/{command_id}/done")
+def command_done(command_id: str, payload: DoneIn) -> dict:
+    """The copier acks a command it ran."""
+    try:
+        return commands.done(command_id, payload.ok, payload.result)
+    except commands.CommandError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))

@@ -612,6 +612,47 @@ class Copier:
         except Exception as e:
             return f"{done} FAILED: {e}"
 
+    # --- commands from AURON (dashboard, chat, Telegram) ---------------
+
+    def command(self, action: str) -> str:
+        """pause: no new trades until resumed (open ones keep running). resume: lift a pause
+        or a loss stop -- Brano decided by hand. close_all: cancel this copier's limits and close
+        its positions; trades opened by hand are not touched."""
+        if action == "pause":
+            if self.book.halted(self.clock()) and self.book.halt_reason.startswith("paused"):
+                return "already paused"
+            self.book.halt_reason, self.book.halt_until = "paused by Brano", None
+            self._save()
+            self._say("PAUSED by Brano: no new trades until resumed. Open trades keep their SL/TP.")
+            return "paused"
+        if action == "resume":
+            if not self.book.halt_reason:
+                return "was not paused"
+            was = self.book.halt_reason
+            self.book.halt_reason, self.book.halt_until = "", None
+            self._save()
+            self._say(f"RESUMED by Brano (was: {was}). New signals are traded again.")
+            return f"resumed (was: {was})"
+        if action == "close_all":
+            if self.dry:
+                return "dry run: nothing closed"
+            orders, positions = self.ex.bot_orders(), self.ex.bot_positions()
+            failed = []
+            for o in orders:
+                try:
+                    self.ex.cancel_order(o)
+                except Exception as e:  # noqa: BLE001
+                    failed.append(f"limit #{o.ticket}: {e}")
+            for pos in positions:
+                try:
+                    self.ex.close_position(pos)
+                except Exception as e:  # noqa: BLE001
+                    failed.append(f"#{pos.ticket}: {e}")
+            text = f"CLOSE ALL by Brano: {len(positions)} positions closed, {len(orders)} limits cancelled"
+            self._say(text + (f" -- FAILED: {'; '.join(failed)}" if failed else ""))
+            return text + (f"; failed: {'; '.join(failed)}" if failed else "")
+        return f"unknown command {action}"
+
     # --- watchdog -------------------------------------------------------
 
     def watch(self) -> None:
@@ -706,8 +747,11 @@ class AuronReporter:
     """Posts the profile's status to AURON on its own thread. AURON down never touches trading."""
 
     def __init__(self, base_url: str):
-        self.url = base_url.rstrip("/") + "/v1/copier/status"
+        self.base = base_url.rstrip("/")
+        self.url = self.base + "/v1/copier/status"
         self.q: queue.Queue[dict] = queue.Queue(maxsize=1)
+        self.commands: queue.Queue[dict] = queue.Queue()   # from AURON's answer, run on the main loop
+        self.seen: set[str] = set()                         # AURON repeats a command until it is acked
         self.failing = False
         threading.Thread(target=self._run, daemon=True).start()
 
@@ -722,7 +766,14 @@ class AuronReporter:
             body = json.dumps(self.q.get()).encode()
             req = urllib.request.Request(self.url, body, {"Content-Type": "application/json"})
             try:
-                urllib.request.urlopen(req, timeout=15).read()
+                answer = urllib.request.urlopen(req, timeout=15).read()
+                try:
+                    for c in json.loads(answer or b"{}").get("commands", []):
+                        if c.get("id") and c["id"] not in self.seen:
+                            self.seen.add(c["id"])
+                            self.commands.put(c)
+                except ValueError:
+                    pass
                 if self.failing:
                     log.info("AURON reachable again")
                 self.failing = False
@@ -730,6 +781,15 @@ class AuronReporter:
                 if not self.failing:  # once per outage, not once a minute
                     log.warning("AURON status push failed (%s) -- trading goes on", e)
                 self.failing = True
+
+    def ack(self, command_id: str, ok: bool, result: str) -> None:
+        body = json.dumps({"ok": ok, "result": result[:500]}).encode()
+        req = urllib.request.Request(f"{self.base}/v1/copier/commands/{command_id}/done", body,
+                                     {"Content-Type": "application/json"})
+        try:
+            urllib.request.urlopen(req, timeout=15).read()
+        except Exception as e:  # noqa: BLE001 -- AURON shows it as still pending; the copier did it
+            log.warning("command ack failed (%s)", e)
 
 
 async def main(profile: str | None, dry: bool) -> None:
@@ -804,6 +864,13 @@ async def main(profile: str | None, dry: bool) -> None:
     async def watchdog() -> None:
         while True:
             copier.watch()
+            while auron is not None and not auron.commands.empty():  # MT5 calls stay on this loop
+                c = auron.commands.get()
+                try:
+                    result, ok = copier.command(c.get("action", "")), True
+                except Exception as e:  # noqa: BLE001
+                    result, ok = f"FAILED: {e}", False
+                await asyncio.to_thread(auron.ack, c["id"], ok, result)
             await asyncio.sleep(WATCH_EVERY_S)
 
     auron = AuronReporter(os.environ["AURON_URL"]) if os.environ.get("AURON_URL") else None

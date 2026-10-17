@@ -511,3 +511,20 @@ class SmartBacktestRow(Base):
     key: Mapped[str] = mapped_column(String(20), primary_key=True)          # "latest"
     generated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     data: Mapped[str] = mapped_column(Text)
+
+
+class CopierCommandRow(Base):
+    """A command for one copier profile: pause, resume, close_all.
+
+    close_all waits for Brano's confirmation (Telegram button or the dashboard's dialog);
+    the copier picks pending commands up with its next status push and acks them."""
+
+    __tablename__ = "copier_commands"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    profile: Mapped[str] = mapped_column(String(40), index=True)
+    action: Mapped[str] = mapped_column(String(20))
+    status: Mapped[str] = mapped_column(String(24))     # awaiting_confirmation / pending / done / failed / cancelled
+    source: Mapped[str] = mapped_column(String(20), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    done_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    result: Mapped[str] = mapped_column(Text, default="")

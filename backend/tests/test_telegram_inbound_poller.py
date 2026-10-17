@@ -31,7 +31,7 @@ def test_each_action_letter_reaches_exactly_its_module():
 def test_anything_that_is_not_our_tap_goes_nowhere():
     assert route_for({"update_id": 1, "message": {"text": "hallo"}}) is None
     assert route_for(_tap("garbage")) is None
-    assert route_for(_tap("x:z:sig")) is None
+    assert route_for(_tap("x:y:sig")) is None  # z and q belong to copier commands now
 
 
 def _run(coro):

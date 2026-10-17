@@ -54,6 +54,7 @@ class CopierStatusIn(BaseModel):
     open_positions: list[CopierPosition] = Field(default_factory=list)
     label: str | None = Field(default=None, max_length=100)  # display name, e.g. the group's
     closed: list[CopierClosedTrade] = Field(default_factory=list, max_length=500)  # newest first
+    halt_reason: str = Field(default="", max_length=300)  # paused by Brano / loss stop; "" = trading
 
 
 class CopierState(StrEnum):
@@ -65,6 +66,7 @@ class CopierState(StrEnum):
 class CopierStatus(CopierStatusIn):
     received_at: datetime
     state: CopierState
+    commands: list[dict] = Field(default_factory=list)  # for the copier: pause / resume / close_all to run now
 
 
 class CopierTotals(BaseModel):

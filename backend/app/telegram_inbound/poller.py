@@ -13,7 +13,7 @@ refuses getUpdates while a webhook is set, and one bot has one queue.
 Messages (typed or spoken) go to AURON (app.assistant.telegram); taps are
 routed by the action letter in callback_data, not by trying each
 module in turn. The three token alphabets are disjoint by design
-(instagram {p, d, g, n, 0-9}, setups {a, r}, live orders {x, c}, mail {m, k}), so the letter names
+(instagram {p, d, g, n, 0-9}, setups {a, r}, live orders {x, c}, mail {m, k}, copier commands {z, q}), so the letter names
 exactly one module. Trying all three would work too, but every miss would
 be written to the other modules' audit logs as a rejected token -- a tap on
 a post would show up as an attack on the trading approvals.
@@ -58,6 +58,12 @@ def _mail(update: dict) -> object:
     return mail_service.handle_tap(update)
 
 
+def _copier_command(update: dict) -> object:
+    from app.copier_status.commands import handle_tap
+
+    return handle_tap(update)
+
+
 ROUTES: dict[str, Callable[[dict], object]] = {
     "p": _instagram,
     "d": _instagram,
@@ -69,6 +75,8 @@ ROUTES: dict[str, Callable[[dict], object]] = {
     "c": _live_orders,
     "m": _mail,   # send a reply draft
     "k": _mail,   # discard it
+    "z": _copier_command,   # confirm a copier command (close all)
+    "q": _copier_command,   # cancel it
     # "take item N out of the post" on an Instagram card
     **{digit: _instagram for digit in "0123456789"},
 }

@@ -141,6 +141,13 @@ function renderAccounts(o) {
       <div class="chips"><span class="chip">today<b>${signed(today)}</b></span><span class="chip">total<b>${signed(total)}</b></span><span class="chip">open<b>${open}</b></span></div>
       <svg class="spark" id="sp-${esc(a.profile)}" viewBox="0 0 800 48" preserveAspectRatio="none"></svg>
       <div class="mini">${a.groups.map((g) => `<div><span>${esc(g.name)}</span><span>${signed(g.pnl_total)}</span></div>`).join('')}</div>
+      ${a.halt_reason ? `<div class="halt">⏸ ${esc(a.halt_reason)}</div>` : ''}
+      <div class="acc-cmds">
+        ${a.halt_reason ? `<button type="button" data-cmd="resume" data-p="${esc(a.profile)}">▶ Fortsetzen</button>`
+          : `<button type="button" data-cmd="pause" data-p="${esc(a.profile)}">⏸ Pausieren</button>`}
+        <button type="button" class="danger" data-cmd="close_all" data-p="${esc(a.profile)}" data-n="${esc(nameOf(a))}">✖ Alle schließen</button>
+        <span class="cmd-msg" id="cm-${esc(a.profile)}"></span>
+      </div>
     </article>`;
   }).join('');
   o.accounts.forEach((a) => {
@@ -151,6 +158,20 @@ function renderAccounts(o) {
     drawChart($(`#sp-${CSS.escape(a.profile)}`), pts, rising ? '#3ddc97' : '#f2647c', 48);
   });
 }
+
+$('#accounts').addEventListener('click', async (e) => {
+  const b = e.target.closest('button[data-cmd]');
+  if (!b) return;
+  const { cmd, p, n } = b.dataset;
+  if (cmd === 'close_all' && !confirm(`Wirklich ALLE Trades von „${n}“ schließen?\nOffene Positionen werden zum Marktpreis geschlossen, Limits gelöscht.`)) return;
+  b.disabled = true;
+  const msg = $(`#cm-${CSS.escape(p)}`);
+  try {
+    await send('POST', '/v1/copier/commands', { profile: p, action: cmd, confirmed: cmd === 'close_all' });
+    msg.textContent = 'gesendet – der Kopierer führt es in bis zu 20 s aus';
+  } catch (err) { msg.textContent = `Fehler: ${err.message}`; }
+  setTimeout(() => { b.disabled = false; }, 20000);
+});
 
 function renderGroups(o) {
   const groups = (o.groups || []).filter((g) => g.closed_trades || g.open_positions || g.pnl_total);

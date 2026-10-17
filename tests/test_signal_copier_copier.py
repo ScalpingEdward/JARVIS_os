@@ -310,3 +310,15 @@ def test_replies_to_open_trades_are_followed_even_late():
     c.on_message(CHAT, 10, None, SIGNAL, posted_at=now[0])
     c.on_message(CHAT, 12, 10, "Close all now", posted_at=now[0] - 15 * 60)
     assert not t.positions
+
+
+def test_commands_pause_blocks_new_trades_resume_lifts_it_close_all_empties():
+    c, t, said, now = make()
+    assert c.command("pause") == "paused" and c.command("pause") == "already paused"
+    c.on_message(CHAT, 1, None, SIGNAL)
+    assert t.positions == {} and "trading stopped" in said[-1]
+    assert c.command("resume").startswith("resumed")
+    c.on_message(CHAT, 2, None, SIGNAL)
+    assert t.positions
+    assert c.command("close_all").startswith("CLOSE ALL by Brano: 2 positions")
+    assert t.positions == {} and c.command("explode") == "unknown command explode"

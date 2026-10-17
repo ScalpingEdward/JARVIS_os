@@ -44,6 +44,7 @@ class Status:
     open_positions: list[dict] = field(default_factory=list)
     label: str = ""  # what people call this account -- its group's name, not the folder name
     closed: list[dict] = field(default_factory=list)  # newest first, see closed_trades()
+    halt_reason: str = ""  # why no new trades are opened right now (pause, loss stop); "" = trading
 
     def to_json(self) -> dict:
         return asdict(self)
@@ -137,4 +138,5 @@ def build(profile: str, account: dict, positions: list[dict], deals: list[dict],
     ordered = [x for x in ordered if x.name != OTHER or x.closed_trades or x.open_positions or x.pnl_total]
     return Status(profile, account["login"], account["server"], account["currency"],
                   round(account["balance"], 2), round(account["equity"], 2),
-                  now.isoformat(), ordered, open_list, label or profile, closed_trades(deals, owner))
+                  now.isoformat(), ordered, open_list, label or profile, closed_trades(deals, owner),
+                  book.halt_reason if book.halted(now.timestamp()) else "")
