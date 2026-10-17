@@ -18,8 +18,9 @@
   const lang = () => { try { return localStorage.getItem('auron_lang') || 'de'; } catch { return 'de'; } };
 
   function render() {
-    log.innerHTML = turns.map((t) => `<div class="msg ${t.role}${t.error ? ' err' : ''}">${esc(t.content.replace(TAGS, ''))}`
-      + `${t.tools?.length ? `<small>${[...new Set(t.tools)].map((n) => TOOL_NAMES[n] || n).join(' · ')}</small>` : ''}</div>`).join('')
+    log.innerHTML = turns.map((t, i) => `<div class="msg ${t.role}${t.error ? ' err' : ''}">${esc(t.content.replace(TAGS, ''))}`
+      + `${t.tools?.length ? `<small>${[...new Set(t.tools)].map((n) => TOOL_NAMES[n] || n).join(' · ')}</small>` : ''}`
+      + `${t.role === 'assistant' && !t.error && !t.pending ? `<button type="button" class="msg-say" data-say="${i}" title="Vorlesen">▶ Vorlesen</button>` : ''}</div>`).join('')
       || '<div class="msg hint">Frag mich etwas – „Wie läuft Trading heute?“, „Was macht Gold?“, „Recherchier NVIDIA“.</div>';
     log.scrollTop = log.scrollHeight;
   }
@@ -29,7 +30,7 @@
     if (on) { render(); input.focus(); }
   }
 
-  async function ask(text) {
+  async function ask(text, spoken = false) {  // spoken: he talked -- AURON talks back; typed: text only
     turns.push({ role: 'user', content: text });
     const thinking = { role: 'assistant', content: 'AURON denkt nach …', pending: true };
     turns.push(thinking); render();
@@ -43,7 +44,7 @@
       if (!r.ok) throw new Error(typeof data.detail === 'string' ? data.detail : `HTTP ${r.status}`);
       Object.assign(thinking, { content: data.text, tools: data.tools, pending: false });
       if ((data.tools || []).includes('mail_draft_reply') && typeof refreshMail === 'function') refreshMail();  // the draft shows up on the Post card
-      if (voiceOn()) say(data.text).catch((err) => console.warn('voice:', err.message));
+      if (spoken || voiceOn()) say(data.text).catch((err) => console.warn('voice:', err.message));
     } catch (e) {
       Object.assign(thinking, { content: `Fehler: ${e.message}`, error: true, pending: false });
     }
@@ -54,7 +55,8 @@
   // ---- voice -------------------------------------------------------------
   const pref = (k, d) => { try { return localStorage.getItem(k) ?? d; } catch { return d; } };
   const setPref = (k, v) => { try { localStorage.setItem(k, v); } catch { /* private window */ } };
-  const voiceOn = () => pref('auron_voice_on', '1') === '1';
+  // Read every answer aloud only when switched on; by default AURON speaks when spoken to, or on ▶ Vorlesen.
+  const voiceOn = () => pref('auron_voice_auto', '0') === '1';
   const chosen = () => { try { return JSON.parse(pref('auron_voice2', '')) || null; } catch { return null; } };
   const DEFAULT_VOICE = { provider: 'elevenlabs', voice: 'JBFqnCBsd6RMkjVDRZzb', model: 'eleven_v4', name: 'George', accent: 'British accent' }  // Brano's pick, 2026-10-16;
   const player = new Audio();
@@ -70,8 +72,8 @@
   }
 
   const speakBtn = document.getElementById('chatSpeak');
-  const paintSpeak = () => { speakBtn.textContent = voiceOn() ? '🔊' : '🔇'; speakBtn.title = voiceOn() ? 'Vorlesen an' : 'Vorlesen aus'; };
-  speakBtn.addEventListener('click', () => { setPref('auron_voice_on', voiceOn() ? '0' : '1'); if (!voiceOn()) player.pause(); paintSpeak(); });
+  const paintSpeak = () => { speakBtn.textContent = voiceOn() ? '🔊' : '🔇'; speakBtn.title = voiceOn() ? 'Jede Antwort vorlesen: an' : 'Jede Antwort vorlesen: aus (nur bei Sprache oder ▶)'; };
+  speakBtn.addEventListener('click', () => { setPref('auron_voice_auto', voiceOn() ? '0' : '1'); if (!voiceOn()) player.pause(); paintSpeak(); });
   paintSpeak();
 
   const SAMPLE = '[chuckles] Guten Abend, Sir. Gold steht ruhig, die Kopierer laufen, und Instagram wartet mal wieder auf Sie. Soll ich weitermachen?';
@@ -93,6 +95,16 @@
       <button type="button" class="vdone" id="vDone">Fertig</button></div>`;
   }
   const p_ok = (p) => (p.available ? '' : ' <small>– kein Schlüssel</small>');
+  log.addEventListener('click', (e) => {
+    const b = e.target.closest('.msg-say');
+    if (!b) return;
+    const t = turns[Number(b.dataset.say)];
+    if (!player.paused && b.classList.contains('playing')) { player.pause(); b.classList.remove('playing'); b.textContent = '▶ Vorlesen'; return; }
+    log.querySelectorAll('.msg-say.playing').forEach((x) => { x.classList.remove('playing'); x.textContent = '▶ Vorlesen'; });
+    b.classList.add('playing'); b.textContent = '■ Stopp';
+    player.onended = () => { b.classList.remove('playing'); b.textContent = '▶ Vorlesen'; };
+    say(t.content).catch((err) => { b.textContent = 'Fehler'; console.warn(err); });
+  });
   log.addEventListener('click', async (e) => {
     if (e.target.id === 'vDone') { render(); return; }
     const b = e.target.closest('.vbtns button');
@@ -147,7 +159,7 @@
         const r = await fetch(`${API}/v1/assistant/listen?lang=${lang()}`, { method: 'POST', headers: { 'Content-Type': blob.type }, body: blob });
         const d = await r.json().catch(() => ({}));
         if (!r.ok) throw new Error(d.detail || `HTTP ${r.status}`);
-        if (d.text) { open(true); ask(d.text); }
+        if (d.text) { open(true); ask(d.text, true); }
       } catch (e) { open(true); turns.push({ role: 'assistant', content: `Nicht verstanden: ${e.message}`, error: true }); render(); }
       mic.classList.remove('busy');
     };
