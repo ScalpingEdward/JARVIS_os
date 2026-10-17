@@ -213,3 +213,30 @@ h1, h2, h3 { margin: 0; line-height: 1.12; letter-spacing: -.01em; }
   .g-left, .g-right { transform: none; justify-self: stretch; max-width: none; }
   .hero .core { order: -1; }
 }
+
+/* type in AURON's voice: the logo's spaced capitals for navigation and marks */
+.nav nav a { font-size: 12px; font-weight: 600; letter-spacing: .24em; text-transform: uppercase; color: #b9c4d6; }
+.nav nav { gap: 30px; }
+.company { font-size: 12px; font-weight: 600; letter-spacing: .3em; text-transform: uppercase; color: #dfe8f4; }
+.hero-mark { position: absolute; z-index: 2; left: 0; right: 0; top: 78px; display: grid; justify-items: center; gap: 6px; text-align: center; pointer-events: none; }
+.mark { display: inline-flex; align-items: center; gap: 16px; font-size: clamp(26px, 2.6vw, 40px); font-weight: 600; letter-spacing: .5em; padding-left: .5em;
+  text-shadow: 0 0 22px rgba(79,216,255,.45), 0 2px 4px rgba(0,0,0,.6); }
+.glyph.big { width: 26px; height: 26px; border-width: 2px; }
+.hero-mark small { font-size: 12px; letter-spacing: .26em; text-transform: uppercase; color: #c8d2e2; text-shadow: 0 1px 3px rgba(0,0,0,.8); }
+.hero-stage { padding-top: 150px; }
+
+/* icons in "Heute für dich erledigt" */
+.done li { grid-template-columns: 26px 58px 1fr; }
+.di { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 8px; background: rgba(255,255,255,.06); }
+.di svg { width: 17px; height: 17px; }
+
+/* company */
+.about { display: grid; grid-template-columns: 1fr 1.2fr; gap: 40px; align-items: center; }
+.about h2 { margin-bottom: 18px; }
+.about-lead { color: #c3cddd; font-size: 17px; margin: 0; }
+.about-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
+.glass-sm { display: grid; gap: 6px; padding: 18px; border-radius: 16px; border: 1px solid rgba(170,220,255,.18);
+  background: linear-gradient(155deg, rgba(150,200,255,.1), rgba(10,20,36,.4)); backdrop-filter: blur(14px); }
+.glass-sm b { font-size: 15px; } .glass-sm span { color: var(--muted); font-size: 14px; }
+@media (max-width: 1000px) { .hero-mark { position: static; padding-top: 90px; } .hero-stage { padding-top: 20px; } .about { grid-template-columns: 1fr; } .about-grid { grid-template-columns: 1fr; } }
+.glass { background: linear-gradient(155deg, rgba(150,200,255,.12), rgba(30,60,110,.18) 45%, rgba(8,14,26,.55)); }  /* a touch denser: bright spots behind it no longer wash out the text */
