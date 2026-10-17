@@ -196,6 +196,7 @@ void main() {
 
   // ---- the room picker in the header -------------------------------------------------------
   const btn = document.getElementById('roomBtn'), menu = document.getElementById('roomMenu');
+  if (!btn || !menu) return;  // the picker lives in Settings > Design now
   const paint = () => {
     menu.innerHTML = window.AURON_room.list().map((r) => `<button type="button" data-k="${r.key}" class="${r.key === key ? 'on' : ''}">
       <i style="background-image:url('${r.src}')"></i><span>${r.name}</span></button>`).join('');

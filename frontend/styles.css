@@ -682,3 +682,38 @@ html[data-clock="neon"] .topclock .clock { font-weight: 300; color: var(--accent
 html[data-clock="bold"] .topclock .clock { font-weight: 800; letter-spacing: .08em; }
 .theme-panel .seg.seg3 { grid-template-columns: repeat(3, 1fr); }
 .theme-panel { max-height: calc(100vh - 80px); overflow-y: auto; }
+
+/* settings: a panel of its own (not inside the bar -- the bar's span rules scrambled it), menu -> sections */
+.theme-panel { position: fixed; right: 18px; bottom: 48px; top: auto; width: 360px; max-height: calc(100vh - 110px); overflow-y: auto;
+  z-index: 30; padding: 14px 16px 16px; gap: 14px; display: grid; align-content: start; }
+.theme-panel[hidden] { display: none; }
+.th-head { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 6px; }
+.th-head b { grid-column: 2; }
+.th-back { background: none; border: 0; color: var(--text); font-size: 20px; line-height: 1; cursor: pointer; padding: 0 6px 0 0; }
+.th-menu { display: grid; gap: 6px; }
+.th-menu button { display: grid; grid-template-columns: 30px 1fr auto; align-items: center; gap: 10px; text-align: left; padding: 10px 12px;
+  border-radius: 12px; border: 1px solid var(--line-2); background: rgba(255,255,255,.04); color: var(--text); font: inherit; cursor: pointer; }
+.th-menu button:hover { border-color: color-mix(in srgb, var(--accent) 50%, transparent); background: color-mix(in srgb, var(--accent) 8%, transparent); }
+.th-menu i { font-style: normal; font-size: 18px; text-align: center; }
+.th-menu b { display: block; font-size: 13.5px; } .th-menu small { color: var(--muted); font-size: 11.5px; } .th-menu em { font-style: normal; color: var(--muted); font-size: 18px; }
+.th-sec { display: grid; gap: 8px; padding-top: 12px; border-top: 1px solid var(--line); }
+.th-sec h4 { margin: 0; font-size: 11px; letter-spacing: .18em; text-transform: uppercase; color: var(--accent); font-weight: 600; }
+.theme-panel .th-label { display: flex; justify-content: space-between; margin: 2px 0 0; }
+.theme-panel .th-label b { color: var(--text); font-weight: 500; letter-spacing: 0; text-transform: none; }
+.th-rooms { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.th-rooms button { display: grid; gap: 4px; padding: 4px; border-radius: 10px; border: 1px solid transparent; background: none; color: var(--muted); font: inherit; font-size: 10.5px; cursor: pointer; text-align: left; }
+.th-rooms button.on { border-color: var(--accent); color: var(--text); }
+.th-rooms i { display: block; height: 52px; border-radius: 7px; background: center / cover no-repeat; }
+.th-rooms span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.theme-panel .sw label.own { width: 24px; height: 24px; border-radius: 50%; border: 1px dashed var(--line-2); display: grid; place-items: center; color: var(--muted); cursor: pointer; position: relative; font-size: 14px; }
+.theme-panel .sw label.own input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.th-clocks { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.th-clocks button { display: grid; justify-items: center; gap: 2px; padding: 8px 4px; border-radius: 10px; border: 1px solid var(--line-2);
+  background: rgba(255,255,255,.04); color: var(--muted); font: inherit; font-size: 11px; cursor: pointer; }
+.th-clocks button.on { border-color: var(--accent); color: var(--text); background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.th-clocks b { font-size: 20px; color: var(--text); font-family: Inter, "Segoe UI", sans-serif; font-weight: 500; }
+.th-clocks .ck-thin { font-weight: 200; letter-spacing: .1em; } .th-clocks .ck-mono { font-family: var(--mono); font-weight: 400; }
+.th-clocks .ck-elegant { font-family: Georgia, serif; font-weight: 400; } .th-clocks .ck-neon { font-weight: 300; color: var(--accent); text-shadow: 0 0 6px var(--accent); }
+.th-clocks .ck-bold { font-weight: 800; }
+.th-text { margin: 0; font-size: 12.5px; line-height: 1.5; color: var(--muted); }
+.th-reset { justify-self: end; }
