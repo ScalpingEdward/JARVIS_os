@@ -112,6 +112,35 @@ def _stats(vals: list[float]) -> dict:
             "hit": round(sum(v > 0 for v in vals) / len(vals), 3)}
 
 
+def _r(ret: dict, h: int):
+    """The result at a horizon -- keys are ints here, strings after a JSON round trip."""
+    return ret.get(h, ret.get(str(h))) if ret else None
+
+
+def by_insider(evts: list[dict], horizon: int = 60, min_n: int = 3) -> list[dict]:
+    """Each insider's record at one company: was he right? A buy is right when the stock then
+    beat the S&P 500, a sale when it lagged. edge: the average of (+excess for buys, -excess for
+    sales). verdict: 'folgen' (n >= 3, right >= 60 %, edge > 0), 'aussortieren' (right <= 40 % or
+    edge < 0), otherwise 'offen'."""
+    groups: dict[tuple[str, str], list[dict]] = defaultdict(list)
+    for e in evts:
+        if _r(e.get("ret") or {}, horizon) is not None and e.get("owner"):
+            groups[(e["owner"], e["ticker"])].append(e)
+    out = []
+    for (owner, ticker), lst in groups.items():
+        if len(lst) < min_n:
+            continue
+        signed = [(_r(e["ret"], horizon) if e["code"] == "P" else -_r(e["ret"], horizon)) for e in lst]
+        right = sum(v > 0 for v in signed) / len(signed)
+        edge = statistics.fmean(signed)
+        verdict = "folgen" if right >= 0.6 and edge > 0 else "aussortieren" if right <= 0.4 or edge < 0 else "offen"
+        out.append({"owner": owner, "ticker": ticker, "role": lst[0].get("role", ""), "n": len(lst),
+                    "buys": sum(e["code"] == "P" for e in lst), "sales": sum(e["code"] == "S" for e in lst),
+                    "right": round(right, 3), "edge": round(edge, 4), "verdict": verdict})
+    out.sort(key=lambda x: (-x["edge"], -x["n"]))
+    return out
+
+
 def summarize(evts: list[dict]) -> dict:
     """Averages, medians and hit rates of the excess return, overall and by group."""
     def table(select) -> dict:
@@ -120,7 +149,8 @@ def summarize(evts: list[dict]) -> dict:
             if e.get("ret"):
                 for g in select(e):
                     groups[g].append(e)
-        return {g: {str(h): _stats([e["ret"][h] for e in lst if h in e["ret"]]) for h in HORIZONS} for g, lst in groups.items()}
+        return {g: {str(h): _stats([_r(e["ret"], h) for e in lst if _r(e["ret"], h) is not None]) for h in HORIZONS}
+                for g, lst in groups.items()}
 
     def size(e):
         v = e["value"]
@@ -133,5 +163,6 @@ def summarize(evts: list[dict]) -> dict:
         "by_size": table(lambda e: size(e) if e["code"] == "P" else []),
         "by_cluster": table(lambda e: (["Cluster" if e.get("cluster") else "Einzeln"]) if e["code"] == "P" else []),
         "by_ticker": table(lambda e: [e["ticker"]] if e["code"] == "P" else []),
+        "by_insider": by_insider(evts),
         "events": len(evts), "buys": len(buys), "with_prices": sum(1 for e in evts if e.get("ret")),
     }

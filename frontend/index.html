@@ -124,6 +124,11 @@
             <p class="bt-note">Rendite der Aktie <b>minus S&amp;P 500</b> ab dem ersten Schlusskurs nach der Meldung – Durchschnitt, Anteil im Plus, Anzahl Fälle.
               Alle US-Firmen mit Kursen bei PU Prime. Vergangenheit, keine Vorhersage.</p>
             <div class="table-wrap"><table class="positions" id="btTable"></table></div></section>
+          <section class="card span-12"><div class="label">Bilanz pro Insider <span class="count" id="biCount"></span></div>
+            <p class="bt-note">Lag der Insider richtig? Kauf richtig = Aktie danach besser als der S&amp;P 500, Verkauf richtig = schlechter (60 Handelstage).
+              Ab 3 bewertbaren Trades. <b>Folgen</b>: ≥ 60 % richtig und im Schnitt vorn. <b>Aussortieren</b>: ≤ 40 % richtig oder im Schnitt hinten.</p>
+            <div class="hist-filter" id="biFilter"></div>
+            <div class="table-wrap bi-wrap"><table class="positions" id="biTable"></table></div></section>
           <section class="card span-12"><div class="label">Makro diese Woche</div><div class="table-wrap"><table class="positions" id="smMacro"></table></div></section>
           <section class="card span-12"><div class="label">Mehrere Insider kaufen <span class="count" id="smClusterCount">0</span></div><div id="smClusters" class="muted"></div></section>
           <section class="card span-12"><div class="label">Insider (30 Tage) <span class="count" id="smCount">0</span></div><div class="table-wrap"><table class="positions" id="smInsider"></table></div></section>
