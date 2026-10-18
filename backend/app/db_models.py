@@ -504,6 +504,25 @@ class SmartAlertRow(Base):
     sent_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
 
+class SmartFollowRow(Base):
+    """An insider Brano watches (from the profi list): every new trade of theirs is an alert."""
+
+    __tablename__ = "smart_follows"
+    owner: Mapped[str] = mapped_column(String(200), primary_key=True)       # as the SEC writes it, e.g. "Benioff Marc"
+    tickers: Mapped[str] = mapped_column(String(300), default="")           # comma-separated, polled with the watchlist
+    added_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    note: Mapped[str] = mapped_column(String(300), default="")              # why: hit rate, avg at the time of adding
+
+
+class AppSettingRow(Base):
+    """One setting a user changes in the dashboard (e.g. the Instagram account voice) -- key/value text."""
+
+    __tablename__ = "app_settings"
+    key: Mapped[str] = mapped_column(String(80), primary_key=True)
+    value: Mapped[str] = mapped_column(Text)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
 class SmartBacktestRow(Base):
     """The latest insider backtest (tools/insider_backtest.py): summary and per-event results as JSON."""
 

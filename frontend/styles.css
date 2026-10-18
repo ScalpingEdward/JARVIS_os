@@ -808,3 +808,13 @@ html[data-cards="dark"] .detail .card { background: linear-gradient(160deg, rgb(
 .more-stats > summary::before { content: "▸"; margin-right: 4px; transition: rotate .2s; }
 .more-stats[open] > summary::before { rotate: 90deg; }
 .more-stats[open] > summary { margin-bottom: 12px; }
+
+/* watch an insider: the star in the profi list */
+.star { font: inherit; font-size: 17px; line-height: 1; width: 28px; height: 28px; border-radius: 50%; cursor: pointer;
+  background: transparent; border: 1px solid transparent; color: var(--muted); transition: color .2s, transform .2s; }
+.star:hover { color: var(--accent); transform: scale(1.15); }
+.star.on { color: #f5b84a; text-shadow: 0 0 10px rgba(245,184,74,.6); }
+
+.voice-text { width: 100%; font: 13.5px/1.55 inherit; color: var(--text); background: rgba(0,0,0,.25); border: 1px solid var(--line);
+  border-radius: 12px; padding: 12px 14px; resize: vertical; margin-bottom: 10px; }
+.voice-text:focus { outline: none; border-color: var(--accent); }

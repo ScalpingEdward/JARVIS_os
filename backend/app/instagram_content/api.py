@@ -459,3 +459,23 @@ def put_back(candidate_id: UUID, reason: str = "not now -- later") -> ContentCan
         return instagram_content_service.put_back(candidate_id, reason)
     except InstagramContentError as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+
+
+class AccountVoice(BaseModel):
+    voice: str
+
+
+@router.get("/voice")
+def get_voice() -> dict:
+    """The account's voice the captions are written in: character, style, themes."""
+    from . import account_voice
+    from .caption_writer import DEFAULT_BRAND_VOICE
+    return {"voice": account_voice.current(), "is_default": account_voice.is_default(), "default": DEFAULT_BRAND_VOICE}
+
+
+@router.put("/voice")
+def put_voice(body: AccountVoice) -> dict:
+    """Write the account's voice (empty = back to the built-in one). The next caption uses it."""
+    from . import account_voice
+    account_voice.save(body.voice)
+    return get_voice()

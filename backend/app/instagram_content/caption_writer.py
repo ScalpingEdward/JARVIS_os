@@ -127,7 +127,7 @@ class CaptionWriterConfig:
     model: str = field(default_factory=lambda: os.getenv("AURON_CAPTION_MODEL", "claude-sonnet-5"))
     timeout_seconds: float = 30.0
     max_tokens: int = 500
-    brand_voice: str = DEFAULT_BRAND_VOICE
+    brand_voice: str | None = None   # None: the account voice from the dashboard (account_voice.current())
 
 
 class AnthropicCaptionWriter:
@@ -144,6 +144,12 @@ class AnthropicCaptionWriter:
         self.config = config or CaptionWriterConfig()
         self._client = client
 
+    def _voice(self) -> str:
+        if self.config.brand_voice is not None:
+            return self.config.brand_voice
+        from . import account_voice
+        return account_voice.current()
+
     def _build_prompt(self, theme: str, media_items: list[MediaPoolItem], post_format: str,
                       recent: list[str] | None = None) -> str:
         tag_hint = ", ".join(sorted({t for item in media_items for t in item.tags})) or "none provided"
@@ -151,7 +157,7 @@ class AnthropicCaptionWriter:
         return (
             f"Write one Instagram caption for a {post_format.replace('_', ' ')} post on a high-end, "
             f"growth-focused account.\n\n"
-            f"Brand voice: {self.config.brand_voice}\n\n"
+            f"Brand voice: {self._voice()}\n\n"
             f"Post theme: {theme}\n"
             f"Media tags observed: {tag_hint}\n"
             f"Number of media items: {len(media_items)}\n\n"

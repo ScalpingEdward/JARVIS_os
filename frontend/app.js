@@ -404,7 +404,7 @@ function open(view, fromTile, push = true) {
   if (push) history_.pushState({ view }, '', `#${view}`);
   if (view === 'watchlist' && watch) renderWatchView(watch);
   if (view === 'smart') renderSmartView();
-  if (view === 'instagram') loadWaiting();
+  if (view === 'instagram') { loadWaiting(); loadVoice(); }
   if (view === 'trading' && overview) { renderTotals(overview); renderAccounts(overview); renderGroups(overview); renderPositions(overview); renderHistory(overview); renderTotalChart(); }
   if (fromTile) morph($('#detailPanel'), fromTile.getBoundingClientRect(), false);
   $('#close').focus();
@@ -485,6 +485,26 @@ refreshInstagram();
 setInterval(refreshTrading, 5000);
 setInterval(refreshHistory, 60000);
 setInterval(refreshInstagram, 30000);
+
+// --- Instagram: the account's voice for captions ----------
+async function loadVoice() {
+  try {
+    const v = await get('/v1/instagram/voice');
+    $('#voiceText').value = v.voice;
+    $('#voiceState').textContent = v.is_default ? 'eingebaut' : 'eigene';
+  } catch (e) { $('#voiceMsg').textContent = `Fehler: ${e.message}`; }
+}
+async function saveVoice(text) {
+  $('#voiceMsg').textContent = 'Speichere …';
+  try {
+    const v = await send('PUT', '/v1/instagram/voice', { voice: text });
+    $('#voiceText').value = v.voice;
+    $('#voiceState').textContent = v.is_default ? 'eingebaut' : 'eigene';
+    $('#voiceMsg').textContent = 'Gespeichert – die nächste Caption klingt so.';
+  } catch (e) { $('#voiceMsg').textContent = `Fehler: ${e.message}`; }
+}
+$('#voiceSave').addEventListener('click', () => saveVoice($('#voiceText').value));
+$('#voiceReset').addEventListener('click', () => { if (confirm('Zur eingebauten Stimme zurück?')) saveVoice(''); });
 
 // --- Instagram: the post that waits, with its pictures and caption, approvable here ----------
 async function loadWaiting() {
@@ -613,11 +633,35 @@ document.querySelectorAll('.hist-filter[data-side]').forEach((f) => f.addEventLi
   renderInsiders(smart?.backtest?.by_insider);
 }));
 
-let sgVerdict = 'profi', sgData = null;
+let sgVerdict = 'profi', sgData = null, follows = [];
+async function loadFollows() {
+  try { follows = await get('/v1/smartmoney/follows'); } catch (e) { console.warn(e); return; }
+  $('#fwCount').textContent = follows.length;
+  $('#fwTable').innerHTML = follows.length ? '<tr><th>INSIDER</th><th>FIRMEN</th><th>BILANZ BEIM HINZUFÜGEN</th><th>SEIT</th><th></th></tr>'
+    + follows.map((f) => `<tr><td><b>${esc(f.owner)}</b></td><td>${esc(f.tickers.join(', '))}</td><td class="muted">${esc(f.note)}</td>`
+      + `<td class="muted">${esc(new Date(f.added_at).toLocaleDateString('de-DE'))}</td>`
+      + `<td><button type="button" class="star on" data-unfollow="${esc(f.owner)}" title="Nicht mehr beobachten">★</button></td></tr>`).join('')
+    : '<tr><td class="muted">Noch niemand – markiere unten in der Profi-Liste einen Insider mit ☆.</td></tr>';
+  if (sgData) renderSignalers();
+}
+async function toggleFollow(owner, on) {
+  try {
+    if (on) await send('POST', '/v1/smartmoney/follows', { owner });
+    else await send('DELETE', `/v1/smartmoney/follows?owner=${encodeURIComponent(owner)}`);
+  } catch (e) { alert(`Fehler: ${e.message}`); }
+  loadFollows();
+}
+document.addEventListener('click', (e) => {
+  const b = e.target.closest('[data-follow], [data-unfollow]');
+  if (!b) return;
+  if (b.dataset.unfollow !== undefined) toggleFollow(b.dataset.unfollow, false);
+  else toggleFollow(b.dataset.follow, !follows.some((f) => f.owner === b.dataset.follow));
+});
 const pct = (v, d = 1) => (v == null ? '–' : `${v > 0 ? '+' : ''}${(v * 100).toFixed(d)} %`);
 async function loadSignalers() {
   try { sgData = await get(`/v1/smartmoney/signalers?verdict=${sgVerdict}&limit=400`); } catch (e) { console.warn(e); return; }
   renderSignalers();
+  loadFollows();
 }
 function renderSignalers() {
   const d = sgData;
@@ -639,8 +683,11 @@ function renderSignalers() {
   $('#sgCount').textContent = `${d.counts.profi} profi · ${d.counts.weg} weg · ${d.counts.offen} offen`;
   $('#sgFilter').innerHTML = [['profi', 'Profi'], ['weg', 'Weg'], ['offen', 'Offen']].map(([k, n]) =>
     `<button type="button" class="hchip${k === sgVerdict ? ' on' : ''}" data-sg="${k}">${n} <small>${d.counts[k]}</small></button>`).join('');
-  $('#sgTable').innerHTML = d.rows.length ? '<tr><th>INSIDER</th><th>FIRMA</th><th>KÄUFE</th><th>TREFFER</th><th>Ø GEWINN</th><th>MARKT Ø</th><th>ZULETZT</th><th>URTEIL</th></tr>'
-    + d.rows.map((x) => `<tr><td>${esc(x.owner)} <small class="muted">${esc(x.role)}</small></td><td><b>${esc(x.tickers.slice(0, 3).join(', '))}</b></td>`
+  const watched = new Set(follows.map((f) => f.owner));
+  $('#sgTable').innerHTML = d.rows.length ? '<tr><th></th><th>INSIDER</th><th>FIRMA</th><th>KÄUFE</th><th>TREFFER</th><th>Ø GEWINN</th><th>MARKT Ø</th><th>ZULETZT</th><th>URTEIL</th></tr>'
+    + d.rows.map((x) => `<tr><td><button type="button" class="star${watched.has(x.owner) ? ' on' : ''}" data-follow="${esc(x.owner)}"`
+      + ` title="${watched.has(x.owner) ? 'Nicht mehr beobachten' : 'Beobachten: jeder neue Trade per Telegram'}">${watched.has(x.owner) ? '★' : '☆'}</button></td>`
+      + `<td>${esc(x.owner)} <small class="muted">${esc(x.role)}</small></td><td><b>${esc(x.tickers.slice(0, 3).join(', '))}</b></td>`
       + `<td class="num">${x.n}</td><td class="num">${Math.round(x.hit * 100)} %</td>`
       + `<td class="num ${x.avg > 0 ? 'up' : 'down'}">${pct(x.avg)}</td>`
       + `<td class="num muted">${pct(x.market)}</td><td class="muted">${esc(new Date(x.last).toLocaleDateString('de-DE'))}</td>`

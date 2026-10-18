@@ -80,6 +80,7 @@ def _smart_money(ticker: str | None = None) -> dict:
     if bt and bt["summary"].get("walk_forward"):
         o["walk_forward"] = bt["summary"]["walk_forward"]
         o["strategies"] = bt["summary"].get("strategies")
+        o["watched_insiders"] = smart_money_service.follows()
         sig = bt["summary"].get("by_signaler", [])
         o["signalers_profi"] = [x for x in sig if x["verdict"] == "profi"][:40]
         o["signalers_counts"] = {v: sum(1 for x in sig if x["verdict"] == v) for v in ("profi", "weg", "offen")}

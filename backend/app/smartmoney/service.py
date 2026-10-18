@@ -13,7 +13,7 @@ import os
 from datetime import datetime, timedelta, timezone
 
 from app.db import SessionLocal, refuse_reset_in_production
-from app.db_models import InsiderTradeRow, SmartAlertRow, SmartBacktestRow
+from app.db_models import InsiderTradeRow, SmartAlertRow, SmartBacktestRow, SmartFollowRow
 
 from . import macro
 from .backtest import role_of
@@ -29,6 +29,11 @@ if not log.handlers:
 
 BIG_BUY = 100_000
 LOOKBACK_DAYS = 30
+
+
+def _norm(owner: str) -> str:
+    """SEC names come as "Benioff Marc" or "BENIOFF MARC R." -- compare case- and punctuation-free."""
+    return " ".join("".join(c for c in owner.lower() if c.isalnum() or c == " ").split())
 
 
 def _aware(t: datetime) -> datetime:
@@ -48,6 +53,7 @@ class SmartMoneyService:
             s.query(InsiderTradeRow).delete()
             s.query(SmartAlertRow).delete()
             s.query(SmartBacktestRow).delete()
+            s.query(SmartFollowRow).delete()
             s.commit()
         self._bt_cache = None
 
@@ -69,13 +75,46 @@ class SmartMoneyService:
         except TelegramDeliveryError as exc:
             log.warning("telegram failed: %s", exc)
 
+    # ------------------------------------------------------------ watched insiders
+    def follows(self) -> list[dict]:
+        with SessionLocal() as s:
+            return [{"owner": r.owner, "tickers": [t for t in r.tickers.split(",") if t], "added_at": _aware(r.added_at).isoformat(),
+                     "note": r.note} for r in s.query(SmartFollowRow).order_by(SmartFollowRow.added_at.desc()).all()]
+
+    def follow(self, owner: str) -> dict:
+        """Watch an insider from the backtest's signaler list: their companies join the SEC poll,
+        and every new trade of theirs goes to Telegram."""
+        sig = next((x for x in (self.backtest() or {}).get("summary", {}).get("by_signaler", []) if x["owner"] == owner), None)
+        if sig is None:
+            raise KeyError(owner)
+        note = f"{sig['n']} Käufe, {sig['hit'] * 100:.0f} % Treffer, Ø {sig['avg'] * 100:+.1f} % ({sig['verdict']})"
+        with SessionLocal() as s:
+            s.merge(SmartFollowRow(owner=owner[:200], tickers=",".join(sig["tickers"])[:300], added_at=datetime.now(timezone.utc), note=note))
+            s.commit()
+        return next(f for f in self.follows() if f["owner"] == owner)
+
+    def unfollow(self, owner: str) -> bool:
+        with SessionLocal() as s:
+            n = s.query(SmartFollowRow).filter(SmartFollowRow.owner == owner).delete()
+            s.commit()
+        return bool(n)
+
+    def _polled(self) -> dict[str, str]:
+        """Ticker -> name: the watchlist plus every company of a watched insider."""
+        out = {t: n for n, t in TICKERS.items()}
+        for f in self.follows():
+            for t in f["tickers"]:
+                out.setdefault(t, t)
+        return out
+
     # ------------------------------------------------------------ insiders
     def poll_insiders(self, now: datetime | None = None) -> dict:
         now = now or datetime.now(timezone.utc)
         since = now - timedelta(days=LOOKBACK_DAYS)
         new = 0
+        watched = {_norm(f["owner"]): f for f in self.follows()}
         try:
-            for name, ticker in TICKERS.items():
+            for ticker, name in self._polled().items():
                 cik = self.sec.cik(ticker)
                 if cik is None:
                     continue
@@ -93,7 +132,12 @@ class SmartMoneyService:
                                                     value=tr["value"], traded_on=tr["traded_on"], filed_at=f["filed"],
                                                     url=f"https://www.sec.gov/Archives/edgar/data/{cik}/{f['acc'].replace('-', '')}/"))
                             new += 1
-                            if tr["code"] == "P" and tr["value"] >= BIG_BUY:
+                            w = watched.get(_norm(tr["owner"]))
+                            if w:   # a watched insider: every trade, any size, buy or sale
+                                side = "kauft" if tr["code"] == "P" else "verkauft"
+                                self._telegram("Beobachteter Insider", f"{tr['owner']} {side} {name} ({ticker}): {tr['shares']:,.0f} Aktien "
+                                               f"zu {tr['price']:,.2f} $ = {tr['value']:,.0f} $.\nSeine Bilanz: {w['note']}.\n\nBeobachtung, keine Empfehlung.")
+                            elif tr["code"] == "P" and tr["value"] >= BIG_BUY:
                                 note = self.track_record(ticker, role_of("Officer" if tr["title"] else "", tr["title"]))
                                 v = self.insider_verdict(tr["owner"], ticker, "buy")
                                 if v:
@@ -109,7 +153,7 @@ class SmartMoneyService:
         for ticker, owners in clusters(self.trades(days=14)).items():
             week = now.strftime("%G-%V")
             if self._once(f"cluster:{ticker}:{week}"):
-                name = next((n for n, t in TICKERS.items() if t == ticker), ticker)
+                name = self._polled().get(ticker, ticker)
                 self._telegram("Mehrere Insider kaufen", f"{name} ({ticker}): {len(owners)} Insider haben in 14 Tagen gekauft -- "
                                + ", ".join(owners[:5]) + ".\n\nBeobachtung, keine Empfehlung.")
         self.last_insider_poll, self.insider_error = now, ""
@@ -122,7 +166,7 @@ class SmartMoneyService:
             q = s.query(InsiderTradeRow).filter(InsiderTradeRow.traded_on >= since)
             if ticker:
                 q = q.filter(InsiderTradeRow.ticker == ticker.upper())
-            names = {t: n for n, t in TICKERS.items()}
+            names = self._polled()
             return [{"ticker": r.ticker, "name": names.get(r.ticker, r.ticker), "owner": r.owner, "title": r.title,
                      "code": r.code, "shares": r.shares, "price": r.price, "value": r.value,
                      "traded_on": _aware(r.traded_on), "url": r.url}
@@ -195,7 +239,7 @@ class SmartMoneyService:
                 "clusters": clusters(trades), "insider_connected": self.sec.configured(),
                 "insider_error": self.insider_error,
                 "last_insider_poll": self.last_insider_poll.isoformat() if self.last_insider_poll else None,
-                "backtest": self._backtest_brief()}
+                "backtest": self._backtest_brief(), "follows": self.follows()}
 
     def _backtest_brief(self) -> dict | None:
         bt = self.backtest()

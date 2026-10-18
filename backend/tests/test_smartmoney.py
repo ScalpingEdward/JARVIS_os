@@ -83,3 +83,25 @@ def test_insider_poll_stores_alerts_big_buys_and_reads_each_filing_once(monkeypa
     assert [s[0] for s in sent] == ["Insider-Kauf"] and "NVIDIA (NVDA)" in sent[0][1]
     o = smart_money_service.overview()
     assert o["insider"][0]["ticker"] == "NVDA" and o["insider"][0]["value"] == 150500
+
+
+def test_a_watched_insider_is_polled_and_every_trade_alerts(monkeypatch):
+    smart_money_service.reset()
+    smart_money_service.save_backtest({"generated_at": datetime.now(timezone.utc).isoformat(), "events": [],
+                                       "summary": {"by_signaler": [{"owner": "Huang Jen Hsun", "tickers": ["NVDA", "XYZ"], "n": 5,
+                                                                    "hit": 0.8, "avg": 0.12, "verdict": "profi"}]}})
+    f = smart_money_service.follow("Huang Jen Hsun")
+    assert f["tickers"] == ["NVDA", "XYZ"] and "80 %" in f["note"]
+    assert "XYZ" in smart_money_service._polled()            # his other company joins the poll
+
+    class Sec:
+        def cik(self, t): return 1 if t == "NVDA" else None
+        def recent_form4(self, cik, since): return [{"acc": "0001-26-1", "doc": "x.xml", "filed": datetime.now(timezone.utc)}]
+        def form4(self, cik, acc, doc): return FORM4.format(day=_day()).replace("<transactionCode>P</transactionCode>", "<transactionCode>S</transactionCode>") \
+            .replace("<transactionCode>M</transactionCoding>", "<transactionCode>M</transactionCode>").replace("1000", "10")
+    monkeypatch.setattr(smart_money_service, "sec", Sec())
+    sent = []
+    monkeypatch.setattr(svc.SmartMoneyService, "_telegram", staticmethod(lambda title, text: sent.append((title, text))))
+    smart_money_service.poll_insiders()
+    assert [t for t, _ in sent] == ["Beobachteter Insider"] and "verkauft" in sent[0][1]   # a small sale still alerts
+    assert smart_money_service.unfollow("Huang Jen Hsun") and smart_money_service.follows() == []

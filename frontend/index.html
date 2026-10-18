@@ -123,6 +123,9 @@
             <p class="bt-note">Insider, deren <b>Käufe</b> sich gelohnt haben: ≥ 3 Käufe, ≥ 60 % im Gewinn nach 60 Handelstagen, im Schnitt im Plus (nach 1 % Kosten).</p>
             <div class="hist-filter" id="sgFilter"></div>
             <div class="table-wrap bi-wrap"><table class="positions" id="sgTable"></table></div></section>
+          <section class="card span-12"><div class="label">Meine Beobachtungsliste <span class="count" id="fwCount">0</span></div>
+            <p class="bt-note">Insider, die du mit ☆ in der Profi-Liste markierst. Ihre Firmen werden mit abgefragt, und <b>jeder</b> neue Trade von ihnen kommt sofort per Telegram.</p>
+            <div class="table-wrap"><table class="positions" id="fwTable"></table></div></section>
           <section class="card span-12"><div class="label">Hätte es sich gelohnt? <span class="count" id="wfMeta"></span></div>
             <p class="bt-note">Ohne Blick in die Zukunft: einem Insider wird erst gefolgt, wenn er sich <b>vorher</b> bewiesen hat. Kauf = Long, gehalten 60 Handelstage.</p>
             <div class="wf" id="wfBox"></div></section>
@@ -154,6 +157,11 @@
         <div class="grid">
           <section class="card span-12"><div class="label">Wartet auf dich <span class="count" id="igWaitCount">0</span></div>
             <div id="igWaiting"><p class="muted">Lade …</p></div></section>
+          <section class="card span-12"><div class="label">Dein Account – Charakter &amp; Stil <span class="count" id="voiceState"></span></div>
+            <p class="bt-note">Beschreibe einmal, wer hinter dem Account steht, wie er klingt und worüber er (nicht) spricht. Jede neue Caption wird in dieser Stimme geschrieben. Leer speichern = zurück zur eingebauten Stimme.</p>
+            <textarea id="voiceText" class="voice-text" rows="9" spellcheck="false"></textarea>
+            <div class="ig-btns"><button type="button" class="go" id="voiceSave">Speichern</button>
+              <button type="button" id="voiceReset">Eingebaute Stimme</button><span class="ig-msg" id="voiceMsg"></span></div></section>
           <section class="card span-5">
             <div class="label">Next post</div>
             <div class="next">
