@@ -639,10 +639,10 @@ function renderSignalers() {
   $('#sgCount').textContent = `${d.counts.profi} profi · ${d.counts.weg} weg · ${d.counts.offen} offen`;
   $('#sgFilter').innerHTML = [['profi', 'Profi'], ['weg', 'Weg'], ['offen', 'Offen']].map(([k, n]) =>
     `<button type="button" class="hchip${k === sgVerdict ? ' on' : ''}" data-sg="${k}">${n} <small>${d.counts[k]}</small></button>`).join('');
-  $('#sgTable').innerHTML = d.rows.length ? '<tr><th>INSIDER</th><th>FIRMA</th><th>ROLLE</th><th>SIGNALE</th><th>TREFFER</th><th>Ø GEWINN</th><th>SUMME</th><th>MARKT Ø</th><th>ZULETZT</th><th>URTEIL</th></tr>'
-    + d.rows.map((x) => `<tr><td>${esc(x.owner)}</td><td><b>${esc(x.tickers.slice(0, 3).join(', '))}</b></td><td class="muted">${esc(x.role)}</td>`
-      + `<td class="num">${x.n} <small class="muted">${x.buys}K/${x.sales}V</small></td><td class="num">${Math.round(x.hit * 100)} %</td>`
-      + `<td class="num ${x.avg > 0 ? 'up' : 'down'}">${pct(x.avg)}</td><td class="num ${x.total > 0 ? 'up' : 'down'}">${pct(x.total, 0)}</td>`
+  $('#sgTable').innerHTML = d.rows.length ? '<tr><th>INSIDER</th><th>FIRMA</th><th>KÄUFE</th><th>TREFFER</th><th>Ø GEWINN</th><th>MARKT Ø</th><th>ZULETZT</th><th>URTEIL</th></tr>'
+    + d.rows.map((x) => `<tr><td>${esc(x.owner)} <small class="muted">${esc(x.role)}</small></td><td><b>${esc(x.tickers.slice(0, 3).join(', '))}</b></td>`
+      + `<td class="num">${x.n}</td><td class="num">${Math.round(x.hit * 100)} %</td>`
+      + `<td class="num ${x.avg > 0 ? 'up' : 'down'}">${pct(x.avg)}</td>`
       + `<td class="num muted">${pct(x.market)}</td><td class="muted">${esc(new Date(x.last).toLocaleDateString('de-DE'))}</td>`
       + `<td><span class="verdict ${x.verdict}">${x.verdict}</span></td></tr>`).join('')
     : '<tr><td class="muted">Niemand in dieser Gruppe.</td></tr>';

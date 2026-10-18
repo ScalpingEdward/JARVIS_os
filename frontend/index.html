@@ -117,21 +117,20 @@
       </div>
 
       <div class="view" data-view="smart">
-        <p class="watch-note">Beobachtung, keine Empfehlung. Makro: Termine mit hoher Wirkung diese Woche. Insider: Käufe und Verkäufe
-          am offenen Markt (SEC Form 4) bei den US-Aktien deiner Watchlist, letzte 30 Tage.</p>
         <div class="grid">
-          <section class="card span-12 bt"><div class="label">Lohnt es sich, Insidern zu folgen? <span class="count" id="btMeta"></span></div>
-            <p class="bt-note">Rendite der Aktie <b>minus S&amp;P 500</b> ab dem ersten Schlusskurs nach der Meldung – Durchschnitt, Anteil im Plus, Anzahl Fälle.
-              Alle US-Firmen mit Kursen bei PU Prime. Vergangenheit, keine Vorhersage.</p>
-            <div class="table-wrap"><table class="positions" id="btTable"></table></div></section>
-          <section class="card span-12"><div class="label">Hätten wir nur den Profis gefolgt? <span class="count" id="wfMeta"></span></div>
-            <p class="bt-note">Jeder Insider-Trade als Position: Kauf = Long, Verkauf = Short, 60 Handelstage gehalten, 1 % Kosten.
-              Gefolgt wird einem Insider erst, wenn er sich <b>vorher</b> bewiesen hat (≥ 3 Signale mit bekanntem Ergebnis, ≥ 60 % Treffer, im Schnitt im Plus) – ohne Blick in die Zukunft.</p>
-            <div class="wf" id="wfBox"></div></section>
-          <section class="card span-12"><div class="label">Signalgeber – wer bringt Profit? <span class="count" id="sgCount"></span></div>
-            <p class="bt-note">Pro Insider alle seine Käufe und Verkäufe als Positionen. <b>Profi</b>: ≥ 3 Signale, ≥ 60 % im Gewinn, im Schnitt im Plus. <b>Weg</b>: ≤ 40 % oder im Schnitt im Minus.</p>
+          <section class="card span-12"><div class="label">Makro diese Woche</div><div class="table-wrap"><table class="positions" id="smMacro"></table></div></section>
+          <section class="card span-12"><div class="label">Profis – wem folgen? <span class="count" id="sgCount"></span></div>
+            <p class="bt-note">Insider, deren <b>Käufe</b> sich gelohnt haben: ≥ 3 Käufe, ≥ 60 % im Gewinn nach 60 Handelstagen, im Schnitt im Plus (nach 1 % Kosten).</p>
             <div class="hist-filter" id="sgFilter"></div>
             <div class="table-wrap bi-wrap"><table class="positions" id="sgTable"></table></div></section>
+          <section class="card span-12"><div class="label">Hätte es sich gelohnt? <span class="count" id="wfMeta"></span></div>
+            <p class="bt-note">Ohne Blick in die Zukunft: einem Insider wird erst gefolgt, wenn er sich <b>vorher</b> bewiesen hat. Kauf = Long, gehalten 60 Handelstage.</p>
+            <div class="wf" id="wfBox"></div></section>
+          <section class="card span-12"><div class="label">Mehrere Insider kaufen <span class="count" id="smClusterCount">0</span></div><div id="smClusters" class="muted"></div></section>
+          <section class="card span-12"><div class="label">Insider (30 Tage, Watchlist) <span class="count" id="smCount">0</span></div><div class="table-wrap"><table class="positions" id="smInsider"></table></div></section>
+          <details class="card span-12 more-stats"><summary class="label">Mehr Statistik – nach Rolle, Größe, Cluster <span class="count" id="btMeta"></span></summary>
+            <p class="bt-note">Rendite der Aktie <b>minus S&amp;P 500</b> ab dem ersten Schlusskurs nach der Meldung. Vergangenheit, keine Vorhersage.</p>
+            <div class="table-wrap"><table class="positions" id="btTable"></table></div></details>
           <section class="card span-6" hidden><div class="label">Käufer – wem folgen? <span class="count" id="biBuyCount"></span></div>
             <p class="bt-note">Stieg die Aktie nach seinen Käufen stärker als der S&amp;P 500 (60 Handelstage)? Ab 3 Käufen.
               <b>Folgen</b>: ≥ 60 % richtig und im Schnitt vorn. <b>Aussortieren</b>: ≤ 40 % richtig oder im Schnitt hinten.</p>
@@ -142,10 +141,8 @@
               <b>Warnung</b>: ≥ 60 % richtig. <b>Ignorieren</b>: seine Verkäufe sagten nichts voraus.</p>
             <div class="hist-filter" data-side="sell"></div>
             <div class="table-wrap bi-wrap"><table class="positions" id="biSell"></table></div></section>
-          <section class="card span-12"><div class="label">Makro diese Woche</div><div class="table-wrap"><table class="positions" id="smMacro"></table></div></section>
-          <section class="card span-12"><div class="label">Mehrere Insider kaufen <span class="count" id="smClusterCount">0</span></div><div id="smClusters" class="muted"></div></section>
-          <section class="card span-12"><div class="label">Insider (30 Tage) <span class="count" id="smCount">0</span></div><div class="table-wrap"><table class="positions" id="smInsider"></table></div></section>
         </div>
+        <p class="watch-note">Beobachtung, keine Empfehlung. Insider: SEC Form 4, Käufe und große Verkäufe am offenen Markt.</p>
       </div>
 
       <div class="view" data-view="watchlist">
