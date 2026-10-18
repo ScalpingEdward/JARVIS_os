@@ -356,3 +356,6 @@ html[data-glass="solid"] .benefit { background: linear-gradient(155deg, rgb(var(
 @media (max-width: 1000px) { .benefit { grid-template-columns: 1fr; } }
 @media (max-width: 600px) { .b-list { grid-template-columns: 1fr; } }
 .b-list em { white-space: nowrap; }
+
+.faq em.soon { font-style: normal; font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; padding: 2px 7px; border-radius: 999px; white-space: nowrap;
+  border: 1px solid color-mix(in srgb, var(--accent) 50%, transparent); color: var(--accent); }
