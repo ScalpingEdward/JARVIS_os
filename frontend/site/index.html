@@ -5,19 +5,21 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="robots" content="noindex, nofollow" />
   <title>AURON – Phoenix Life Solutions</title>
-  <meta name="description" content="AURON ist dein digitales Büro mit persönlichem Assistenten – von Phoenix Life Solutions." />
+  <meta name="description" content="AURON bündelt Trading, Postfach, Social Media und Märkte in einem Dashboard – mit einem persönlichen Assistenten, der die Routine übernimmt. Von Phoenix Life Solutions." />
   <link rel="icon" href="../auron.ico" />
   <link rel="stylesheet" href="./site.css" />
 </head>
 <body>
+  <div class="page-bg" id="pageBg" aria-hidden="true"></div>
   <!-- Entwurf: nicht veröffentlicht, keine Anbindungen. Bilder der Räume kommen aus ../rooms/. -->
   <header class="nav">
     <span class="nav-space"></span>
     <nav>
+      <a href="#fuer-wen">Für wen</a>
       <a href="#funktionen">Funktionen</a>
-      <a href="#einblick">Einblick</a>
+      <a href="#dashboard">Dashboard</a>
+      <a href="#kontrolle">Kontrolle</a>
       <a href="#preise">Preise</a>
-      <a href="#unternehmen">Unternehmen</a>
       <a href="#faq">FAQ</a>
     </nav>
     <a class="btn small" href="#preise">Warteliste</a>
@@ -30,18 +32,20 @@
       <span class="mark"><span class="glyph big"></span>AURON</span>
       <small>Dein digitales Büro mit persönlichem Assistenten</small>
     </div>
+    <button class="hero-arrow prev" id="prevLook" type="button" aria-label="Vorheriger Look">‹</button>
+    <button class="hero-arrow next-look" id="nextLook" type="button" aria-label="Nächster Look">›</button>
     <div class="hero-stage">
       <article class="glass g-left">
-        <p class="eyebrow">Dein persönliches Büro</p>
-        <h1>Dein Büro.<br /><span>Wo immer du willst.</span></h1>
-        <p class="where" id="where">Über der Erde</p>
-        <p class="lead">Über den Wolken, in den Alpen, am Wasserfall – AURON nimmt dir die digitale Arbeit ab.
-          Trading, Instagram, Post und Märkte laufen automatisch; du entscheidest, er erledigt den Rest.
-          Und wenn du fragst, antwortet er. Mit Stimme.</p>
+        <p class="eyebrow">Ein Dashboard. Ein Assistent.</p>
+        <h1>Dein Business.<br /><span>Auf einen Blick.</span></h1>
+        <p class="lead">AURON bündelt Trading-Konten, Signalgruppen, Bots, Postfach, Social Media und Märkte
+          in einer einzigen Übersicht – und ein persönlicher Assistent übernimmt die Routine dahinter.
+          Du entscheidest. AURON erledigt den Rest und fragt, bevor er handelt.</p>
         <div class="cta">
-          <a class="btn" href="#funktionen">Was AURON kann</a>
-          <a class="btn ghost" href="#einblick">Einblick</a>
+          <a class="btn" href="#fuer-wen">Für wen AURON gemacht ist</a>
+          <a class="btn ghost" href="#dashboard">Das Dashboard</a>
         </div>
+        <p class="where" id="where"><b>Über der Erde</b> · Klares Glas</p>
       </article>
       <div class="core" id="core" aria-hidden="true">
         <div class="orbit o1"><i></i></div><div class="orbit o2"><i></i></div><div class="orbit o3 warm"><i></i></div>
@@ -51,88 +55,148 @@
       <article class="glass g-right">
         <p class="eyebrow">Heute für dich erledigt</p>
         <ul class="done">
-          <li><i class="di"><svg viewBox="0 0 24 24"><path d="M3 17l5-5 4 3 7-8" fill="none" stroke="#3ddc97" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M15 7h4v4" fill="none" stroke="#3ddc97" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></i><b>12</b><span>Trading-Signale kopiert, Stops nachgezogen</span></li>
+          <li><i class="di"><svg viewBox="0 0 24 24"><path d="M3 17l5-5 4 3 7-8" fill="none" stroke="#3ddc97" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M15 7h4v4" fill="none" stroke="#3ddc97" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></i><b>12</b><span>Signale aus 3 Gruppen kopiert, Stops nachgezogen</span></li>
           <li><i class="di"><svg viewBox="0 0 24 24"><rect x="3" y="5.5" width="18" height="13" rx="2.5" fill="none" stroke="#9fd4ff" stroke-width="2"/><path d="M4 7l8 6 8-6" fill="none" stroke="#9fd4ff" stroke-width="2" stroke-linejoin="round"/></svg></i><b>3</b><span>wichtige Mails erkannt, 41 Werbung aussortiert</span></li>
-          <li><i class="di"><svg viewBox="0 0 24 24"><defs><linearGradient id="igs" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#feda75"/><stop offset=".35" stop-color="#fa7e1e"/><stop offset=".6" stop-color="#d62976"/><stop offset=".85" stop-color="#962fbf"/><stop offset="1" stop-color="#4f5bd5"/></linearGradient></defs><rect x="3" y="3" width="18" height="18" rx="5.2" fill="none" stroke="url(#igs)" stroke-width="2"/><circle cx="12" cy="12" r="4.1" fill="none" stroke="url(#igs)" stroke-width="2"/><circle cx="17.2" cy="6.8" r="1.2" fill="url(#igs)"/></svg></i><b>1</b><span>Instagram-Reel geplant für 19:00</span></li>
+          <li><i class="di"><svg viewBox="0 0 24 24"><defs><linearGradient id="igs" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#feda75"/><stop offset=".35" stop-color="#fa7e1e"/><stop offset=".6" stop-color="#d62976"/><stop offset=".85" stop-color="#962fbf"/><stop offset="1" stop-color="#4f5bd5"/></linearGradient></defs><rect x="3" y="3" width="18" height="18" rx="5.2" fill="none" stroke="url(#igs)" stroke-width="2"/><circle cx="12" cy="12" r="4.1" fill="none" stroke="url(#igs)" stroke-width="2"/><circle cx="17.2" cy="6.8" r="1.2" fill="url(#igs)"/></svg></i><b>1</b><span>Reel geschnitten und zur Freigabe bereit</span></li>
           <li><i class="di"><svg viewBox="0 0 24 24"><path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z" fill="none" stroke="#f2c14e" stroke-width="2" stroke-linejoin="round"/><path d="M10 20.5a2.2 2.2 0 0 0 4 0" fill="none" stroke="#f2c14e" stroke-width="2" stroke-linecap="round"/></svg></i><b>14:30</b><span>Inflationsdaten – Warnung 30 Min vorher</span></li>
         </ul>
         <p class="saved">≈ 2,5 Stunden gespart</p>
       </article>
     </div>
     <ul class="trust">
-      <li>Spart dir Stunden pro Woche</li>
-      <li>Läuft auf deinem Rechner, deine Daten bleiben bei dir</li>
-      <li>Nichts passiert ohne deine Regeln</li>
+      <li>Spart Stunden pro Woche</li>
+      <li>Läuft bei dir – deine Daten bleiben bei dir</li>
+      <li>Nichts passiert ohne deine Freigabe</li>
     </ul>
+  </section>
+
+  <section class="section" id="fuer-wen">
+    <p class="eyebrow">Für wen</p>
+    <h2>Gemacht für Menschen, die zu viele Tabs offen haben.</h2>
+    <p class="sub">Ob Shop, Trading-Desk oder Büro: AURON nimmt die Routine aus deinem Alltag und zeigt dir nur, was zählt.</p>
+    <div class="grid four">
+      <article class="card who">
+        <span class="ic">◈</span>
+        <h3>E-Commerce &amp; Creator</h3>
+        <ul>
+          <li>Kundenanfragen, Rechnungen und Fristen zuerst – Werbung bleibt draußen.</li>
+          <li>Antworten als Entwurf, gesendet wird mit einem Tipp.</li>
+          <li>Fotos und Videos sortiert, bearbeitet und als Post vorgeschlagen.</li>
+        </ul>
+      </article>
+      <article class="card who">
+        <span class="ic">⇄</span>
+        <h3>Trader &amp; Signalgruppen</h3>
+        <ul>
+          <li>Signale aus Telegram-Gruppen in Sekunden auf dem Konto – nach deinem Risiko.</li>
+          <li>Ergebnis je Gruppe: Wer liefert wirklich, wer kostet nur?</li>
+          <li>Makro-Termine und Insider-Käufe mit Warnung vorab.</li>
+        </ul>
+      </article>
+      <article class="card who">
+        <span class="ic">⚙</span>
+        <h3>Algo-Trader &amp; Bots</h3>
+        <ul>
+          <li>Jeder Bot und jedes Konto live: läuft, pausiert, offline.</li>
+          <li>Alarm aufs Handy, sobald einer ausfällt.</li>
+          <li>Pausieren oder alles schließen – per Klick, Telegram oder Stimme.</li>
+        </ul>
+      </article>
+      <article class="card who">
+        <span class="ic">▤</span>
+        <h3>Unternehmen &amp; Selbstständige</h3>
+        <ul>
+          <li>Ein Assistent mit Stimme, der recherchiert, zusammenfasst und erinnert.</li>
+          <li>Post, Termine und Kennzahlen in einer Übersicht.</li>
+          <li>Eigene Module für eure Abläufe – auf Anfrage.</li>
+        </ul>
+      </article>
+    </div>
   </section>
 
   <section class="section" id="funktionen">
     <p class="eyebrow">Funktionen</p>
-    <h2>Ein System. Sechs Aufgaben weniger.</h2>
+    <h2>Was AURON für dich erledigt.</h2>
     <div class="grid">
+      <article class="card">
+        <span class="ic">◉</span>
+        <h3>Ein Assistent, der zuhört</h3>
+        <p>Frag per Chat, Mikrofon oder Telegram-Sprachnachricht. AURON schaut selbst in deinen Konten, Mails
+          und im Web nach und antwortet – auf Wunsch mit echter Stimme, auf Deutsch oder Englisch.</p>
+      </article>
       <article class="card">
         <span class="ic">⇄</span>
         <h3>Signal-Kopierer</h3>
         <p>Signale aus Telegram-Gruppen landen in Sekunden in MetaTrader 5 – mit Lotgröße nach Risiko,
-          Teilgewinnen, Break-even und nachgezogenem Stop. Pro Gruppe ein eigenes Konto, alles im Blick.</p>
+          Teilgewinnen, Break-even und nachgezogenem Stop. Pro Gruppe ein eigenes Konto.</p>
       </article>
       <article class="card">
         <span class="ic">◔</span>
-        <h3>Trading-Dashboard</h3>
-        <p>Kontostand, Ergebnis pro Gruppe, offene Positionen und die komplette History. Die Ringe um den
-          Planeten leuchten grün, wenn eine Gruppe im Plus ist.</p>
-      </article>
-      <article class="card">
-        <span class="ic">◎</span>
-        <h3>Watchlist &amp; Smart Money</h3>
-        <p>Deine Werte mit Kurs, Abstand zum Hoch und Alarm bei Einbrüchen. Dazu Insider-Käufe aus den
-          offiziellen SEC-Meldungen und der Makro-Kalender – 30 Minuten vor CPI &amp; Co. kommt die Warnung.</p>
-      </article>
-      <article class="card">
-        <span class="ic">▣</span>
-        <h3>Instagram-Autopilot</h3>
-        <p>Fotos und Videos werden sortiert, bewertet, farblich angepasst und als Post oder Reel vorgeschlagen.
-          Du gibst frei – AURON übernimmt den Rest.</p>
+        <h3>Konten &amp; Bots im Blick</h3>
+        <p>Kontostand, Ergebnis pro Gruppe und Bot, offene Positionen, komplette History.
+          Fällt etwas aus, meldet sich AURON – bevor es teuer wird.</p>
       </article>
       <article class="card">
         <span class="ic">✉</span>
-        <h3>Post, sortiert</h3>
-        <p>Behörden, Fristen, Verträge: Wichtiges meldet AURON sofort, Werbung bleibt draußen.
-          Antworten schreibt er als Entwurf – senden tust du, mit einem Tipp.</p>
+        <h3>Postfach, sortiert</h3>
+        <p>Behörden, Verträge, Kunden: Wichtiges meldet AURON sofort, der Rest wartet.
+          Antworten schreibt er als Entwurf – senden tust du.</p>
       </article>
       <article class="card">
-        <span class="ic">◉</span>
-        <h3>Er spricht mit dir</h3>
-        <p>Frag per Chat, Mikrofon oder Telegram-Sprachnachricht. AURON schaut selbst nach und antwortet –
-          auf Wunsch mit einer echten Stimme, auf Deutsch, Englisch oder Slowakisch.</p>
+        <span class="ic">▣</span>
+        <h3>Social-Media-Autopilot</h3>
+        <p>Fotos und Videos werden bewertet, farblich angepasst und als Post, Karussell oder Reel vorbereitet.
+          Du siehst die Vorschau und gibst frei.</p>
+      </article>
+      <article class="card">
+        <span class="ic">◎</span>
+        <h3>Märkte &amp; Smart Money</h3>
+        <p>Watchlist mit Alarmen, Makro-Kalender mit Warnung 30 Minuten vorher und Insider-Trades aus den
+          offiziellen SEC-Meldungen – samt Auswertung, wessen Käufe sich gelohnt haben.</p>
       </article>
     </div>
   </section>
 
-  <section class="section showcase" id="einblick">
+  <section class="section showcase" id="dashboard">
     <div class="shot">
       <img src="./img/dashboard.webp" alt="Das AURON-Dashboard: Trading, Watchlist, Instagram, Post und Smart Money um einen Hologramm-Planeten" loading="lazy" />
     </div>
     <div class="copy">
-      <p class="eyebrow">Einblick</p>
-      <h2>Ein Dashboard, das sich wie ein Raum anfühlt.</h2>
+      <p class="eyebrow">Dashboard</p>
+      <h2>Ein Blick am Morgen statt zehn Tabs.</h2>
       <ul class="ticks">
-        <li>Lebende Räume: Wasser fließt, Pflanzen wiegen sich, Sterne funkeln.</li>
-        <li>Glaskarten in deiner Farbe – klar, matt, verblasst oder tiefschwarz.</li>
-        <li>Jede Karte als Liste oder Kacheln, mit einem Klick.</li>
-        <li>Uhr, Wetter mit animiertem Himmel, Systemstatus auf einen Blick.</li>
+        <li>Konten, Gruppen, Bots, Post, Social Media und Märkte auf einer Fläche.</li>
+        <li>Jede Karte öffnet die volle Ansicht – mit Verlauf, Details und Aktionen.</li>
+        <li>Karten als Liste oder Kacheln, Bereiche nach deinen Prioritäten.</li>
+        <li>Erweiterbar: Shop, CRM oder eigene Bots als neues Modul.</li>
       </ul>
     </div>
   </section>
 
-  <section class="section rooms">
-    <p class="eyebrow">Räume</p>
-    <h2>Wähle, wo du arbeitest.</h2>
+  <section class="section rooms" id="design">
+    <p class="eyebrow">Dein Design</p>
+    <h2>Dein Büro sieht aus, wie du willst.</h2>
+    <p class="sub">Lebende Räume, Kartenfarbe, Glasart, Planet und Uhr – alles einstellbar. Probier es oben mit ‹ › aus.</p>
     <div class="room-row">
       <figure><img src="../rooms/forest.webp" alt="Wald mit Wasserfall" loading="lazy" /><figcaption>Wald mit Wasserfall</figcaption></figure>
       <figure><img src="../rooms/alps.webp" alt="Alpen bei Sonnenuntergang" loading="lazy" /><figcaption>Alpen bei Sonnenuntergang</figcaption></figure>
-      <figure><img src="../rooms/gold.webp" alt="Gold" loading="lazy" /><figcaption>Gold</figcaption></figure>
+      <figure><img src="../rooms/noir.webp" alt="Noir" loading="lazy" /><figcaption>Noir</figcaption></figure>
       <figure><img src="../rooms/earth.webp" alt="Über der Erde" loading="lazy" /><figcaption>Über der Erde</figcaption></figure>
+    </div>
+  </section>
+
+  <section class="section about" id="kontrolle">
+    <div>
+      <p class="eyebrow">Kontrolle</p>
+      <h2>Er fragt, bevor er handelt.</h2>
+      <p class="about-lead">AURON arbeitet selbstständig, aber nie an dir vorbei. Was nach außen geht – eine Mail,
+        ein Post, das Schließen von Positionen – passiert erst nach deiner Bestätigung.</p>
+    </div>
+    <div class="about-grid">
+      <div class="glass-sm"><b>Freigabe vor jeder Aktion</b><span>Senden, posten, schließen: immer erst nach deinem Klick.</span></div>
+      <div class="glass-sm"><b>Daten bleiben bei dir</b><span>AURON läuft auf deinem Rechner. Zugänge verlassen ihn nicht.</span></div>
+      <div class="glass-sm"><b>Alles nachvollziehbar</b><span>Jeder Schritt wird protokolliert – du siehst, was wann passiert ist.</span></div>
+      <div class="glass-sm"><b>Verschlüsselte Sicherung</b><span>Jede Nacht, an drei Orten, wiederherstellbar.</span></div>
     </div>
   </section>
 
@@ -140,7 +204,7 @@
     <p class="eyebrow">So funktioniert's</p>
     <h2>In drei Schritten startklar.</h2>
     <ol>
-      <li><b>Verbinden</b><span>MetaTrader 5, Telegram, Gmail und Instagram – jeweils mit deiner eigenen Anmeldung.</span></li>
+      <li><b>Verbinden</b><span>Broker, Telegram, Postfach und Social Media – jeweils mit deiner eigenen Anmeldung.</span></li>
       <li><b>Regeln setzen</b><span>Risiko pro Trade, Tagesgrenze, welche Gruppen, welche Alarme. Du bestimmst.</span></li>
       <li><b>Zurücklehnen</b><span>AURON arbeitet, meldet sich, wenn es zählt – und fragt, bevor er etwas sendet.</span></li>
     </ol>
@@ -161,13 +225,13 @@
         <span class="tag">Beliebt</span>
         <h3>Pro</h3>
         <p class="amount">59 €<small>/Monat</small></p>
-        <ul><li>Alles aus Starter, 3 Konten</li><li>Smart Money &amp; Makro-Alarme</li><li>AURON-Chat mit Stimme</li><li>Post-Sortierung</li></ul>
+        <ul><li>Alles aus Starter, 3 Konten</li><li>Bot-Überwachung &amp; Alarme</li><li>Assistent mit Stimme</li><li>Postfach-Sortierung</li><li>Smart Money &amp; Makro</li></ul>
         <button class="btn" disabled>Bald verfügbar</button>
       </article>
       <article class="card price">
-        <h3>Elite</h3>
+        <h3>Business</h3>
         <p class="amount">99 €<small>/Monat</small></p>
-        <ul><li>Alles aus Pro, unbegrenzt Konten</li><li>Instagram-Autopilot</li><li>Eigene Räume &amp; Designs</li></ul>
+        <ul><li>Alles aus Pro, unbegrenzt Konten</li><li>Social-Media-Autopilot</li><li>Eigene Module auf Anfrage</li><li>Eigene Räume &amp; Designs</li></ul>
         <button class="btn ghost" disabled>Bald verfügbar</button>
       </article>
     </div>
@@ -177,25 +241,27 @@
     <div>
       <p class="eyebrow">Unternehmen</p>
       <h2>Phoenix Life Solutions</h2>
-      <p class="about-lead">Wir entwickeln digitale Automatisierungssysteme für Büros und Privatpersonen: Software, die
-        wiederkehrende digitale Arbeit übernimmt – zuverlässig, nachvollziehbar und unter deiner Kontrolle.
-        AURON ist unser Flaggschiff: ein digitales Büro mit persönlichem Assistenten.</p>
+      <p class="about-lead">Wir entwickeln digitale Automatisierungssysteme für Selbstständige, Trader und Unternehmen:
+        Software, die wiederkehrende digitale Arbeit übernimmt – zuverlässig, nachvollziehbar und unter deiner Kontrolle.
+        AURON ist unser Flaggschiff.</p>
     </div>
     <div class="about-grid">
       <div class="glass-sm"><b>Automatisierung</b><span>Abläufe, die heute Zeit kosten, laufen von selbst – vom Posteingang bis zum Trading-Konto.</span></div>
-      <div class="glass-sm"><b>Kontrolle</b><span>Klare Regeln, Freigaben vor jedem kritischen Schritt, alles protokolliert.</span></div>
-      <div class="glass-sm"><b>Datenhoheit</b><span>Die Systeme laufen bei dir. Zugangsdaten verlassen deinen Rechner nicht.</span></div>
-      <div class="glass-sm"><b>Für Büros</b><span>Auf Anfrage passen wir Automatisierungen an die Abläufe deines Teams an.</span></div>
+      <div class="glass-sm"><b>Maßgeschneidert</b><span>Wir passen AURON an die Abläufe deines Teams an.</span></div>
+      <div class="glass-sm"><b>Datenhoheit</b><span>Die Systeme laufen bei dir, nicht bei uns.</span></div>
+      <div class="glass-sm"><b>Aus der Praxis</b><span>Entstanden im eigenen Trading- und Content-Alltag.</span></div>
     </div>
   </section>
 
   <section class="section faq" id="faq">
     <p class="eyebrow">FAQ</p>
     <h2>Gut zu wissen.</h2>
+    <details><summary>Für wen lohnt sich AURON?</summary><p>Für alle, die täglich zwischen vielen Konten, Gruppen, Postfächern und Kanälen wechseln – Shop-Betreiber, Creator, Trader, Bot-Betreiber und kleine Teams.</p></details>
+    <details><summary>Lässt sich AURON an mein Geschäft anpassen?</summary><p>Ja. Karten, Bereiche und Alarme stellst du selbst ein; eigene Module – etwa für deinen Shop oder dein CRM – bauen wir auf Anfrage.</p></details>
     <details><summary>Handelt AURON selbstständig?</summary><p>Der Kopierer setzt nur Signale der Gruppen um, die du auswählst, nach deinen Risikoregeln und mit Tagesgrenze. Eigene Kauf- oder Verkaufsempfehlungen gibt AURON nicht.</p></details>
-    <details><summary>Wo liegen meine Daten?</summary><p>AURON läuft auf deinem Rechner. Zugänge zu Broker, Telegram und Gmail bleiben bei dir; nichts davon landet auf fremden Servern.</p></details>
+    <details><summary>Wo liegen meine Daten?</summary><p>AURON läuft auf deinem Rechner. Zugänge zu Broker, Telegram und Postfach bleiben bei dir.</p></details>
     <details><summary>Kann AURON Mails in meinem Namen senden?</summary><p>Nur, wenn du auf „Senden“ tippst. AURON schreibt Entwürfe – abschicken kannst nur du.</p></details>
-    <details><summary>Welche Broker werden unterstützt?</summary><p>Alle, die MetaTrader 5 anbieten. MetaTrader 4 ist nicht vorgesehen.</p></details>
+    <details><summary>Welche Broker werden unterstützt?</summary><p>Alle, die MetaTrader 5 anbieten.</p></details>
   </section>
 
   <section class="disclaimer">

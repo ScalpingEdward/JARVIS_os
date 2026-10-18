@@ -240,3 +240,4 @@ signal_copier/market_feed.log
 
 # SEC insider data sets (tools/insider_backtest.py) -- downloaded, not source
 data/insider/
+frontend/site/export/

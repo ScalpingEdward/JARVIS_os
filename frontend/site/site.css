@@ -255,3 +255,60 @@ h1, h2, h3 { margin: 0; line-height: 1.12; letter-spacing: -.01em; }
 .company small { font-size: 9.5px; letter-spacing: .34em; color: #c6ae32; font-weight: 600; }
 .about-logo { width: min(320px, 70%); margin: 0 0 18px; }
 .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+
+/* --- looks: the page wears the dashboard settings (hero.js sets --accent, --tint, --planet-filter, data-glass) --- */
+:root { --tint: 150 200 255; --planet-filter: none; }
+.core { filter: var(--planet-filter); transition: filter 1.2s; }
+.glass, .card, .glass-sm, .steps li {
+  background: linear-gradient(155deg, rgb(var(--tint) / .14), rgb(var(--tint) / .05) 45%, rgb(8 14 26 / .52));
+  border: 1px solid rgb(var(--tint) / .22); border-top-color: rgb(var(--tint) / .42);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.16), 0 40px 80px -40px rgba(0,0,0,.9), 0 0 46px -22px color-mix(in srgb, var(--accent) 50%, transparent);
+  transition: background .9s, border-color .9s, box-shadow .9s, transform .3s; }
+.card:hover { border-color: color-mix(in srgb, var(--accent) 55%, transparent); }
+.card .ic { color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); border-color: color-mix(in srgb, var(--accent) 30%, transparent); transition: color .9s, background .9s; }
+.btn { background: var(--accent); box-shadow: 0 8px 30px -10px color-mix(in srgb, var(--accent) 80%, transparent); transition: background .9s, transform .2s; }
+.btn.ghost { background: rgba(255,255,255,.06); }
+.glyph { border-color: var(--accent); box-shadow: 0 0 12px color-mix(in srgb, var(--accent) 60%, transparent), inset 0 0 6px color-mix(in srgb, var(--accent) 60%, transparent); }
+.mark { text-shadow: 0 0 22px color-mix(in srgb, var(--accent) 45%, transparent), 0 2px 4px rgba(0,0,0,.6); }
+.hero h1 span { text-shadow: 0 0 24px color-mix(in srgb, var(--accent) 35%, transparent); transition: color .9s; }
+.done li { border-bottom-color: rgb(var(--tint) / .14); }
+.price.featured { border-color: color-mix(in srgb, var(--accent) 55%, transparent); }
+.shot img { box-shadow: 0 50px 100px -40px rgba(0,0,0,.95), 0 0 80px -30px color-mix(in srgb, var(--accent) 55%, transparent); }
+html[data-glass="faded"] :is(.glass, .card, .glass-sm, .steps li) {
+  background: linear-gradient(180deg, rgb(var(--tint) / .18), rgb(var(--tint) / .05) 55%, rgb(var(--tint) / 0));
+  border-bottom-color: transparent; border-left-color: rgb(var(--tint) / .1); border-right-color: rgb(var(--tint) / .1); }
+html[data-glass="matte"] :is(.glass, .card, .glass-sm, .steps li) {
+  background: linear-gradient(155deg, rgb(var(--tint) / .26), rgb(var(--tint) / .12) 50%, rgb(20 16 22 / .5));
+  backdrop-filter: blur(30px) saturate(120%); -webkit-backdrop-filter: blur(30px) saturate(120%); }
+html[data-glass="solid"] :is(.glass, .card, .glass-sm, .steps li) {
+  background: linear-gradient(155deg, rgb(var(--tint) / .22), rgb(28 24 18 / .9) 40%, rgb(14 12 10 / .94)); }
+html[data-glass="dark"] :is(.glass, .card, .glass-sm, .steps li) {
+  background: linear-gradient(160deg, rgb(var(--tint) / .82), rgb(var(--tint) / .92));
+  border-color: rgba(255,255,255,.09); border-top-color: color-mix(in srgb, var(--accent) 40%, transparent); }
+
+/* ‹ › in the hero: switch room and card style together */
+.hero-arrow { position: absolute; z-index: 3; top: 55%; translate: 0 -50%; width: 54px; height: 54px; border-radius: 50%;
+  display: grid; place-items: center; font: 300 34px/1 inherit; color: var(--text); cursor: pointer;
+  background: rgb(var(--tint) / .14); border: 1px solid rgb(var(--tint) / .35);
+  backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+  box-shadow: 0 0 30px -8px color-mix(in srgb, var(--accent) 60%, transparent); transition: transform .2s, background .9s, border-color .9s; }
+.hero-arrow:hover { transform: scale(1.08); border-color: var(--accent); }
+.hero-arrow.prev { left: clamp(10px, 1.6vw, 28px); }
+.hero-arrow.next-look { right: clamp(10px, 1.6vw, 28px); }
+.where { font-size: 12.5px; letter-spacing: .12em; text-transform: uppercase; color: #c8d2e2; margin-top: 18px; }
+.where b { color: var(--accent); font-weight: 600; }
+
+/* "Für wen" */
+.grid.four { grid-template-columns: repeat(auto-fit, minmax(min(250px, 100%), 1fr)); }
+.who ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 10px; color: #c3cddd; font-size: 14.5px; }
+.who li { position: relative; padding-left: 20px; }
+.who li::before { content: ""; position: absolute; left: 0; top: .62em; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 8px var(--accent); }
+.section .sub { margin-top: -18px; max-width: 720px; }
+
+/* the whole page in the chosen room, dimmed -- the glass cards below the hero sit on it as on the dashboard */
+body { background: var(--bg); }
+.page-bg { position: fixed; inset: 0; z-index: -1; background: center / cover no-repeat; transition: opacity .9s;
+  filter: blur(3px) brightness(.38) saturate(1.1); transform: scale(1.04); }
+.hero { background: transparent; }
+.footer, .disclaimer { position: relative; }
+.hero::after { background: radial-gradient(ellipse 85% 75% at 50% 45%, transparent 45%, rgba(5,7,12,.6) 100%); }
