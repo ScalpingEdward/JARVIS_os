@@ -7,7 +7,12 @@
   const STYLES = { clear: ['Klar', { blur: 4, glass: 0.6, solid: 0 }], frosted: ['Matt', { blur: 18, glass: 1, solid: 0 }],
     faded: ['Verblasst', { blur: 24, glass: 1, solid: 0 }], solid: ['Massiv', { blur: 18, glass: 1, solid: 1 }] };
   const CLOCKS = { clean: 'Klar', thin: 'Dünn', mono: 'Digital', elegant: 'Elegant', neon: 'Neon', bold: 'Fett' };
-  const DEFAULT = { accent: '#4fd8ff', tint: '#96c8ff', style: 'frosted', strength: 100, clock: 'clean', clockSize: 72 };
+  // The planet is drawn cyan; another colour is a hue turn of the whole core (globe, rings, beam).
+  const PLANETS = [['#4fd8ff', 'Cyan'], ['#f5b84a', 'Gold'], ['#ff7eb6', 'Rosa'], ['#3ddc97', 'Grün'], ['#b88cff', 'Lila'], ['#ff5a5a', 'Rot'], ['#e8e8e8', 'Silber']];
+  const CORES = { planet: 'Planet', bare: 'Ohne Ringe', rings: 'Nur Ringe', off: 'Aus' };
+  const CLOCK_COLORS = [['#ffffff', 'Weiß'], ['accent', 'Akzent'], ['#f5b84a', 'Gold'], ['#ff7eb6', 'Rosa'], ['#3ddc97', 'Grün'], ['#9fb0c8', 'Grau']];
+  const DEFAULT = { accent: '#4fd8ff', tint: '#96c8ff', style: 'frosted', strength: 100, clock: 'clean', clockSize: 72,
+    planet: '#4fd8ff', core: 'planet', clockColor: '#ffffff' };
   const SECTIONS = [
     ['design', '🎨', 'Design', 'Raum, Farben, Glas, Uhr'],
     ['voice', '🔊', 'Stimme', 'AURONs Stimme wählen und anhören'],
@@ -18,6 +23,13 @@
   let page = 'home';
 
   const rgb = (hex) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16)).join(' ');
+  function hueOf(hex) {
+    const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255);
+    const max = Math.max(r, g, b), min = Math.min(r, g, b), d = max - min;
+    if (!d) return { h: 0, s: 0 };
+    const h = max === r ? ((g - b) / d) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
+    return { h: (h * 60 + 360) % 360, s: d / (1 - Math.abs(max + min - 1)) };
+  }
   function apply() {
     const r = document.documentElement.style, st = STYLES[t.style] || STYLES.frosted;
     r.setProperty('--accent', t.accent);
@@ -31,6 +43,11 @@
     const [cr, cg, cb] = rgb(t.tint).split(' ').map(Number);
     document.documentElement.dataset.cards = (0.2126 * cr + 0.7152 * cg + 0.0722 * cb) / 255 < 0.25 ? 'dark' : 'glass';
     document.documentElement.dataset.clock = t.clock;
+    // planet colour: turn the cyan core to the chosen hue; grey-ish picks take the colour out instead
+    const { h, s } = hueOf(t.planet);
+    r.setProperty('--planet-filter', s < 0.15 ? 'grayscale(1) brightness(1.15)' : `hue-rotate(${Math.round(h - 192)}deg) saturate(${s > 0.6 ? 1.15 : 1})`);
+    document.documentElement.dataset.core = t.core;
+    r.setProperty('--clock-color', t.clockColor === 'accent' ? t.accent : t.clockColor);
   }
   const save = () => { try { localStorage.setItem(KEY, JSON.stringify(t)); } catch { /* private window */ } };
 
@@ -61,7 +78,13 @@
             `<button type="button" data-k="style" data-v="${k}" class="${k === t.style ? 'on' : ''}">${n}</button>`).join('')}</div>
             <span class="th-label">Farbstärke <b data-out="strength">${t.strength} %</b></span>
             <input type="range" min="20" max="200" step="10" data-k="strength" value="${t.strength}" />`)
-        + section('Uhr', `<div class="th-clocks">${Object.entries(CLOCKS).map(([k, n]) =>
+        + section('Planet', `<span class="th-label">Farbe</span>${swatches(PLANETS, t.planet, 'planet')}
+            <span class="th-label">Form</span><div class="seg">${Object.entries(CORES).map(([k, n]) =>
+              `<button type="button" data-k="core" data-v="${k}" class="${k === t.core ? 'on' : ''}">${n}</button>`).join('')}</div>`)
+        + section('Uhr', `<span class="th-label">Farbe</span><div class="sw">${CLOCK_COLORS.map(([c, n]) =>
+              `<button type="button" data-k="clockColor" data-v="${c}" title="${n}" style="background:${c === 'accent' ? t.accent : c}" class="${c === t.clockColor ? 'on' : ''}">${c === 'accent' ? '<small>A</small>' : ''}</button>`).join('')}
+              <label class="own" title="eigene Farbe"><input type="color" data-k="clockColor" value="${t.clockColor === 'accent' ? t.accent : t.clockColor}" />+</label></div>
+            <span class="th-label">Schrift</span><div class="th-clocks">${Object.entries(CLOCKS).map(([k, n]) =>
             `<button type="button" data-k="clock" data-v="${k}" class="${k === t.clock ? 'on' : ''}"><b class="ck-${k}">${now()}</b><span>${n}</span></button>`).join('')}</div>
             <span class="th-label">Größe <b data-out="clockSize">${t.clockSize} px</b></span>
             <input type="range" min="40" max="120" step="4" data-k="clockSize" value="${t.clockSize}" />`)
