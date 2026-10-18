@@ -33,3 +33,18 @@ def backtest(ticker: str | None = None) -> dict:
     if ticker:
         out["events"] = [e for e in bt["events"] if e["ticker"] == ticker.upper()]
     return out
+
+
+@router.get("/signalers")
+def signalers(verdict: str | None = None, limit: int = 300) -> dict:
+    """Every insider as a signal source: buys taken long, sales taken short, 60 trading days, after costs.
+    verdict: profi / weg / offen. Plus the walk-forward test: following only proven insiders, no hindsight."""
+    bt = smart_money_service.backtest()
+    if not bt or "by_signaler" not in bt["summary"]:
+        return {"available": False}
+    rows = bt["summary"]["by_signaler"]
+    counts = {v: sum(1 for x in rows if x["verdict"] == v) for v in ("profi", "weg", "offen")}
+    if verdict:
+        rows = [x for x in rows if x["verdict"] == verdict]
+    return {"available": True, "generated_at": bt["generated_at"], "quarters": bt.get("quarters", []),
+            "counts": counts, "walk_forward": bt["summary"].get("walk_forward"), "strategies": bt["summary"].get("strategies"), "rows": rows[:min(max(limit, 1), 2000)]}

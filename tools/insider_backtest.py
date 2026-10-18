@@ -30,9 +30,10 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "backend"))
-from app.smartmoney.backtest import events, excess_returns, mark_clusters, summarize  # noqa: E402
+from app.smartmoney.backtest import events, excess_returns, mark_clusters, position_returns, summarize  # noqa: E402
 
 DATA = ROOT / "data" / "insider"
+PRICES = DATA / "prices"
 URL = "https://www.sec.gov/files/structureddata/data/insider-transactions-data-sets/{q}_form345.zip"
 TERMINAL = r"C:\Program Files\PU Prime MT5 Terminal\terminal64.exe"
 API = os.getenv("AURON_API", "http://127.0.0.1:8000")
@@ -123,13 +124,25 @@ def mt5_prices(evts: list[dict]):
                 return by_name[cand.upper()]
         return by_desc.get(norm(issuer))
 
+    PRICES.mkdir(parents=True, exist_ok=True)
+
     def closes(sym: str) -> list[tuple[date, float]]:
+        """Daily closes, from the cache when it is from today -- and the terminal left as found:
+        on 2026-10-17 the first run put 487 symbols into the Market Watch of the very terminal the
+        copiers trade on, and that evening all copiers were gone. Now each symbol leaves again."""
+        f = PRICES / (re.sub(r"[^A-Za-z0-9._-]", "_", sym) + ".json")
+        if f.exists() and date.fromtimestamp(f.stat().st_mtime) == date.today():
+            return [(date.fromisoformat(d), c) for d, c in json.loads(f.read_text())]
+        info = mt5.symbol_info(sym)
+        was_visible = bool(info and info.visible)
         mt5.symbol_select(sym, True)
         time.sleep(0.05)
         r = mt5.copy_rates_from_pos(sym, mt5.TIMEFRAME_D1, 0, 2000)
-        if r is None:
-            return []
-        return [(datetime.fromtimestamp(int(x["time"]), timezone.utc).date(), float(x["close"])) for x in r]
+        if not was_visible:
+            mt5.symbol_select(sym, False)
+        out = [] if r is None else [(datetime.fromtimestamp(int(x["time"]), timezone.utc).date(), float(x["close"])) for x in r]
+        f.write_text(json.dumps([(d.isoformat(), c) for d, c in out]))
+        return out
 
     bench = dict(closes("SP500.s"))
     if not bench:
@@ -149,13 +162,14 @@ def mt5_prices(evts: list[dict]):
             mapped += 1
             e["symbol"] = sym
             e["ret"] = excess_returns(e["filed"], cache[sym], bench)
+            e["move"] = position_returns(e["filed"], cache[sym], bench)
     mt5.shutdown()
     print(f"  prices: {len(cache)} symbols, {mapped} events mapped")
 
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--quarters", type=int, default=10)
+    ap.add_argument("--quarters", type=int, default=28)  # seven years; MT5 holds ~8 years of daily prices
     ap.add_argument("--no-post", action="store_true")
     args = ap.parse_args()
     contact = env("SEC_CONTACT")
@@ -173,10 +187,11 @@ def main() -> int:
     mark_clusters(evts)
     mt5_prices(evts)
     summary = summarize(evts)
-    rows = [{k: e.get(k) for k in ("ticker", "issuer", "owner", "role", "code", "value", "filed", "cluster", "ret")}
+    rows = [{k: e.get(k) for k in ("ticker", "issuer", "owner", "role", "code", "value", "filed", "cluster", "ret", "move", "symbol")}
             for e in evts if e.get("ret")]
+    symbols = {e["ticker"]: e["symbol"] for e in evts if e.get("symbol")}
     payload = {"generated_at": datetime.now(timezone.utc).isoformat(), "quarters": quarters(args.quarters),
-               "summary": summary, "events": rows}
+               "summary": summary, "events": rows, "symbols": symbols}
     (DATA / "result.json").write_text(json.dumps(payload, default=str), encoding="utf-8")
     print(json.dumps(summary["overall"], indent=1))
     if not args.no_post:

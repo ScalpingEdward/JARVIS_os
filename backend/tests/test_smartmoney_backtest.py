@@ -73,3 +73,44 @@ def test_by_insider_rates_buys_and_sales_and_needs_three_trades():
     assert res[("Good", "buy")]["verdict"] == "folgen" and res[("Good", "buy")]["right"] == 1.0
     assert res[("Bad", "buy")]["verdict"] == "aussortieren"
     assert res[("Seller", "sell")]["verdict"] == "warnung" and res[("Seller", "sell")]["edge"] > 0
+
+
+def _sig(owner, code, stock, filed, market=0.0):
+    return {"owner": owner, "ticker": "T", "code": code, "role": "Director", "filed": filed,
+            "move": {"60": {"stock": stock, "market": market}}}
+
+
+def test_a_sale_is_a_short_and_costs_are_paid():
+    from app.smartmoney.backtest import signal_profit
+    assert signal_profit(_sig("A", "P", 0.10, "2025-01-01")) == 0.09     # long +10 % minus 1 % costs
+    assert signal_profit(_sig("A", "S", -0.10, "2025-01-01")) == 0.09    # short, stock fell 10 %
+    assert signal_profit(_sig("A", "S", 0.05, "2025-01-01")) == -0.06
+
+
+def test_signalers_are_judged_on_all_their_positions():
+    from app.smartmoney.backtest import by_signaler
+    ev = [_sig("Pro", "P", .1, "2024-01-01"), _sig("Pro", "S", -.08, "2024-02-01"), _sig("Pro", "P", .05, "2024-03-01"),
+          _sig("Bad", "P", -.1, "2024-01-01"), _sig("Bad", "S", .1, "2024-02-01"), _sig("Bad", "P", .2, "2024-03-01")]
+    r = {x["owner"]: x for x in by_signaler(ev, codes=("P", "S"))}
+    assert r["Pro"]["verdict"] == "profi" and r["Pro"]["hit"] == 1.0 and r["Pro"]["n"] == 3
+    assert r["Bad"]["verdict"] == "weg"
+
+
+def test_walk_forward_only_follows_insiders_who_proved_themselves_before():
+    from app.smartmoney.backtest import walk_forward
+    ev = [_sig("Pro", "P", .1, "2024-01-01"), _sig("Pro", "P", .1, "2024-02-01"), _sig("Pro", "P", .1, "2024-03-01"),
+          _sig("Pro", "P", .1, "2024-04-01"),     # results of the first three not known yet (90 days) -> not followed
+          _sig("Pro", "P", -.2, "2024-08-01")]    # by now three are known and good -> followed, and it loses
+    w = walk_forward(ev)
+    assert w["followed"]["n"] == 1 and w["followed"]["avg"] == -0.21 and w["all_signals"]["n"] == 5
+
+
+def test_filing_before_price_history_gets_no_move():
+    from datetime import date, timedelta
+
+    from app.smartmoney.backtest import position_returns
+    days = [date(2021, 1, 4) + timedelta(days=i) for i in range(200)]
+    closes = [(d, 100.0 + i) for i, d in enumerate(days)]
+    bench = {d: 100.0 for d in days}
+    assert position_returns("2020-03-30", closes, bench) is None
+    assert position_returns("2021-01-03", closes, bench) is not None

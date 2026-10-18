@@ -15,6 +15,10 @@ from collections import defaultdict
 from datetime import date
 
 HORIZONS = (5, 20, 60, 120)
+HOLD = 60                 # the position: held 60 trading days
+HOLD_CALENDAR_DAYS = 90   # ...which is about this long -- when its result is known
+COST = 0.01               # spread + overnight financing over ~3 months, per position
+PROFI_MIN_N, PROFI_MIN_HIT = 3, 0.6
 MIN_BUY = 25_000          # smaller buys are noise
 MIN_SALE = 1_000_000      # only big sales, as a comparison
 CLUSTER_DAYS = 14
@@ -85,11 +89,25 @@ def mark_clusters(evts: list[dict]) -> None:
                                and abs((date.fromisoformat(o["filed"]) - d).days) <= CLUSTER_DAYS for o in lst)
 
 
+MAX_ENTRY_GAP_DAYS = 5   # the entry close must follow the filing closely
+
+
+def _entry(filed: str, closes: list[tuple[date, float]], bench: dict[date, float]) -> int | None:
+    """Index of the first close after the filing -- None when the price history starts later
+    (MT5 keeps ~2000 bars, fewer for some stocks): taking the first bar there would hand every
+    older filing the same, wrong move."""
+    from datetime import timedelta
+    d0 = date.fromisoformat(filed)
+    start = next((i for i, (d, _) in enumerate(closes) if d > d0 and d in bench), None)
+    if start is None or closes[start][0] > d0 + timedelta(days=MAX_ENTRY_GAP_DAYS):
+        return None
+    return start
+
+
 def excess_returns(filed: str, closes: list[tuple[date, float]], bench: dict[date, float]) -> dict[int, float] | None:
     """Stock minus S&P 500 over each horizon, entered at the first close after the filing date.
     closes: the stock's (day, close), oldest first; bench: the index's close per day."""
-    d0 = date.fromisoformat(filed)
-    start = next((i for i, (d, _) in enumerate(closes) if d > d0 and d in bench), None)
+    start = _entry(filed, closes, bench)
     if start is None:
         return None
     out = {}
@@ -103,6 +121,124 @@ def excess_returns(filed: str, closes: list[tuple[date, float]], bench: dict[dat
             continue
         out[h] = round((e_px / s_px - 1) - (bench[e_day] / bench[s_day] - 1), 5)
     return out or None
+
+
+def position_returns(filed: str, closes: list[tuple[date, float]], bench: dict[date, float]) -> dict[int, dict] | None:
+    """The stock's own move and the S&P 500's over each horizon, from the first close after the filing."""
+    start = _entry(filed, closes, bench)
+    if start is None:
+        return None
+    s_day, s_px = closes[start]
+    out = {}
+    for h in HORIZONS:
+        j = start + h
+        if j >= len(closes):
+            continue
+        e_day, e_px = closes[j]
+        if e_day not in bench or s_px <= 0 or bench[s_day] <= 0:
+            continue
+        out[h] = {"stock": round(e_px / s_px - 1, 5), "market": round(bench[e_day] / bench[s_day] - 1, 5)}
+    return out or None
+
+
+def signal_profit(e: dict, horizon: int = HOLD, cost: float = COST) -> float | None:
+    """What following this one signal made: a buy taken long, a sale taken short, minus costs."""
+    mv = (e.get("move") or {}).get(horizon, (e.get("move") or {}).get(str(horizon)))
+    if not mv:
+        return None
+    return round((mv["stock"] if e["code"] == "P" else -mv["stock"]) - cost, 5)
+
+
+FOLLOW_CODES = ("P",)   # 7 years (2019-2026): shorting insider sales lost -3.7 % per 60 days
+                         # (-11 % behind "proven" sellers) in a rising market; only buys are followed.
+
+
+def by_signaler(evts: list[dict], horizon: int = HOLD, codes: tuple = FOLLOW_CODES) -> list[dict]:
+    """Per insider (the person, across companies): every buy (by default only buys, see
+    FOLLOW_CODES) as a position.
+    hit = share of positions in profit after costs; avg/total = profit per position and summed;
+    market = the S&P 500 over the same days, on average. verdict: 'profi' (>= 3 signals,
+    >= 60 % hits, average in profit), 'weg' (<= 40 % hits or average in loss), else 'offen'."""
+    groups: dict[str, list[dict]] = defaultdict(list)
+    for e in evts:
+        if e.get("owner") and e["code"] in codes and signal_profit(e, horizon) is not None:
+            groups[e["owner"]].append(e)
+    out = []
+    for owner, lst in groups.items():
+        prof = [signal_profit(e, horizon) for e in lst]
+        mkt = [((e["move"].get(horizon) or e["move"].get(str(horizon)))["market"]) for e in lst]
+        hit = sum(v > 0 for v in prof) / len(prof)
+        avg = statistics.fmean(prof)
+        n = len(prof)
+        verdict = "profi" if n >= PROFI_MIN_N and hit >= PROFI_MIN_HIT and avg > 0 else \
+                  "weg" if n >= PROFI_MIN_N and (hit <= 0.4 or avg < 0) else "offen"
+        out.append({"owner": owner, "tickers": sorted({e["ticker"] for e in lst}), "role": lst[0].get("role", ""),
+                    "n": n, "buys": sum(e["code"] == "P" for e in lst), "sales": sum(e["code"] == "S" for e in lst),
+                    "hit": round(hit, 3), "avg": round(avg, 4), "total": round(sum(prof), 4),
+                    "market": round(statistics.fmean(mkt), 4), "last": max(e["filed"] for e in lst), "verdict": verdict})
+    out.sort(key=lambda x: (x["verdict"] != "profi", -x["avg"] * min(x["n"], 10)))
+    return out
+
+
+CONTRA_MAX_HIT = 0.35    # an insider this often wrong (with >= 3 known results) is traded against
+
+
+def walk_forward(evts: list[dict], horizon: int = HOLD, contra: bool = False, codes: tuple = FOLLOW_CODES) -> dict:
+    """The honest test: go through the signals in time order; follow one only if its insider
+    already qualified for the profi list on results known BEFORE that day. No hindsight.
+    contra=True: the mirror -- trade AGAINST insiders who had proven themselves wrong."""
+    from datetime import timedelta
+    held_days = round(horizon * HOLD_CALENDAR_DAYS / HOLD)
+    timeline = sorted((e for e in evts if e.get("owner") and e["code"] in codes and signal_profit(e, horizon) is not None),
+                      key=lambda e: e["filed"])
+    history: dict[str, list[tuple[date, float]]] = defaultdict(list)  # owner -> (result known on, profit)
+    taken = []
+    for e in timeline:
+        d = date.fromisoformat(e["filed"])
+        known = [p for (k, p) in history[e["owner"]] if k <= d]
+        raw = signal_profit(e, horizon, cost=0)
+        if len(known) >= PROFI_MIN_N:
+            hit = sum(p > 0 for p in known) / len(known)
+            if not contra and hit >= PROFI_MIN_HIT and statistics.fmean(known) > 0:
+                taken.append({"filed": e["filed"], "owner": e["owner"], "ticker": e["ticker"],
+                              "side": "long" if e["code"] == "P" else "short", "profit": round(raw - COST, 5)})
+            elif contra and hit <= CONTRA_MAX_HIT and statistics.fmean(known) < 0:
+                taken.append({"filed": e["filed"], "owner": e["owner"], "ticker": e["ticker"],
+                              "side": "short" if e["code"] == "P" else "long", "profit": round(-raw - COST, 5)})
+        history[e["owner"]].append((d + timedelta(days=held_days), signal_profit(e, horizon)))
+    prof = [t["profit"] for t in taken]
+    by_year: dict[str, list[float]] = defaultdict(list)
+    for t in taken:
+        by_year[t["filed"][:4]].append(t["profit"])
+    every = [signal_profit(e, horizon) for e in timeline]
+    return {
+        "followed": {"n": len(prof), "hit": round(sum(v > 0 for v in prof) / len(prof), 3) if prof else None,
+                     "avg": round(statistics.fmean(prof), 4) if prof else None, "total": round(sum(prof), 4)},
+        "all_signals": {"n": len(every), "hit": round(sum(v > 0 for v in every) / len(every), 3) if every else None,
+                        "avg": round(statistics.fmean(every), 4) if every else None},
+        "by_year": {y: {"n": len(v), "hit": round(sum(x > 0 for x in v) / len(v), 3), "avg": round(statistics.fmean(v), 4)}
+                    for y, v in sorted(by_year.items())},
+        "recent": taken[-25:][::-1],
+        "rules": {"hold_days": horizon, "cost": COST, "min_n": PROFI_MIN_N, "min_hit": PROFI_MIN_HIT, "contra": contra,
+                  "codes": list(codes)},
+    }
+
+
+def strategies(evts: list[dict]) -> dict:
+    """Which way of working with insider signals has paid -- all walk-forward, after costs:
+    follow the proven ones for 5 / 20 / 60 / 120 trading days, or trade against the proven-wrong."""
+    out = {}
+    for h in HORIZONS:
+        f = walk_forward(evts, h)["followed"]
+        out[f"follow_{h}"] = {**f, "label": f"Käufe der Profis long, {h} Handelstage", "hold_days": h}
+    a = walk_forward(evts, HOLD)["all_signals"]
+    out["all_buys"] = {**a, "label": f"Jeden Insider-Kauf long, {HOLD} Handelstage", "hold_days": HOLD}
+    s = walk_forward(evts, HOLD, codes=("S",))
+    out["short_sales"] = {**s["all_signals"], "label": f"Jeden großen Verkauf short, {HOLD} Handelstage", "hold_days": HOLD}
+    out["short_profi_sellers"] = {**s["followed"], "label": f"Verkäufe der 'Profi'-Verkäufer short, {HOLD} Handelstage", "hold_days": HOLD}
+    c = walk_forward(evts, HOLD, contra=True, codes=("P", "S"))["followed"]
+    out["contra"] = {**c, "label": f"Gegen die Dauer-Falschen, {HOLD} Handelstage", "hold_days": HOLD}
+    return out
 
 
 def _stats(vals: list[float]) -> dict:
@@ -167,5 +303,8 @@ def summarize(evts: list[dict]) -> dict:
         "by_cluster": table(lambda e: (["Cluster" if e.get("cluster") else "Einzeln"]) if e["code"] == "P" else []),
         "by_ticker": table(lambda e: [e["ticker"]] if e["code"] == "P" else []),
         "by_insider": by_insider(evts),
+        "by_signaler": by_signaler(evts),
+        "walk_forward": walk_forward(evts),
+        "strategies": strategies(evts),
         "events": len(evts), "buys": len(buys), "with_prices": sum(1 for e in evts if e.get("ret")),
     }

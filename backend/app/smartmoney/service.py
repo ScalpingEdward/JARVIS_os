@@ -203,7 +203,7 @@ class SmartMoneyService:
             return None
         sm = bt["summary"]
         return {"generated_at": bt["generated_at"], "quarters": bt.get("quarters", []),
-                **{k: sm.get(k) for k in ("overall", "by_role", "by_size", "by_cluster", "by_insider", "events", "buys", "with_prices")}}
+                **{k: sm.get(k) for k in ("overall", "by_role", "by_size", "by_cluster", "events", "buys", "with_prices")}}
 
 
 def _berlin():

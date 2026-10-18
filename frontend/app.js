@@ -625,13 +625,17 @@ function renderSignalers() {
   const w = d.walk_forward, f = w.followed, a = w.all_signals;
   $('#wfMeta').textContent = `${d.quarters[0] || ''}–${d.quarters[d.quarters.length - 1] || ''}`;
   $('#wfBox').innerHTML = `<div class="wf-cards">
-      <div><small>Nur Profis gefolgt</small><b class="${f.avg > 0 ? 'up' : 'down'}">${pct(f.avg)}</b><span>pro Position · ${Math.round((f.hit || 0) * 100)} % Treffer · ${f.n} Positionen</span></div>
-      <div><small>Allen Signalen gefolgt</small><b class="${a.avg > 0 ? 'up' : 'down'}">${pct(a.avg)}</b><span>pro Position · ${Math.round((a.hit || 0) * 100)} % Treffer · ${a.n} Positionen</span></div>
+      <div><small>Käufe der Profis, long</small><b class="${f.avg > 0 ? 'up' : 'down'}">${pct(f.avg)}</b><span>pro Position · ${Math.round((f.hit || 0) * 100)} % Treffer · ${f.n} Positionen</span></div>
+      <div><small>Jeden Insider-Kauf, long</small><b class="${a.avg > 0 ? 'up' : 'down'}">${pct(a.avg)}</b><span>pro Position · ${Math.round((a.hit || 0) * 100)} % Treffer · ${a.n} Positionen</span></div>
       <div><small>Summe Profis</small><b class="${f.total > 0 ? 'up' : 'down'}">${pct(f.total, 0)}</b><span>alle Positionen addiert (je gleich groß)</span></div>
     </div>
     <table class="positions wf-years"><tr><th>JAHR</th>${Object.keys(w.by_year).map((y) => `<th>${y}</th>`).join('')}</tr>
       <tr><td>Ø pro Position</td>${Object.values(w.by_year).map((v) => `<td class="num ${v.avg > 0 ? 'up' : 'down'}">${pct(v.avg)}</td>`).join('')}</tr>
-      <tr><td>Treffer · Anzahl</td>${Object.values(w.by_year).map((v) => `<td class="num muted">${Math.round(v.hit * 100)} % · ${v.n}</td>`).join('')}</tr></table>`;
+      <tr><td>Treffer · Anzahl</td>${Object.values(w.by_year).map((v) => `<td class="num muted">${Math.round(v.hit * 100)} % · ${v.n}</td>`).join('')}</tr></table>
+    ${d.strategies ? `<div class="label" style="margin-top:14px">Welche Arbeitsweise hat sich gelohnt? <small class="muted">ohne Rückblick, nach 1 % Kosten</small></div>
+    <table class="positions"><tr><th>STRATEGIE</th><th>Ø PRO POSITION</th><th>TREFFER</th><th>POSITIONEN</th></tr>
+      ${Object.values(d.strategies).map((v) => `<tr><td>${esc(v.label)}</td><td class="num ${v.avg > 0 ? 'up' : 'down'}">${pct(v.avg)}</td>`
+        + `<td class="num">${v.hit == null ? '–' : Math.round(v.hit * 100) + ' %'}</td><td class="num muted">${v.n}</td></tr>`).join('')}</table>` : ''}`;
   $('#sgCount').textContent = `${d.counts.profi} profi · ${d.counts.weg} weg · ${d.counts.offen} offen`;
   $('#sgFilter').innerHTML = [['profi', 'Profi'], ['weg', 'Weg'], ['offen', 'Offen']].map(([k, n]) =>
     `<button type="button" class="hchip${k === sgVerdict ? ' on' : ''}" data-sg="${k}">${n} <small>${d.counts[k]}</small></button>`).join('');
