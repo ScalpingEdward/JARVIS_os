@@ -286,6 +286,25 @@ class InstagramContentService:
         logger.info("withdrew posted candidate %s, released %s media items", candidate_id, released)
         return item
 
+    def put_back(self, candidate_id: UUID, reason: str) -> ContentCandidate:
+        """A post Brano turned down only because it was not the time yet: its photos go back into
+        the pool, so curation offers them again in their place in the queue (oldest day first).
+
+        Rejecting used to keep the media 'used' for good -- on 2026-10-18 seven drafts' photos
+        were locked that way, and the queue had moved on to 2025 while the first planned days
+        still waited. A proposed card is rejected first; a posted one cannot be put back here
+        (that is withdraw_posted)."""
+        item = self.get(candidate_id)
+        if item.status in (ContentStatus.posted, ContentStatus.publishing, ContentStatus.approved):
+            raise InstagramContentError(f"Cannot put back a candidate in status {item.status}")
+        if item.status != ContentStatus.rejected:
+            item.status = ContentStatus.rejected
+        item.audit_log.append(f"Put back: {reason}. Media released into the pool.")
+        self._save_candidate(item)
+        released = media_pool_service.release_items_used_by(item.id)
+        logger.info("put back candidate %s, released %s media items", candidate_id, released)
+        return item
+
     def _recent_captions(self, exclude_id=None, limit: int = 8) -> list[str]:
         """The captions that actually went out or are waiting, newest first.
 

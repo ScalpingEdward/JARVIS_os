@@ -130,3 +130,51 @@ async def webhook(request: Request) -> dict:
     except TelegramInstagramError as exc:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
     return {"status": decided.status.value if decided else None}
+
+
+
+_media_cache: dict[tuple[str, int], tuple[str, bytes]] = {}
+
+
+@router.get("/candidates/{candidate_id}/media/{index}")
+def candidate_media(candidate_id: UUID, index: int):
+    """One photo or clip of a post, for the dashboard's preview: photos shrunk, clips as they are."""
+    from fastapi import Response
+
+    from app.instagram_content.models import MediaType
+    from app.instagram_content.service import InstagramContentError, instagram_content_service
+
+    from .preview import PostPreviewSender, PreviewError
+
+    key = (str(candidate_id), index)
+    if key not in _media_cache:
+        try:
+            c = instagram_content_service.get(candidate_id)
+            item = c.media_items[index]
+        except (InstagramContentError, IndexError) as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        sender = PostPreviewSender()
+        try:
+            import httpx
+            with httpx.Client(timeout=60) as client:
+                f = sender.file_for(client, item, index + 1)
+        except PreviewError as exc:
+            raise HTTPException(status_code=502, detail=str(exc)) from exc
+        if item.media_type == MediaType.video:
+            _media_cache[key] = ("video/mp4", f.data)
+        else:
+            _media_cache[key] = ("image/jpeg", PostPreviewSender._shrink_photo(f.data))
+        while len(_media_cache) > 24:
+            _media_cache.pop(next(iter(_media_cache)))
+    kind, data = _media_cache[key]
+    return Response(data, media_type=kind, headers={"Cache-Control": "max-age=600"})
+
+
+@router.post("/candidates/{candidate_id}/approve")
+def approve_candidate(candidate_id: UUID) -> dict:
+    """Brano's approval from the dashboard: same path as the Telegram button."""
+    try:
+        c = telegram_instagram_service.approve(candidate_id, "dashboard")
+    except TelegramInstagramError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return {"id": str(c.id), "status": c.status.value}

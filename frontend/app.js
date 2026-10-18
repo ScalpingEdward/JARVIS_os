@@ -404,6 +404,7 @@ function open(view, fromTile, push = true) {
   if (push) history_.pushState({ view }, '', `#${view}`);
   if (view === 'watchlist' && watch) renderWatchView(watch);
   if (view === 'smart') renderSmartView();
+  if (view === 'instagram') loadWaiting();
   if (view === 'trading' && overview) { renderTotals(overview); renderAccounts(overview); renderGroups(overview); renderPositions(overview); renderHistory(overview); renderTotalChart(); }
   if (fromTile) morph($('#detailPanel'), fromTile.getBoundingClientRect(), false);
   $('#close').focus();
@@ -484,6 +485,44 @@ refreshInstagram();
 setInterval(refreshTrading, 5000);
 setInterval(refreshHistory, 60000);
 setInterval(refreshInstagram, 30000);
+
+// --- Instagram: the post that waits, with its pictures and caption, approvable here ----------
+async function loadWaiting() {
+  let list;
+  try { list = (await get('/v1/instagram/candidates?status=proposed')).items || []; } catch (e) { $('#igWaiting').innerHTML = `<p class="muted">Fehler: ${esc(e.message)}</p>`; return; }
+  $('#igWaitCount').textContent = list.length;
+  const fmtName = { single_image: 'Einzelfoto', carousel: 'Karussell', reel: 'Reel' };
+  $('#igWaiting').innerHTML = list.length ? list.map((c) => `<article class="ig-wait" data-id="${esc(c.id)}">
+      <div class="ig-media">${c.media_items.map((m, i) => m.media_type === 'video'
+        ? `<video src="${API}/v1/telegram-instagram/candidates/${esc(c.id)}/media/${i}" controls preload="metadata" playsinline></video>`
+        : `<img src="${API}/v1/telegram-instagram/candidates/${esc(c.id)}/media/${i}" alt="${i + 1}" loading="lazy" />`).join('')}</div>
+      <div class="ig-info">
+        <div class="ig-meta"><b>${esc(fmtName[c.post_format] || c.post_format)}</b> · ${c.media_items.length} ${c.media_items.length === 1 ? 'Datei' : 'Dateien'}
+          · erstellt ${esc(new Date(c.created_at).toLocaleDateString('de-DE'))}</div>
+        <p class="ig-caption">${esc(c.caption_draft)}</p>
+        ${c.hashtags?.length ? `<p class="ig-tags">${c.hashtags.map((h) => esc(h.startsWith('#') ? h : '#' + h)).join(' ')}</p>` : ''}
+        <div class="ig-btns">
+          <button type="button" class="go" data-ig="approve">✅ Freigeben</button>
+          <button type="button" data-ig="later">⏸ Später – Fotos zurück in die Reihe</button>
+          <span class="ig-msg"></span>
+        </div>
+        <p class="ig-note">Wartet ohne Ablaufdatum, bis du freigibst. ${c.post_format === 'reel' ? 'Reel: Nach der Freigabe kommen die Dateien nach Telegram – du postest mit Musik.' : 'Fotos/Karussell posten sich nach der Freigabe selbst; Musik legst du danach in der App nach.'}</p>
+      </div></article>`).join('')
+    : '<p class="muted">Gerade wartet kein Post. Der nächste kommt zum nächsten Slot.</p>';
+}
+$('#igWaiting').addEventListener('click', async (e) => {
+  const b = e.target.closest('button[data-ig]');
+  if (!b) return;
+  const card = b.closest('.ig-wait'), id = card.dataset.id, msg = card.querySelector('.ig-msg');
+  if (b.dataset.ig === 'approve' && !confirm('Diesen Post jetzt freigeben?')) return;
+  card.querySelectorAll('button').forEach((x) => { x.disabled = true; });
+  try {
+    if (b.dataset.ig === 'approve') await send('POST', `/v1/telegram-instagram/candidates/${id}/approve`);
+    else await send('POST', `/v1/instagram/candidates/${id}/put-back?reason=${encodeURIComponent('später – im Dashboard')}`);
+    msg.textContent = b.dataset.ig === 'approve' ? 'Freigegeben.' : 'Zurückgelegt – die Fotos kommen wieder dran.';
+    setTimeout(loadWaiting, 1500);
+  } catch (err) { msg.textContent = `Fehler: ${err.message}`; card.querySelectorAll('button').forEach((x) => { x.disabled = false; }); }
+});
 
 // --- post: important mail and reply drafts (backend/app/mail) ---------------------------
 async function refreshMail() {
@@ -574,9 +613,42 @@ document.querySelectorAll('.hist-filter[data-side]').forEach((f) => f.addEventLi
   renderInsiders(smart?.backtest?.by_insider);
 }));
 
+let sgVerdict = 'profi', sgData = null;
+const pct = (v, d = 1) => (v == null ? '–' : `${v > 0 ? '+' : ''}${(v * 100).toFixed(d)} %`);
+async function loadSignalers() {
+  try { sgData = await get(`/v1/smartmoney/signalers?verdict=${sgVerdict}&limit=400`); } catch (e) { console.warn(e); return; }
+  renderSignalers();
+}
+function renderSignalers() {
+  const d = sgData;
+  if (!d || !d.available) { $('#wfBox').innerHTML = '<p class="muted">Noch keine Auswertung – tools/insider_backtest.py.</p>'; return; }
+  const w = d.walk_forward, f = w.followed, a = w.all_signals;
+  $('#wfMeta').textContent = `${d.quarters[0] || ''}–${d.quarters[d.quarters.length - 1] || ''}`;
+  $('#wfBox').innerHTML = `<div class="wf-cards">
+      <div><small>Nur Profis gefolgt</small><b class="${f.avg > 0 ? 'up' : 'down'}">${pct(f.avg)}</b><span>pro Position · ${Math.round((f.hit || 0) * 100)} % Treffer · ${f.n} Positionen</span></div>
+      <div><small>Allen Signalen gefolgt</small><b class="${a.avg > 0 ? 'up' : 'down'}">${pct(a.avg)}</b><span>pro Position · ${Math.round((a.hit || 0) * 100)} % Treffer · ${a.n} Positionen</span></div>
+      <div><small>Summe Profis</small><b class="${f.total > 0 ? 'up' : 'down'}">${pct(f.total, 0)}</b><span>alle Positionen addiert (je gleich groß)</span></div>
+    </div>
+    <table class="positions wf-years"><tr><th>JAHR</th>${Object.keys(w.by_year).map((y) => `<th>${y}</th>`).join('')}</tr>
+      <tr><td>Ø pro Position</td>${Object.values(w.by_year).map((v) => `<td class="num ${v.avg > 0 ? 'up' : 'down'}">${pct(v.avg)}</td>`).join('')}</tr>
+      <tr><td>Treffer · Anzahl</td>${Object.values(w.by_year).map((v) => `<td class="num muted">${Math.round(v.hit * 100)} % · ${v.n}</td>`).join('')}</tr></table>`;
+  $('#sgCount').textContent = `${d.counts.profi} profi · ${d.counts.weg} weg · ${d.counts.offen} offen`;
+  $('#sgFilter').innerHTML = [['profi', 'Profi'], ['weg', 'Weg'], ['offen', 'Offen']].map(([k, n]) =>
+    `<button type="button" class="hchip${k === sgVerdict ? ' on' : ''}" data-sg="${k}">${n} <small>${d.counts[k]}</small></button>`).join('');
+  $('#sgTable').innerHTML = d.rows.length ? '<tr><th>INSIDER</th><th>FIRMA</th><th>ROLLE</th><th>SIGNALE</th><th>TREFFER</th><th>Ø GEWINN</th><th>SUMME</th><th>MARKT Ø</th><th>ZULETZT</th><th>URTEIL</th></tr>'
+    + d.rows.map((x) => `<tr><td>${esc(x.owner)}</td><td><b>${esc(x.tickers.slice(0, 3).join(', '))}</b></td><td class="muted">${esc(x.role)}</td>`
+      + `<td class="num">${x.n} <small class="muted">${x.buys}K/${x.sales}V</small></td><td class="num">${Math.round(x.hit * 100)} %</td>`
+      + `<td class="num ${x.avg > 0 ? 'up' : 'down'}">${pct(x.avg)}</td><td class="num ${x.total > 0 ? 'up' : 'down'}">${pct(x.total, 0)}</td>`
+      + `<td class="num muted">${pct(x.market)}</td><td class="muted">${esc(new Date(x.last).toLocaleDateString('de-DE'))}</td>`
+      + `<td><span class="verdict ${x.verdict}">${x.verdict}</span></td></tr>`).join('')
+    : '<tr><td class="muted">Niemand in dieser Gruppe.</td></tr>';
+}
+$('#sgFilter').addEventListener('click', (e) => { const b = e.target.closest('[data-sg]'); if (!b) return; sgVerdict = b.dataset.sg; loadSignalers(); });
+
 function renderSmartView() {
   const s = smart;
   if (!s) return;
+  if (!sgData) loadSignalers();
   renderBacktest(s.backtest);
   renderInsiders(s.backtest?.by_insider);
   const verdictOf = Object.fromEntries((s.backtest?.by_insider || []).map((x) => [`${x.owner.toLowerCase()}|${x.ticker}|${x.side || 'buy'}`, x]));

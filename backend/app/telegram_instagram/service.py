@@ -384,14 +384,29 @@ class TelegramInstagramService:
 
         self._record("decide", True, decided.status.value, candidate_id, actor)
         if approved:
-            refusal = auto_publish_refusal(decided.post_format.value)
-            if refusal is None:
-                self._publish_now(decided)
-            else:
-                self._record("auto_publish_refused", True, refusal, candidate_id, actor)
-                self._send_post_pack(decided)
+            self._after_approval(decided, actor)
         else:
             self._safe_send("Abgelehnt. Die Medien bleiben vergeben, der Post geht nicht raus.")
+        return decided
+
+    def _after_approval(self, decided: ContentCandidate, actor: str | None) -> None:
+        refusal = auto_publish_refusal(decided.post_format.value)
+        if refusal is None:
+            self._publish_now(decided)
+        else:
+            self._record("auto_publish_refused", True, refusal, decided.id, actor)
+            self._send_post_pack(decided)
+
+    def approve(self, candidate_id, source: str) -> ContentCandidate:
+        """The same as the green button on the Telegram card -- for the dashboard and for AURON.
+        Photos and carousels post themselves; a Reel's files come to Telegram for posting by
+        hand with music (publish_mode)."""
+        current = instagram_content_service.get(candidate_id)
+        if current.status != ContentStatus.proposed:
+            raise TelegramInstagramError(f"already {current.status.value}")
+        decided = instagram_content_service.decide(candidate_id, ContentDecision(approved=True, reason=f"approved via {source}"))
+        self._record("decide", True, decided.status.value, candidate_id, source)
+        self._after_approval(decided, source)
         return decided
 
     def _publish_now(self, candidate: ContentCandidate) -> None:

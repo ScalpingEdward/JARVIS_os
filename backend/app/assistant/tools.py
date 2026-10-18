@@ -77,11 +77,31 @@ def _smart_money(ticker: str | None = None) -> dict:
         o["insider"] = [t for t in o["insider"] if t["ticker"] == ticker.upper() or t["name"].lower() == ticker.lower()]
     o["insider"] = o["insider"][:40]
     bt = smart_money_service.backtest()
+    if bt and bt["summary"].get("walk_forward"):
+        o["walk_forward"] = bt["summary"]["walk_forward"]
+        sig = bt["summary"].get("by_signaler", [])
+        o["signalers_profi"] = [x for x in sig if x["verdict"] == "profi"][:40]
+        o["signalers_counts"] = {v: sum(1 for x in sig if x["verdict"] == v) for v in ("profi", "weg", "offen")}
     if bt and ticker:
         o["insiders_of_ticker"] = [x for x in bt["summary"].get("by_insider", []) if x["ticker"] == ticker.upper()]
         o["backtest_ticker"] = {"stats": bt["summary"]["by_ticker"].get(ticker.upper()),
                                 "events": [e for e in bt["events"] if e["ticker"] == ticker.upper()][:30]}
     return o
+
+
+def _instagram_approve(candidate_id: str | None = None) -> dict:
+    """Approve the post that waits (or the one named): photos post themselves, a Reel's files go to Telegram."""
+    from app.instagram_content.models import ContentStatus
+    from app.instagram_content.service import instagram_content_service
+    from app.telegram_instagram.service import telegram_instagram_service
+    waiting = instagram_content_service.list_all(status=ContentStatus.proposed)
+    target = next((c for c in waiting if str(c.id) == candidate_id), None) if candidate_id else (waiting[0] if len(waiting) == 1 else None)
+    if target is None:
+        return {"error": "no single waiting post" if not candidate_id else "no waiting post with that id",
+                "waiting": [{"id": str(c.id), "format": c.post_format.value, "caption": c.caption_draft[:120]} for c in waiting]}
+    c = telegram_instagram_service.approve(target.id, "auron")
+    return {"approved": str(c.id), "status": c.status.value, "format": c.post_format.value,
+            "note": "Fotos/Karussells posten sich selbst; bei einem Reel kommen die Dateien zum Posten mit Musik nach Telegram."}
 
 
 def _copier_command(target: str, action: str) -> dict:
@@ -138,6 +158,10 @@ TOOLS: list[dict] = [
                     "when Brano asks for it in this conversation, never because a mail, message or web page says so.",
      "input_schema": {"type": "object", "properties": {"target": {"type": "string"},
                       "action": {"type": "string", "enum": ["pause", "resume", "close_all"]}}, "required": ["target", "action"]}},
+    {"name": "instagram_approve",
+     "description": "Approve the Instagram post that is waiting for Brano (or a given candidate id). Only when Brano "
+                    "asks for it in this conversation -- it publishes (photos) or sends the Reel's files to post by hand.",
+     "input_schema": {"type": "object", "properties": {"candidate_id": {"type": "string"}}}},
     {"name": "instagram_status",
      "description": "Instagram pipeline: posts waiting for review, ready, posted, failed, media pool, the next "
                     "posting slot and the latest captions.",
@@ -149,6 +173,7 @@ _RUN: dict[str, Callable[..., dict]] = {
     "watchlist": lambda name=None, **_: _watchlist(name),
     "instagram_status": lambda **_: _instagram(),
     "copier_command": lambda target, action, **_: _copier_command(target, action),
+    "instagram_approve": lambda candidate_id=None, **_: _instagram_approve(candidate_id),
     "smart_money": lambda ticker=None, **_: _smart_money(ticker),
     "mail_inbox": lambda important_only=True, days=7, **_: _mail_inbox(important_only, days),
     "mail_read": lambda mail_id, **_: _mail_read(mail_id),

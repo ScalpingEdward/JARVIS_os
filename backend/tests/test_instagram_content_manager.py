@@ -544,3 +544,16 @@ def test_a_candidate_claimed_for_publishing_but_never_completed_stays_claimed_ac
 
     release.set()
     t.join()
+
+
+def test_put_back_releases_the_photos_of_a_turned_down_post(monkeypatch):
+    from app.instagram_content import service as mod
+    from app.instagram_content.service import instagram_content_service
+
+    instagram_content_service.reset()
+    released = []
+    monkeypatch.setattr(mod.media_pool_service, "release_items_used_by", lambda cid: released.append(cid) or 1)
+    cid = api_client.post("/v1/instagram/candidates", json=_candidate_payload()).json()["id"]
+    r = api_client.post(f"/v1/instagram/candidates/{cid}/put-back")
+    assert r.status_code == 200 and r.json()["status"] == "rejected" and "Put back" in r.json()["audit_log"][-1]
+    assert [str(x) for x in released] == [cid]

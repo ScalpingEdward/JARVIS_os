@@ -124,12 +124,20 @@
             <p class="bt-note">Rendite der Aktie <b>minus S&amp;P 500</b> ab dem ersten Schlusskurs nach der Meldung – Durchschnitt, Anteil im Plus, Anzahl Fälle.
               Alle US-Firmen mit Kursen bei PU Prime. Vergangenheit, keine Vorhersage.</p>
             <div class="table-wrap"><table class="positions" id="btTable"></table></div></section>
-          <section class="card span-6"><div class="label">Käufer – wem folgen? <span class="count" id="biBuyCount"></span></div>
+          <section class="card span-12"><div class="label">Hätten wir nur den Profis gefolgt? <span class="count" id="wfMeta"></span></div>
+            <p class="bt-note">Jeder Insider-Trade als Position: Kauf = Long, Verkauf = Short, 60 Handelstage gehalten, 1 % Kosten.
+              Gefolgt wird einem Insider erst, wenn er sich <b>vorher</b> bewiesen hat (≥ 3 Signale mit bekanntem Ergebnis, ≥ 60 % Treffer, im Schnitt im Plus) – ohne Blick in die Zukunft.</p>
+            <div class="wf" id="wfBox"></div></section>
+          <section class="card span-12"><div class="label">Signalgeber – wer bringt Profit? <span class="count" id="sgCount"></span></div>
+            <p class="bt-note">Pro Insider alle seine Käufe und Verkäufe als Positionen. <b>Profi</b>: ≥ 3 Signale, ≥ 60 % im Gewinn, im Schnitt im Plus. <b>Weg</b>: ≤ 40 % oder im Schnitt im Minus.</p>
+            <div class="hist-filter" id="sgFilter"></div>
+            <div class="table-wrap bi-wrap"><table class="positions" id="sgTable"></table></div></section>
+          <section class="card span-6" hidden><div class="label">Käufer – wem folgen? <span class="count" id="biBuyCount"></span></div>
             <p class="bt-note">Stieg die Aktie nach seinen Käufen stärker als der S&amp;P 500 (60 Handelstage)? Ab 3 Käufen.
               <b>Folgen</b>: ≥ 60 % richtig und im Schnitt vorn. <b>Aussortieren</b>: ≤ 40 % richtig oder im Schnitt hinten.</p>
             <div class="hist-filter" data-side="buy"></div>
             <div class="table-wrap bi-wrap"><table class="positions" id="biBuy"></table></div></section>
-          <section class="card span-6"><div class="label">Verkäufer – Warnung ernst nehmen? <span class="count" id="biSellCount"></span></div>
+          <section class="card span-6" hidden><div class="label">Verkäufer – Warnung ernst nehmen? <span class="count" id="biSellCount"></span></div>
             <p class="bt-note">Lief die Aktie nach seinen Verkäufen schlechter als der S&amp;P 500 (60 Handelstage)? Ab 3 Verkäufen ab 1 Mio $.
               <b>Warnung</b>: ≥ 60 % richtig. <b>Ignorieren</b>: seine Verkäufe sagten nichts voraus.</p>
             <div class="hist-filter" data-side="sell"></div>
@@ -147,6 +155,8 @@
 
       <div class="view" data-view="instagram">
         <div class="grid">
+          <section class="card span-12"><div class="label">Wartet auf dich <span class="count" id="igWaitCount">0</span></div>
+            <div id="igWaiting"><p class="muted">Lade …</p></div></section>
           <section class="card span-5">
             <div class="label">Next post</div>
             <div class="next">

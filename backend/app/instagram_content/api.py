@@ -450,3 +450,12 @@ def apply_platform_rules(strategy: PlatformStrategy) -> PlatformStrategy:
     field from a /refresh response, after review) -- the only way these
     values ever change. Never called automatically by /refresh."""
     return platform_strategy_store.apply(strategy)
+
+
+@router.post("/candidates/{candidate_id}/put-back", response_model=ContentCandidate)
+def put_back(candidate_id: UUID, reason: str = "not now -- later") -> ContentCandidate:
+    """Turned down only for timing: release its photos so they come again in queue order."""
+    try:
+        return instagram_content_service.put_back(candidate_id, reason)
+    except InstagramContentError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc

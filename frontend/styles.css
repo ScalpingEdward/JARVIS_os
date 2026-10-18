@@ -755,3 +755,28 @@ html[data-cards="dark"] .kpis div, html[data-cards="dark"] .tile-list.as-tiles .
 .verdict.warnung { color: var(--warn); background: rgba(242,193,78,.12); }
 .verdict.ignorieren { color: var(--muted); background: rgba(255,255,255,.06); }
 .hchip small { opacity: .6; margin-left: 3px; }
+
+/* signal sources and the walk-forward result */
+.wf-cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-bottom: 14px; }
+.wf-cards div { display: grid; gap: 4px; padding: 14px; border-radius: 12px; background: rgba(255,255,255,.04); border: 1px solid var(--line); }
+.wf-cards small { font-size: 10.5px; letter-spacing: .16em; text-transform: uppercase; color: var(--muted); }
+.wf-cards b { font-size: 26px; font-family: var(--mono); }
+.wf-cards span { font-size: 12px; color: var(--muted); }
+.verdict.profi { color: var(--up); background: rgba(61,220,151,.14); }
+.verdict.weg { color: var(--down); background: rgba(242,100,124,.12); }
+@media (max-width: 800px) { .wf-cards { grid-template-columns: 1fr; } }
+
+/* Instagram: the waiting post */
+.ig-wait { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 18px; }
+.ig-media { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; align-content: start; }
+.ig-media img, .ig-media video { width: 100%; aspect-ratio: 4 / 5; object-fit: cover; border-radius: 10px; background: rgba(255,255,255,.04); border: 1px solid var(--line); }
+.ig-meta { font-size: 12.5px; color: var(--muted); }
+.ig-caption { white-space: pre-wrap; font-size: 14px; line-height: 1.55; margin: 10px 0; }
+.ig-tags { color: var(--accent); font-size: 13px; margin: 0 0 12px; }
+.ig-btns { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.ig-btns button { font: inherit; font-size: 13px; padding: 8px 14px; border-radius: 999px; border: 1px solid var(--line-2); background: rgba(255,255,255,.05); color: var(--text); cursor: pointer; }
+.ig-btns button.go { border: 0; background: var(--accent); color: #001018; font-weight: 600; }
+.ig-btns button:disabled { opacity: .5; cursor: wait; }
+.ig-msg { font-size: 12.5px; color: var(--muted); }
+.ig-note { font-size: 12px; color: var(--faint); margin-top: 12px; }
+@media (max-width: 900px) { .ig-wait { grid-template-columns: 1fr; } }
