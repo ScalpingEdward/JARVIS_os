@@ -5,10 +5,12 @@ from .models import (
     BacktestComparisonRequest,
     BacktestJob,
     BacktestJobCreate,
-    BacktestMetrics,
     BacktestingLabStatus,
-    SplitMode,
 )
+
+
+class BacktestUnavailable(RuntimeError):
+    """No real backtest can run here -- said instead of inventing metrics."""
 
 
 class BacktestingLabService:
@@ -25,37 +27,16 @@ class BacktestingLabService:
         )
 
     def create(self, payload: BacktestJobCreate) -> BacktestJob:
-        cost_penalty = (
-            payload.costs.spread_points * 0.03
-            + payload.costs.slippage_points * 0.04
-            + payload.costs.commission_per_lot * 0.01
-        )
-        data_factor = min(payload.dataset.bars / 20_000, 1.0)
-        walk_forward_bonus = 4.0 if payload.split_mode == SplitMode.walk_forward else 0.0
-        risk_penalty = max(payload.risk_per_trade_pct - 1.0, 0) * 3.0
-        net_profit = round(8.0 + data_factor * 7.0 - cost_penalty - risk_penalty, 2)
-        drawdown = round(3.5 + payload.risk_per_trade_pct * 2.2 + cost_penalty * 0.3, 2)
-        trades = max(20, int(payload.dataset.bars / 300))
-        metrics = BacktestMetrics(
-            net_profit_pct=net_profit,
-            max_drawdown_pct=drawdown,
-            win_rate_pct=round(51.0 + data_factor * 8.0, 2),
-            profit_factor=round(max(0.1, 1.25 + data_factor * 0.55 - cost_penalty * 0.02), 2),
-            expectancy_r=round(0.18 + data_factor * 0.22 - cost_penalty * 0.01, 2),
-            trades=trades,
-            sharpe_ratio=round(0.8 + data_factor * 0.9 - risk_penalty * 0.04, 2),
-            stability_score=round(min(100.0, 58.0 + data_factor * 25.0 + walk_forward_bonus), 2),
-        )
-        warnings: list[str] = []
-        if payload.split_mode == SplitMode.full_sample:
-            warnings.append("Use walk-forward validation before considering deployment.")
-        if payload.dataset.bars < 5_000:
-            warnings.append("Dataset may be too small for robust conclusions.")
-        if metrics.max_drawdown_pct > 10:
-            warnings.append("Maximum drawdown exceeds conservative funded-account tolerance.")
-        job = BacktestJob(request=payload, metrics=metrics, warnings=warnings)
-        self._jobs[job.id] = job
-        return job
+        """Refuses: there is no price data behind this lab yet.
+
+        Until 2026-10-18 this computed net profit, win rate, Sharpe and the rest from a formula over
+        the request (bars, costs, risk) -- no prices involved -- and returned them as a completed
+        backtest. A strategy "tested" here got plausible numbers that meant nothing. It comes back
+        when a job runs the strategy over real bars (the honest pattern: smartmoney/backtest.py,
+        prices from MT5 via tools/insider_backtest.py)."""
+        raise BacktestUnavailable(
+            f"no price data connected -- this lab does not run real backtests yet "
+            f"({payload.dataset.symbol} {payload.dataset.timeframe} was not tested)")
 
     def list_all(self) -> list[BacktestJob]:
         return sorted(self._jobs.values(), key=lambda job: job.created_at, reverse=True)

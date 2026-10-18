@@ -9,7 +9,7 @@ from .models import (
     BacktestJobCreate,
     BacktestingLabStatus,
 )
-from .service import backtesting_lab_service
+from .service import BacktestUnavailable, backtesting_lab_service
 
 router = APIRouter(prefix="/v1/backtesting-lab", tags=["backtesting-lab"])
 
@@ -21,7 +21,10 @@ def get_status() -> BacktestingLabStatus:
 
 @router.post("/jobs", response_model=BacktestJob, status_code=status.HTTP_201_CREATED)
 def create_job(payload: BacktestJobCreate) -> BacktestJob:
-    return backtesting_lab_service.create(payload)
+    try:
+        return backtesting_lab_service.create(payload)
+    except BacktestUnavailable as exc:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
 
 
 @router.get("/jobs", response_model=list[BacktestJob])
