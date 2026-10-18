@@ -78,3 +78,22 @@
   if (matchMedia('(prefers-reduced-motion: reduce)').matches || LOOKS.length < 2) return;
   timer = setInterval(() => show(n + 1), 7000);
 })();
+
+// pictures with data-zoom open large; "Als Bild öffnen" shows the picture alone in a new tab
+(() => {
+  const box = document.getElementById('lightbox'), img = document.getElementById('lbImg');
+  if (!box) return;
+  const close = () => { box.hidden = true; document.body.style.overflow = ''; };
+  document.querySelectorAll('img[data-zoom]').forEach((el) => el.addEventListener('click', () => {
+    img.src = el.currentSrc || el.src; img.alt = el.alt;
+    box.hidden = false; document.body.style.overflow = 'hidden';
+  }));
+  box.addEventListener('click', (e) => { if (e.target === box || e.target === img) close(); });
+  document.getElementById('lbClose').addEventListener('click', close);
+  addEventListener('keydown', (e) => { if (e.key === 'Escape' && !box.hidden) close(); });
+  // a blob address also works when the picture is embedded (the one-file export); data: tabs are blocked
+  document.getElementById('lbOpen').addEventListener('click', async () => {
+    const blob = await (await fetch(img.src)).blob();
+    window.open(URL.createObjectURL(blob), '_blank');
+  });
+})();
