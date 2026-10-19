@@ -912,3 +912,12 @@ html.phone-land .topclock { display: none; }
    the pointer there, only the cards do (same fix as .scene, 2026-10-17; the columns came later) */
 .col { pointer-events: none; }
 .col > * { pointer-events: auto; }
+
+/* Trading card: a group's open trades under its row */
+.grp-open { display: block; font-size: 10.5px; letter-spacing: .04em; color: var(--muted); margin-top: 1px; }
+.grp-pos { display: grid; gap: 2px; margin: -2px 0 6px 24px; padding: 4px 8px; border-left: 2px solid rgba(255,255,255,.08); font-size: 11.5px; }
+.grp-pos > div { display: grid; grid-template-columns: 38px minmax(0, 1fr) 46px 72px; gap: 8px; align-items: center; }
+.grp-pos .mono { text-align: right; font-family: var(--mono); font-size: 11.5px; }
+.grp-pos .side { font-size: 9.5px; font-weight: 700; letter-spacing: .08em; padding: 1px 5px; border-radius: 5px; text-align: center; }
+.grp-pos .side.buy { color: var(--up); background: rgba(61,220,151,.12); }
+.grp-pos .side.sell { color: var(--down); background: rgba(242,100,124,.12); }

@@ -272,9 +272,18 @@ function renderTradingTile(o) {
     const states = (g.accounts || []).map((p) => stateOf[p]);
     return states.length && states.every((x) => x === 'live') ? 'ok' : states.some((x) => x === 'live' || x === 'stale') ? 'warn' : 'bad';
   };
-  $('#tGroups').innerHTML = '<div class="cap"><span>Gruppen</span><span>heute</span><span>gesamt</span></div>' + (groups.length ? groups.map((g) =>
-    `<div class="row grp"><span class="dot ${copier(g)}" title="Kopierer ${copier(g) === 'ok' ? 'online' : 'nicht online'}"></span><span>${esc(g.name)}</span>`
-    + `<span class="mono">${signed(g.pnl_today)}</span><span>${signed(g.pnl_total)}</span></div>`).join('')
+  // under each group: its open trades right now -- symbol, side, lots, profit or loss (Brano, 2026-10-19)
+  const openOf = (name) => o.accounts.flatMap((a) => a.open_positions || []).filter((p) => p.group === name);
+  const pl = (v) => `<span class="${v > 0 ? 'up' : v < 0 ? 'down' : 'muted'}">${v > 0 ? '+' : ''}${fmt(v)}</span>`;
+  $('#tGroups').innerHTML = '<div class="cap"><span>Gruppen</span><span>heute</span><span>gesamt</span></div>' + (groups.length ? groups.map((g) => {
+    const open = openOf(g.name), sum = open.reduce((x, p) => x + (p.profit || 0), 0);
+    return `<div class="row grp"><span class="dot ${copier(g)}" title="Kopierer ${copier(g) === 'ok' ? 'online' : 'nicht online'}"></span><span>${esc(g.name)}`
+      + `${open.length ? ` <small class="grp-open">${open.length} offen · ${pl(sum)}</small>` : ''}</span>`
+      + `<span class="mono">${signed(g.pnl_today)}</span><span>${signed(g.pnl_total)}</span></div>`
+      + (open.length ? `<div class="grp-pos">${open.slice(0, 4).map((p) => `<div><span class="side ${p.side}">${esc(p.side.toUpperCase())}</span>`
+        + `<span>${esc(p.symbol)}</span><span class="mono">${fmt(p.volume)}</span><span class="mono">${pl(p.profit || 0)}</span></div>`).join('')}`
+        + `${open.length > 4 ? `<div class="muted">+ ${open.length - 4} weitere</div>` : ''}</div>` : '');
+  }).join('')
     : '<div class="row"><span></span><span class="muted">Noch keine Gruppe hat gehandelt</span><span></span></div>');
   $('#kToday').innerHTML = signed(t.pnl_today, t.currency);
   $('#kWeek').innerHTML = signed(t.pnl_week, t.currency);

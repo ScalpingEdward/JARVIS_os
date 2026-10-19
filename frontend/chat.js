@@ -107,11 +107,24 @@
 
   // Sentence by sentence while the answer is still being written: each one's audio is fetched at
   // once and played in order, so the next sentence is ready when the current one ends.
-  let speechRun = 0, chain = Promise.resolve();
+  // ElevenLabs takes only a few requests at once (3 on this plan, measured 2026-10-19): firing every
+  // sentence together dropped the 4th and 5th, so AURON skipped parts of longer answers. Sentences
+  // are fetched one after the other -- the next while the current one plays -- with retries.
+  let speechRun = 0, chain = Promise.resolve(), fetches = Promise.resolve();
+  async function fetchAudio(text, v) {
+    for (let attempt = 0; attempt < 4; attempt++) {
+      try {
+        const r = await fetch(`${API}/v1/assistant/speak`, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text, provider: v.provider, voice: v.voice, model: v.model, accent: v.accent ?? DEFAULT_VOICE.accent }) });
+        if (r.ok) return await r.blob();
+      } catch { /* network hiccup: try again */ }
+      await new Promise((ok) => setTimeout(ok, 700 * (attempt + 1)));
+    }
+    console.warn('voice: sentence not spoken after 4 tries:', text.slice(0, 60));
+    return null;
+  }
   function speakChunk(text, run, v = chosen() || DEFAULT_VOICE) {
-    const audio = fetch(`${API}/v1/assistant/speak`, { method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text, provider: v.provider, voice: v.voice, model: v.model, accent: v.accent ?? DEFAULT_VOICE.accent }) })
-      .then((r) => (r.ok ? r.blob() : null)).catch(() => null);
+    const audio = fetches = fetches.then(() => (run === speechRun ? fetchAudio(text, v) : null));
     chain = chain.then(async () => {
       const blob = await audio;
       if (!blob || run !== speechRun) return;
