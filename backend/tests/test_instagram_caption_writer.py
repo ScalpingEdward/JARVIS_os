@@ -329,3 +329,11 @@ def test_the_recent_captions_reach_the_prompt():
     assert "second line" not in block, "only the opening line matters here"
     assert "Do not reuse their opening move" in block
     assert _recent_block([]) == "" and _recent_block(None) == ""
+
+
+def test_a_long_caption_is_sent_back_shorter():
+    from app.instagram_content.caption_writer import CAPTION_MAX_CHARS, _length_problem
+    short = "Fog ate the skyline. I pretended that was the plan.\n\n#portrait #lifestyle #travel"
+    long = ("Turns out doing nothing well takes almost as much practice as doing something. " * 3) + "#travel #dubai"
+    assert _length_problem(short) is None
+    assert f"at most {CAPTION_MAX_CHARS}" in _length_problem(long)

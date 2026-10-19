@@ -13,6 +13,11 @@ from .platform_strategy import platform_strategy_store
 ANTHROPIC_MESSAGES_URL = "https://api.anthropic.com/v1/messages"
 ANTHROPIC_API_VERSION = "2023-06-01"
 
+#: Captions ran to 250-420 characters -- three paragraphs of half-story under a photo. Brano
+#: (2026-10-19): too long, too much talk; clear, direct, easy to read. The text before the
+#: hashtags stays under this, checked, not just asked for.
+CAPTION_MAX_CHARS = 160
+
 DEFAULT_BRAND_VOICE = (
     "One person writing, not a brand. Brano, in his own words: a bit crazy, "
     "humble, good-hearted, disciplined, hard on himself, and funny with it. "
@@ -162,6 +167,9 @@ class AnthropicCaptionWriter:
             f"Media tags observed: {tag_hint}\n"
             f"Number of media items: {len(media_items)}\n\n"
             f"Requirements:\n"
+            f"- SHORT: one or two short sentences, at most {CAPTION_MAX_CHARS} characters before the hashtags. "
+            f"Plain everyday words, easy to read in one glance on a phone. No filler, no second paragraph, "
+            f"no explaining the joke.\n"
             f"- Opening line must work as a scroll-stopping hook, under 125 characters, "
             f"not a hashtag, not written in all caps.\n"
             f"- End with exactly {strategy.optimal_hashtag_min}-{strategy.optimal_hashtag_max} hashtags, chosen ONLY "
@@ -192,12 +200,12 @@ class AnthropicCaptionWriter:
         low, high = strategy.optimal_hashtag_min, strategy.optimal_hashtag_max
         prompt = self._build_prompt(theme, media_items, post_format, recent)
         caption = self._complete(prompt)
-        problem = self._hashtag_problem(caption, low, high) or _sermon_problem(caption, recent)
+        problem = self._hashtag_problem(caption, low, high) or _length_problem(caption) or _sermon_problem(caption, recent)
         if problem is None:
             return caption
 
         caption = self._complete(prompt + f"\nYour previous answer was rejected: {problem} Fix exactly that.")
-        problem = self._hashtag_problem(caption, low, high) or _sermon_problem(caption, recent)
+        problem = self._hashtag_problem(caption, low, high) or _length_problem(caption) or _sermon_problem(caption, recent)
         if problem is None:
             return caption
         raise CaptionWriterError(f"caption rejected after a corrective retry: {problem}")
@@ -250,3 +258,15 @@ class AnthropicCaptionWriter:
         finally:
             if should_close:
                 client.close()
+
+
+def _length_problem(caption: str) -> str | None:
+    """The words before the hashtags must stay short (CAPTION_MAX_CHARS)."""
+    body = caption
+    for tag in hashtags_in(caption):
+        body = body.replace(tag, "")
+    n = len(" ".join(body.split()))
+    if n > CAPTION_MAX_CHARS:
+        return (f"the text before the hashtags is {n} characters; keep it to one or two short sentences, "
+                f"at most {CAPTION_MAX_CHARS} characters.")
+    return None
