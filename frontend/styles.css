@@ -881,3 +881,30 @@ html[data-cards="dark"] .detail .card { background: linear-gradient(160deg, rgb(
 .an-row input { accent-color: var(--accent); }
 .an-quiet { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); }
 .an-quiet select { font: inherit; font-size: 12px; padding: 4px; border-radius: 7px; border: 1px solid var(--line-2); background: #0d121c; color: var(--text); }
+
+/* --- phone held upright: the planet large on top, the cards below at full width, upright --- */
+@media (max-width: 700px) {
+  .top .brand { display: none; }                       /* the planet is the brand here */
+  .topclock { top: calc(8px + env(safe-area-inset-top, 0px)); }
+  .topclock .clock { font-size: 46px !important; letter-spacing: .04em; }
+  .topclock .when small { font-size: 11px; }
+  .stage { min-height: 0; place-items: start stretch; padding: calc(150px + env(safe-area-inset-top, 0px)) 12px 150px; perspective: none; }
+  .scene { grid-template-columns: minmax(0, 1fr) !important; grid-template-areas: "holo" "left" "right" !important; gap: 16px; transform: none !important; }
+  .holo { transform: none; }
+  .core { --s: min(88vw, 380px) !important; }
+  .col { gap: 14px; }
+  .col > .tile { --base-ry: 0deg !important; --ry: 0deg !important; --rx: 0deg !important; transform: none !important; }
+  .chat { bottom: calc(40px + env(safe-area-inset-bottom, 0px)); width: calc(100vw - 24px); }
+  .sysbar { flex-wrap: nowrap; gap: 10px; padding: 5px 12px; font-size: 10px; white-space: nowrap; max-width: calc(100vw - 24px); overflow: hidden;
+    bottom: calc(4px + env(safe-area-inset-bottom, 0px)); }
+}
+@media (max-width: 700px) {
+  html, body { overflow-x: hidden; }                    /* the planet's widest ring may reach past the edge */
+  .sysbar .sys-status { display: flex; flex-wrap: nowrap; gap: 10px; }
+}
+/* phone: no clock and weather -- the phone shows both itself (Brano, 2026-10-19) */
+html.phone-land .topclock { display: none; }
+@media (max-width: 700px) {
+  .topclock { display: none; }
+  .stage { padding-top: calc(28px + env(safe-area-inset-top, 0px)); }
+}

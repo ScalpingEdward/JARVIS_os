@@ -13,7 +13,7 @@
     if (ROOMS[q]) return q;
     try { const k = localStorage.getItem('auron_room'); return ROOMS[k] ? k : 'lounge'; } catch { return 'lounge'; }
   };
-  let key = pick(), room = ROOMS[key], rect = [0, 0, 1, 1];
+  let key = pick(), room = ROOMS[key], rect = [0, 0, 1, 1], fade = 0;
 
   // ---- placement: the picture's pedestal right under the planet ----------------------------
   // Scaled so the pedestal's top is about as wide as the planet's orbits, never smaller than
@@ -22,6 +22,18 @@
     const core = document.getElementById('core').getBoundingClientRect();
     const px = core.left + core.width / 2, py = core.top + core.height * 0.88;
     const vw = innerWidth, vh = innerHeight, [x, y, top] = room.ped;
+    if (vw <= 700) {
+      // phone held upright: the room as a room -- a little wider than the screen, pedestal under the
+      // planet, top and bottom fading into the dark -- instead of blown up to fill the tall window
+      const W = Math.max(vw * 1.9, (core.width * 0.8) / top), H = W * room.h / room.w;
+      rect = [px - x * W, py - y * H, W, H]; fade = 1;
+      document.body.style.backgroundImage = `url("${room.src}")`;
+      document.body.style.backgroundSize = `${W}px ${H}px`;
+      document.body.style.backgroundPosition = `${rect[0]}px ${rect[1]}px`;
+      document.body.style.backgroundRepeat = 'no-repeat';
+      return;
+    }
+    fade = 0;
     let scale = Math.max(vw / room.w, vh / room.h, (core.width * 0.8) / (top * room.w));  // 0.8: less zoom, sharper room
     for (let i = 0; i < 40; i++) {
       const W = room.w * scale, H = room.h * scale, bx = px - x * W, by = py - y * H;
@@ -43,7 +55,7 @@
 
   const FRAG = `
 precision highp float;
-uniform sampler2D img; uniform vec2 res; uniform vec4 rect; uniform vec2 texel; uniform float t; uniform float sharp;
+uniform sampler2D img; uniform vec2 res; uniform vec4 rect; uniform vec2 texel; uniform float t; uniform float sharp; uniform float fade;
 uniform vec4 zr[${MAX_Z}]; uniform float zk[${MAX_Z}]; uniform int nz;
 float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 float noise(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3. - 2. * f);
@@ -115,6 +127,10 @@ void main() {
     float band = exp(-pow((uv.x * .7 + uv.y * .5 - fract(t * .02) * 2.4 + .5) * 7., 2.));
     c += c * wSheen * band * .3 * smoothstep(.06, .45, l);
   }
+  if (fade > 0.) {   // phone upright: the picture ends above and below -- let it fade into the dark
+    float k = smoothstep(0., .16, uv.y) * smoothstep(1., .82, uv.y);
+    c = mix(vec3(.012, .02, .04), c, k);
+  }
   gl_FragColor = vec4(c, 1.);
 }`;
   const VERT = 'attribute vec2 a; void main() { gl_Position = vec4(a, 0., 1.); }';
@@ -131,7 +147,7 @@ void main() {
     gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
     const a = gl.getAttribLocation(prog, 'a'); gl.enableVertexAttribArray(a); gl.vertexAttribPointer(a, 2, gl.FLOAT, false, 0, 0);
-    for (const n of ['img', 'res', 'rect', 'texel', 't', 'zr', 'zk', 'nz', 'sharp']) u[n] = gl.getUniformLocation(prog, n);
+    for (const n of ['img', 'res', 'rect', 'texel', 't', 'zr', 'zk', 'nz', 'sharp', 'fade']) u[n] = gl.getUniformLocation(prog, n);
     tex = gl.createTexture();
   }
 
@@ -170,6 +186,7 @@ void main() {
       gl.uniform2f(u.res, canvas.width, canvas.height);
       gl.uniform4f(u.rect, rect[0] * dpr, rect[1] * dpr, rect[2] * dpr, rect[3] * dpr);
       gl.uniform1f(u.t, now / 1000);
+      gl.uniform1f(u.fade, fade);
       gl.uniform1f(u.sharp, Math.min(1.1, Math.max(.35, (rect[2] * dpr / texW - .5) * 1.2)));
       gl.drawArrays(gl.TRIANGLES, 0, 3);
       canvas.classList.add('on');
