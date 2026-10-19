@@ -51,7 +51,7 @@
   // 2. the card gets its box: its natural height plus its share of the free room in its column
   //    (top bar and status bar stay clear) -- or, on the wallpaper, one height for the whole row
   // 3. the largest text that fits in that box
-  function finish({ id, card, els, nat, box }) {
+  function finish({ id, card, els, nat, box }, forced) {
     const st = styleOf(id), desk = document.documentElement.classList.contains('desk');
     const base = els.map((el) => parseFloat(getComputedStyle(el).fontSize) || 0), num = els.map((el) => el.matches(NUM_SEL));
     card.style.height = `${box}px`;
@@ -65,6 +65,13 @@
     const one = SIZES.indexOf(1), oneN = NUMS.indexOf(1), ai = SIZES.indexOf(st.size), bi = NUMS.indexOf(st.num);
     const aLow = Math.min(one, ai), bLow = Math.min(oneN, bi);
     let used = SIZES[aLow], usedNum = NUMS[bLow], ok = false;
+    // a data refresh keeps the size it had while it still fits -- trying larger ones on every refresh
+    // made a card jump between two sizes as its numbers changed width (Brano, 2026-10-19)
+    const key = `${st.size}|${st.num}|${box}`, prev = card._fit;
+    if (!forced && prev && prev.key === key) {
+      set(prev.a, prev.b);
+      if (fits()) { used = prev.a; usedNum = prev.b; ok = true; }
+    }
     for (let d = 0; d <= (ai - aLow) + (bi - bLow) && !ok; d++) {
       for (let db = 0; db <= d && !ok; db++) {
         const a = ai - (d - db), b = bi - db;
@@ -74,6 +81,7 @@
       }
     }
     if (!ok) set(used, usedNum);
+    card._fit = { key, a: used, b: usedNum };
     // the wallpaper's row has one height for all: what doesn't fit there steps out whole, never half
     const topIn = (el) => { let t = 0; for (let e = el; e && e !== card; e = e.offsetParent) t += e.offsetTop; return t; };
     if (desk) [...card.querySelectorAll('.tile-list > *')].forEach((el) => {
@@ -82,6 +90,7 @@
   }
 
   const TOP_CLEAR = 90, BOTTOM_CLEAR = 120;   // the column is centred a little above the middle
+  let force = true;   // a new size, a new window size: look for the largest again
   function fitAll() {
     const desk = document.documentElement.classList.contains('desk');
     const all = Object.keys(CARDS).map(prepare).filter(Boolean);
@@ -97,7 +106,8 @@
         mine.forEach((p) => { p.box = p.nat + Math.floor(spare * p.nat / sum); });
       }
     }
-    shown.forEach(finish);
+    shown.forEach((p) => finish(p, force));
+    force = false;
   }
 
   function apply(id) {
@@ -108,7 +118,7 @@
     card.style.zoom = '';
     card.style.fontFamily = st.font === 'std' ? '' : FONTS[st.font][1];
     card.dataset.font = st.font;
-    refit();
+    force = true; refit();
   }
   // the lists are re-rendered with every refresh: fit again once the new rows are in
   let pending = 0;
@@ -176,10 +186,12 @@
       if (b.dataset.all) Object.keys(CARDS).forEach((other) => { styles[other] = { ...styleOf(id) }; apply(other); });
       save(); apply(id); paint(); place();
     });
-    new MutationObserver(refit).observe(card, { childList: true, subtree: true, characterData: true });
+    // the countdown and the big figure tick every second without changing any height: not a reason to fit again
+    new MutationObserver((ms) => { if (ms.some((m) => !(m.target.parentElement || m.target).closest?.('.tile-figure'))) refit(); })
+      .observe(card, { childList: true, subtree: true, characterData: true });
     apply(id);
   }
-  addEventListener('resize', refit);
+  addEventListener('resize', () => { force = true; refit(); });
   document.fonts?.ready.then(refit);
   const closeAll = () => document.querySelectorAll('.card-menu').forEach((m) => {
     if (!m.hidden) { m.hidden = true; document.getElementById(m.dataset.card)?.classList.remove('menu-open'); } });
