@@ -934,3 +934,11 @@ html.phone-land .topclock { display: none; }
 .card-menu .cm-all { margin-top: 4px; border-top: 1px solid var(--line); border-radius: 0 0 8px 8px; color: var(--accent); }
 /* the big views: a little larger too (Brano, 2026-10-19) */
 .detail .view { zoom: 1.1; }
+
+/* the card menu opens beside its card (cardview.js places it), solid so the text reads */
+body > .card-menu { position: fixed; top: 0; left: 0; right: auto; z-index: 40; transform: none;
+  background: rgba(8, 12, 20, .97); border: 1px solid rgb(var(--tint) / .25); box-shadow: 0 24px 60px -18px rgba(0,0,0,.9); }
+/* tiles view: a group's open trades across the full width under the group, room for the symbol */
+.tile-list.as-tiles .grp-pos { grid-column: 1 / -1; margin: 0 0 4px; }
+.grp-pos > div { grid-template-columns: 38px minmax(0, 1fr) auto 64px; }
+.grp-pos > div > span:nth-child(2) { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

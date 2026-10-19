@@ -49,9 +49,27 @@
           `<span role="button" data-font="${k}" class="${st.font === k ? 'on' : ''}" style='font-family:${fam}'>${n}</span>`).join('')
         + `<span role="button" data-all="1" class="cm-all">Für alle Karten übernehmen</span>`;
     };
-    card.append(gear, menu);
+    card.append(gear);
+    // The menu lives on the page, not in the card: inside, it covered the card's own content and a
+    // card that clips (Post) cut it off. It opens beside the card, toward the middle of the screen --
+    // to the right of a card on the left, to the left of a card on the right.
+    menu.dataset.card = id;
+    document.body.append(menu);
+    const place = () => {
+      const r = card.getBoundingClientRect(), w = menu.offsetWidth, h = menu.offsetHeight;
+      const onLeft = r.left + r.width / 2 < innerWidth / 2;
+      let x = onLeft ? r.right + 10 : r.left - w - 10;
+      if (x < 8 || x + w > innerWidth - 8) x = Math.min(Math.max(8, r.right - w - 10), innerWidth - w - 8);   // narrow screen: over the card
+      menu.style.left = `${x}px`;
+      menu.style.top = `${Math.min(Math.max(8, r.top + 8), innerHeight - h - 8)}px`;
+    };
     // the card itself is a button that opens its view -- clicks on the gear and menu stay here
-    gear.addEventListener('click', (e) => { e.stopPropagation(); e.preventDefault(); paint(); menu.hidden = !menu.hidden; card.classList.toggle('menu-open', !menu.hidden); });
+    gear.addEventListener('click', (e) => {
+      e.stopPropagation(); e.preventDefault();
+      const open = menu.hidden;
+      document.querySelectorAll('.card-menu').forEach((m) => { m.hidden = true; document.getElementById(m.dataset.card)?.classList.remove('menu-open'); });
+      if (open) { paint(); menu.hidden = false; place(); card.classList.add('menu-open'); }
+    });
     menu.addEventListener('click', (e) => {
       e.stopPropagation(); e.preventDefault();
       const b = e.target.closest('[data-v], [data-size], [data-font], [data-all]');
@@ -64,10 +82,12 @@
       }
       if (b.dataset.font) styles[id] = { ...st, font: b.dataset.font };
       if (b.dataset.all) Object.keys(CARDS).forEach((other) => { styles[other] = { ...styleOf(id) }; apply(other); });
-      save(); apply(id); paint();
+      save(); apply(id); paint(); place();
     });
     apply(id);
   }
-  document.addEventListener('click', () => document.querySelectorAll('.card-menu').forEach((m) => {
-    if (!m.hidden) { m.hidden = true; m.parentElement.classList.remove('menu-open'); } }));
+  const closeAll = () => document.querySelectorAll('.card-menu').forEach((m) => {
+    if (!m.hidden) { m.hidden = true; document.getElementById(m.dataset.card)?.classList.remove('menu-open'); } });
+  document.addEventListener('click', closeAll);
+  addEventListener('resize', closeAll);
 })();
