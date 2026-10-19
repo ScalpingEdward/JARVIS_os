@@ -6,7 +6,9 @@ Read-only for now -- see tools.py.
 """
 from __future__ import annotations
 
+import json
 import os
+from collections.abc import Iterator
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
@@ -87,6 +89,100 @@ def reply(history: list[dict], lang: str = "de", client: httpx.Client | None = N
                 if not text:
                     raise AssistantError(f"Anthropic API returned no text (stop_reason {stop})")
                 return {"text": text, "tools": used}
+            results = []
+            for b in content:
+                if b.get("type") == "tool_use":
+                    out, failed = tools.run(b["name"], b.get("input") or {})
+                    results.append({"type": "tool_result", "tool_use_id": b["id"], "content": out, "is_error": failed})
+            messages.append({"role": "user", "content": results})
+        raise AssistantError(f"no answer after {MAX_ROUNDS} tool rounds")
+    except httpx.HTTPError as exc:
+        raise AssistantError(f"Could not reach the Anthropic API: {exc}") from exc
+    finally:
+        if close:
+            c.close()
+
+
+def _blocks_from_stream(lines: Iterator[str]) -> Iterator[tuple[str, object]]:
+    """Anthropic's SSE stream -> ("text", delta) while text arrives, then ("message", (content, stop_reason)).
+    Rebuilds every block as the non-streaming API would return it -- thinking with its signature,
+    tool calls with their parsed input -- so the next tool round can send it back unchanged."""
+    blocks: dict[int, dict] = {}
+    partial: dict[int, str] = {}
+    stop = None
+    for line in lines:
+        if not line.startswith("data:"):
+            continue
+        ev = json.loads(line[5:].strip() or "{}")
+        kind = ev.get("type")
+        if kind == "content_block_start":
+            i, block = ev["index"], dict(ev["content_block"])
+            if block["type"] in ("tool_use", "server_tool_use"):
+                partial[i] = ""
+            blocks[i] = block
+        elif kind == "content_block_delta":
+            i, d = ev["index"], ev["delta"]
+            b = blocks[i]
+            if d["type"] == "text_delta":
+                b["text"] = b.get("text", "") + d["text"]
+                yield "text", d["text"]
+            elif d["type"] == "input_json_delta":
+                partial[i] += d.get("partial_json", "")
+            elif d["type"] == "thinking_delta":
+                b["thinking"] = b.get("thinking", "") + d["thinking"]
+            elif d["type"] == "signature_delta":
+                b["signature"] = d["signature"]
+            elif d["type"] == "citations_delta":
+                b.setdefault("citations", []).append(d["citation"])
+        elif kind == "content_block_stop":
+            i = ev["index"]
+            if i in partial:
+                blocks[i]["input"] = json.loads(partial.pop(i) or "{}")
+        elif kind == "message_delta":
+            stop = ev.get("delta", {}).get("stop_reason") or stop
+        elif kind == "error":
+            raise AssistantError(f"Anthropic stream error: {ev.get('error')}")
+    yield "message", ([blocks[i] for i in sorted(blocks)], stop)
+
+
+def reply_stream(history: list[dict], lang: str = "de", client: httpx.Client | None = None) -> Iterator[dict]:
+    """The same answer as reply(), as it is written: {"text": delta} while Claude writes,
+    {"tool": name} when it looks something up, finally {"done": True, "text", "tools"}.
+    The dashboard speaks each finished sentence while the next one is still being written."""
+    key = os.getenv("ANTHROPIC_API_KEY")
+    if not key:
+        raise AssistantError("ANTHROPIC_API_KEY is not set")
+    messages: list[dict] = [{"role": m["role"], "content": m["content"]} for m in history]
+    used: list[str] = []
+    c, close = (client, False) if client else (httpx.Client(), True)
+    try:
+        for _ in range(MAX_ROUNDS):
+            with c.stream("POST", ANTHROPIC_MESSAGES_URL, timeout=120, headers={
+                    "x-api-key": key, "anthropic-version": ANTHROPIC_API_VERSION, "content-type": "application/json"},
+                    json={"model": _model(), "max_tokens": MAX_TOKENS, "system": system_prompt(lang), "stream": True,
+                          "tools": [*tools.TOOLS, tools.WEB_SEARCH], "messages": messages}) as r:
+                if r.status_code >= 400:
+                    r.read()
+                    raise AssistantError(f"Anthropic API returned {r.status_code}: {r.text[:300]}")
+                content, stop = [], None
+                for kind, value in _blocks_from_stream(r.iter_lines()):
+                    if kind == "text":
+                        yield {"text": value}
+                    else:
+                        content, stop = value
+            names = [b["name"] for b in content if b.get("type") in ("tool_use", "server_tool_use")]
+            used += names
+            for n in names:
+                yield {"tool": n}
+            messages.append({"role": "assistant", "content": content})
+            if stop == "pause_turn":
+                continue
+            if stop != "tool_use":
+                text = "".join(b.get("text", "") for b in content if b.get("type") == "text").strip()
+                if not text:
+                    raise AssistantError(f"Anthropic API returned no text (stop_reason {stop})")
+                yield {"done": True, "text": text, "tools": used}
+                return
             results = []
             for b in content:
                 if b.get("type") == "tool_use":

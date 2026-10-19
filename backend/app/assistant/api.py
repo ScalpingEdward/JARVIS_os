@@ -1,10 +1,13 @@
 from typing import Literal
 
+import json
+
 from fastapi import APIRouter, HTTPException, Request, Response
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from . import voice
-from .brain import AssistantError, reply
+from .brain import AssistantError, reply, reply_stream
 
 router = APIRouter(prefix="/v1/assistant", tags=["assistant"])
 
@@ -33,6 +36,23 @@ def chat(payload: ChatIn) -> ChatOut:
         return ChatOut(**reply([m.model_dump() for m in payload.messages], payload.lang))
     except AssistantError as exc:
         raise HTTPException(status_code=502, detail=str(exc))
+
+
+@router.post("/chat/stream")
+def chat_stream(payload: ChatIn) -> StreamingResponse:
+    """The answer as it is written, one JSON object per line: {"text"}, {"tool"}, finally {"done"}
+    -- or {"error"}. The dashboard starts speaking after the first sentence."""
+    if payload.messages[-1].role != "user":
+        raise HTTPException(status_code=422, detail="the last message must be Brano's")
+
+    def lines():
+        try:
+            for ev in reply_stream([m.model_dump() for m in payload.messages], payload.lang):
+                yield json.dumps(ev, ensure_ascii=False) + "\n"
+        except AssistantError as exc:
+            yield json.dumps({"error": str(exc)}, ensure_ascii=False) + "\n"
+
+    return StreamingResponse(lines(), media_type="application/x-ndjson", headers={"X-Accel-Buffering": "no"})
 
 
 class SpeakIn(BaseModel):

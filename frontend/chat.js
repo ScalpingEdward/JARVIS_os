@@ -36,16 +36,49 @@
     const thinking = { role: 'assistant', content: 'AURON denkt nach …', pending: true };
     turns.push(thinking); render();
     form.classList.add('busy');
+    const talk = spoken || voiceOn();
+    const run = ++speechRun;           // a new question silences what is still being said
+    player.pause();
+    let spokenUpTo = '';               // text not yet handed to the voice
+    const flush = (all) => {           // whole sentences go to the voice as soon as they are written
+      const re = all ? /^([\s\S]+)$/ : /^([\s\S]*?[.!?…:](?:["“”»«)]*))\s+/;
+      let m;
+      while ((m = spokenUpTo.match(re)) && m[1].trim()) {
+        if (!all && m[1].trim().length < 18 && !/\n/.test(spokenUpTo)) break;   // too short alone: wait for more
+        speakChunk(m[1].trim(), run);
+        spokenUpTo = spokenUpTo.slice(m[0].length);
+        if (all) break;
+      }
+    };
     try {
       const messages = turns.filter((t) => !t.pending && !t.error).slice(-KEEP).map(({ role, content }) => ({ role, content }));
       while (messages.length && messages[0].role !== 'user') messages.shift();
-      const r = await fetch(`${API}/v1/assistant/chat`, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      const r = await fetch(`${API}/v1/assistant/chat/stream`, { method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ messages, lang: lang() }) });
-      const data = await r.json().catch(() => ({}));
-      if (!r.ok) throw new Error(typeof data.detail === 'string' ? data.detail : `HTTP ${r.status}`);
-      Object.assign(thinking, { content: data.text, tools: data.tools, pending: false });
-      if ((data.tools || []).includes('mail_draft_reply') && typeof refreshMail === 'function') refreshMail();  // the draft shows up on the Post card
-      if (spoken || voiceOn()) say(data.text).catch((err) => console.warn('voice:', err.message));
+      if (!r.ok) { const d = await r.json().catch(() => ({})); throw new Error(typeof d.detail === 'string' ? d.detail : `HTTP ${r.status}`); }
+      const reader = r.body.getReader(), dec = new TextDecoder();
+      let buf = '';
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += dec.decode(value, { stream: true });
+        let nl;
+        while ((nl = buf.indexOf('\n')) >= 0) {
+          const line = buf.slice(0, nl).trim(); buf = buf.slice(nl + 1);
+          if (!line) continue;
+          const ev = JSON.parse(line);
+          if (ev.error) throw new Error(ev.error);
+          if (ev.text) {
+            if (thinking.pending) Object.assign(thinking, { content: '', pending: false });
+            thinking.content += ev.text; render();
+            if (talk) { spokenUpTo += ev.text; flush(false); }
+          }
+          if (ev.tool) { thinking.tools = [...(thinking.tools || []), ev.tool]; render(); }
+          if (ev.done) Object.assign(thinking, { content: ev.text, tools: ev.tools, pending: false });
+        }
+      }
+      if (talk) flush(true);
+      if ((thinking.tools || []).includes('mail_draft_reply') && typeof refreshMail === 'function') refreshMail();  // the draft shows up on the Post card
     } catch (e) {
       Object.assign(thinking, { content: `Fehler: ${e.message}`, error: true, pending: false });
     }
@@ -71,6 +104,23 @@
     })).then(() => say(text)).catch((err) => console.warn('announce voice:', err.message)); return queue; },
     note: (text) => { turns.push({ role: 'assistant', content: text }); save(); if (dock.classList.contains('open')) render(); },
   };
+
+  // Sentence by sentence while the answer is still being written: each one's audio is fetched at
+  // once and played in order, so the next sentence is ready when the current one ends.
+  let speechRun = 0, chain = Promise.resolve();
+  function speakChunk(text, run, v = chosen() || DEFAULT_VOICE) {
+    const audio = fetch(`${API}/v1/assistant/speak`, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text, provider: v.provider, voice: v.voice, model: v.model, accent: v.accent ?? DEFAULT_VOICE.accent }) })
+      .then((r) => (r.ok ? r.blob() : null)).catch(() => null);
+    chain = chain.then(async () => {
+      const blob = await audio;
+      if (!blob || run !== speechRun) return;
+      if (lastUrl) URL.revokeObjectURL(lastUrl);
+      player.src = lastUrl = URL.createObjectURL(blob);
+      await player.play().catch(() => {});
+      await new Promise((done) => { player.onended = done; player.onpause = done; });
+    });
+  }
 
   async function say(text, v = chosen() || DEFAULT_VOICE) {
     const r = await fetch(`${API}/v1/assistant/speak`, { method: 'POST', headers: { 'Content-Type': 'application/json' },
