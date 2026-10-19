@@ -666,6 +666,15 @@ async function loadFollows() {
     : '<tr><td class="muted">Noch niemand – markiere unten in der Profi-Liste einen Insider mit ☆.</td></tr>';
   if (sgData) renderSignalers();
 }
+async function loadInsiderAccount() {
+  let d;
+  try { d = await get('/v1/smartmoney/insider-account'); } catch (e) { console.warn(e); return; }
+  $('#iaState').textContent = d.config.connected ? 'verbunden' : 'nicht verbunden';
+  $('#iaTable').innerHTML = d.intents.length ? '<tr><th>WANN</th><th>INSIDER</th><th>AKTIE</th><th>MT5</th><th>RISIKO</th><th>HALTEN</th><th>STATUS</th></tr>'
+    + d.intents.map((i) => `<tr><td class="muted">${esc(new Date(i.at).toLocaleDateString('de-DE'))}</td><td>${esc(i.owner)}</td><td><b>${esc(i.ticker)}</b></td>`
+      + `<td>${esc(i.mt5_symbol || '–')}</td><td class="num">${i.risk_pct} %</td><td class="num">${i.hold_trading_days} T</td><td class="muted">${esc(i.status)}</td></tr>`).join('')
+    : '<tr><td class="muted">Noch nichts vorgemerkt – sobald ein beobachteter Insider kauft, steht es hier.</td></tr>';
+}
 async function toggleFollow(owner, on) {
   try {
     if (on) await send('POST', '/v1/smartmoney/follows', { owner });
@@ -684,6 +693,7 @@ async function loadSignalers() {
   try { sgData = await get(`/v1/smartmoney/signalers?verdict=${sgVerdict}&limit=400`); } catch (e) { console.warn(e); return; }
   renderSignalers();
   loadFollows();
+  loadInsiderAccount();
 }
 function renderSignalers() {
   const d = sgData;

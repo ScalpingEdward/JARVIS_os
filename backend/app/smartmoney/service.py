@@ -137,6 +137,8 @@ class SmartMoneyService:
                                 side = "kauft" if tr["code"] == "P" else "verkauft"
                                 self._telegram("Beobachteter Insider", f"{tr['owner']} {side} {name} ({ticker}): {tr['shares']:,.0f} Aktien "
                                                f"zu {tr['price']:,.2f} $ = {tr['value']:,.0f} $.\nSeine Bilanz: {w['note']}.\n\nBeobachtung, keine Empfehlung.")
+                                from . import insider_account
+                                insider_account.on_trade({**tr, "ticker": ticker}, ((self.backtest() or {}).get("symbols") or {}).get(ticker), w["note"])
                             elif tr["code"] == "P" and tr["value"] >= BIG_BUY:
                                 note = self.track_record(ticker, role_of("Officer" if tr["title"] else "", tr["title"]))
                                 v = self.insider_verdict(tr["owner"], ticker, "buy")

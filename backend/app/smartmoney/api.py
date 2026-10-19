@@ -68,3 +68,10 @@ def follow(payload: dict) -> dict:
 @router.delete("/follows")
 def unfollow(owner: str) -> dict:
     return {"removed": smart_money_service.unfollow(owner)}
+
+
+@router.get("/insider-account")
+def insider_account_view() -> dict:
+    """The dedicated insider account: its settings and the intents collected so far (not connected yet)."""
+    from . import insider_account
+    return {"config": insider_account.config(), "intents": insider_account.intents()[:50]}

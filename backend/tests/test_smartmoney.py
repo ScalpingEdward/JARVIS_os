@@ -105,3 +105,15 @@ def test_a_watched_insider_is_polled_and_every_trade_alerts(monkeypatch):
     smart_money_service.poll_insiders()
     assert [t for t, _ in sent] == ["Beobachteter Insider"] and "verkauft" in sent[0][1]   # a small sale still alerts
     assert smart_money_service.unfollow("Huang Jen Hsun") and smart_money_service.follows() == []
+
+
+def test_a_watched_insiders_buy_becomes_an_intent_for_the_insider_account_and_a_sale_does_not():
+    from app.smartmoney import insider_account
+    insider_account._write(insider_account.INTENTS_KEY, [])
+    buy = {"owner": "Huang Jen Hsun", "ticker": "NVDA", "code": "P", "value": 150500, "price": 150.5}
+    i = insider_account.on_trade(buy, "NVDA.s", "5 Käufe, 80 % Treffer")
+    assert i["side"] == "buy" and i["mt5_symbol"] == "NVDA.s" and i["status"] == "nicht verbunden" and i["hold_trading_days"] == 60
+    assert insider_account.on_trade(buy, "NVDA.s", "") is None              # same insider, stock, day: once
+    assert insider_account.on_trade({**buy, "code": "S"}, "NVDA.s", "") is None
+    assert insider_account.on_trade({**buy, "ticker": "XYZ"}, None, "")["status"] == "kein Symbol beim Broker"
+    assert len(insider_account.intents()) == 2
