@@ -15,6 +15,7 @@
     planet: '#4fd8ff', core: 'planet', clockColor: '#ffffff' };
   const SECTIONS = [
     ['design', '🎨', 'Design', 'Raum, Farben, Glas, Uhr'],
+    ['cards', '▦', 'Karten', 'Welche Karten, wo, in welcher Reihenfolge'],
     ['voice', '🔊', 'Stimme', 'AURONs Stimme wählen und anhören'],
     ['info', 'ℹ', 'Info', 'Was läuft, Versionen, Hinweise'],
   ];
@@ -89,6 +90,11 @@
             <span class="th-label">Größe <b data-out="clockSize">${t.clockSize} px</b></span>
             <input type="range" min="40" max="120" step="4" data-k="clockSize" value="${t.clockSize}" />`)
         + '<button type="button" class="th-reset" data-k="reset">Design zurücksetzen</button>';
+      return;
+    }
+    if (page === 'cards') {
+      panel.innerHTML = head('Karten', true) + '<div class="le" id="cardEditor"></div>';
+      window.AURON_layoutEditor?.open(panel.querySelector('#cardEditor'));
       return;
     }
     if (page === 'info') {

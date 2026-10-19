@@ -4,11 +4,11 @@ Eine Liste statt fünf. Quelle: CLAUDE.md, docs/ROADMAP.md, docs/signal-copier-b
 docs/futures-bot-datenquellen.md und Brano's Ansagen. Reihenfolge = Bau-Reihenfolge.
 `[ ]` offen · `[~]` in Arbeit · `[x]` erledigt · **Gerüst** = Struktur steht, Anbindung später.
 
-## 1. Dashboard-Karten individualisieren  `[~]` (freigegeben 2026-10-19)
-- [ ] Anordnung in der Datenbank (`app_settings` `dashboard.layout`), nicht im Browser – gilt überall
-- [ ] Bearbeiten-Modus: Karte ein/aus, links/rechts, Reihenfolge, „＋ Karte“ aus dem Katalog
-- [ ] AURON-Befehl („Zeig mir Gold rechts oben“) – AURON fragt vorher
-- [ ] Neue Karten: Kurs (MT5-Symbol), Kopierer/Bots mit Pause/Weiter, Notizen/To-do
+## 1. Dashboard-Karten individualisieren  `[x]` (2026-10-19)
+- [x] Anordnung in der Datenbank (`app_settings` `dashboard.layout`), nicht im Browser – gilt überall
+- [x] Bearbeiten-Modus: Karte ein/aus, links/rechts, Reihenfolge, „＋ Karte“ aus dem Katalog
+- [x] AURON-Befehl („Zeig mir Gold rechts oben“) – AURON fragt vorher
+- [x] Neue Karten: Kurs (MT5-Symbol), Kopierer/Bots mit Pause/Weiter, Notizen/To-do
 
 ## 2. AURON baut mit Claude Code – mit Erlaubnis  `[ ]`
 Ziel: Im Dashboard über eine Strategie reden (z. B. Opening Range Breakout), daraus entsteht
