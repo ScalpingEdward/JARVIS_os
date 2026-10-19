@@ -122,7 +122,9 @@
   }
   // the lists are re-rendered with every refresh: fit again once the new rows are in
   let pending = 0;
-  const refit = () => { clearTimeout(pending); pending = setTimeout(fitAll, 30); };   // not rAF: it sleeps in a hidden window
+  const refit = () => { clearTimeout(pending); pending = setTimeout(fitAll, 30); };
+  let queued = false;
+  const refitNow = () => { if (queued) return; queued = true; queueMicrotask(() => { queued = false; fitAll(); }); };   // not rAF: it sleeps in a hidden window
 
   for (const id of Object.keys(CARDS)) {
     const card = document.getElementById(id);
@@ -187,7 +189,9 @@
       save(); apply(id); paint(); place();
     });
     // the countdown and the big figure tick every second without changing any height: not a reason to fit again
-    new MutationObserver((ms) => { if (ms.some((m) => !(m.target.parentElement || m.target).closest?.('.tile-figure'))) refit(); })
+    // straight in the observer (a microtask, before the browser paints): with a timer in between, new
+    // rows showed for a frame at their plain size every refresh and the card flickered (Brano, 2026-10-19)
+    new MutationObserver((ms) => { if (ms.some((m) => !(m.target.parentElement || m.target).closest?.('.tile-figure'))) refitNow(); })
       .observe(card, { childList: true, subtree: true, characterData: true });
     apply(id);
   }
