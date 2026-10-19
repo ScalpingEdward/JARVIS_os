@@ -454,3 +454,8 @@ html[data-glass="solid"] .benefit { background: linear-gradient(155deg, rgb(var(
   .m-head { padding-top: 30px; }
   .hero::before { height: 300px; }
 }
+@media (max-width: 900px) {
+  .hero { padding-top: calc(6px + env(safe-area-inset-top, 0px)); }
+  .hero-mark { gap: 0; }
+  .hero-mark small { margin-top: -4px; }
+}
