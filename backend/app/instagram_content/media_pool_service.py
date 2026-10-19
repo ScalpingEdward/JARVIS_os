@@ -493,7 +493,7 @@ class MediaPoolService:
         return analyze_gaps(self.list_available())
 
     def run_curation(self, max_groups: int = 10) -> list[CuratedDraft]:
-        groups = curate(self.list_available(), max_groups=max_groups)
+        groups = curate(self.list_all(), max_groups=max_groups)   # all: the day rule needs to see what was used
         drafts: list[CuratedDraft] = []
         with SessionLocal() as session:
             for group in groups:

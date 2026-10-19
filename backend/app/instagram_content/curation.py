@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import os
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import date, datetime
+from pathlib import Path
 
 from .media_pool_models import ContentGapReport, MediaPoolItem, ThemeGap
 from .models import MediaType
@@ -16,6 +18,62 @@ _DEFAULTS = PlatformStrategy()
 ELITE_SOLO_THRESHOLD = _DEFAULTS.elite_solo_threshold
 CAROUSEL_MIN_SIZE = _DEFAULTS.carousel_min_size
 CAROUSEL_IDEAL_MAX_SIZE = _DEFAULTS.carousel_ideal_max_size
+
+
+#: One shoot -> one carousel (CLAUDE.md, "Tagesregel"). A day's strongest items still carry their
+#: own Reel or single post -- those are rare and the reach lever -- but the day's photos below the
+#: bar go into ONE carousel, its best ten. The rest stay in the pool, unused, never deleted.
+DAY_CAROUSELS = 1
+#: Two photos this close (64-bit difference hash, bits apart) are the same moment shot twice; only
+#: the higher-scored one is offered. The other stays in the pool.
+DUP_MAX_DISTANCE = 6
+_hash_cache: dict[str, int | None] = {}
+
+
+def _dhash(item: MediaPoolItem) -> int | None:
+    """Difference hash of the processed photo; None for videos or a file that is not there."""
+    if item.media_type != MediaType.image or not item.processed_file:
+        return None
+    key = item.processed_file
+    if key not in _hash_cache:
+        path = Path(os.getenv("JARVIS_PROCESSED_DIR", "/data/images/processed")) / key
+        try:
+            from PIL import Image
+            with Image.open(path) as im:
+                px = list(im.convert("L").resize((9, 8)).getdata())
+            bits = 0
+            for r in range(8):
+                for c in range(8):
+                    bits = (bits << 1) | (px[r * 9 + c] > px[r * 9 + c + 1])
+            _hash_cache[key] = bits
+        except (OSError, ValueError):
+            _hash_cache[key] = None
+    return _hash_cache[key]
+
+
+def _without_duplicates(items: list[MediaPoolItem]) -> list[MediaPoolItem]:
+    """Score-sorted in, near-identical later ones out (they stay in the pool)."""
+    kept: list[MediaPoolItem] = []
+    hashes: list[int] = []
+    for item in items:
+        h = _dhash(item)
+        if h is not None and any(bin(h ^ k).count("1") <= DUP_MAX_DISTANCE for k in hashes):
+            continue
+        kept.append(item)
+        if h is not None:
+            hashes.append(h)
+    return kept
+
+
+def _carouselled_keys(pool_items: list[MediaPoolItem]) -> set[str]:
+    """Shoot days (group keys) that already had a carousel: two or more of their items sit in the
+    same draft or post."""
+    posts: dict[str, list[MediaPoolItem]] = defaultdict(list)
+    for item in pool_items:
+        ref = item.reserved_in_draft_id or item.used_in_candidate_id
+        if ref is not None:
+            posts[str(ref)].append(item)
+    return {_group_key(items[0]) for items in posts.values() if len(items) >= 2}
 
 
 @dataclass(frozen=True)
@@ -90,6 +148,7 @@ def curate(pool_items: list[MediaPoolItem], max_groups: int = 10) -> list[Curate
     weak carousel slide.
     """
     strategy = platform_strategy_store.current()
+    done_days = _carouselled_keys(pool_items)
     unused = [item for item in pool_items if item.available]
     by_theme: dict[str, list[MediaPoolItem]] = defaultdict(list)
     for item in unused:
@@ -100,6 +159,7 @@ def curate(pool_items: list[MediaPoolItem], max_groups: int = 10) -> list[Curate
     for theme, items in by_theme.items():
         day = _parse_day(theme)
         items.sort(key=lambda i: i.aesthetic_score, reverse=True)
+        items = _without_duplicates(items)
         remaining: list[MediaPoolItem] = []
 
         for item in items:
@@ -135,6 +195,10 @@ def curate(pool_items: list[MediaPoolItem], max_groups: int = 10) -> list[Curate
                 # it is also what stops a swipe.
                 remaining.append(item)
 
+        # Tagesregel: one carousel per shoot -- none if this day already had one, else its best ten
+        if theme in done_days:
+            continue
+        carousels = 0
         batch: list[MediaPoolItem] = []
         for item in remaining:
             batch.append(item)
@@ -148,7 +212,10 @@ def curate(pool_items: list[MediaPoolItem], max_groups: int = 10) -> list[Curate
                     )
                 )
                 batch = []
-        if len(batch) >= strategy.carousel_min_size:
+                carousels += 1
+                if carousels >= DAY_CAROUSELS:
+                    break
+        if carousels < DAY_CAROUSELS and len(batch) >= strategy.carousel_min_size:
             groups.append(
                 CuratedGroup(
                     theme=theme,

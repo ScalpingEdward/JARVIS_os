@@ -59,16 +59,15 @@ def test_curate_groups_same_theme_images_into_one_carousel():
     assert len(groups[0].media_items) == 4
 
 
-def test_curate_splits_a_large_theme_into_multiple_right_sized_carousels():
+def test_one_shoot_gives_one_carousel_of_its_best_and_the_rest_stays_in_the_pool():
+    # Tagesregel (2026-10-19): it used to split a large shoot into several carousels
     from app.instagram_content.media_pool_models import MediaPoolItem
 
-    n = CAROUSEL_IDEAL_MAX_SIZE + CAROUSEL_MIN_SIZE  # guarantees a full batch + a valid remainder
-    items = [MediaPoolItem(**_image_create(f"img-{i}", score=0.6).model_dump()) for i in range(n)]
+    n = CAROUSEL_IDEAL_MAX_SIZE + CAROUSEL_MIN_SIZE
+    items = [MediaPoolItem(**_image_create(f"img-{i}", score=0.6 - i / 100).model_dump()) for i in range(n)]
     groups = curate(items)
-    sizes = sorted(len(g.media_items) for g in groups)
-    assert sizes[0] >= CAROUSEL_MIN_SIZE
-    assert sizes[-1] <= CAROUSEL_IDEAL_MAX_SIZE
-    assert sum(sizes) == n
+    assert [len(g.media_items) for g in groups] == [CAROUSEL_IDEAL_MAX_SIZE]
+    assert {i.media_ref for i in groups[0].media_items} == {f"img-{i}" for i in range(CAROUSEL_IDEAL_MAX_SIZE)}
 
 
 def test_curate_does_not_propose_a_carousel_below_the_minimum_size():
