@@ -277,7 +277,13 @@ function renderTradingTile(o) {
   const pl = (v) => `<span class="${v > 0 ? 'up' : v < 0 ? 'down' : 'muted'}">${v > 0 ? '+' : ''}${fmt(v)}</span>`;
   $('#tGroups').innerHTML = '<div class="cap"><span>Gruppen</span><span>heute</span><span>gesamt</span></div>' + (groups.length ? groups.map((g) => {
     const open = openOf(g.name), sum = open.reduce((x, p) => x + (p.profit || 0), 0);
+    // the account(s) behind the group: its size, and with trades open the equity too (Brano, 2026-10-19)
+    const accs = o.accounts.filter((a) => (g.accounts || []).includes(a.profile));
+    const bal = accs.reduce((x, a) => x + (a.balance || 0), 0), eq = accs.reduce((x, a) => x + (a.equity || 0), 0);
+    const cur = accs[0]?.currency || '';
+    const size = accs.length ? `Konto ${fmt(bal)} ${esc(cur)}${open.length ? ` · Equity ${fmt(eq)}` : ''}` : '';
     return `<div class="row grp"><span class="dot ${copier(g)}" title="Kopierer ${copier(g) === 'ok' ? 'online' : 'nicht online'}"></span><span>${esc(g.name)}`
+      + `${size ? ` <small class="grp-open">${size}</small>` : ''}`
       + `${open.length ? ` <small class="grp-open">${open.length} offen · ${pl(sum)}</small>` : ''}</span>`
       + `<span class="mono">${signed(g.pnl_today)}</span><span>${signed(g.pnl_total)}</span></div>`
       + (open.length ? `<div class="grp-pos">${open.slice(0, 4).map((p) => `<div><span class="side ${p.side}">${esc(p.side.toUpperCase())}</span>`
