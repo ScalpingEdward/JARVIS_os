@@ -148,6 +148,9 @@ services:
       N8N_RESTRICT_FILE_ACCESS_TO: /data/images/ingest;/data/images/processed
       # Neu: verhindert das erneute Zuwachsen der SQLite-DB
       EXECUTIONS_DATA_SAVE_ON_SUCCESS: none
+      # The file was 1.5 GB of which 1502 MB were free pages (2026-10-19): pruning deletes rows,
+      # SQLite keeps the space. VACUUM on every start gives it back ("Database connection timed out").
+      DB_SQLITE_VACUUM_ON_STARTUP: "true"
       EXECUTIONS_DATA_SAVE_ON_ERROR: all
       EXECUTIONS_DATA_SAVE_ON_PROGRESS: "false"
       # Wieder "false" seit 5b durch ist -- das war die Bedingung, unter der

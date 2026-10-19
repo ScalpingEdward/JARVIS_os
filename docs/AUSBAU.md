@@ -50,11 +50,19 @@ Plan (vor dem Bau mit Brano abstimmen):
 
 ## 5. Technik
 - [ ] Secrets rotieren – **Brano** erneuert die Schlüssel in den Konsolen, AURON trägt sie in `.env` ein
-- [ ] n8n-SQLite 1,5 GB („Database connection timed out“) verkleinern
-- [ ] Tests schreiben `backend/data/workflows.json` um – abstellen
-- [ ] 7 alte rote Testdateien (Live-Order Telegram/MT5, End-to-End, Provider) reparieren oder ehrlich markieren
-- [ ] Profit-Faktor `999.0` als Platzhalter ersetzen (None, wenn es keinen Verlust gab)
+- [x] n8n-SQLite 1,5 GB („Database connection timed out“) verkleinern
+- [x] Tests schreiben `backend/data/workflows.json` um – abstellen
+- [x] 7 alte rote Testdateien (Live-Order Telegram/MT5, End-to-End, Provider) reparieren oder ehrlich markieren
+- [x] Profit-Faktor `999.0` als Platzhalter ersetzen (None, wenn es keinen Verlust gab)
 - [ ] Drive-Ingest-Trigger 20 min → wieder täglich, wenn Instagram live geht
+
+## 6. Produkt (vorbereiten, Verkauf erst nach einigen Monaten Eigennutzung)
+- [ ] Website: Pakete Signal 29 / Trader 59 / Business 99 €, Insta-Manager-Add-on, 30 Tage Test,
+      jährlich 2 Monate geschenkt, Founder Edition 690 € (100 Plätze), Einrichtung durch uns nach Aufwand
+- [ ] Website: Systemvoraussetzungen (Docker, VPS empfohlen, RAM, Speicher)
+- [ ] AURON als Chatbot auf der Website: Wünsche aufnehmen, Aufwand schätzen, Anfrage an Brano
+- [ ] Lizenz/Module je Abo freischalten (Installationspaket, Add-ons zuschaltbar)
+- [ ] iOS- und Android-App: das Dashboard mit Planet, quer gehalten wie am Bildschirm
 
 ## Später (ROADMAP.md)
 E-Mail/Kalender/Dokumente, Chart-Analyse per Bild, Smart Home, tragbares verschlüsseltes
