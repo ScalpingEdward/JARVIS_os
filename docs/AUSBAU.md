@@ -40,7 +40,7 @@ Plan (vor dem Bau mit Brano abstimmen):
 - Später/extern: Futures-Bot NinjaTrader (erst wenn Instagram läuft), Signal-Kopierer als Produkt
 
 ## 4. Instagram
-- [ ] Kennzeichen-Engine: Nummernschilder beim Ingest unkenntlich machen
+- [x] Kennzeichen-Engine: Nummernschilder beim Ingest unkenntlich machen
 - [x] Tagesregel + Duplikat-Filter (ein Shooting → ein Post, fast gleiche Bilder raus)
 - [x] Pillar-Feld (Trading/Portrait/Gym/Essen/Travel) im Datenmodell
 - [x] HEIC → JPG beim Ingest (pillow-heif), Live-Photo-MOVs (< 3 s, gleicher Name) nicht hochladen
