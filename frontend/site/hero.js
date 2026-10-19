@@ -124,3 +124,13 @@
     window.open(URL.createObjectURL(blob), '_blank');
   });
 })();
+
+// phone: the menu sits behind ☰ at the top right, next to the language button
+(() => {
+  const nav = document.querySelector('.nav'), b = document.getElementById('navBurger');
+  if (!nav || !b) return;
+  const set = (open) => { nav.classList.toggle('open', open); b.setAttribute('aria-expanded', String(open)); b.textContent = open ? '✕' : '☰'; };
+  b.addEventListener('click', (e) => { e.stopPropagation(); set(!nav.classList.contains('open')); });
+  nav.querySelectorAll('nav a').forEach((a) => a.addEventListener('click', () => set(false)));
+  document.addEventListener('click', (e) => { if (!nav.contains(e.target)) set(false); });
+})();

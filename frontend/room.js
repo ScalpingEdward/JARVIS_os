@@ -7,7 +7,12 @@
   const ROOMS = window.AURON_ROOMS;
   const KINDS = { sway: 1, water: 2, clouds: 3, stars: 4, city: 5, sun: 6, glow: 7, flicker: 8, sheen: 9, fall: 10 };
   const MAX_Z = 16;
-  const pick = () => { try { const k = localStorage.getItem('auron_room'); return ROOMS[k] ? k : 'lounge'; } catch { return 'lounge'; } };
+  // ?room=earth shows a room without changing the saved choice (screenshots, promo images)
+  const pick = () => {
+    const q = new URLSearchParams(location.search).get('room');
+    if (ROOMS[q]) return q;
+    try { const k = localStorage.getItem('auron_room'); return ROOMS[k] ? k : 'lounge'; } catch { return 'lounge'; }
+  };
   let key = pick(), room = ROOMS[key], rect = [0, 0, 1, 1];
 
   // ---- placement: the picture's pedestal right under the planet ----------------------------

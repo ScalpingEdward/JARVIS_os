@@ -486,3 +486,23 @@ html[data-glass="solid"] .benefit { background: linear-gradient(155deg, rgb(var(
 [dir="rtl"] .b-list li::before, [dir="rtl"] .who li::before, [dir="rtl"] .ticks li::before { left: auto; right: 0; }
 .lang-menu[hidden] { display: none; }
 .mark { direction: ltr; }   /* the logo stays "◯ AURON" in Arabic too */
+
+/* phone: top bar with language and ☰ at the top right; the menu opens below it */
+.nav-burger { display: none; }
+@media (max-width: 900px) {
+  .nav { display: flex; position: fixed; top: 0; left: 0; right: 0; padding: calc(8px + env(safe-area-inset-top, 0px)) max(12px, env(safe-area-inset-right, 0px)) 8px max(12px, env(safe-area-inset-left, 0px));
+    background: linear-gradient(180deg, rgba(5,7,12,.92), rgba(5,7,12,0)); backdrop-filter: none; justify-content: flex-end; gap: 8px; }
+  .nav .nav-space, .nav > .btn { display: none; }
+  .nav .lang { margin: 0; }
+  .nav-burger { display: grid; place-items: center; width: 38px; height: 38px; border-radius: 12px; font-size: 20px; line-height: 1; cursor: pointer;
+    color: var(--text); background: rgba(255,255,255,.06); border: 1px solid var(--line); }
+  .nav nav { display: none; position: absolute; top: calc(100% - 4px); right: max(12px, env(safe-area-inset-right, 0px)); flex-direction: column; gap: 2px;
+    min-width: 210px; padding: 8px; border-radius: 14px; background: rgba(8,12,20,.97); border: 1px solid var(--line); box-shadow: 0 24px 60px -20px rgba(0,0,0,.9); }
+  .nav.open nav { display: flex; }
+  .nav nav a { padding: 12px 14px; border-radius: 10px; font-size: 13px; letter-spacing: .14em; }
+  .nav nav a:hover { background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--text); }
+  [dir="rtl"] .nav { justify-content: flex-start; }
+  [dir="rtl"] .nav nav { right: auto; left: max(12px, env(safe-area-inset-left, 0px)); }
+  .hero { padding-top: calc(54px + env(safe-area-inset-top, 0px)); }
+  .m-cta .lang { display: none; }
+}
