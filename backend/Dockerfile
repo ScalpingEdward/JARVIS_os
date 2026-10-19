@@ -18,6 +18,12 @@ RUN addgroup --system jarvis && adduser --system --ingroup jarvis jarvis
 
 COPY requirements.txt ./requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
+# licence-plate detector (app/instagram_content/plates.py): fetched once here, checksum pinned --
+# never at runtime, and no picture ever leaves the machine
+RUN mkdir -p /opt/models && python -c "import urllib.request,hashlib; \
+d=urllib.request.urlopen('https://github.com/ankandrew/open-image-models/releases/download/assets/yolo-v9-t-640-license-plates-end2end.onnx').read(); \
+assert hashlib.sha256(d).hexdigest()=='c3c1026ca7d0585dd88084d68182dd897113712fa734ae1557ca70174440c076', 'plate model checksum'; \
+open('/opt/models/plates-yolo-v9-t-640.onnx','wb').write(d)"
 
 COPY app ./app
 

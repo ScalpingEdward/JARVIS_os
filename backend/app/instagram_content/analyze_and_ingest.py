@@ -22,6 +22,7 @@ from .media_pool_models import (
     MediaPoolItemCreate,
     TrimAnalysisResult,
 )
+from . import plates
 from .media_processing import MediaProcessingError, process_image, process_video
 from .media_pool_service import MediaPoolService
 from .models import MediaType
@@ -219,6 +220,8 @@ def _process_now(
     except MediaProcessingError as exc:
         logger.warning("could not process %s, keeping the analysis without it: %s", media_ref, exc)
         return None
+    if not _plates_covered(processed.path, media_ref, video=True):
+        return None
     logger.info(
         "processed %s: %s%s",
         media_ref,
@@ -248,7 +251,23 @@ def grade_photo_bytes(data: bytes, media_ref: str) -> str | None:
         return None
     finally:
         Path(handle.name).unlink(missing_ok=True)
+    if not _plates_covered(processed.path, media_ref, video=False):
+        return None
     return processed.path.name
+
+
+def _plates_covered(path: Path, media_ref: str, *, video: bool) -> bool:
+    """Licence plates made unreadable in the processed file. If that cannot be done, the file goes:
+    without a processed file the item cannot be posted -- held back, never posted unchecked."""
+    try:
+        n = plates.video(path) if video else plates.photo(path)
+    except Exception as exc:  # noqa: BLE001 -- any failure holds the item back, with the reason logged
+        logger.warning("plate check failed for %s, holding it back: %s", media_ref, exc)
+        path.unlink(missing_ok=True)
+        return False
+    if n:
+        logger.info("%s: %d licence plate%s covered", media_ref, n, "" if n == 1 else "s")
+    return True
 
 
 def _trim_note(trim: "TrimAnalysisResult | None") -> str:
