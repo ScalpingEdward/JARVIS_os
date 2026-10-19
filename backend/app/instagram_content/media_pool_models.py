@@ -47,6 +47,9 @@ class MediaPoolItemCreate(BaseModel):
     aesthetic_score: float = Field(ge=0, le=1)
     file_name: str | None = Field(default=None, max_length=500,
                                   description="The original file name (IMG_1234.HEIC) -- matches a Live Photo's MOV to its still.")
+    pillar: str | None = Field(default=None, max_length=20,
+                               description="Brano's own pillar for this item (Trading/Gym/Essen/Portrait/Travel); "
+                                           "unset, it is read from theme and tags (pillars.py).")
     analysis_reasoning: str = Field(
         default="",
         max_length=2000,

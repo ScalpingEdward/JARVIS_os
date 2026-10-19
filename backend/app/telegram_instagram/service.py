@@ -16,6 +16,7 @@ from uuid import UUID
 
 from app.db import SessionLocal, refuse_reset_in_production
 from app.db_models import TelegramInstagramAuditRow
+from app.instagram_content.pillars import group_pillar, pick_next
 from app.instagram_content.media_pool_models import FinalizeDraftRequest
 from app.instagram_content.media_pool_service import media_pool_service
 from app.instagram_content.models import ContentCandidate, ContentDecision, ContentStatus, MediaType
@@ -244,7 +245,7 @@ class TelegramInstagramService:
             raise TelegramInstagramError(
                 f"no pending drafts to finalize{'' if kind is None else f' for {kind}'}"
             )
-        draft = drafts[0]
+        draft = pick_next(drafts, lambda d: group_pillar(media_pool_service.draft_media_items(d)), self._last_pillar())
         try:
             candidate = instagram_content_service.finalize_draft(
                 draft.id, FinalizeDraftRequest(caption_draft=caption_draft)
@@ -261,6 +262,18 @@ class TelegramInstagramService:
 
         message_id = self.notify(candidate.id)
         return NotifyResult(candidate_id=candidate.id, message_id=message_id, from_draft_id=draft.id)
+
+    @staticmethod
+    def _last_pillar() -> str | None:
+        """The pillar of the post that went out (or waits) last -- the next one must differ."""
+        done = [c for c in instagram_content_service.list_all()
+                if c.status not in (ContentStatus.rejected, ContentStatus.moderation_rejected)]
+        if not done:
+            return None
+        last = max(done, key=lambda c: c.created_at)
+        by_ref = {i.media_ref: i for i in media_pool_service.list_all()}
+        items = [by_ref[m.media_ref] for m in last.media_items if m.media_ref in by_ref]
+        return group_pillar(items) if items else None
 
     @staticmethod
     def _draft_kind(draft) -> str:
