@@ -52,7 +52,7 @@ def test_loader_keeps_external_providers_disabled_by_default() -> None:
 
 def test_loader_rejects_enabled_provider_without_key() -> None:
     with pytest.raises(ValueError, match="ANTHROPIC_API_KEY"):
-        load_providers(Settings(anthropic_enabled=True))
+        load_providers(Settings(anthropic_enabled=True, ANTHROPIC_API_KEY=None))  # not the key in .env
 
     with pytest.raises(ValueError, match="OPENAI_API_KEY"):
-        load_providers(Settings(openai_enabled=True))
+        load_providers(Settings(openai_enabled=True, OPENAI_API_KEY=None))
