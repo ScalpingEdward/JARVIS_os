@@ -908,3 +908,7 @@ html.phone-land .topclock { display: none; }
   .topclock { display: none; }
   .stage { padding-top: calc(28px + env(safe-area-inset-top, 0px)); }
 }
+/* the columns are flat boxes; the turned cards reach half behind them -- the column must not catch
+   the pointer there, only the cards do (same fix as .scene, 2026-10-17; the columns came later) */
+.col { pointer-events: none; }
+.col > * { pointer-events: auto; }
