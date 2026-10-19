@@ -78,7 +78,7 @@ class ShadowPortfolioSimulatorService:
         gross_profit = sum(wins)
         gross_loss = abs(sum(losses))
         expectancy = sum(t.realized_rr for t in p.trades) / len(p.trades)
-        profit_factor = gross_profit / gross_loss if gross_loss else 999.0
+        profit_factor = gross_profit / gross_loss if gross_loss else None
         avg_slippage = sum(t.slippage_bps for t in p.trades) / len(p.trades)
         max_drawdown_pct = max_drawdown / p.initial_equity * 100
         total_breaches += int(worst_daily_loss > p.max_daily_loss_pct)
@@ -88,7 +88,7 @@ class ShadowPortfolioSimulatorService:
             "net_pnl": round(sum(pnls), 2),
             "win_rate_pct": round(len(wins) / len(pnls) * 100, 2),
             "expectancy_r": round(expectancy, 4),
-            "profit_factor": round(profit_factor, 4),
+            "profit_factor": None if profit_factor is None else round(profit_factor, 4),
             "max_drawdown": round(max_drawdown, 2),
             "max_drawdown_pct": round(max_drawdown_pct, 4),
             "max_daily_loss_pct_observed": round(worst_daily_loss, 4),
@@ -97,7 +97,7 @@ class ShadowPortfolioSimulatorService:
         }
         if total_breaches:
             return ShadowPortfolioState.BREACH_DETECTED, "shadow portfolio breached governed risk limits", metrics, strategy_results
-        if expectancy < p.min_expectancy_r or profit_factor < p.min_profit_factor or avg_slippage > p.max_slippage_bps:
+        if expectancy < p.min_expectancy_r or (profit_factor is not None and profit_factor < p.min_profit_factor) or avg_slippage > p.max_slippage_bps:
             return ShadowPortfolioState.DEGRADATION_DETECTED, "shadow performance below promotion thresholds", metrics, strategy_results
         if len(p.trades) >= p.promotion_min_trades:
             return ShadowPortfolioState.PROMOTION_CANDIDATE, "shadow portfolio qualifies for governed promotion review", metrics, strategy_results
@@ -116,13 +116,13 @@ class ShadowPortfolioSimulatorService:
             peak = max(peak, equity)
             drawdown = max(drawdown, peak - equity)
         expectancy = sum(t.realized_rr for t in trades) / len(trades)
-        profit_factor = gross_profit / gross_loss if gross_loss else 999.0
+        profit_factor = gross_profit / gross_loss if gross_loss else None
         avg_slippage = sum(t.slippage_bps for t in trades) / len(trades)
         breaches = int(drawdown / initial_equity * 100 > max_dd_pct)
         recommendation = "retain"
         if breaches or expectancy <= 0:
             recommendation = "reject"
-        elif profit_factor < 1.2 or avg_slippage > 8:
+        elif (profit_factor is not None and profit_factor < 1.2) or avg_slippage > 8:
             recommendation = "recalibrate"
         return ShadowStrategyResult(
             strategy_id=strategy_id,
@@ -132,7 +132,7 @@ class ShadowPortfolioSimulatorService:
             win_rate_pct=round(len(wins) / len(trades) * 100, 2),
             net_pnl=round(sum(t.pnl for t in trades), 2),
             expectancy_r=round(expectancy, 4),
-            profit_factor=round(profit_factor, 4),
+            profit_factor=None if profit_factor is None else round(profit_factor, 4),
             max_drawdown=round(drawdown, 2),
             avg_slippage_bps=round(avg_slippage, 4),
             risk_breaches=breaches,

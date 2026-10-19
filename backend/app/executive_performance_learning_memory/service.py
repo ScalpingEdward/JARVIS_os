@@ -70,7 +70,7 @@ class PerformanceLearningMemoryService:
                 win_rate_pct=round(win_rate, 2),
                 net_pnl=round(sum(t.pnl for t in trades), 2),
                 expectancy_r=round(expectancy, 4),
-                profit_factor=round(gross_profit / gross_loss, 4) if gross_loss else 999.0,
+                profit_factor=round(gross_profit / gross_loss, 4) if gross_loss else None,
                 avg_slippage_bps=round(sum(t.slippage_bps for t in trades) / len(trades), 4),
                 avg_holding_seconds=round(sum(t.holding_seconds for t in trades) / len(trades), 2),
                 confidence_calibration_error=round(confidence_error, 2),
@@ -97,7 +97,7 @@ class PerformanceLearningMemoryService:
         metrics = {
             "portfolio_win_rate_pct": round(win_rate, 2),
             "portfolio_expectancy_r": round(expectancy, 4),
-            "portfolio_profit_factor": round(gross_profit / gross_loss, 4) if gross_loss else 999.0,
+            "portfolio_profit_factor": round(gross_profit / gross_loss, 4) if gross_loss else None,
             "max_drawdown": round(drawdown, 2),
         }
         if any(r.action == "pause" for r in recommendations):

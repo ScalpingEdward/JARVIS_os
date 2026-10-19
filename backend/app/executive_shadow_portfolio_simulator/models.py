@@ -83,7 +83,7 @@ class ShadowStrategyResult(BaseModel):
     win_rate_pct: float
     net_pnl: float
     expectancy_r: float
-    profit_factor: float
+    profit_factor: float | None   # None: no losing trade (was 999.0)
     max_drawdown: float
     avg_slippage_bps: float
     risk_breaches: int
@@ -101,7 +101,7 @@ class ShadowPortfolioRecord(BaseModel):
     net_pnl: float = 0
     win_rate_pct: float = 0
     expectancy_r: float = 0
-    profit_factor: float = 0
+    profit_factor: float | None = 0
     max_drawdown: float = 0
     max_drawdown_pct: float = 0
     max_daily_loss_pct_observed: float = 0

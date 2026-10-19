@@ -71,7 +71,7 @@ class StrategyPerformance(BaseModel):
     win_rate_pct: float
     net_pnl: float
     expectancy_r: float
-    profit_factor: float
+    profit_factor: float | None   # None: no losing trade, the ratio is undefined (was 999.0)
     avg_slippage_bps: float
     avg_holding_seconds: float
     confidence_calibration_error: float
@@ -93,7 +93,7 @@ class PerformanceLearningRecord(BaseModel):
     request: PerformanceLearningCreate
     portfolio_win_rate_pct: float = 0
     portfolio_expectancy_r: float = 0
-    portfolio_profit_factor: float = 0
+    portfolio_profit_factor: float | None = 0
     max_drawdown: float = 0
     strategies: list[StrategyPerformance] = Field(default_factory=list)
     recommendations: list[LearningRecommendation] = Field(default_factory=list)
