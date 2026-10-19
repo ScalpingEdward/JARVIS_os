@@ -41,9 +41,10 @@ Plan (vor dem Bau mit Brano abstimmen):
 
 ## 4. Instagram
 - [ ] Kennzeichen-Engine: Nummernschilder beim Ingest unkenntlich machen
-- [ ] Tagesregel + Duplikat-Filter (ein Shooting → ein Post, fast gleiche Bilder raus)
-- [ ] Pillar-Feld (Trading/Portrait/Gym/Essen/Travel) im Datenmodell
-- [ ] HEIC → JPG beim Ingest (pillow-heif), Live-Photo-MOVs (< 3 s, gleicher Name) nicht hochladen
+- [x] Tagesregel + Duplikat-Filter (ein Shooting → ein Post, fast gleiche Bilder raus)
+- [x] Pillar-Feld (Trading/Portrait/Gym/Essen/Travel) im Datenmodell
+- [x] HEIC → JPG beim Ingest (pillow-heif), Live-Photo-MOVs (< 3 s, gleicher Name) nicht hochladen
+- [x] Captions kurz und direkt (max. 160 Zeichen vor den Hashtags, geprüft) – Brano 2026-10-19
 - Wartet auf Daten/Dritte: Analyse auf Reichweite (nach 4 Wochen Insights), Reels-Vollautomatik
   (Instagram Audio API, braucht „Instagram API with Facebook Login“)
 
