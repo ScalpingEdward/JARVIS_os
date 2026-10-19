@@ -439,3 +439,18 @@ html[data-glass="solid"] .benefit { background: linear-gradient(155deg, rgb(var(
   .m-head { padding-top: 12px; }
 }
 @media (max-width: 900px) { .hero-mark small { font-size: 10px; letter-spacing: .09em; white-space: nowrap; } }
+
+/* the managers: one card each, what it does and for whom */
+.mgr { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr)); gap: 16px; }
+.mgr .card { display: grid; gap: 8px; align-content: start; }
+.mgr .card h3 { margin: 0; }
+.mgr small { color: var(--accent); font-size: 11.5px; letter-spacing: .12em; text-transform: uppercase; }
+.mgr em.soon { font-style: normal; font-size: 10px; letter-spacing: .1em; text-transform: uppercase; padding: 1px 6px; border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--accent) 50%, transparent); color: var(--accent); vertical-align: 3px; }
+/* phone: AURON right under the top edge (the nav button would collide -- "Preise" sits in the hero), more air below */
+@media (max-width: 900px) {
+  .nav { display: none; }
+  .hero { padding-top: calc(18px + env(safe-area-inset-top, 0px)); }
+  .m-head { padding-top: 30px; }
+  .hero::before { height: 300px; }
+}

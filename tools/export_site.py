@@ -59,5 +59,25 @@ def main() -> None:
     print(f"{OUT / 'auron-website.html'}: {len(html) / 1e6:.1f} MB; unresolved: {left}")
 
 
+def artifact(out: Path) -> None:
+    """The same page as a claude.ai artifact (the shared promo link): no html/head/body wrapper (the
+    artifact adds its own), and the globe's world map inline -- the artifact frame blocks fetch()."""
+    import re
+    import urllib.request
+    s = (OUT / "auron-website.html").read_text(encoding="utf-8")
+    url = "https://cdn.jsdelivr.net/npm/world-atlas@2.0.2/land-110m.json"
+    land = urllib.request.urlopen(url, timeout=30).read().decode("utf-8")
+    s = s.replace(f"await (await fetch('{url}')).json()", land)
+    head = s[s.index("<head>") + 6:s.index("</head>")]
+    head = re.sub(r'<meta charset[^>]*>\s*|<meta name="viewport"[^>]*>\s*', "", head)
+    head = re.sub(r"<title>.*?</title>", "<title>AURON Website</title>", head, count=1)
+    body = s[s.index("<body>") + 6:s.rindex("</body>")]
+    out.write_text(head + "<style>:root{color-scheme:dark} body{background:#05070c}</style>\n" + body, encoding="utf-8")
+    print(f"{out}: {out.stat().st_size / 1e6:.1f} MB")
+
+
 if __name__ == "__main__":
+    import sys
     main()
+    if len(sys.argv) > 2 and sys.argv[1] == "--artifact":
+        artifact(Path(sys.argv[2]))
