@@ -281,8 +281,40 @@ function renderTradingTile(o) {
   $('#kOpen').innerHTML = `${t.open_positions} <small class="muted">${signed(t.open_pnl)}</small>`;
   $('#kTotal').innerHTML = signed(t.pnl_total, t.currency);
   renderTileSpark(o, t.currency);
-  // ring 1: one light per group -- green when up today (open trades included), red when down, white when flat
+  // ring 1: one light per group -- green when up today (open trades included), red when down, white when flat;
+  // it breathes while the group has trades open (green in profit, red in loss)
   ringLights('.o1', groups.map((g) => { const v = (g.pnl_today || 0) + (g.open_pnl || 0); return v > 0.005 ? 'g' : v < -0.005 ? 'r' : 'w'; }));
+  document.querySelectorAll('.o1 i').forEach((el, i) => {
+    const g = groups[i];
+    el.classList.toggle('open-g', !!g && g.open_positions > 0 && g.open_pnl >= 0);
+    el.classList.toggle('open-r', !!g && g.open_positions > 0 && g.open_pnl < 0);
+  });
+  pulseClosed(o, groups);
+}
+
+// A trade that closed since the last look: its group's light pulses green (profit) or red (loss),
+// and the ring flashes with it. The first look only learns what is already there.
+const seenClosed = new Set();
+let closedPrimed = false;
+function pulseClosed(o, groups) {
+  const fresh = [];
+  o.accounts.forEach((a) => (a.closed || []).forEach((c) => {
+    const id = `${a.profile}:${c.position}`;
+    if (!seenClosed.has(id)) { seenClosed.add(id); if (closedPrimed) fresh.push(c); }
+  }));
+  closedPrimed = true;
+  fresh.forEach((c, k) => setTimeout(() => {
+    const i = groups.findIndex((g) => g.name === c.group);
+    const light = document.querySelectorAll('.o1 i')[i];
+    const cls = c.profit >= 0 ? 'flash-g' : 'flash-r';
+    [light, document.querySelector('.o1')].forEach((el) => {
+      if (!el) return;
+      el.classList.remove('flash-g', 'flash-r'); void el.offsetWidth;   // restart the animation
+      el.classList.add(cls);
+      setTimeout(() => el.classList.remove(cls), 4200);
+    });
+    document.dispatchEvent(new CustomEvent('auron:trade-closed', { detail: c }));
+  }, k * 4500));
 }
 
 // The lights on one of the planet's rings, spread evenly around it.
@@ -350,6 +382,7 @@ function tickCountdown() {
 async function refreshInstagram() {
   try {
     const [dash, sched] = await Promise.all([get('/v1/instagram/dashboard'), get('/v1/telegram-instagram/schedule')]);
+    document.dispatchEvent(new CustomEvent('auron:instagram', { detail: dash }));
     const left = dash.media_pool_available, used = dash.media_pool_used, all = left + used || 1;
     const n = parseNext(sched.next);
     nextAt = n ? n.at : null;
@@ -571,6 +604,7 @@ async function refreshMail() {
   try {
     const m = await get('/v1/mail?important_only=true&days=14');
     const open = m.items.filter((i) => !i.done);
+    if (m.connected && !m.error) document.dispatchEvent(new CustomEvent('auron:mail', { detail: open }));
     $('#mBadge').textContent = !m.connected ? 'nicht verbunden' : m.error ? 'Fehler' : open.length ? `${open.length} wichtig` : 'alles ruhig';
     $('#mBadge').classList.toggle('live', m.connected && !m.error);
     $('#mBadge').title = m.error || '';

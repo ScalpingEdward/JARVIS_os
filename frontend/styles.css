@@ -859,3 +859,25 @@ html[data-cards="dark"] .detail .card { background: linear-gradient(160deg, rgb(
 .le-row button:hover:not(:disabled), .le-add button:hover { border-color: var(--accent); }
 .le-add { display: flex; gap: 4px; flex-wrap: wrap; }
 .le-add select { font: inherit; font-size: 12px; padding: 4px; border-radius: 7px; border: 1px solid var(--line-2); background: #0d121c; color: var(--text); max-width: 100px; }
+
+/* ring 1: a group's light breathes while it has open trades; a closed trade pulses it green or red */
+@keyframes breathe-g { 50% { box-shadow: 0 0 26px #6dffb4, 0 0 60px rgba(61,220,151,.95); transform: scale(1.35); } }
+@keyframes breathe-r { 50% { box-shadow: 0 0 26px #ff8da0, 0 0 60px rgba(242,100,124,.95); transform: scale(1.35); } }
+.orbit i.open-g { animation: breathe-g 2.4s ease-in-out infinite; }
+.orbit i.open-r { animation: breathe-r 2.4s ease-in-out infinite; }
+@keyframes flash-light-g { 0%, 100% { transform: scale(1); } 15%, 45%, 75% { transform: scale(2.4); box-shadow: 0 0 30px #6dffb4, 0 0 90px rgba(61,220,151,1); background: #b6ffd9; } 30%, 60% { transform: scale(1.3); } }
+@keyframes flash-light-r { 0%, 100% { transform: scale(1); } 15%, 45%, 75% { transform: scale(2.4); box-shadow: 0 0 30px #ff8da0, 0 0 90px rgba(242,100,124,1); background: #ffc2cc; } 30%, 60% { transform: scale(1.3); } }
+.orbit i.flash-g { animation: flash-light-g 4s ease-in-out; }
+.orbit i.flash-r { animation: flash-light-r 4s ease-in-out; }
+@keyframes flash-ring-g { 15%, 45%, 75% { border-color: rgba(61,220,151,.95); box-shadow: 0 0 30px rgba(61,220,151,.8), inset 0 0 24px rgba(61,220,151,.5); } }
+@keyframes flash-ring-r { 15%, 45%, 75% { border-color: rgba(242,100,124,.95); box-shadow: 0 0 30px rgba(242,100,124,.8), inset 0 0 24px rgba(242,100,124,.5); } }
+.orbit.flash-g { animation: orbit1 11s linear infinite, flash-ring-g 4s ease-in-out; }
+.orbit.flash-r { animation: orbit1 11s linear infinite, flash-ring-r 4s ease-in-out; }
+@media (prefers-reduced-motion: reduce) { .orbit i.open-g, .orbit i.open-r { animation: none; } }
+
+/* Settings > Durchsagen */
+.an { display: grid; gap: 8px; }
+.an-row { display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer; }
+.an-row input { accent-color: var(--accent); }
+.an-quiet { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); }
+.an-quiet select { font: inherit; font-size: 12px; padding: 4px; border-radius: 7px; border: 1px solid var(--line-2); background: #0d121c; color: var(--text); }

@@ -317,7 +317,7 @@
     document.title = t('AURON – Weniger Routine. Mehr Zeit für dein Business.');
     document.querySelectorAll('.lang-btn b').forEach((b) => { b.textContent = lang.toUpperCase(); });
     document.querySelectorAll('.lang-menu button').forEach((b) => b.classList.toggle('on', b.dataset.lang === lang));
-    try { localStorage.setItem('auron_lang', lang); } catch { /* private window */ }
+    try { localStorage.setItem('auron_site_lang', lang); } catch { /* private window */ }
     document.dispatchEvent(new CustomEvent('auron:lang', { detail: lang }));
   }
 
@@ -338,7 +338,7 @@
   document.querySelector('.m-cta')?.appendChild(switcher());
 
   let saved = null;
-  try { saved = localStorage.getItem('auron_lang'); } catch { /* private window */ }
+  try { saved = localStorage.getItem('auron_site_lang'); } catch { /* private window */ }
   const fromUrl = new URLSearchParams(location.search).get('lang');
   const browser = (navigator.language || 'en').slice(0, 2).toLowerCase();
   apply(fromUrl || saved || (LANGS[browser] ? browser : 'en'));

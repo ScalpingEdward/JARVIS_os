@@ -15,7 +15,8 @@
   let turns = [];
   try { turns = JSON.parse(localStorage.getItem(KEY) || '[]'); } catch { turns = []; }
   const save = () => { try { localStorage.setItem(KEY, JSON.stringify(turns.slice(-100))); } catch { /* private window */ } };
-  const lang = () => { try { return localStorage.getItem('auron_lang') || 'de'; } catch { return 'de'; } };
+  // only what the assistant speaks; the website once wrote es/ru/ar under the same key
+  const lang = () => { try { const l = localStorage.getItem('auron_lang'); return ['de', 'en', 'sk'].includes(l) ? l : 'de'; } catch { return 'de'; } };
 
   function render() {
     log.innerHTML = turns.map((t, i) => `<div class="msg ${t.role}${t.error ? ' err' : ''}">${esc(t.content.replace(TAGS, ''))}`
@@ -61,6 +62,15 @@
   const DEFAULT_VOICE = { provider: 'elevenlabs', voice: 'JBFqnCBsd6RMkjVDRZzb', model: 'eleven_v4', name: 'George', accent: 'British accent' }  // Brano's pick, 2026-10-16;
   const player = new Audio();
   let lastUrl = '';
+
+  // AURON speaking on his own (announce.js): one after the other, never over an answer
+  let queue = Promise.resolve();
+  window.AURON_voice = {
+    say: (text) => { queue = queue.then(() => new Promise((done) => {
+      if (!player.paused && !player.ended) player.addEventListener('ended', done, { once: true }); else done();
+    })).then(() => say(text)).catch((err) => console.warn('announce voice:', err.message)); return queue; },
+    note: (text) => { turns.push({ role: 'assistant', content: text }); save(); if (dock.classList.contains('open')) render(); },
+  };
 
   async function say(text, v = chosen() || DEFAULT_VOICE) {
     const r = await fetch(`${API}/v1/assistant/speak`, { method: 'POST', headers: { 'Content-Type': 'application/json' },

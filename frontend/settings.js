@@ -16,6 +16,7 @@
   const SECTIONS = [
     ['design', '🎨', 'Design', 'Raum, Farben, Glas, Uhr'],
     ['cards', '▦', 'Karten', 'Welche Karten, wo, in welcher Reihenfolge'],
+    ['announce', '📣', 'Durchsagen', 'AURON meldet Wichtiges von selbst'],
     ['voice', '🔊', 'Stimme', 'AURONs Stimme wählen und anhören'],
     ['info', 'ℹ', 'Info', 'Was läuft, Versionen, Hinweise'],
   ];
@@ -90,6 +91,11 @@
             <span class="th-label">Größe <b data-out="clockSize">${t.clockSize} px</b></span>
             <input type="range" min="40" max="120" step="4" data-k="clockSize" value="${t.clockSize}" />`)
         + '<button type="button" class="th-reset" data-k="reset">Design zurücksetzen</button>';
+      return;
+    }
+    if (page === 'announce') {
+      panel.innerHTML = head('Durchsagen', true) + '<div class="an" id="announceEditor"></div>';
+      window.AURON_announce?.editor(panel.querySelector('#announceEditor'));
       return;
     }
     if (page === 'cards') {
