@@ -21,6 +21,11 @@
       window.matchMedia('(orientation: landscape)').addEventListener('change', fit);
     })();
   </script>
+  <script>
+    // ?desk: the wallpaper layout (desk.js) -- set before the first paint so nothing jumps
+    // ?bare: only the room (and planet) -- for rendering the wallpaper images; ?noplanet: the room alone
+    (function (q, c) { ['desk', 'bare', 'noplanet'].forEach(function (k) { if (q.has(k)) c.add(k); }); })(new URLSearchParams(location.search), document.documentElement.classList);
+  </script>
   <meta name="theme-color" content="#03050a" />
   <title>AURON</title>
   <link rel="icon" href="./auron-planet.ico?v=2" sizes="any" />
@@ -250,6 +255,7 @@
   <script src="./cardview.js"></script>
   <script src="./layout.js"></script>
   <script src="./announce.js"></script>
+  <script src="./desk.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/d3-array@3.2.4/dist/d3-array.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/d3-geo@3.1.1/dist/d3-geo.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js"></script>

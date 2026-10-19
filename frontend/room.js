@@ -20,7 +20,7 @@
   // the window, then shifted so the two line up; grown until it still covers the window.
   function place() {
     const core = document.getElementById('core').getBoundingClientRect();
-    const px = core.left + core.width / 2, py = core.top + core.height * 0.88;
+    const px = core.left + core.width / 2, py = core.top + core.height * (document.documentElement.classList.contains('desk') ? 0.8 : 0.88);  // desk: planet closer to its pedestal
     const vw = innerWidth, vh = innerHeight, [x, y, top] = room.ped;
     if (vw <= 700) {
       // phone held upright: the room as a room -- a little wider than the screen, pedestal under the

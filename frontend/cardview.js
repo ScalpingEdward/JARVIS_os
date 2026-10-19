@@ -25,44 +25,79 @@
   const save = () => { try { localStorage.setItem(KEY, JSON.stringify(views)); localStorage.setItem(STYLE_KEY, JSON.stringify(styles)); } catch { /* private window */ } };
   const styleOf = (id) => ({ ...DEFAULT, ...(styles[id] || {}) });
 
-  const kids = (card) => [...card.children].filter((el) => !el.matches('.corner, .card-gear'));
-  // something runs over its box: a number column wider than its cell, the card wider than itself.
-  // Names cut off with "…" are meant to be cut, they don't count -- a number cut off does.
-  const spills = (card) => card.scrollWidth > card.clientWidth + 1 || [...card.querySelectorAll('*')].some((el) =>
-    el.scrollWidth > el.clientWidth + 1 && el.clientWidth > 0
-    && (getComputedStyle(el).textOverflow !== 'ellipsis' || el.matches(NUM_SEL)));
+  // Only the letters grow -- paddings, gaps and the card stay as they are, so the text takes the
+  // room the card already has. Nothing is dropped from the card (Brano, 2026-10-19: "alles bleibt
+  // auf der Karte"): the size stops at the step where the content would reach the card's bottom
+  // edge (half its padding stays free) or a number would run over its cell.
+  const textEls = (card) => [...card.querySelectorAll('*')].filter((el) => !(el instanceof SVGElement) && !el.closest('.card-gear, .corner'));
+  const flowKids = (card) => [...card.children].filter((el) => el instanceof HTMLElement && !el.matches('.corner, .card-gear') && getComputedStyle(el).position !== 'absolute');
+  const spillCount = (card) => [...card.querySelectorAll(NUM_SEL), ...card.querySelectorAll('.tile-list .row, .kpis > div, .tile-head, .tile-figure')]
+    .filter((el) => el.clientWidth > 0 && el.scrollWidth > el.clientWidth + 1).length
+    // neighbours in a row that run into each other (a badge wider than its column)
+    + [...card.querySelectorAll('.tile-list .row')].reduce((t, row) => {
+      const c = [...row.children].filter((el) => el.offsetWidth);
+      return t + c.slice(1).filter((el, k) => Math.abs(el.offsetTop - c[k].offsetTop) < 8 && c[k].offsetLeft + c[k].scrollWidth > el.offsetLeft + 1).length;
+    }, 0);
 
-  function fit(id) {
+  // 1. every card back to 100 % and its natural height, sizes read
+  function prepare(id) {
     const card = document.getElementById(id);
-    if (!card) return;
-    const st = styleOf(id), parts = kids(card), lists = [...card.querySelectorAll('.tile-list > *')];
-    const zoom = (z, n) => { parts.forEach((el) => { el.style.zoom = z === 1 ? '' : String(z); });
-      card.querySelectorAll(NUM_SEL).forEach((el) => { el.style.zoom = n === 1 ? '' : String(n); }); };
-    lists.forEach((el) => { el.style.display = ''; });
-    card.style.height = ''; zoom(1, 1);
-    const h = card.offsetHeight;
-    if (!h) return;                       // parked or hidden: measured when it shows
-    card.style.height = `${h}px`;
+    if (!card) return null;
+    const els = textEls(card);
+    els.forEach((el) => { el.style.fontSize = ''; if (el.dataset.deskHidden) { el.style.display = ''; delete el.dataset.deskHidden; } });
+    card.style.height = '';
+    return { id, card, els };
+  }
+  // 2. the card gets its box: its natural height plus its share of the free room in its column
+  //    (top bar and status bar stay clear) -- or, on the wallpaper, one height for the whole row
+  // 3. the largest text that fits in that box
+  function finish({ id, card, els, nat, box }) {
+    const st = styleOf(id), desk = document.documentElement.classList.contains('desk');
+    const base = els.map((el) => parseFloat(getComputedStyle(el).fontSize) || 0), num = els.map((el) => el.matches(NUM_SEL));
+    card.style.height = `${box}px`;
     const pad = parseFloat(getComputedStyle(card).paddingBottom) || 0;
-    const bottom = () => card.getBoundingClientRect().top + card.clientTop + card.clientHeight - pad;
-    // from the chosen size downwards, the first step at which the fixed parts fit
-    let used = 1;
-    for (let i = SIZES.indexOf(st.size); i >= 0; i--) {
-      const z = SIZES[i];
-      zoom(z, st.num);
-      const lim = bottom() + 1;
-      const fixed = parts.filter((el) => !el.classList.contains('tile-list'));
-      const overTop = fixed.some((el) => el.getBoundingClientRect().bottom > lim);
-      used = z;
-      if (z <= 1 || (!overTop && !spills(card))) break;
+    const set = (z, n) => els.forEach((el, k) => { el.style.fontSize = z === 1 && n === 1 ? '' : `${(base[k] * z * (num[k] ? n : 1)).toFixed(2)}px`; });
+    const bottom = () => Math.max(0, ...flowKids(card).map((el) => el.offsetTop + el.offsetHeight));
+    const spill0 = spillCount(card);        // what already runs over at 100 % does not hold the size back
+    const fits = () => bottom() <= box - pad / 2 + 1 && spillCount(card) <= spill0;
+    // from the chosen sizes downwards (never below 100 % unless chosen): the pair that gives up the
+    // fewest steps; on a tie the numbers keep theirs -- they are what is read from across the room
+    const one = SIZES.indexOf(1), oneN = NUMS.indexOf(1), ai = SIZES.indexOf(st.size), bi = NUMS.indexOf(st.num);
+    const aLow = Math.min(one, ai), bLow = Math.min(oneN, bi);
+    let used = SIZES[aLow], usedNum = NUMS[bLow], ok = false;
+    for (let d = 0; d <= (ai - aLow) + (bi - bLow) && !ok; d++) {
+      for (let db = 0; db <= d && !ok; db++) {
+        const a = ai - (d - db), b = bi - db;
+        if (a < aLow || b < bLow) continue;
+        set(SIZES[a], NUMS[b]);
+        if (fits()) { used = SIZES[a]; usedNum = NUMS[b]; ok = true; }
+      }
     }
-    // still running over at 100 % text: then the numbers give way too
-    let num = st.num;
-    for (let j = NUMS.indexOf(st.num); j > 0 && spills(card); j--) { num = NUMS[j - 1]; zoom(used, num); }
-    // rows that no longer fit leave whole, never half
-    const lim = bottom() + 1;
-    lists.forEach((el) => { if (el.getBoundingClientRect().bottom > lim) el.style.display = 'none'; });
-    card.dataset.fit = String(used); card.dataset.fitNum = String(num);
+    if (!ok) set(used, usedNum);
+    // the wallpaper's row has one height for all: what doesn't fit there steps out whole, never half
+    const topIn = (el) => { let t = 0; for (let e = el; e && e !== card; e = e.offsetParent) t += e.offsetTop; return t; };
+    if (desk) [...card.querySelectorAll('.tile-list > *')].forEach((el) => {
+      if (topIn(el) + el.offsetHeight > box - pad / 2) { el.style.display = 'none'; el.dataset.deskHidden = '1'; } });
+    card.dataset.fit = String(used); card.dataset.fitNum = String(usedNum);
+  }
+
+  const TOP_CLEAR = 90, BOTTOM_CLEAR = 120;   // the column is centred a little above the middle
+  function fitAll() {
+    const desk = document.documentElement.classList.contains('desk');
+    const all = Object.keys(CARDS).map(prepare).filter(Boolean);
+    all.forEach((p) => { p.nat = p.card.offsetHeight; p.box = p.nat; });
+    const shown = all.filter((p) => p.nat);   // parked or hidden cards are measured when they show
+    // wallpaper: at least a third of the screen (room for the text to grow), a tall card up to 46 %
+    if (desk) shown.forEach((p) => { p.box = Math.round(Math.min(Math.max(p.nat, innerHeight * 0.34), innerHeight * 0.46)); });
+    else if (innerWidth > 1000) {
+      for (const col of document.querySelectorAll('#colLeft, #colRight')) {
+        const mine = shown.filter((p) => p.card.parentElement === col);
+        const spare = Math.max(0, innerHeight - TOP_CLEAR - BOTTOM_CLEAR - col.offsetHeight);
+        const sum = mine.reduce((t, p) => t + p.nat, 0) || 1;
+        mine.forEach((p) => { p.box = p.nat + Math.floor(spare * p.nat / sum); });
+      }
+    }
+    shown.forEach(finish);
   }
 
   function apply(id) {
@@ -73,12 +108,11 @@
     card.style.zoom = '';
     card.style.fontFamily = st.font === 'std' ? '' : FONTS[st.font][1];
     card.dataset.font = st.font;
-    fit(id);
+    refit();
   }
   // the lists are re-rendered with every refresh: fit again once the new rows are in
-  const pending = new Set();
-  const refit = (id) => { if (pending.has(id)) return; pending.add(id);
-    setTimeout(() => { pending.delete(id); fit(id); }, 30); };   // not rAF: it sleeps in a hidden window
+  let pending = 0;
+  const refit = () => { clearTimeout(pending); pending = setTimeout(fitAll, 30); };   // not rAF: it sleeps in a hidden window
 
   for (const id of Object.keys(CARDS)) {
     const card = document.getElementById(id);
@@ -142,11 +176,11 @@
       if (b.dataset.all) Object.keys(CARDS).forEach((other) => { styles[other] = { ...styleOf(id) }; apply(other); });
       save(); apply(id); paint(); place();
     });
-    new MutationObserver(() => refit(id)).observe(card, { childList: true, subtree: true, characterData: true });
+    new MutationObserver(refit).observe(card, { childList: true, subtree: true, characterData: true });
     apply(id);
   }
-  addEventListener('resize', () => Object.keys(CARDS).forEach(refit));
-  document.fonts?.ready.then(() => Object.keys(CARDS).forEach(refit));
+  addEventListener('resize', refit);
+  document.fonts?.ready.then(refit);
   const closeAll = () => document.querySelectorAll('.card-menu').forEach((m) => {
     if (!m.hidden) { m.hidden = true; document.getElementById(m.dataset.card)?.classList.remove('menu-open'); } });
   document.addEventListener('click', closeAll);
