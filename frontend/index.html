@@ -113,6 +113,13 @@
             <div class="muted empty" id="noPositions">Nothing open right now.</div>
           </section>
           <section class="card span-12">
+            <div class="label">Signal-Verspätung <span class="count" id="tmCount">0</span></div>
+            <p class="bt-note">Wie spät jedes Signal bei uns ankam (gepostet → empfangen) und wie weit der Kurs bis dahin gegen den Trade lief.
+              Grundlage für die Pip-Grenze – gemessen, nicht geschätzt.</p>
+            <div class="wf-cards" id="tmSummary"></div>
+            <div class="table-wrap"><table class="positions" id="tmTable"></table></div>
+          </section>
+          <section class="card span-12">
             <div class="label">History <span class="count" id="histCount">0</span> <span class="hist-sum" id="histSum"></span></div>
             <div class="hist-filter" id="histFilter"></div>
             <div class="table-wrap"><table class="positions" id="history"></table></div>

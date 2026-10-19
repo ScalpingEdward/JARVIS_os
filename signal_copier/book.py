@@ -52,6 +52,12 @@ class Book:
     # Set when a loss stop was hit: no new trades until halt_until (None = for good).
     halt_reason: str = ""
     halt_until: float | None = None
+    # How late each signal arrived and how far price had run (see Copier._timing), newest last.
+    timings: list[dict] = field(default_factory=list)
+
+    def add_timing(self, t: dict) -> None:
+        self.timings.append(t)
+        del self.timings[:-200]
 
     def halted(self, now: float) -> bool:
         return bool(self.halt_reason) and (self.halt_until is None or now < self.halt_until)
@@ -98,7 +104,7 @@ class Book:
     def save(self, path: Path) -> None:
         data = {"signals": {k: asdict(v) for k, v in self.signals.items()},
                 "about": self.about, "initial_balance": self.initial_balance,
-                "account": self.account, "pending_be": self.pending_be, "halt_reason": self.halt_reason, "halt_until": self.halt_until}
+                "account": self.account, "pending_be": self.pending_be, "halt_reason": self.halt_reason, "halt_until": self.halt_until, "timings": self.timings}
         tmp = path.with_suffix(".tmp")
         tmp.write_text(json.dumps(data, indent=1), encoding="utf-8")
         tmp.replace(path)
@@ -110,7 +116,7 @@ class Book:
         data = json.loads(path.read_text(encoding="utf-8"))
         return cls({k: TrackedSignal(**v) for k, v in data["signals"].items()},
                    data["about"], data.get("initial_balance"), data.get("account", ""), data.get("pending_be", []),
-                   data.get("halt_reason", ""), data.get("halt_until"))
+                   data.get("halt_reason", ""), data.get("halt_until"), data.get("timings", []))
 
 
 def close_half_plan(legs: dict[str, int], open_tickets: set[int], volumes: dict[int, float],

@@ -1,0 +1,25 @@
+{
+  "_comment": "Gold + Bitcoin auf EINEM Konto (Geruest, 2026-10-19). Auf dem VPS: als profiles/gold_btc/config.json kopieren, Gruppen und Konto eintragen, connected auf true.",
+  "connected": false,
+  "label": "Gold & BTC",
+  "channels": ["<Gold-Gruppe>", "<Bitcoin-Gruppe>"],
+  "terminal": null,
+  "login": null,
+  "allow_live": false,
+  "initial_balance": null,
+  "strategy": "signals",
+  "trail_pips": 100,
+  "sizing": "risk_pct",
+  "fixed_lot": 0.01,
+  "risk": {
+    "risk_per_position_pct": 0.5,
+    "risk_per_symbol_pct": {"XAUUSD": 0.5, "BTCUSD": 0.3},
+    "daily_loss_stop_pct": 30,
+    "overall_loss_stop_pct": 50,
+    "default_entry_deviation_pips": 5,
+    "max_entry_deviation_pips": {"XAUUSD": 60, "BTCUSD": 150}
+  },
+  "legs_without_tp": 2,
+  "symbol_overrides": {},
+  "channel_labels": {}
+}

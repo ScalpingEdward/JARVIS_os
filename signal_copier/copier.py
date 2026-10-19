@@ -93,6 +93,7 @@ class Copier:
             self.book.save(self.state_path)
 
     def _say(self, text: str) -> None:
+        self._last_said = text
         log.info(text)
         self.notify(("[DRY] " if self.dry else "") + text)
 
@@ -115,6 +116,10 @@ class Copier:
         if result is None and event is None:
             return
         where = f"#{msg_id}"
+        # Delay measurement (Brano, 2026-10-15: #4909 arrived 34 pips away). Only the quote now is
+        # taken before trading -- one fast call; the rest is worked out after the signal is handled.
+        timing = self._timing_start(chat_id, msg_id, result, posted_at) if isinstance(result, (Signal, ZoneSignal)) else None
+        self._last_said = ""
         if not self._account_ok():
             self._say(f"{where} ignored: MT5 is not on {self.book.account}\n{text[:200]}")
             return
@@ -141,7 +146,43 @@ class Copier:
         except Exception as e:  # one bad message must not stop the copier
             log.exception("handling %s", where)
             self._say(f"{where} ERROR {type(e).__name__}: {e}")
+        if timing is not None:
+            self._timing_finish(timing, msg_id)
         self._save()
+
+    def _timing_start(self, chat_id: int, msg_id: int, sig, posted_at: float | None) -> dict | None:
+        try:
+            symbol = resolve(sig.symbol, self.symbols, self.overrides)
+            now = self.clock()
+            t = {"msg_id": msg_id, "chat_id": chat_id, "symbol": sig.symbol, "broker_symbol": symbol, "side": sig.side,
+                 "entry": getattr(sig, "entry", None), "zone": list(getattr(sig, "zone", ()) or ()) or None,
+                 "now_signal": bool(getattr(sig, "now", False)), "posted_at": posted_at, "received_at": now,
+                 "delay_s": round(now - posted_at, 2) if posted_at else None,
+                 "price_received": self.ex.price(symbol, sig.side) if symbol else None}
+            return t
+        except Exception as e:  # measuring must never cost a trade
+            log.warning("timing start failed: %s", e)
+            return None
+
+    def _timing_finish(self, t: dict, msg_id: int) -> None:
+        """Price at posting time, how far it ran against the trade until we saw it, and what happened."""
+        try:
+            pip = pip_size(t["symbol"])
+            against = (lambda a, b: (b - a) if t["side"] == "buy" else (a - b))   # positive = worse for the trade
+            if t["posted_at"] and t["broker_symbol"] and hasattr(self.ex, "price_at"):
+                try:
+                    t["price_posted"] = self.ex.price_at(t["broker_symbol"], t["side"], t["posted_at"])
+                except Exception as e:  # no ticks for that moment: the delay is still worth keeping
+                    log.warning("price at posting time unavailable: %s", e)
+            if t.get("price_posted") and t.get("price_received"):
+                t["drift_pips"] = round(against(t["price_posted"], t["price_received"]) / pip, 1)
+            if t.get("entry") and t.get("price_received"):
+                t["entry_gap_pips"] = round(against(t["entry"], t["price_received"]) / pip, 1)
+            t["outcome"] = "opened" if self.book.get(msg_id) else (self._last_said.split("\n")[0][:160] or "ignored")
+            self.book.add_timing(t)
+        except Exception as e:
+            log.warning("timing finish failed: %s", e)
+
 
     def _signal(self, chat_id: int, msg_id: int, sig: Signal) -> None:
         where = f"#{msg_id} {sig.side} {sig.symbol}"
@@ -192,10 +233,10 @@ class Copier:
                           f"the broker minimum {spec.volume_min}")
                 return
         else:
-            lots = lots_for_risk(state.balance, self.profile.risk_per_position_pct, price, sig.sl, spec)
+            pct = self._risk_pct(sig.symbol)
+            lots = lots_for_risk(state.balance, pct, price, sig.sl, spec)
             if lots <= 0:
-                self._say(f"{where} not traded: even {spec.volume_min} lots would risk more than "
-                          f"{self.profile.risk_per_position_pct}%")
+                self._say(f"{where} not traded: even {spec.volume_min} lots would risk more than {pct}%")
                 return
         worst = sum(self.ex.pnl_at_sl(symbol, sig.side, lots, price, sig.sl) for _ in tps)
         verdict = may_open(state, self.profile, worst)
@@ -261,7 +302,7 @@ class Copier:
 
         spec = self.ex.spec(symbol)
         state = self.ex.account_state(self.book.initial_balance)
-        lots, why = self._size(spec, state.balance, price, z.sl)
+        lots, why = self._size(spec, state.balance, price, z.sl, z.symbol)
         if not lots:
             self._say(f"{where} not traded: {why}")
             return
@@ -291,12 +332,19 @@ class Copier:
             self.book.add(tracked)
         self._say(f"{where} opened, SL {z.sl}\n" + "\n".join(lines))
 
-    def _size(self, spec, balance: float, price: float, sl: float) -> tuple[float, str]:
+    def _risk_pct(self, symbol: str) -> float:
+        """Risk per position for this symbol: risk.risk_per_symbol_pct overrides the profile's one value --
+        Gold and Bitcoin copied onto one account need different sizes for the same risk feeling."""
+        per = self.config.get("risk", {}).get("risk_per_symbol_pct") or {}
+        return float(per.get(symbol, self.profile.risk_per_position_pct))
+
+    def _size(self, spec, balance: float, price: float, sl: float, symbol: str = "") -> tuple[float, str]:
         if self.config.get("sizing", "risk_pct") == "fixed_lot":
             lots = fixed_lots(self.config["fixed_lot"], spec)
             return lots, f"fixed lot {self.config['fixed_lot']} is below the broker minimum {spec.volume_min}"
-        lots = lots_for_risk(balance, self.profile.risk_per_position_pct, price, sl, spec)
-        return lots, f"even {spec.volume_min} lots would risk more than {self.profile.risk_per_position_pct}%"
+        pct = self._risk_pct(symbol)
+        lots = lots_for_risk(balance, pct, price, sl, spec)
+        return lots, f"even {spec.volume_min} lots would risk more than {pct}%"
 
     def _open_layer(self, s: TrackedSignal) -> dict[int, object]:
         """Position number -> open position, for one layer."""
@@ -807,6 +855,9 @@ async def main(profile: str | None, dry: bool) -> None:
         raise SystemExit(str(e))
     folder = profiles.folder(name)
     config = profiles.load(name)
+    if config.get("connected") is False:
+        raise SystemExit(f"Profil '{name}' ist vorbereitet, aber noch nicht verbunden (\"connected\": false). "
+                         "Gruppen, Konto und Terminal eintragen -- auf dem VPS -- und dann auf true setzen.")
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s",
                         handlers=[logging.FileHandler(folder / "copier.log", encoding="utf-8"), logging.StreamHandler()])
     # What people call this account: its group's name, not the folder name (Brano, 2026-10-15).

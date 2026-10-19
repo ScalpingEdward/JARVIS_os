@@ -207,6 +207,28 @@ function renderPositions(o) {
 
 // --- closed trades, newest first, filterable by group -----------------------------
 let histGroup = '';
+function renderTimings(o) {
+  const all = o.accounts.flatMap((a) => (a.timings || []).map((t) => ({ ...t, account: nameOf(a) })))
+    .sort((x, y) => (y.received_at || 0) - (x.received_at || 0));
+  $('#tmCount').textContent = all.length;
+  if (!all.length) { $('#tmSummary').innerHTML = '<p class="muted">Noch keine Messung – die erste kommt mit dem nächsten Signal.</p>'; $('#tmTable').innerHTML = ''; return; }
+  const med = (xs) => { const v = xs.filter((x) => x != null).sort((a, b) => a - b); return v.length ? v[Math.floor(v.length / 2)] : null; };
+  const groups = [...new Set(all.map((t) => t.group))];
+  $('#tmSummary').innerHTML = groups.map((g) => {
+    const ts = all.filter((t) => t.group === g), d = med(ts.map((t) => t.delay_s)), p = med(ts.map((t) => t.drift_pips));
+    const missed = ts.filter((t) => t.outcome !== 'opened').length;
+    return `<div><small>${esc(g)}</small><b>${d == null ? '–' : d.toFixed(1) + ' s'}</b>
+      <span>Median Verspätung · Kurs lief ${p == null ? '–' : p.toFixed(1) + ' Pips'} · ${ts.length} Signale, ${missed} nicht eröffnet</span></div>`;
+  }).join('');
+  $('#tmTable').innerHTML = '<tr><th>WANN</th><th>GRUPPE</th><th>SIGNAL</th><th>VERSPÄTUNG</th><th>KURS GELAUFEN</th><th>ABSTAND EINSTIEG</th><th>ERGEBNIS</th></tr>'
+    + all.slice(0, 25).map((t) => `<tr><td class="muted">${t.received_at ? esc(new Date(t.received_at * 1000).toLocaleString('de-DE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })) : '–'}</td>`
+      + `<td>${esc(t.group)}</td><td><b>${esc((t.side || '').toUpperCase())} ${esc(t.symbol)}</b></td>`
+      + `<td class="num">${t.delay_s == null ? '–' : t.delay_s.toFixed(1) + ' s'}</td>`
+      + `<td class="num ${t.drift_pips > 0 ? 'down' : 'up'}">${t.drift_pips == null ? '–' : t.drift_pips.toFixed(1)}</td>`
+      + `<td class="num">${t.entry_gap_pips == null ? '–' : t.entry_gap_pips.toFixed(1)}</td>`
+      + `<td class="${t.outcome === 'opened' ? 'up' : 'muted'}">${esc(t.outcome === 'opened' ? 'eröffnet' : t.outcome)}</td></tr>`).join('');
+}
+
 function renderHistory(o) {
   const all = o.accounts.flatMap((a) => (a.closed || []).map((t) => ({ ...t, profile: nameOf(a), currency: a.currency })))
     .sort((a, b) => b.closed - a.closed);
@@ -293,7 +315,7 @@ async function refreshTrading() {
   try {
     overview = await get('/v1/copier/overview');
     renderTradingTile(overview);
-    if (openView === 'trading') { renderTotals(overview); renderAccounts(overview); renderGroups(overview); renderPositions(overview); renderHistory(overview); renderTotalChart(); }
+    if (openView === 'trading') { renderTotals(overview); renderAccounts(overview); renderGroups(overview); renderPositions(overview); renderHistory(overview); renderTimings(overview); renderTotalChart(); }
   } catch (e) { console.warn(e); }
 }
 
@@ -405,7 +427,7 @@ function open(view, fromTile, push = true) {
   if (view === 'watchlist' && watch) renderWatchView(watch);
   if (view === 'smart') renderSmartView();
   if (view === 'instagram') { loadWaiting(); loadVoice(); }
-  if (view === 'trading' && overview) { renderTotals(overview); renderAccounts(overview); renderGroups(overview); renderPositions(overview); renderHistory(overview); renderTotalChart(); }
+  if (view === 'trading' && overview) { renderTotals(overview); renderAccounts(overview); renderGroups(overview); renderPositions(overview); renderHistory(overview); renderTimings(overview); renderTotalChart(); }
   if (fromTile) morph($('#detailPanel'), fromTile.getBoundingClientRect(), false);
   $('#close').focus();
 }

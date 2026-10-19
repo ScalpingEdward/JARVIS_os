@@ -55,6 +55,8 @@ class CopierStatusIn(BaseModel):
     label: str | None = Field(default=None, max_length=100)  # display name, e.g. the group's
     closed: list[CopierClosedTrade] = Field(default_factory=list, max_length=500)  # newest first
     halt_reason: str = Field(default="", max_length=300)  # paused by Brano / loss stop; "" = trading
+    # per signal: group, symbol, side, delay_s, drift_pips, entry_gap_pips, outcome ... (signal_copier Copier._timing_*)
+    timings: list[dict] = Field(default_factory=list, max_length=200)
 
 
 class CopierState(StrEnum):

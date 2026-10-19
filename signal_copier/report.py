@@ -45,6 +45,7 @@ class Status:
     label: str = ""  # what people call this account -- its group's name, not the folder name
     closed: list[dict] = field(default_factory=list)  # newest first, see closed_trades()
     halt_reason: str = ""  # why no new trades are opened right now (pause, loss stop); "" = trading
+    timings: list[dict] = field(default_factory=list)  # how late signals came, newest last (Copier._timing_*)
 
     def to_json(self) -> dict:
         return asdict(self)
@@ -139,4 +140,6 @@ def build(profile: str, account: dict, positions: list[dict], deals: list[dict],
     return Status(profile, account["login"], account["server"], account["currency"],
                   round(account["balance"], 2), round(account["equity"], 2),
                   now.isoformat(), ordered, open_list, label or profile, closed_trades(deals, owner),
-                  book.halt_reason if book.halted(now.timestamp()) else "")
+                  book.halt_reason if book.halted(now.timestamp()) else "",
+                  [{**{k: v for k, v in t.items() if k != "chat_id"}, "group": chat_names.get(t.get("chat_id"), "?")}
+                   for t in book.timings[-60:]])

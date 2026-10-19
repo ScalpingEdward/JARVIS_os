@@ -196,6 +196,18 @@ def close_position(position, volume: float | None = None) -> None:
     })
 
 
+def price_at(symbol: str, side: str, ts: float) -> float | None:
+    """The quote at a past moment (UTC epoch) -- the first tick at or after it. MT5 keeps tick
+    times in server time posing as UTC, so the request is shifted by the server's offset."""
+    from datetime import datetime, timezone
+    ticks = mt5.copy_ticks_from(symbol, datetime.fromtimestamp(ts + _server_offset_seconds(symbol), timezone.utc),
+                                1, mt5.COPY_TICKS_INFO)
+    if ticks is None or len(ticks) == 0:
+        return None
+    t = ticks[0]
+    return float(t["ask"] if side == "buy" else t["bid"])
+
+
 def _server_offset_seconds(symbol: str = "EURUSD") -> int:
     """MT5 stamps deals in server time posing as UTC; this is the gap, to the hour."""
     tick = _tick(symbol)

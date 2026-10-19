@@ -322,3 +322,30 @@ def test_commands_pause_blocks_new_trades_resume_lifts_it_close_all_empties():
     assert t.positions
     assert c.command("close_all").startswith("CLOSE ALL by Brano: 2 positions")
     assert t.positions == {} and c.command("explode") == "unknown command explode"
+
+
+def test_every_signal_records_how_late_it_came_and_how_far_price_ran():
+    c, t, said, now = make()
+    t.price_at = lambda symbol, side, ts: 4148.0        # the quote when the group posted
+    c.on_message(CHAT, 10, None, SIGNAL, posted_at=now[0] - 7.5)
+    tm = c.book.timings[-1]
+    assert tm["delay_s"] == 7.5 and tm["outcome"] == "opened"
+    assert tm["price_posted"] == 4148.0 and tm["drift_pips"] is not None and tm["entry_gap_pips"] is not None
+    c.on_message(CHAT, 11, None, "XAUUSD SELL @ 4200\nSL @ 4210\nTP1 @ 4180", posted_at=now[0] - 2)
+    assert "not traded" in c.book.timings[-1]["outcome"]     # refused: price ran too far -- and why is kept
+
+
+def test_a_failing_measurement_never_costs_the_trade():
+    c, t, said, now = make()
+    t.price_at = lambda *a: (_ for _ in ()).throw(RuntimeError("no ticks"))
+    c.on_message(CHAT, 10, None, SIGNAL, posted_at=now[0] - 3)
+    assert len(t.positions) == 2 and c.book.timings[-1]["delay_s"] == 3
+
+
+def test_risk_can_differ_per_symbol_on_one_account():
+    c, t, said, _ = make()
+    c.config = {**c.config, "risk": {**c.config.get("risk", {}), "risk_per_symbol_pct": {"XAUUSD": 1.0}}}
+    c.on_message(CHAT, 10, None, SIGNAL)
+    # 1 % of 10 000 = 100 instead of 50 -> twice the lots of the default 0.5 %
+    assert [p.volume for p in t.positions.values()] == [0.1, 0.1]
+    assert c._risk_pct("BTCUSD") == c.profile.risk_per_position_pct
