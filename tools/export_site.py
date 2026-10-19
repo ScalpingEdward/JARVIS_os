@@ -47,6 +47,7 @@ def main() -> None:
     html = html.replace('<script src="../globe.js"></script>', f"<script>\n{(FRONT / 'globe.js').read_text(encoding='utf-8')}\n</script>")
     html = html.replace('<script src="../rooms/rooms.js"></script>', f"<script>\n{rooms_js}\n</script>{patch}")
     html = html.replace('<script src="./hero.js"></script>', f"<script>\n{hero}\n</script>")
+    html = html.replace('<script src="./i18n.js"></script>', f"<script>\n{(SITE / 'i18n.js').read_text(encoding='utf-8')}\n</script>")
     for name in ("dashboard.webp", "phoenix-mark.png", "hologram.webp"):
         if not (SITE / "img" / name).exists():
             continue

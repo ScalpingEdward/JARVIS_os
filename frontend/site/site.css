@@ -466,3 +466,23 @@ html[data-glass="solid"] .benefit { background: linear-gradient(155deg, rgb(var(
   .hero-bg { -webkit-mask-image: linear-gradient(180deg, transparent, #000 16%, #000 80%, transparent);
     mask-image: linear-gradient(180deg, transparent, #000 16%, #000 80%, transparent); }
 }
+
+/* language switcher */
+.lang { position: relative; }
+.lang-btn { font: 600 12.5px/1 inherit; padding: 9px 12px; border-radius: 999px; cursor: pointer; color: var(--text);
+  background: rgba(255,255,255,.06); border: 1px solid var(--line); letter-spacing: .06em; }
+.lang-btn:hover, .lang-btn:focus-visible { border-color: var(--accent); }
+.lang-menu { position: absolute; right: 0; top: calc(100% + 6px); z-index: 30; display: grid; min-width: 150px; padding: 6px; border-radius: 12px;
+  background: rgba(8,12,20,.96); border: 1px solid var(--line); box-shadow: 0 20px 50px -20px rgba(0,0,0,.9); }
+.m-cta .lang-menu { top: auto; bottom: calc(100% + 6px); }
+.lang-menu button { font: 14px/1 inherit; text-align: start; padding: 10px 12px; border: 0; border-radius: 8px; background: none; color: var(--muted); cursor: pointer; }
+.lang-menu button:hover, .lang-menu button.on { color: var(--text); background: color-mix(in srgb, var(--accent) 16%, transparent); }
+.nav .lang { margin-left: auto; margin-right: 12px; }
+[dir="rtl"] .nav .lang { margin-left: 12px; margin-right: auto; }
+[dir="rtl"] .lang-menu { right: auto; left: 0; }
+[dir="rtl"] body { font-family: "Segoe UI", Tahoma, "Noto Sans Arabic", system-ui, sans-serif; }
+[dir="rtl"] .g-left { transform: rotateY(-14deg); } [dir="rtl"] .g-right { transform: rotateY(14deg); }
+[dir="rtl"] .b-list li, [dir="rtl"] .who li, [dir="rtl"] .ticks li { padding-left: 0; padding-right: 28px; }
+[dir="rtl"] .b-list li::before, [dir="rtl"] .who li::before, [dir="rtl"] .ticks li::before { left: auto; right: 0; }
+.lang-menu[hidden] { display: none; }
+.mark { direction: ltr; }   /* the logo stays "◯ AURON" in Arabic too */

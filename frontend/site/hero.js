@@ -67,6 +67,9 @@
   }
 
   let n = 0, front = a, back = b, timer = null;
+  const tr = (x) => (window.AURON_t ? window.AURON_t(x) : x);
+  const label = (look) => { where.innerHTML = `<b>${tr(look.name)}</b> · ${tr(look.style)}`; };
+  document.addEventListener('auron:lang', () => label(LOOKS[n]));
   place(front, LOOKS[0].room);
   wear(LOOKS[0]);
   addEventListener('resize', () => { place(front, front.dataset.room); if (back.dataset.room) place(back, back.dataset.room); });
@@ -80,7 +83,7 @@
     [front, back] = [back, front];
     wear(look);
     where.style.opacity = 0;
-    setTimeout(() => { where.innerHTML = `<b>${look.name}</b> · ${look.style}`; where.style.opacity = 1; }, 400);
+    setTimeout(() => { label(look); where.style.opacity = 1; }, 400);
   }
   // a click takes over: the tour stops, so the chosen look stays
   document.getElementById('prevLook').addEventListener('click', () => { clearInterval(timer); show(n - 1); });
