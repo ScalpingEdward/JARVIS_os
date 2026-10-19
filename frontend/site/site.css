@@ -506,3 +506,5 @@ html[data-glass="solid"] .benefit { background: linear-gradient(155deg, rgb(var(
   .hero { padding-top: calc(54px + env(safe-area-inset-top, 0px)); }
   .m-cta .lang { display: none; }
 }
+.holo-note em.soon { white-space: nowrap; }
+.holo-img img { aspect-ratio: auto; }      /* Brano's picture keeps its own shape */
