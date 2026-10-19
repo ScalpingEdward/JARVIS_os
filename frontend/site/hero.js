@@ -21,6 +21,20 @@
     const room = ROOMS[key], c = core.getBoundingClientRect(), hero = layer.parentElement.getBoundingClientRect();
     const px = c.left - hero.left + c.width / 2, py = c.top - hero.top + c.height * 0.88;
     const vw = hero.width, vh = hero.height, [x, y, top] = room.ped;
+    if (vw < 900) {
+      // phone: show the room as a room -- a little wider than the screen, the pedestal under the planet,
+      // its top and bottom fading out (CSS mask) instead of blowing it up to fill the whole tall hero
+      const W = Math.max(vw * 1.8, (c.width * 0.8) / top), H = W * room.h / room.w;
+      layer.style.backgroundImage = `url("${src(key)}")`;
+      layer.style.backgroundSize = `${W}px ${H}px`;
+      layer.style.backgroundPosition = `${px - x * W}px 0px`;
+      layer.style.top = `${py - y * H}px`;
+      layer.style.height = `${H}px`;
+      layer.style.bottom = 'auto';
+      layer.dataset.room = key;
+      return;
+    }
+    layer.style.top = layer.style.height = layer.style.bottom = '';
     let scale = Math.max(vw / room.w, vh / room.h, (c.width * 0.8) / (top * room.w));
     for (let i = 0; i < 40; i++) {
       const W = room.w * scale, H = room.h * scale, bx = px - x * W, by = py - y * H;
@@ -77,6 +91,16 @@
   });
   if (matchMedia('(prefers-reduced-motion: reduce)').matches || LOOKS.length < 2) return;
   timer = setInterval(() => show(n + 1), 7000);
+  // scrolled past the hero: the tour stops on the blue earth (unless someone picked a look with ‹ ›)
+  let picked = false;
+  ['prevLook', 'nextLook'].forEach((id) => document.getElementById(id).addEventListener('click', () => { picked = true; }));
+  const heroEl = document.getElementById('top');
+  addEventListener('scroll', function stopTour() {
+    if (scrollY < heroEl.offsetHeight * 0.6) return;
+    removeEventListener('scroll', stopTour);
+    clearInterval(timer); timer = null;
+    if (!picked && n !== 0) show(0);
+  }, { passive: true });
 })();
 
 // pictures with data-zoom open large; "Als Bild öffnen" shows the picture alone in a new tab

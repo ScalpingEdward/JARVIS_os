@@ -459,3 +459,10 @@ html[data-glass="solid"] .benefit { background: linear-gradient(155deg, rgb(var(
   .hero-mark { gap: 0; }
   .hero-mark small { margin-top: -4px; }
 }
+
+/* phone: the room drawn smaller (hero.js sets its box); top and bottom fade into the page */
+@media (max-width: 900px) {
+  .hero { background: #05070c; }
+  .hero-bg { -webkit-mask-image: linear-gradient(180deg, transparent, #000 16%, #000 80%, transparent);
+    mask-image: linear-gradient(180deg, transparent, #000 16%, #000 80%, transparent); }
+}
