@@ -942,3 +942,4 @@ body > .card-menu { position: fixed; top: 0; left: 0; right: auto; z-index: 40; 
 .tile-list.as-tiles .grp-pos { grid-column: 1 / -1; margin: 0 0 4px; }
 .grp-pos > div { grid-template-columns: 38px minmax(0, 1fr) auto 64px; }
 .grp-pos > div > span:nth-child(2) { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.card-menu .cm-note { display: block; padding: 0 12px 4px; font-size: 10px; color: var(--faint); }
