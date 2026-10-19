@@ -962,3 +962,5 @@ html.desk .col > .tile.dragging { cursor: grabbing; animation: none; transition:
    into a picture is wrong a minute later; ?noplanet: the room alone, for the side screens */
 html.bare .col, html.bare .topclock, html.bare .brand, html.bare .chat, html.bare .sysbar, html.bare .top { display: none !important; }
 html.noplanet .core { visibility: hidden; }
+/* the group's account line (Konto … · Equity …) and its open count read in white, not grey (Brano, 2026-10-19) */
+.row.grp .grp-open { color: var(--text); opacity: .9; }
