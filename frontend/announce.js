@@ -22,11 +22,27 @@
     window.AURON_voice?.say(text);
   }
 
-  // trades: app.js fires this when a closed trade shows up (the ring pulses at the same moment)
-  document.addEventListener('auron:trade-closed', (e) => {
-    const c = e.detail;
-    announce('trades', `Sir, ${c.group} hat einen Trade ${c.profit >= 0 ? 'im Gewinn' : 'im Verlust'} geschlossen: ${c.symbol || ''} ${eur(c.profit)}.`);
+  // trades: app.js fires one event per group with all trades that closed since its last look. Legs of
+  // one signal can also close a few seconds apart and land in two looks -- so a group's trades are
+  // collected for 20 s after the last one and then said once, short.
+  const NAMES = { XAUUSD: 'Gold', XAGUSD: 'Silber', BTCUSD: 'Bitcoin', ETHUSD: 'Ethereum', NAS100: 'Nasdaq', US30: 'Dow Jones', GER40: 'DAX', US500: 'S&P 500', USOIL: 'Öl' };
+  const spoken = (sym) => { const base = String(sym || '').toUpperCase().replace(/[^A-Z0-9].*$/, ''); return NAMES[base] || base; };
+  const pending = new Map();
+  document.addEventListener('auron:trades-closed', (e) => {
+    const { group, trades } = e.detail;
+    const p = pending.get(group) || { trades: [] };
+    clearTimeout(p.timer);
+    p.trades.push(...trades);
+    p.timer = setTimeout(() => { pending.delete(group); say(group, p.trades); }, 20000);
+    pending.set(group, p);
   });
+  function say(group, trades) {
+    const sum = trades.reduce((x, c) => x + (c.profit || 0), 0);
+    const syms = [...new Set(trades.map((c) => spoken(c.symbol)))].join(' und ');
+    const what = trades.length === 1 ? 'einen Trade' : `${trades.length} Trades`;
+    const result = Math.abs(sum) < 0.005 ? 'bei null, also Break-even' : `zusammen ${eur(sum)}`;
+    announce('trades', `Sir, ${group} hat ${what} ${syms ? 'in ' + syms + ' ' : ''}geschlossen, ${result}.`);
+  }
 
   // important mail: new ids since the last look; the first look only learns what is there
   const seenMail = new Set();

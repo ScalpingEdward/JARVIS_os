@@ -312,17 +312,21 @@ function pulseClosed(o, groups) {
     if (!seenClosed.has(id)) { seenClosed.add(id); if (closedPrimed) fresh.push(c); }
   }));
   closedPrimed = true;
-  fresh.forEach((c, k) => setTimeout(() => {
-    const i = groups.findIndex((g) => g.name === c.group);
-    const light = document.querySelectorAll('.o1 i')[i];
-    const cls = c.profit >= 0 ? 'flash-g' : 'flash-r';
-    [light, document.querySelector('.o1')].forEach((el) => {
+  // one signal is several legs (TP1, TP2, TP3) that close together: one pulse and one event per
+  // group with all its trades, not one per leg (Brano, 2026-10-19: four announcements for one signal)
+  const byGroup = new Map();
+  fresh.forEach((c) => byGroup.set(c.group, [...(byGroup.get(c.group) || []), c]));
+  [...byGroup.entries()].forEach(([group, trades], k) => setTimeout(() => {
+    const sum = trades.reduce((x, c) => x + (c.profit || 0), 0);
+    const i = groups.findIndex((g) => g.name === group);
+    const cls = sum >= 0 ? 'flash-g' : 'flash-r';
+    [document.querySelectorAll('.o1 i')[i], document.querySelector('.o1')].forEach((el) => {
       if (!el) return;
       el.classList.remove('flash-g', 'flash-r'); void el.offsetWidth;   // restart the animation
       el.classList.add(cls);
       setTimeout(() => el.classList.remove(cls), 4200);
     });
-    document.dispatchEvent(new CustomEvent('auron:trade-closed', { detail: c }));
+    document.dispatchEvent(new CustomEvent('auron:trades-closed', { detail: { group, trades, sum } }));
   }, k * 4500));
 }
 
