@@ -77,8 +77,24 @@ def artifact(out: Path) -> None:
     print(f"{out}: {out.stat().st_size / 1e6:.1f} MB")
 
 
+def pages(out: Path) -> None:
+    """A folder to upload as it is to a static host (Cloudflare Pages, Netlify): the one-file page as
+    index.html, the legal pages with their stylesheet, the icon, and a header that keeps search
+    engines out until Brano decides otherwise."""
+    import shutil
+    out.mkdir(parents=True, exist_ok=True)
+    shutil.copy(OUT / "auron-website.html", out / "index.html")
+    for name in ("impressum.html", "datenschutz.html", "agb.html", "site.css"):
+        shutil.copy(SITE / name, out / name)
+    shutil.copy(FRONT / "app-icon-192.png", out / "favicon.png")
+    (out / "_headers").write_text("/*\n  X-Robots-Tag: noindex, nofollow\n", encoding="utf-8")
+    print(f"{out}: {', '.join(sorted(p.name for p in out.iterdir()))}")
+
+
 if __name__ == "__main__":
     import sys
     main()
+    if len(sys.argv) > 2 and sys.argv[1] == "--pages":
+        pages(Path(sys.argv[2]))
     if len(sys.argv) > 2 and sys.argv[1] == "--artifact":
         artifact(Path(sys.argv[2]))
