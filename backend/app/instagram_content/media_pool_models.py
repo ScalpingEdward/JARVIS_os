@@ -45,6 +45,8 @@ class MediaPoolItemCreate(BaseModel):
         "is None. Kept as its own field so an upload time can never masquerade as a capture time.",
     )
     aesthetic_score: float = Field(ge=0, le=1)
+    file_name: str | None = Field(default=None, max_length=500,
+                                  description="The original file name (IMG_1234.HEIC) -- matches a Live Photo's MOV to its still.")
     analysis_reasoning: str = Field(
         default="",
         max_length=2000,

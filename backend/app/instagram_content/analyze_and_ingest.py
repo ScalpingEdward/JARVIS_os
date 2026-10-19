@@ -12,6 +12,7 @@ from PIL import Image
 
 from .analysis_completeness import analysis_is_complete
 from .captured_at_resolution import resolve_captured_at
+from .heic import HeicError, is_heic, live_photo_companion, to_jpeg_base64
 from .ingest_paths import IngestPathError, ingest_directory_status, resolve_ingest_path
 from .media_pool_models import (
     MediaAnalyzeAndIngestItem,
@@ -276,9 +277,11 @@ def analyze_and_ingest(
     # n8n workflow would drop it as "known" on every run and nothing would ever
     # revisit it. pool_service.ingest() then updates that row in place instead
     # of inserting a duplicate.
-    analyzed_media_refs = {
-        existing.media_ref for existing in pool_service.list_all() if analysis_is_complete(existing)
-    }
+    pool_now = pool_service.list_all()
+    analyzed_media_refs = {existing.media_ref for existing in pool_now if analysis_is_complete(existing)}
+    # photo names, to recognise a Live Photo's MOV: the pool's and this batch's own
+    photo_stems = {Path(i.file_name).stem.lower() for i in pool_now if i.file_name and i.media_type == MediaType.image}
+    photo_stems |= {Path(i.file_name).stem.lower() for i in items if i.file_name and i.media_type == MediaType.image}
 
     for item in items:
         if item.media_ref in analyzed_media_refs:
@@ -328,6 +331,12 @@ def analyze_and_ingest(
                 duration_seconds, frames = sample_video(
                     resolved_video_path, claimed_duration_seconds=item.duration_seconds
                 )
+                if live_photo_companion(item.file_name, duration_seconds, photo_stems):
+                    results.append(MediaAnalyzeAndIngestItemResult(
+                        media_ref=item.media_ref, success=False,
+                        error=f"Live-Photo companion ({item.file_name}, {duration_seconds:.1f}s) -- belongs to a still, "
+                              "not a clip anyone shot on purpose; kept out of the pool."))
+                    continue
                 analysis = analyzer.analyze(frames=frames)
             except (VideoFrameExtractionError, VisionAnalysisError) as exc:
                 results.append(
@@ -421,6 +430,15 @@ def analyze_and_ingest(
             )
             continue
 
+        if item.media_type == MediaType.image and item.image_base64 and is_heic(
+                base64.b64decode(item.image_base64[:64]), item.image_media_type, item.file_name):
+            # Instagram takes JPEG only: convert once, here, and let everything after see a JPEG
+            try:
+                item = item.model_copy(update={"image_base64": to_jpeg_base64(item.image_base64), "image_media_type": "image/jpeg"})
+            except HeicError as exc:
+                results.append(MediaAnalyzeAndIngestItemResult(media_ref=item.media_ref, success=False, error=str(exc)))
+                continue
+
         try:
             scaled_image_base64, scaled_image_media_type = _downscale_if_needed(
                 item.image_base64, item.image_media_type
@@ -451,6 +469,7 @@ def analyze_and_ingest(
                 analysis_reasoning=analysis.reasoning or "",
                 duration_seconds=item.duration_seconds,
                 source_group=item.source_group,
+                file_name=item.file_name,
                 captured_at=captured_at,
                 captured_at_source=captured_at_source,
                 processed_file=(
