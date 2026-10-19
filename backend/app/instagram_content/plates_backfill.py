@@ -20,14 +20,19 @@ from .media_processing import output_dir
 from .models import MediaType
 
 
+DONE_LIST = ".plates-backfill-done"   # in the processed dir: a second run skips what is done
+
+
 def main(kind: str | None = None) -> None:
     root = output_dir()
+    done_file = Path(root) / DONE_LIST
+    done = set(done_file.read_text().split()) if done_file.is_file() else set()
     with SessionLocal() as s:
         rows = s.query(InstagramMediaPoolItemRow).all()
     todo = []
     for row in rows:
         item = MediaPoolItem.model_validate_json(row.data)
-        if item.processed_file and (kind is None or item.media_type.value == kind):
+        if item.processed_file and item.processed_file not in done and (kind is None or item.media_type.value == kind):
             todo.append((row.id, item))
     changed = failed = 0
     for n, (row_id, item) in enumerate(todo, 1):
@@ -45,6 +50,8 @@ def main(kind: str | None = None) -> None:
         if found:
             changed += 1
             _update(row_id, processed_media_ref=None)   # re-upload the covered file
+        with done_file.open("a") as fh:
+            fh.write(item.processed_file + chr(10))
         print(f"[{n}/{len(todo)}] {item.media_ref}: {found} covered", flush=True)
     print(f"done: {len(todo)} checked, {changed} changed (re-upload), {failed} held back", flush=True)
 
