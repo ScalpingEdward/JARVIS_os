@@ -151,6 +151,10 @@ def signal_profit(e: dict, horizon: int = HOLD, cost: float = COST) -> float | N
 
 FOLLOW_CODES = ("P",)   # 7 years (2019-2026): shorting insider sales lost -3.7 % per 60 days
                          # (-11 % behind "proven" sellers) in a rising market; only buys are followed.
+                         # Re-tested 2026-10-19 with a market filter known at filing time (S&P 500 below its
+                         # 200-day average): still -5.2 % per 60 days (2,752 shorts, 44 % hits), "proven"
+                         # sellers -12 %; only 2022 broke even (+1.1 %). The +8.8 % seen when the market FELL
+                         # during the hold was hindsight -- nobody knows that at filing time. Shorts stay out.
 
 
 def by_signaler(evts: list[dict], horizon: int = HOLD, codes: tuple = FOLLOW_CODES) -> list[dict]:

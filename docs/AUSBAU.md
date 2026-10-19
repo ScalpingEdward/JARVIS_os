@@ -30,13 +30,13 @@ Plan (vor dem Bau mit Brano abstimmen):
 - Offene Frage an Brano: Claude Code mit seinem Abo oder per API-Key abrechnen?
 
 ## 3. Trading
-- [ ] MT5-Demo anschließen: `/v1/accounts` zeigt denselben Kontostand wie das Terminal
-- [ ] Kopierer: Signal-Verspätung messen (Nachrichtenzeit vs. Empfang vs. Kurs) bevor die Pip-Grenze weiter wächst
+- [x] MT5-Demo geprüft (2026-10-19): Kontostände kommen korrekt über den Kopierer (`/v1/copier/status`) aus den Terminals; `/v1/accounts` + MT5-Bridge sind leer, nie befüllt – Altbestand, beim VPS-Umzug entscheiden: anbinden oder entfernen
+- [x] Kopierer: Signal-Verspätung messen (Nachrichtenzeit vs. Empfang vs. Kurs) bevor die Pip-Grenze weiter wächst
 - [ ] Backtesting-Lab mit echten MT5-Kursen statt Verweigerung
-- [ ] Insider-Shorts nur mit Marktfilter testen (S&P unter 200-Tage-Schnitt)
+- [x] Insider-Shorts mit Marktfilter getestet: auch gefiltert -5,2 % je 60 Tage – Shorts bleiben draußen
 - [ ] Strategie aus der Beobachtungsliste (Einstieg, Haltedauer, Absicherung) – aus Daten
-- [ ] **Gerüst**: eigenes Insider-Konto mit Signal-Feed (Anbindung später, VPS)
-- [ ] **Gerüst**: Gold- + Bitcoin-Kopierer auf einem Konto (Anbindung später, VPS)
+- [x] **Gerüst**: eigenes Insider-Konto mit Signal-Feed (Anbindung später, VPS)
+- [x] **Gerüst**: Gold- + Bitcoin-Kopierer auf einem Konto (Anbindung später, VPS)
 - Später/extern: Futures-Bot NinjaTrader (erst wenn Instagram läuft), Signal-Kopierer als Produkt
 
 ## 4. Instagram
