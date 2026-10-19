@@ -921,3 +921,16 @@ html.phone-land .topclock { display: none; }
 .grp-pos .side { font-size: 9.5px; font-weight: 700; letter-spacing: .08em; padding: 1px 5px; border-radius: 5px; text-align: center; }
 .grp-pos .side.buy { color: var(--up); background: rgba(61,220,151,.12); }
 .grp-pos .side.sell { color: var(--down); background: rgba(242,100,124,.12); }
+
+/* card menu: size and typeface (cardview.js) */
+.card-menu { max-height: 70vh; overflow-y: auto; min-width: 190px; }
+.card-menu .cm-h { font-size: 9.5px; letter-spacing: .16em; text-transform: uppercase; color: var(--faint); padding: 8px 12px 2px; font-weight: 600; }
+.card-menu .cm-size { display: flex; align-items: center; justify-content: space-between; gap: 6px; cursor: default; }
+.card-menu .cm-size:hover { background: none; }
+.card-menu .cm-size i { font-style: normal; font-weight: 700; padding: 4px 10px; border-radius: 8px; border: 1px solid var(--line-2); cursor: pointer; color: var(--text); }
+.card-menu .cm-size i:hover { border-color: var(--accent); }
+.card-menu .cm-size i.off { opacity: .3; pointer-events: none; }
+.card-menu .cm-size em { font-style: normal; font-family: var(--mono); font-size: 11.5px; }
+.card-menu .cm-all { margin-top: 4px; border-top: 1px solid var(--line); border-radius: 0 0 8px 8px; color: var(--accent); }
+/* the big views: a little larger too (Brano, 2026-10-19) */
+.detail .view { zoom: 1.1; }
