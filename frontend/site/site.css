@@ -359,3 +359,49 @@ html[data-glass="solid"] .benefit { background: linear-gradient(155deg, rgb(var(
 
 .faq em.soon { font-style: normal; font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; padding: 2px 7px; border-radius: 999px; white-space: nowrap;
   border: 1px solid color-mix(in srgb, var(--accent) 50%, transparent); color: var(--accent); }
+
+/* prices: four plans, extras, requirements */
+.grid.prices.four { grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr)); }
+.p-for { margin: -4px 0 0; color: var(--muted); font-size: 13.5px; }
+.price em.soon, .extras em.soon { font-style: normal; font-size: 10px; letter-spacing: .1em; text-transform: uppercase; padding: 1px 6px;
+  border-radius: 999px; border: 1px solid color-mix(in srgb, var(--accent) 50%, transparent); color: var(--accent); white-space: nowrap; }
+.extras { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr)); gap: 14px; margin-top: 18px; }
+.extras strong, .reqs strong { color: var(--text); }
+.extras .founder { border-color: rgba(245,184,74,.45); background: linear-gradient(155deg, rgba(245,184,74,.16), rgba(10,20,36,.5)); }
+.extras .founder b { color: #f5b84a; }
+.reqs { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr)); gap: 14px; }
+
+/* hologram fan (coming soon): planet only or the whole dashboard, floating */
+.holo-sec { display: grid; grid-template-columns: 1fr 1fr; gap: 50px; align-items: center; }
+.holo-sec h2 span { color: var(--accent); }
+.holo-modes { display: inline-flex; gap: 6px; padding: 5px; border-radius: 999px; background: rgba(255,255,255,.05); border: 1px solid var(--line); margin-top: 22px; }
+.holo-modes button { font: 600 13px/1 inherit; padding: 10px 18px; border-radius: 999px; border: 0; background: none; color: var(--muted); cursor: pointer; }
+.holo-modes button.on { background: var(--accent); color: #001018; }
+.holo-note { color: var(--muted); font-size: 13.5px; margin-top: 14px; }
+.holo-note em.soon { font-style: normal; font-size: 10px; letter-spacing: .1em; text-transform: uppercase; padding: 1px 6px; border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--accent) 50%, transparent); color: var(--accent); }
+.fan { position: relative; width: min(420px, 80vw); aspect-ratio: 1; margin: 0 auto; border-radius: 50%;
+  background: radial-gradient(circle, #02040a 0 62%, #0b111c 63% 66%, #02040a 67%); box-shadow: 0 40px 90px -30px rgba(0,0,0,.95), inset 0 0 0 2px rgba(255,255,255,.05); }
+.fan::after { content: ""; position: absolute; left: 50%; bottom: -46px; width: 14px; height: 50px; translate: -50% 0; border-radius: 6px;
+  background: linear-gradient(#1a2130, #0b0f17); }
+.fan-blades { position: absolute; inset: 0; border-radius: 50%; animation: spin 0.5s linear infinite;
+  background: conic-gradient(from 0deg, rgba(255,255,255,.035) 0 6deg, transparent 6deg 120deg, rgba(255,255,255,.035) 120deg 126deg, transparent 126deg 240deg,
+    rgba(255,255,255,.035) 240deg 246deg, transparent 246deg); mix-blend-mode: screen; pointer-events: none; }
+.fan-glow { position: absolute; inset: 18%; border-radius: 50%; background: radial-gradient(circle, color-mix(in srgb, var(--accent) 30%, transparent), transparent 70%);
+  filter: blur(20px); }
+.fan-planet { position: absolute; inset: 30%; transition: opacity .6s, transform .6s; }
+.fan-planet b { position: absolute; inset: 14%; border-radius: 50%; filter: var(--planet-filter);
+  background: radial-gradient(circle at 35% 30%, #e6fbff, #4fd8ff 35%, #0b4f8a 75%); box-shadow: 0 0 40px #4fd8ff, 0 0 90px rgba(79,216,255,.5);
+  animation: float 6s ease-in-out infinite; }
+.fan-planet i { position: absolute; inset: -6%; border-radius: 50%; border: 2px solid color-mix(in srgb, var(--accent) 70%, transparent);
+  box-shadow: 0 0 14px var(--accent); }
+.fan-planet .r1 { animation: orbit1 9s linear infinite; } .fan-planet .r2 { inset: -18%; border-color: rgba(255,170,70,.7); box-shadow: 0 0 14px #ffaa46; animation: orbit2 13s linear infinite; }
+.fan-dash { position: absolute; inset: 0; opacity: 0; transition: opacity .6s; }
+.fd { position: absolute; display: grid; gap: 2px; padding: 8px 12px; border-radius: 10px; font-size: 11px; letter-spacing: .12em; text-transform: uppercase;
+  color: #bfefff; border: 1px solid color-mix(in srgb, var(--accent) 60%, transparent); background: rgba(79,216,255,.06);
+  text-shadow: 0 0 8px var(--accent); box-shadow: 0 0 18px -6px var(--accent); }
+.fd b { font-size: 17px; letter-spacing: 0; color: #fff; }
+.fd.a { left: 12%; top: 26%; } .fd.b { right: 12%; top: 26%; } .fd.c { left: 14%; bottom: 26%; } .fd.d { right: 14%; bottom: 26%; }
+.fan[data-mode="dash"] .fan-planet { transform: scale(.62); }
+.fan[data-mode="dash"] .fan-dash { opacity: 1; }
+@media (max-width: 900px) { .holo-sec { grid-template-columns: 1fr; } }

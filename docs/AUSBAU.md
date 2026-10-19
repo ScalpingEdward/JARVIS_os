@@ -57,11 +57,12 @@ Plan (vor dem Bau mit Brano abstimmen):
 - [ ] Drive-Ingest-Trigger 20 min → wieder täglich, wenn Instagram live geht
 
 ## 6. Produkt (vorbereiten, Verkauf erst nach einigen Monaten Eigennutzung)
-- [ ] Website: Pakete Signal 29 / Trader 59 / Business 99 €, Insta-Manager-Add-on, 30 Tage Test,
-      jährlich 2 Monate geschenkt, Founder Edition 690 € (100 Plätze), Einrichtung durch uns nach Aufwand
-- [ ] Website: Systemvoraussetzungen (Docker, VPS empfohlen, RAM, Speicher)
+- [x] Website: Insta-Manager 29 / Signal 39 / Trader 69 / Business 99 €, Add-on Insta +19 €, weiteres
+      IG-Konto +10 €, 30 Tage Test, jährlich 2 Monate geschenkt, Founder 690 € (100 Plätze), Einrichtung nach Aufwand
+- [x] Website: Systemvoraussetzungen (Docker, VPS empfohlen, RAM, Speicher)
 - [ ] AURON als Chatbot auf der Website: Wünsche aufnehmen, Aufwand schätzen, Anfrage an Brano
 - [ ] Lizenz/Module je Abo freischalten (Installationspaket, Add-ons zuschaltbar)
+- [ ] Hologramm-Ventilator: Ausgabe „Nur Planet“ oder „Ganzes Dashboard“ (Website: bald verfügbar)
 - [ ] iOS- und Android-App: das Dashboard mit Planet, quer gehalten wie am Bildschirm
 
 ## Später (ROADMAP.md)

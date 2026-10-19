@@ -97,3 +97,13 @@
     window.open(URL.createObjectURL(blob), '_blank');
   });
 })();
+
+// hologram fan preview: planet only or the whole dashboard
+(() => {
+  const fan = document.getElementById('fan');
+  if (!fan) return;
+  document.querySelectorAll('.holo-modes button').forEach((b) => b.addEventListener('click', () => {
+    document.querySelectorAll('.holo-modes button').forEach((x) => x.classList.toggle('on', x === b));
+    fan.dataset.mode = b.dataset.mode;
+  }));
+})();

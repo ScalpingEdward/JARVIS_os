@@ -21,6 +21,7 @@
       <a href="#dashboard">Dashboard</a>
       <a href="#kontrolle">Kontrolle</a>
       <a href="#preise">Preise</a>
+      <a href="#voraussetzungen">Voraussetzungen</a>
       <a href="#faq">FAQ</a>
     </nav>
     <a class="btn small" href="#preise">Pakete ansehen</a>
@@ -261,6 +262,30 @@
     </div>
   </section>
 
+  <section class="section holo-sec" id="hologramm">
+    <div class="holo-copy">
+      <p class="eyebrow">Bald verfügbar</p>
+      <h2>AURON im Raum.<br /><span>Als Hologramm.</span></h2>
+      <p class="about-lead">Ein Hologramm-Ventilator auf dem Schreibtisch oder im Regal – und AURON schwebt frei in der Luft,
+        live: der Planet mit seinen Ringen, die leuchten, wenn deine Gruppen im Plus sind. Oder gleich das ganze Dashboard,
+        mit Konten, Post und Terminen.</p>
+      <div class="holo-modes" role="group" aria-label="Was das Hologramm zeigt">
+        <button type="button" class="on" data-mode="planet">Nur Planet</button>
+        <button type="button" data-mode="dash">Ganzes Dashboard</button>
+      </div>
+      <p class="holo-note">Du entscheidest, was er zeigt – und wechselst jederzeit. <em class="soon">in Entwicklung</em></p>
+    </div>
+    <div class="fan" id="fan" data-mode="planet" aria-hidden="true">
+      <div class="fan-glow"></div>
+      <div class="fan-planet"><i class="r1"></i><i class="r2"></i><b></b></div>
+      <div class="fan-dash">
+        <span class="fd a">Trading<b>+1,2 %</b></span><span class="fd b">Post<b>3</b></span>
+        <span class="fd c">Gold<b>4.178</b></span><span class="fd d">14:30<b>CPI</b></span>
+      </div>
+      <div class="fan-blades"></div>
+    </div>
+  </section>
+
   <section class="section about" id="kontrolle">
     <div>
       <p class="eyebrow">Kontrolle</p>
@@ -288,28 +313,73 @@
 
   <section class="section" id="preise">
     <p class="eyebrow">Preise</p>
-    <h2>Mehr Entlastung. Passend zu deinem Alltag.</h2>
-    <p class="sub">AURON wird derzeit privat getestet. Die gezeigten Pakete und Preise sind vorläufig – noch nicht buchbar.</p>
-    <div class="grid prices">
+    <h2>Fair von Anfang an. 30 Tage kostenlos testen.</h2>
+    <p class="sub">Alle Pakete monatlich kündbar. Jährlich gezahlt: zwei Monate geschenkt. AURON wird derzeit privat
+      getestet – Preise vorläufig, noch nicht buchbar.</p>
+    <div class="grid prices four">
       <article class="card price">
-        <h3>Starter</h3>
+        <h3>Insta-Manager</h3>
         <p class="amount">29 €<small>/Monat</small></p>
-        <ul><li>Signal-Kopierer, 1 Konto</li><li>Trading-Dashboard &amp; History</li><li>Watchlist mit Alarmen</li></ul>
+        <p class="p-for">Für Creator und Shops – ganz ohne Trading.</p>
+        <ul><li>1 Instagram-Konto</li><li>Fotos &amp; Videos aus deinem Drive</li><li>Bearbeitung nach deinem Preset</li>
+          <li>Bewertung, Auswahl, Videoschnitt</li><li>Kennzeichen automatisch unkenntlich</li><li>Captions in deiner Stimme, Postplanung</li>
+          <li>Postfach sortiert, Notizen</li></ul>
+        <button class="btn ghost" disabled>Bald verfügbar</button>
+      </article>
+      <article class="card price">
+        <h3>Signal</h3>
+        <p class="amount">39 €<small>/Monat</small></p>
+        <p class="p-for">Für alle, die Signalgruppen folgen.</p>
+        <ul><li>3 Kopierer-Konten (MT5)</li><li>Telegram-Gruppen ohne Limit</li><li>Risiko % oder feste Lotgröße</li>
+          <li>Teilgewinne, Break-even, Trailing-Stop</li><li>Bilanz je Gruppe</li><li>Dashboard, Handy-Alarme, Notbremse</li>
+          <li>Postfach sortiert</li></ul>
         <button class="btn ghost" disabled>Bald verfügbar</button>
       </article>
       <article class="card price featured">
-        <span class="tag">Mehr im Blick</span>
-        <h3>Pro</h3>
-        <p class="amount">59 €<small>/Monat</small></p>
-        <ul><li>Alles aus Starter, 3 Konten</li><li>Bot-Überwachung &amp; Alarme</li><li>Assistent mit Stimme</li><li>Postfach-Sortierung</li><li>Smart Money &amp; Makro</li></ul>
+        <span class="tag">Beliebt</span>
+        <h3>Trader</h3>
+        <p class="amount">69 €<small>/Monat</small></p>
+        <p class="p-for">Für Trader mit mehreren Konten und Bots.</p>
+        <ul><li>Alles aus Signal, 10 Konten</li><li>Bot- &amp; Konto-Überwachung, Ausfall-Alarm</li><li>Smart Money: Insider, Profi-Liste</li>
+          <li>Makro-Kalender mit Warnung</li><li>Assistent mit Stimme</li><li>Karten frei gestalten</li></ul>
         <button class="btn" disabled>Bald verfügbar</button>
       </article>
       <article class="card price">
         <h3>Business</h3>
         <p class="amount">99 €<small>/Monat</small></p>
-        <ul><li>Alles aus Pro, unbegrenzt Konten</li><li>Social-Media-Autopilot</li><li>Eigene Module auf Anfrage</li><li>Eigene Räume &amp; Designs</li></ul>
+        <p class="p-for">Volle Leistung – für Büros und Vielbeschäftigte.</p>
+        <ul><li>Alles aus Trader, Konten unbegrenzt</li><li>Insta-Manager inklusive</li><li>Alle Module und Räume</li>
+          <li>Strategie &amp; Bot-Bau mit Claude Code <em class="soon">bald</em></li><li>Bevorzugter Support</li></ul>
         <button class="btn ghost" disabled>Bald verfügbar</button>
       </article>
+    </div>
+
+    <div class="extras">
+      <div class="glass-sm"><b>Add-on: Insta-Manager</b><span>Zu Signal oder Trader dazubuchen: <strong>+19 €/Monat</strong>.
+        Jedes weitere Instagram-Konto <strong>+10 €/Monat</strong>.</span></div>
+      <div class="glass-sm founder"><b>Founder Edition · 690 € einmalig</b><span>Alles aus Business, lebenslang, inklusive Updates.
+        Nur für die ersten 100 Kunden – danach gibt es sie nicht mehr.</span></div>
+      <div class="glass-sm"><b>Einrichtung durch uns</b><span>Du willst es nicht selbst anschließen? Wir richten AURON für dich ein –
+        Preis nach Aufwand. Beschreib deine Wünsche, AURON schätzt den Aufwand und wir melden uns. <em class="soon">Chat folgt</em></span></div>
+    </div>
+  </section>
+
+  <section class="section" id="voraussetzungen">
+    <p class="eyebrow">Voraussetzungen</p>
+    <h2>Was du brauchst.</h2>
+    <p class="sub">AURON läuft bei dir – auf deinem Rechner oder einem eigenen Server. Die Einrichtung führt dich Schritt für Schritt.</p>
+    <div class="reqs">
+      <div class="glass-sm"><b>Rechner oder VPS</b><span>Windows 10/11 oder ein Windows-VPS. <strong>VPS empfohlen</strong> –
+        AURON und der Kopierer laufen dann rund um die Uhr, auch wenn dein PC aus ist.</span></div>
+      <div class="glass-sm"><b>Arbeitsspeicher &amp; CPU</b><span>Mindestens <strong>8 GB RAM</strong> und 4 Kerne,
+        empfohlen 16 GB. Der Insta-Manager mit Videos braucht am meisten.</span></div>
+      <div class="glass-sm"><b>Speicher</b><span>20 GB frei für AURON, dazu Platz für deine Fotos und Videos
+        (Originale bleiben in deinem Google Drive).</span></div>
+      <div class="glass-sm"><b>Software</b><span>Docker Desktop (kostenlos). Für den Kopierer: MetaTrader 5 deines Brokers.
+        Alles Weitere bringt AURON mit.</span></div>
+      <div class="glass-sm"><b>Konten</b><span>Je nach Paket: Telegram, Broker-Konto (MT5), Gmail, Google Drive,
+        Instagram-Business-Konto – immer mit deiner eigenen Anmeldung.</span></div>
+      <div class="glass-sm"><b>Internet</b><span>Stabile Verbindung. Für Signale zählt jede Sekunde – auch deshalb der VPS.</span></div>
     </div>
   </section>
 
@@ -333,7 +403,8 @@
     <p class="eyebrow">FAQ</p>
     <h2>Deine Fragen. Klar beantwortet.</h2>
     <details><summary>Für wen lohnt sich AURON?</summary><p>Für Selbstständige, Creator, Trader und kleine Teams, die regelmäßig Signale übertragen, Mails sortieren, Content vorbereiten oder Konten kontrollieren. Wie viel Zeit du sparst, hängt von deinen Abläufen und der Nutzung ab – je mehr Routine anfällt, desto mehr kann AURON dir abnehmen.</p></details>
-    <details><summary>Lässt sich AURON an mein Geschäft anpassen?</summary><p>Ja. Du ordnest Karten und Bereiche nach deinen Prioritäten und legst Alarme selbst fest. Für Abläufe, die darüber hinausgehen, entwickeln wir auf Anfrage eigene Module – etwa für deinen Shop oder dein CRM.</p></details>
+    <details><summary>Kann ich AURON erst testen?</summary><p>Ja – 30 Tage kostenlos, mit allem, was dein Paket kann. Für den Kopierer empfehlen wir in dieser Zeit ein Demokonto.</p></details>
+    <details><summary>Lässt sich AURON an mein Geschäft anpassen?</summary><p>Ja, und zwar von dir selbst: Karten, Bereiche und Alarme stellst du im Dashboard ein, und beim Anschließen neuer Dienste führt dich AURON Schritt für Schritt – er sagt dir genau, was du tun musst. Wenn du es lieber abgibst, richten wir es für dich ein (Preis nach Aufwand).</p></details>
     <details><summary>Handelt AURON selbstständig?</summary><p>Nein – AURON ist dein Kontrolleur, kein Strategie-Automat. Er überwacht deine Konten, Gruppen und Bots, analysiert und beobachtet und hilft dir so bei deiner Strategie. Gebaut wird sie mit dir zusammen, mit Claude Code – auf Wunsch bis zum fertigen Bot für MetaTrader 5 <em class="soon">in Entwicklung</em>. Handeln tun nur der Signal-Kopierer nach deinen Regeln und Bots, die du freigibst. Mails und Posts brauchen ebenfalls deine Freigabe.</p></details>
     <details><summary>Wo liegen meine Daten?</summary><p>AURON läuft lokal auf deinem Rechner. Für verbundene Dienste nutzt du deine eigenen Zugänge. Wenn AURON mit Broker, Telegram oder Postfach arbeitet, werden die dafür nötigen Daten mit dem jeweiligen Dienst ausgetauscht.</p></details>
     <details><summary>Kann AURON Mails in meinem Namen senden?</summary><p>AURON nimmt dir das Formulieren ab und bereitet einen Entwurf vor. Du liest ihn durch, passt ihn bei Bedarf an und gibst den Versand ausdrücklich frei.</p></details>
