@@ -371,37 +371,57 @@ html[data-glass="solid"] .benefit { background: linear-gradient(155deg, rgb(var(
 .extras .founder b { color: #f5b84a; }
 .reqs { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr)); gap: 14px; }
 
-/* hologram fan (coming soon): planet only or the whole dashboard, floating */
+/* hologram (coming soon): Brano's picture */
 .holo-sec { display: grid; grid-template-columns: 1fr 1fr; gap: 50px; align-items: center; }
 .holo-sec h2 span { color: var(--accent); }
-.holo-modes { display: inline-flex; gap: 6px; padding: 5px; border-radius: 999px; background: rgba(255,255,255,.05); border: 1px solid var(--line); margin-top: 22px; }
-.holo-modes button { font: 600 13px/1 inherit; padding: 10px 18px; border-radius: 999px; border: 0; background: none; color: var(--muted); cursor: pointer; }
-.holo-modes button.on { background: var(--accent); color: #001018; }
 .holo-note { color: var(--muted); font-size: 13.5px; margin-top: 14px; }
 .holo-note em.soon { font-style: normal; font-size: 10px; letter-spacing: .1em; text-transform: uppercase; padding: 1px 6px; border-radius: 999px;
   border: 1px solid color-mix(in srgb, var(--accent) 50%, transparent); color: var(--accent); }
-.fan { position: relative; width: min(420px, 80vw); aspect-ratio: 1; margin: 0 auto; border-radius: 50%;
-  background: radial-gradient(circle, #02040a 0 62%, #0b111c 63% 66%, #02040a 67%); box-shadow: 0 40px 90px -30px rgba(0,0,0,.95), inset 0 0 0 2px rgba(255,255,255,.05); }
-.fan::after { content: ""; position: absolute; left: 50%; bottom: -46px; width: 14px; height: 50px; translate: -50% 0; border-radius: 6px;
-  background: linear-gradient(#1a2130, #0b0f17); }
-.fan-blades { position: absolute; inset: 0; border-radius: 50%; animation: spin 0.5s linear infinite;
-  background: conic-gradient(from 0deg, rgba(255,255,255,.035) 0 6deg, transparent 6deg 120deg, rgba(255,255,255,.035) 120deg 126deg, transparent 126deg 240deg,
-    rgba(255,255,255,.035) 240deg 246deg, transparent 246deg); mix-blend-mode: screen; pointer-events: none; }
-.fan-glow { position: absolute; inset: 18%; border-radius: 50%; background: radial-gradient(circle, color-mix(in srgb, var(--accent) 30%, transparent), transparent 70%);
-  filter: blur(20px); }
-.fan-planet { position: absolute; inset: 30%; transition: opacity .6s, transform .6s; }
-.fan-planet b { position: absolute; inset: 14%; border-radius: 50%; filter: var(--planet-filter);
-  background: radial-gradient(circle at 35% 30%, #e6fbff, #4fd8ff 35%, #0b4f8a 75%); box-shadow: 0 0 40px #4fd8ff, 0 0 90px rgba(79,216,255,.5);
-  animation: float 6s ease-in-out infinite; }
-.fan-planet i { position: absolute; inset: -6%; border-radius: 50%; border: 2px solid color-mix(in srgb, var(--accent) 70%, transparent);
-  box-shadow: 0 0 14px var(--accent); }
-.fan-planet .r1 { animation: orbit1 9s linear infinite; } .fan-planet .r2 { inset: -18%; border-color: rgba(255,170,70,.7); box-shadow: 0 0 14px #ffaa46; animation: orbit2 13s linear infinite; }
-.fan-dash { position: absolute; inset: 0; opacity: 0; transition: opacity .6s; }
-.fd { position: absolute; display: grid; gap: 2px; padding: 8px 12px; border-radius: 10px; font-size: 11px; letter-spacing: .12em; text-transform: uppercase;
-  color: #bfefff; border: 1px solid color-mix(in srgb, var(--accent) 60%, transparent); background: rgba(79,216,255,.06);
-  text-shadow: 0 0 8px var(--accent); box-shadow: 0 0 18px -6px var(--accent); }
-.fd b { font-size: 17px; letter-spacing: 0; color: #fff; }
-.fd.a { left: 12%; top: 26%; } .fd.b { right: 12%; top: 26%; } .fd.c { left: 14%; bottom: 26%; } .fd.d { right: 14%; bottom: 26%; }
-.fan[data-mode="dash"] .fan-planet { transform: scale(.62); }
-.fan[data-mode="dash"] .fan-dash { opacity: 1; }
-@media (max-width: 900px) { .holo-sec { grid-template-columns: 1fr; } }
+.holo-img { margin: 0; position: relative; border-radius: 18px; overflow: hidden; border: 1px solid rgb(var(--tint) / .22);
+  box-shadow: 0 40px 90px -30px rgba(0,0,0,.95), 0 0 60px -24px color-mix(in srgb, var(--accent) 50%, transparent); }
+.holo-img img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; }
+.holo-img figcaption { display: none; }
+.holo-img.missing { aspect-ratio: 4 / 3; display: grid; place-items: center; background: rgb(8 14 26 / .6); border-style: dashed; }
+.holo-img.missing img { display: none; }
+.holo-img.missing figcaption { display: block; color: var(--muted); font-size: 13px; letter-spacing: .14em; text-transform: uppercase; }
+@media (max-width: 900px) { .holo-sec { grid-template-columns: 1fr; gap: 24px; } }
+
+/* --- phone: the dashboard, small -- headline, then the planet floating between two cards --- */
+.m-head, .m-card, .m-cta { display: none; }
+@media (max-width: 900px) {
+  .hero { height: auto; min-height: 0; display: flex; flex-direction: column; padding: 76px 0 18px; }
+  .hero-mark { position: relative; top: 0; padding: 0; gap: 4px; z-index: 2; }
+  .mark { font-size: 30px; gap: 12px; letter-spacing: .42em; }
+  .glyph.big { width: 22px; height: 22px; border-width: 2px; }
+  .hero-mark small { font-size: 10.5px; letter-spacing: .16em; }
+  .m-head { display: block; position: relative; z-index: 2; text-align: center; padding: 18px 20px 0; }
+  .m-head h1 { font-size: 32px; line-height: 1.1; }
+  .m-head h1 span { color: var(--accent); }
+  .m-head p { margin: 10px auto 0; max-width: 330px; font-size: 14.5px; color: #d3dbe8; }
+  .hero-stage { grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 8px; padding: 22px 12px 8px; justify-items: stretch;
+    align-items: center; perspective: 900px; }
+  .g-left, .g-right { display: none; }
+  .hero .core { --s: clamp(130px, 38vw, 190px); order: 0; }
+  .m-card { display: grid; gap: 3px; padding: 12px 10px; border-radius: 14px; font-size: 11px; color: #d3dbe8; animation: hover-float 8s ease-in-out infinite; }
+  .m-card small { font-size: 9px; letter-spacing: .2em; text-transform: uppercase; color: var(--accent); }
+  .m-card b { font-size: 20px; color: var(--text); }
+  .m-card b.up { color: var(--up); }
+  .m-card .warn { color: #f2c14e; }
+  .m-l { transform: rotateY(18deg); } .m-r { transform: rotateY(-18deg); animation-delay: -3s; }
+  .m-cta { display: flex; gap: 10px; justify-content: center; position: relative; z-index: 2; padding: 12px 16px 0; }
+  .hero-arrow { top: auto; bottom: 64px; translate: none; width: 40px; height: 40px; font-size: 26px; }
+  .trust { position: relative; bottom: auto; margin: 18px 0 0; gap: 6px 14px; font-size: 11.5px; }
+  .where { display: none; }
+  .section { padding: 64px 18px; }
+  .section h2 { font-size: 28px; margin-bottom: 22px; }
+  .benefit { padding: 20px; gap: 18px; }
+  .b-head h3 { font-size: 26px; }
+  .b-list { grid-template-columns: 1fr; gap: 12px; }
+  .grid { gap: 12px; }
+  .card { padding: 20px; }
+}
+@media (max-width: 900px) {
+  .m-l { order: 0; } .hero .core { order: 1; } .m-r { order: 2; }
+  .m-head p, .m-head h1 { text-shadow: 0 2px 6px rgba(0,0,0,.85), 0 0 18px rgba(0,0,0,.6); }
+  .trust { padding: 0 58px; }
+}

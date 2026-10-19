@@ -47,7 +47,9 @@ def main() -> None:
     html = html.replace('<script src="../globe.js"></script>', f"<script>\n{(FRONT / 'globe.js').read_text(encoding='utf-8')}\n</script>")
     html = html.replace('<script src="../rooms/rooms.js"></script>', f"<script>\n{rooms_js}\n</script>{patch}")
     html = html.replace('<script src="./hero.js"></script>', f"<script>\n{hero}\n</script>")
-    for name in ("dashboard.webp", "phoenix-mark.png"):
+    for name in ("dashboard.webp", "phoenix-mark.png", "hologram.webp"):
+        if not (SITE / "img" / name).exists():
+            continue
         html = html.replace(f'src="./img/{name}"', f'src="{data_uri(SITE / "img" / name)}"')
     html = html.replace("<!-- Entwurf: nicht veröffentlicht, keine Anbindungen. Bilder der Räume kommen aus ../rooms/. -->",
                         "<!-- Entwurf von AURON / Phoenix Life Solutions -- nicht veröffentlicht. Alles in einer Datei. -->")
