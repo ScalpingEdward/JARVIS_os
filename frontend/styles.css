@@ -980,3 +980,14 @@ html.desk .core.turning { cursor: grabbing; }
 .row.grp .gtop { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
 .row.grp .gname { font-style: normal; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .row.grp .grp-eq { flex: none; font-family: var(--mono); font-weight: 600; color: var(--text); font-size: 12.5px; }
+
+/* Instagram view: "Wartet auf dich" and "Dein Account" as two tiles side by side (Brano, 2026-10-20);
+   the waiting post's picture large on the left, its caption beside it */
+.span-6 { grid-column: span 6; }
+@media (max-width: 1000px) { .span-6 { grid-column: span 12; } }
+.ig-tile .ig-wait { grid-template-columns: minmax(0, 340px) minmax(0, 1fr); }
+.ig-tile .ig-media { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+.ig-tile .ig-media:has(> :only-child) { grid-template-columns: 1fr; }
+@media (max-width: 1300px) { .ig-tile .ig-wait { grid-template-columns: 1fr; } .ig-tile .ig-media:has(> :only-child) { max-width: 360px; } }
+.ig-voice { display: flex; flex-direction: column; }
+.ig-voice .voice-text { flex: 1; min-height: 220px; resize: vertical; }
