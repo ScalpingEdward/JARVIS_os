@@ -18,7 +18,7 @@
     ['cards', '▦', 'Karten', 'Welche Karten, wo, in welcher Reihenfolge'],
     ['announce', '📣', 'Durchsagen', 'AURON meldet Wichtiges von selbst'],
     ['voice', '🔊', 'Stimme', 'AURONs Stimme wählen und anhören'],
-    ['code', '⌨', 'Code', 'Änderungen von AURON ansehen und freigeben'],
+    ['code', '⌨', 'Code', 'Code-Wünsche an AURON prüfen und freigeben'],
     ['info', 'ℹ', 'Info', 'Was läuft, Versionen, Hinweise'],
   ];
   let t = { ...DEFAULT };
