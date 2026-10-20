@@ -255,6 +255,14 @@ def report_inputs() -> tuple[dict, list[dict], list[dict]]:
     return account, positions, deals
 
 
+def live_inputs() -> dict:
+    """The small, fast part of report_inputs(): balance, equity and each open position's profit --
+    two light MT5 calls, read every second for the dashboard's live sums."""
+    a = mt5.account_info()
+    return {"balance": a.balance, "equity": a.equity,
+            "positions": [{"ticket": p.ticket, "profit": p.profit} for p in mt5.positions_get() or ()]}
+
+
 def spec(symbol: str):
     from signal_copier.sizing import SymbolSpec
     i = mt5.symbol_info(symbol)

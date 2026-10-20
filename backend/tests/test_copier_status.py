@@ -77,3 +77,13 @@ def test_history_endpoint():
     client.post("/v1/copier/status", json=_status())
     body = client.get("/v1/copier/history?hours=1").json()
     assert body["puprime_demo"][0]["equity"] == 10_020
+
+
+def test_live_numbers_are_kept_in_memory_and_only_while_fresh(monkeypatch):
+    from app.copier_status import api
+    api._live.clear()
+    api.push_live(api.LiveIn(profile="demo", balance=1000, equity=1012.5, positions=[{"ticket": 7, "profit": 12.5}]))
+    assert api.live() == {"demo": {"balance": 1000, "equity": 1012.5, "positions": {"7": 12.5}, "age_s": 0.0}}
+    t = api.time.monotonic() + api.LIVE_FOR_S + 1
+    monkeypatch.setattr(api.time, "monotonic", lambda: t)
+    assert api.live() == {}

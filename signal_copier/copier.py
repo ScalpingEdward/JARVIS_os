@@ -43,6 +43,7 @@ WATCH_EVERY_S = 5
 # already open are still followed: they close or protect, they open nothing.
 MAX_SIGNAL_AGE_S = 60
 REPORT_EVERY_S = 15  # the dashboard polls every 5 s; AURON keeps a curve point every 5 min
+LIVE_EVERY_S = 1     # balance, equity, open profits only -- the dashboard's sums move with the market
 
 log = logging.getLogger("copier")
 
@@ -791,6 +792,31 @@ class BotNotifier:
                     time.sleep(5)
 
 
+class LivePusher:
+    """Sends the second-by-second numbers to AURON on its own thread; only the newest one counts,
+    so a slow AURON never builds a queue -- and never touches trading."""
+
+    def __init__(self, base_url: str, profile: str):
+        self.url = base_url.rstrip("/") + "/v1/copier/live"
+        self.profile = profile
+        self.q: queue.Queue[dict] = queue.Queue(maxsize=1)
+        threading.Thread(target=self._run, daemon=True).start()
+
+    def __call__(self, live: dict) -> None:
+        try:
+            self.q.put_nowait({"profile": self.profile, **live})
+        except queue.Full:
+            pass
+
+    def _run(self) -> None:
+        while True:
+            body = json.dumps(self.q.get()).encode()
+            try:
+                urllib.request.urlopen(urllib.request.Request(self.url, body, {"Content-Type": "application/json"}), timeout=5).read()
+            except Exception:  # noqa: BLE001 -- the 15 s report says when AURON is gone; this one stays quiet
+                time.sleep(5)
+
+
 class AuronReporter:
     """Posts the profile's status to AURON on its own thread. AURON down never touches trading."""
 
@@ -936,12 +962,22 @@ async def main(profile: str | None, dry: bool) -> None:
                 log.exception("building the AURON status")
             await asyncio.sleep(REPORT_EVERY_S)
 
+    async def live_to_auron() -> None:
+        push = LivePusher(os.environ["AURON_URL"], name)
+        while True:
+            try:
+                push(execution.live_inputs())   # MT5 stays on this loop, the sending on push's thread
+            except Exception:  # noqa: BLE001
+                log.debug("live numbers", exc_info=True)
+            await asyncio.sleep(LIVE_EVERY_S)
+
     halted = f", TRADING STOPPED: {book.halt_reason}" if book.halted(time.time()) else ""
     copier._say(f"copier started on {account}{halted}: {', '.join(chat_names.values())}, "
                 f"initial balance {book.initial_balance}, {len(book.signals)} signals in the book")
     asyncio.create_task(watchdog())
     if auron is not None:
         asyncio.create_task(report_to_auron())
+        asyncio.create_task(live_to_auron())
     await client.run_until_disconnected()
 
 

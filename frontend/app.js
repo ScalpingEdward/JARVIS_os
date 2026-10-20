@@ -365,6 +365,7 @@ function renderTileSpark(o, currency) {
 async function refreshTrading() {
   try {
     overview = await get('/v1/copier/overview');
+    applyLive(overview, lastLive);   // the full report is up to 15 s old: the live numbers stay on top
     renderTradingTile(overview);
     if (openView === 'trading') { renderTotals(overview); renderAccounts(overview); renderGroups(overview); renderPositions(overview); renderHistory(overview); renderTimings(overview); renderTotalChart(); }
   } catch (e) { console.warn(e); }
@@ -557,6 +558,40 @@ refreshHistory().then(refreshTrading).then(refreshHealth).then(() => {
 });
 refreshInstagram();
 setInterval(refreshTrading, 5000);
+
+// Every second: each copier's balance, equity and open profits (POST /v1/copier/live), laid over the
+// last full report -- the sums move with the market, not every 15 s (Brano, 2026-10-20). Groups,
+// closed trades and the history still come from the full report.
+let lastLive = {};
+function applyLive(o, live) {
+  let changed = false;
+  for (const a of o.accounts) {
+    const l = live[a.profile];
+    if (!l) continue;
+    changed = changed || a.equity !== l.equity || a.balance !== l.balance;
+    a.balance = l.balance; a.equity = l.equity;
+    a.open_positions = (a.open_positions || []).filter((p) => String(p.ticket) in l.positions);   // closed since the report
+    a.open_positions.forEach((p) => { p.profit = l.positions[String(p.ticket)]; });
+  }
+  if (!changed) return false;
+  // group and total sums again from the accounts
+  const open = (g) => o.accounts.flatMap((a) => a.open_positions || []).filter((p) => p.group === g.name);
+  (o.groups || []).forEach((g) => { const x = open(g); g.open_positions = x.length; g.open_pnl = x.reduce((s2, p) => s2 + (p.profit || 0), 0); });
+  (o.totals || []).forEach((t) => {
+    const accs = o.accounts.filter((a) => a.currency === t.currency), pos = accs.flatMap((a) => a.open_positions || []);
+    t.balance = accs.reduce((x, a) => x + a.balance, 0); t.equity = accs.reduce((x, a) => x + a.equity, 0);
+    t.open_positions = pos.length; t.open_pnl = pos.reduce((x, p) => x + (p.profit || 0), 0);
+  });
+  return true;
+}
+async function refreshLive() {
+  if (!overview || document.hidden) return;
+  try { lastLive = await get('/v1/copier/live'); } catch { return; }
+  if (!applyLive(overview, lastLive)) return;
+  renderTradingTile(overview);
+  if (openView === 'trading') { renderTotals(overview); renderAccounts(overview); renderGroups(overview); renderPositions(overview); }
+}
+setInterval(refreshLive, 1000);
 setInterval(refreshHistory, 60000);
 setInterval(refreshInstagram, 30000);
 

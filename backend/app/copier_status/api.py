@@ -1,5 +1,7 @@
+import time
+
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from .models import CopierEquityPoint, CopierOverview, CopierStatus, CopierStatusIn
 from . import commands
@@ -14,6 +16,38 @@ def push_status(payload: CopierStatusIn) -> CopierStatus:
     st = copier_status_service.push(payload)
     st.commands = commands.pending_for(payload.profile)
     return st
+
+
+class LivePosition(BaseModel):
+    ticket: int
+    profit: float
+
+
+class LiveIn(BaseModel):
+    profile: str = Field(pattern=r"^[a-z0-9][a-z0-9_-]{0,39}$")
+    balance: float
+    equity: float
+    positions: list[LivePosition] = Field(default_factory=list, max_length=500)
+
+
+# second-by-second numbers live in memory only: a rebuild loses a few seconds, nothing more
+_live: dict[str, tuple[float, LiveIn]] = {}
+LIVE_FOR_S = 10   # older than this: the copier has stopped sending, the 15 s report counts again
+
+
+@router.post("/live", status_code=204)
+def push_live(payload: LiveIn) -> None:
+    """Every second from each copier: balance, equity, each open position's profit."""
+    _live[payload.profile] = (time.monotonic(), payload)
+
+
+@router.get("/live")
+def live() -> dict:
+    """{profile: {balance, equity, positions: {ticket: profit}, age_s}} -- only fresh ones."""
+    now = time.monotonic()
+    return {p: {"balance": v.balance, "equity": v.equity, "positions": {str(x.ticket): x.profit for x in v.positions},
+                "age_s": round(now - at, 1)}
+            for p, (at, v) in list(_live.items()) if now - at <= LIVE_FOR_S}
 
 
 @router.get("/status", response_model=list[CopierStatus])
