@@ -28,7 +28,9 @@ _lock = threading.Lock()
 # what the runner picks up, and what it becomes while it works on it
 CLAIM = {"queued": "running", "approved": "applying", "rejected": "discarding", "revert_requested": "reverting"}
 # Brano's buttons: from -> to
-DECIDE = {"approve": ("ready", "approved"), "reject": ("ready", "rejected"), "revert": ("applied", "revert_requested")}
+# (an approve that could not be merged -- e.g. the checkout had changes of its own -- may be tried again)
+DECIDE = {"approve": (("ready", "apply_failed"), "approved"), "reject": (("ready", "apply_failed"), "rejected"),
+          "revert": (("applied",), "revert_requested")}
 # what the runner may report after each step
 FINISH = {"running": {"ready", "failed"}, "applying": {"applied", "apply_failed"},
           "discarding": {"discarded"}, "reverting": {"reverted", "revert_failed"}}
@@ -91,8 +93,8 @@ def decide(task_id: str, action: str) -> dict:
     want, to = DECIDE[action]
 
     def go(t):
-        if t["status"] != want:
-            raise CodeTaskError(f"task is {t['status']}, not {want}")
+        if t["status"] not in want:
+            raise CodeTaskError(f"task is {t['status']}, not {' or '.join(want)}")
         t["status"] = to
     return _update(task_id, go)
 

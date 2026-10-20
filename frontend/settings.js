@@ -146,5 +146,7 @@
   });
   panel.addEventListener('change', (e) => { if (e.target.type === 'color') paint(); });
   btn.addEventListener('click', (e) => { e.stopPropagation(); page = 'home'; paint(); panel.hidden = !panel.hidden; });
+  // other parts open a page directly (the chat's "Details" on a code wish -> Code)
+  window.AURON_settings = { open(p) { page = p; paint(); panel.hidden = false; } };
   apply();
 })();

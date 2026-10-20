@@ -35,3 +35,11 @@ def test_the_runner_cannot_skip_a_step_and_a_rejected_change_is_discarded():
     assert service.decide(t["id"], "reject")["status"] == "rejected"
     assert service.claim()["status"] == "discarding"
     assert service.report(t["id"], "discarded")["status"] == "discarded"
+
+
+def test_an_approval_that_could_not_be_merged_can_be_given_again():
+    t = service.create("Eine Beschreibung im Menü ändern")
+    service.claim(); service.report(t["id"], "ready")
+    service.decide(t["id"], "approve"); service.claim()
+    service.report(t["id"], "apply_failed", error="local changes would be overwritten")
+    assert service.decide(t["id"], "approve")["status"] == "approved"

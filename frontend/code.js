@@ -33,10 +33,18 @@
           failed: 'Sir, die Code-Änderung hat nicht geklappt. Die Details stehen unter Einstellungen, Code.',
           applied: 'Sir, die Änderung ist jetzt live.',
         }[t.status];
-        if (say) { window.AURON_voice?.note(say); claim(say).then((mine) => { if (mine) window.AURON_voice?.say(say); }); }
+        if (say) { window.AURON_voice?.note(say, { code: t.id }); claim(say).then((mine) => { if (mine) window.AURON_voice?.say(say); }); }
+      }
+    } else {
+      // first look on this screen: a wish already waiting gets its message with buttons, once
+      for (const t of tasks) {
+        if ((t.status === 'ready' || t.status === 'apply_failed') && !window.AURON_voice?.hasCode(t.id)) {
+          window.AURON_voice?.note(`Sir, eine Code-Änderung wartet auf Ihre Freigabe: ${t.text.slice(0, 120)}`, { code: t.id });
+        }
       }
     }
     seen = now;
+    window.AURON_voice?.refresh();
     if (box && box.isConnected) paint();
   }
 
@@ -47,8 +55,8 @@
     }
     box.innerHTML = tasks.slice(0, 15).map((t) => {
       const [label, cls] = STATE[t.status] || [t.status, ''];
-      const btns = t.status === 'ready'
-        ? `<button type="button" class="go" data-a="approve" data-id="${t.id}">✅ Freigeben</button><button type="button" data-a="reject" data-id="${t.id}">Verwerfen</button>`
+      const btns = t.status === 'ready' || t.status === 'apply_failed'
+        ? `<button type="button" class="go" data-a="approve" data-id="${t.id}">✅ ${t.status === 'ready' ? 'Freigeben' : 'Nochmal übernehmen'}</button><button type="button" data-a="reject" data-id="${t.id}">Verwerfen</button>`
         : t.status === 'applied' ? `<button type="button" data-a="revert" data-id="${t.id}">↩ Rückgängig</button>` : '';
       const more = open.has(t.id);
       const when = new Date(t.created_at).toLocaleString('de-DE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
@@ -84,7 +92,24 @@
     load();
   }
 
-  window.AURON_code = { editor(el) { box = el; box.addEventListener('click', act); paint(); load(); } };
+  window.AURON_code = {
+    editor(el) { box = el; box.addEventListener('click', act); paint(); load(); },
+    // under the chat message about a wish: what can be done with it right now
+    buttons(id) {
+      const t = tasks.find((x) => x.id === id);
+      if (!t) return '';
+      const [label] = STATE[t.status] || [t.status];
+      const b = t.status === 'ready' || t.status === 'apply_failed'
+        ? `<button type="button" class="go" data-a="approve" data-id="${id}">✅ ${t.status === 'ready' ? 'Freigeben' : 'Nochmal übernehmen'}</button><button type="button" data-a="reject" data-id="${id}">Verwerfen</button>`
+        : t.status === 'applied' ? `<button type="button" data-a="revert" data-id="${id}">↩ Rückgängig</button>` : '';
+      return `<div class="ct-btns msg-code">${b}<button type="button" data-details="${id}">Details</button><span class="muted">${label}</span></div>`;
+    },
+  };
+  // the buttons in the chat
+  document.getElementById('chatLog')?.addEventListener('click', (e) => {
+    if (e.target.closest('[data-details]')) { window.AURON_settings?.open('code'); return; }
+    if (e.target.closest('.msg-code button[data-a]')) act(e);
+  });
   load();
   setInterval(load, 5000);
 })();

@@ -21,6 +21,7 @@
   function render() {
     log.innerHTML = turns.map((t, i) => `<div class="msg ${t.role}${t.error ? ' err' : ''}">${esc(t.content.replace(TAGS, ''))}`
       + `${t.tools?.length ? `<small>${[...new Set(t.tools)].map((n) => TOOL_NAMES[n] || n).join(' · ')}</small>` : ''}`
+      + `${t.code ? window.AURON_code?.buttons(t.code) || '' : ''}`
       + `${t.role === 'assistant' && !t.error && !t.pending ? `<button type="button" class="msg-say" data-say="${i}" title="Vorlesen">▶ Vorlesen</button>` : ''}</div>`).join('')
       || '<div class="msg hint">Frag mich etwas – „Wie läuft Trading heute?“, „Was macht Gold?“, „Recherchier NVIDIA“.</div>';
     log.scrollTop = log.scrollHeight;
@@ -102,7 +103,10 @@
     say: (text) => { queue = queue.then(() => new Promise((done) => {
       if (!player.paused && !player.ended) player.addEventListener('ended', done, { once: true }); else done();
     })).then(() => say(text)).catch((err) => console.warn('announce voice:', err.message)); return queue; },
-    note: (text) => { turns.push({ role: 'assistant', content: text }); save(); if (dock.classList.contains('open')) render(); },
+    // extra.code: a code wish -- its buttons (Freigeben / Verwerfen / Details) stand under the message
+    note: (text, extra = {}) => { turns.push({ role: 'assistant', content: text, ...extra }); save(); if (dock.classList.contains('open')) render(); },
+    refresh: () => { if (dock.classList.contains('open')) render(); },
+    hasCode: (id) => turns.some((t) => t.code === id),
   };
 
   // Sentence by sentence while the answer is still being written: each one's audio is fetched at
