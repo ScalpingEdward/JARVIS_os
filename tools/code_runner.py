@@ -46,8 +46,9 @@ def call(path: str, body: dict | None = None) -> dict:
     return json.loads(urllib.request.urlopen(req, timeout=30).read() or b"{}")
 
 
-def run(cmd: list[str], cwd: Path = ROOT, timeout: int = 600) -> subprocess.CompletedProcess:
-    return subprocess.run(cmd, cwd=cwd, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=timeout)
+def run(cmd: list[str], cwd: Path = ROOT, timeout: int = 600, stdin: str | None = None) -> subprocess.CompletedProcess:
+    return subprocess.run(cmd, cwd=cwd, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=timeout,
+                          input=stdin)
 
 
 def git(*args: str, cwd: Path = ROOT) -> str:
@@ -89,8 +90,10 @@ def do_task(t: dict) -> None:
         run(["git", "worktree", "prune"])
     git("worktree", "add", "-b", branch, str(wt), "HEAD")
     claude = shutil.which("claude") or "claude"
-    r = run([claude, "-p", PROMPT.format(text=t["text"]), "--permission-mode", "acceptEdits",
-             "--allowedTools", "Read,Edit,Write,Glob,Grep", "--max-turns", "60"], wt, timeout=CLAUDE_TIMEOUT_S)
+    # the wish goes in on stdin: on Windows `claude` is a .cmd, and a batch file cuts an argument at
+    # its first line break -- Claude Code then got only the first line and asked what to do
+    r = run([claude, "-p", "--permission-mode", "acceptEdits", "--allowedTools", "Read,Edit,Write,Glob,Grep",
+             "--max-turns", "60"], wt, timeout=CLAUDE_TIMEOUT_S, stdin=PROMPT.format(text=t["text"]))
     answer = (r.stdout or "").strip()
     if r.returncode or not answer:
         err = (r.stderr or r.stdout or "").strip()
