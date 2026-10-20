@@ -25,8 +25,10 @@
     if (vw <= 700) {
       // phone held upright: the room as a room -- a little wider than the screen, pedestal under the
       // planet, top and bottom fading into the dark -- instead of blown up to fill the tall window
-      const W = Math.max(vw * 1.9, (core.width * 0.8) / top), H = W * room.h / room.w;
-      rect = [px - x * W, py - y * H, W, H]; fade = 1;
+      // the page scrolls here: the room is drawn in page coordinates and scrolls with the planet
+      // (the canvas sits at the top of the page, not fixed) -- else the planet slid off its pedestal
+      const W = Math.max(vw * 1.9, (core.width * 0.8) / top), H = W * room.h / room.w, sy = scrollY;
+      rect = [px - x * W, py + sy - y * H, W, H]; fade = 1;
       document.body.style.backgroundImage = `url("${room.src}")`;
       document.body.style.backgroundSize = `${W}px ${H}px`;
       document.body.style.backgroundPosition = `${rect[0]}px ${rect[1]}px`;
@@ -174,6 +176,9 @@ void main() {
   function size() {
     dpr = Math.min(devicePixelRatio || 1, 1.5);
     canvas.width = Math.round(innerWidth * dpr); canvas.height = Math.round(innerHeight * dpr);
+    // exactly the size measured, not 100vw/100vh: on the iPhone 100vh is taller than the visible
+    // window (more so as a home-screen app), which stretched the room and moved the pedestal
+    canvas.style.width = `${innerWidth}px`; canvas.style.height = `${innerHeight}px`;
     gl.viewport(0, 0, canvas.width, canvas.height);
   }
 
@@ -210,6 +215,9 @@ void main() {
 
   const relayout = () => { place(); if (gl && prog) { size(); last = 0; kick(); } };
   addEventListener('resize', relayout);
+  // iOS reports the new size a moment after turning the phone: measure again once it has settled
+  addEventListener('orientationchange', () => { setTimeout(relayout, 250); setTimeout(relayout, 800); });
+  window.visualViewport?.addEventListener('resize', relayout);
   new ResizeObserver(relayout).observe(document.getElementById('core'));
   document.addEventListener('visibilitychange', kick);
   try { if (gl) { setup(); size(); } } catch (e) { console.warn('room: no WebGL, still picture', e); prog = null; }
