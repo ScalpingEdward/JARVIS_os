@@ -18,6 +18,7 @@
     ['cards', '▦', 'Karten', 'Welche Karten, wo, in welcher Reihenfolge'],
     ['announce', '📣', 'Durchsagen', 'AURON meldet Wichtiges von selbst'],
     ['voice', '🔊', 'Stimme', 'AURONs Stimme wählen und anhören'],
+    ['code', '⌨', 'Code', 'Änderungen von AURON ansehen und freigeben'],
     ['info', 'ℹ', 'Info', 'Was läuft, Versionen, Hinweise'],
   ];
   let t = { ...DEFAULT };
@@ -100,6 +101,11 @@
     if (page === 'announce') {
       panel.innerHTML = head('Durchsagen', true) + '<div class="an" id="announceEditor"></div>';
       window.AURON_announce?.editor(panel.querySelector('#announceEditor'));
+      return;
+    }
+    if (page === 'code') {
+      panel.innerHTML = head('Code', true) + '<div class="ct-list" id="codeEditor"></div>';
+      window.AURON_code?.editor(panel.querySelector('#codeEditor'));
       return;
     }
     if (page === 'cards') {

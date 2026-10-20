@@ -87,6 +87,7 @@ from .assistant.api import router as assistant_router
 from .mail.api import router as mail_router
 from .smartmoney.api import router as smartmoney_router
 from .dashboard_layout.api import router as dashboard_layout_router
+from .code_tasks.api import router as code_tasks_router
 from .backup.api import router as backup_router
 from .orderflow.api import router as orderflow_router
 from .orchestrator.models import (
@@ -362,6 +363,7 @@ app.include_router(assistant_router)
 app.include_router(mail_router)
 app.include_router(smartmoney_router)
 app.include_router(dashboard_layout_router)
+app.include_router(code_tasks_router)
 app.include_router(backup_router)
 app.include_router(orderflow_router)
 app.include_router(planner_router)
