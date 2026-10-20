@@ -19,7 +19,16 @@
     if (!cfg.on || !cfg[kind]) return;
     window.AURON_voice?.note(text);            // always in the chat, even at night
     if (quiet()) return;
-    window.AURON_voice?.say(text);
+    claim(text).then((mine) => { if (mine) window.AURON_voice?.say(text); });
+  }
+  // Only one screen says it: the PC window, the phone app and the wallpaper each see the same trade.
+  // The server lets the first one speak; without an answer this screen speaks (better twice than never).
+  async function claim(text) {
+    try {
+      const r = await fetch(`${window.AURON_API || '/api'}/v1/assistant/announce-claim`, { method: 'POST',
+        headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: text.slice(0, 600) }) });
+      return r.ok ? (await r.json()).speak : true;
+    } catch { return true; }
   }
 
   // trades: app.js fires one event per group with all trades that closed since its last look. Legs of

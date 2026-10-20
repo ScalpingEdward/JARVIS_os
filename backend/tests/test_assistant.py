@@ -106,3 +106,11 @@ def test_listen_refuses_empty_audio(monkeypatch):
     monkeypatch.setenv("ELEVENLABS_API_KEY", "test")
     r = client.post("/v1/assistant/listen", content=b"", headers={"content-type": "audio/webm"})
     assert r.status_code == 502 and "no audio" in r.json()["detail"]
+
+
+def test_only_the_first_screen_may_speak_an_announcement():
+    from app.assistant import api
+    api._claimed.clear()
+    assert api.announce_claim(api.ClaimIn(key="Sir, NINJA hat einen Trade geschlossen.")) == {"speak": True}
+    assert api.announce_claim(api.ClaimIn(key="Sir, NINJA hat einen Trade geschlossen.")) == {"speak": False}
+    assert api.announce_claim(api.ClaimIn(key="Sir, eine wichtige E-Mail")) == {"speak": True}

@@ -55,6 +55,30 @@ def chat_stream(payload: ChatIn) -> StreamingResponse:
     return StreamingResponse(lines(), media_type="application/x-ndjson", headers={"X-Accel-Buffering": "no"})
 
 
+class ClaimIn(BaseModel):
+    key: str = Field(min_length=1, max_length=600)
+
+
+_claimed: dict[str, float] = {}
+CLAIM_FOR_S = 300
+
+
+@router.post("/announce-claim")
+def announce_claim(payload: ClaimIn) -> dict:
+    """One voice per announcement: every open dashboard (PC window, phone app, wallpaper) asks before
+    it speaks, and only the first within five minutes gets {"speak": true} -- the others only write
+    it into their chat. Without this, two screens said every trade twice, a moment apart."""
+    import time
+    now = time.monotonic()
+    for k, at in list(_claimed.items()):
+        if now - at > CLAIM_FOR_S:
+            del _claimed[k]
+    first = payload.key not in _claimed
+    if first:
+        _claimed[payload.key] = now
+    return {"speak": first}
+
+
 class SpeakIn(BaseModel):
     text: str = Field(min_length=1, max_length=4000)
     provider: Literal["elevenlabs", "openai"] = "elevenlabs"
