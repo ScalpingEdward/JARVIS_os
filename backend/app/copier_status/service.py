@@ -3,6 +3,8 @@ from datetime import datetime, timedelta, timezone
 from app.db import SessionLocal, refuse_reset_in_production
 from app.db_models import CopierEquityRow, CopierStatusRow
 
+from . import group_names
+
 from .models import (
     CopierEquityPoint,
     CopierGroupTotal,
@@ -82,11 +84,16 @@ class CopierStatusService:
             session.delete(row)
             session.commit()
 
-    def list(self, now: datetime | None = None) -> list[CopierStatus]:
+    def list(self, now: datetime | None = None, raw: bool = False) -> list[CopierStatus]:
+        """raw: group names as the copiers report them; otherwise with Brano's display names."""
         now = now or datetime.now(timezone.utc)
         with SessionLocal() as session:
             rows = session.query(CopierStatusRow).order_by(CopierStatusRow.profile).all()
-            return [self._status(CopierStatusIn.model_validate_json(r.data), r.received_at, now) for r in rows]
+            out = [self._status(CopierStatusIn.model_validate_json(r.data), r.received_at, now) for r in rows]
+        if raw:
+            return out
+        m = group_names.names()
+        return [group_names.apply(st, m) for st in out]
 
     def overview(self, now: datetime | None = None) -> CopierOverview:
         accounts = self.list(now)

@@ -52,19 +52,21 @@
   }
   const fitAll = () => Object.keys(CARDS).forEach(size);
 
-  // Would one step more still fit? Tried for real (no paint in between) and put back.
-  const TOP_CLEAR = 90, BOTTOM_CLEAR = 120;   // top bar and status bar stay clear
+  // Would one step more still fit? Tried for real (no paint in between) and put back. "Fits" is where
+  // the column really stands on the screen -- below the AURON mark, above the bottom edge -- not a
+  // fixed height: that one was too tight, and once a column was above it, every step up was locked,
+  // even back to a size that had just been shown.
+  const TOP_FREE = 56, BOTTOM_FREE = 8;
   function roomFor(id, key, list) {
     const card = document.getElementById(id), st = styleOf(id), k = list.indexOf(st[key]);
     if (!card || k >= list.length - 1) return false;
     const desk = document.documentElement.classList.contains('desk');
-    const col = card.parentElement;
-    const high = () => (desk ? card.offsetHeight : col.offsetHeight);
-    const before = high(), spill = spillCount(card);
+    const box = desk ? card : card.parentElement;
+    const onScreen = () => { const r = box.getBoundingClientRect();
+      return desk ? r.height <= innerHeight * 0.5 : r.top >= TOP_FREE && r.bottom <= innerHeight - BOTTOM_FREE; };
+    const spill = spillCount(card);
     styles[id] = { ...st, [key]: list[k + 1] }; size(id);
-    const after = high(), ok = spillCount(card) <= spill
-      && (after <= before || innerWidth <= 1000   // phone and narrow window: the page scrolls anyway
-        || after <= (desk ? innerHeight * 0.5 : innerHeight - TOP_CLEAR - BOTTOM_CLEAR));
+    const ok = spillCount(card) <= spill && (innerWidth <= 1000 || onScreen());   // phone, narrow window: the page scrolls anyway
     styles[id] = st; size(id);
     return ok;
   }

@@ -68,7 +68,7 @@
           if (!line) continue;
           const ev = JSON.parse(line);
           if (ev.error) throw new Error(ev.error);
-          if (ev.text) {
+          if (ev.text && !ev.done) {   // the closing {done, text} repeats the whole answer: shown, not spoken again
             if (thinking.pending) Object.assign(thinking, { content: '', pending: false });
             thinking.content += ev.text; render();
             if (talk) { spokenUpTo += ev.text; flush(false); }
