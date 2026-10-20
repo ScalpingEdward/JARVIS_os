@@ -87,6 +87,11 @@ def main() -> None:
         pics[name] = Image.open(png).convert("RGB")
         pics[name].save(OUT / f"auron-{name}.jpg", quality=92)
         print("rendered", name)
+    # lock and sign-in screen: Windows shows only a still picture there (and its own clock) --
+    # planet and rings in the room, no trading data
+    shoot("?desk&bare&room=earth", build / "lock.png")
+    Image.open(build / "lock.png").convert("RGB").save(OUT / "auron-lock.jpg", quality=92)
+    print("rendered lock")
     span = Image.new("RGB", (W * 2, H * 2), (3, 5, 10))
     for name, (_, at) in SHOTS.items():
         span.paste(pics[name], at)

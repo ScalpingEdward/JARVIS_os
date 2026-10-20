@@ -967,3 +967,7 @@ html.noplanet .core { visibility: hidden; }
 /* phone held upright: the page scrolls, so the room scrolls with it (room.js draws it in page coordinates) */
 /* phone held upright: no WebGL room, the still picture on <body> scrolls with the page (room.js) */
 @media (max-width: 700px) { .room { display: none; } }
+/* wallpaper planet (globe.js): the mouse wheel zooms the planet with its rings around the pedestal's
+   top -- a CSS scale, so the room behind stays where it is; dragging turns the globe */
+html.desk .core { scale: var(--planet-zoom, 1); transform-origin: 50% 88%; cursor: grab; }
+html.desk .core.turning { cursor: grabbing; }
