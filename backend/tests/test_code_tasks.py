@@ -42,4 +42,5 @@ def test_an_approval_that_could_not_be_merged_can_be_given_again():
     service.claim(); service.report(t["id"], "ready")
     service.decide(t["id"], "approve"); service.claim()
     service.report(t["id"], "apply_failed", error="local changes would be overwritten")
-    assert service.decide(t["id"], "approve")["status"] == "approved"
+    again = service.decide(t["id"], "approve")
+    assert again["status"] == "approved" and again["error"] == ""

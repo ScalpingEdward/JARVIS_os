@@ -96,6 +96,7 @@ def decide(task_id: str, action: str) -> dict:
         if t["status"] not in want:
             raise CodeTaskError(f"task is {t['status']}, not {' or '.join(want)}")
         t["status"] = to
+        t["error"] = ""          # a second try starts clean; the old failure would read as the new one
     return _update(task_id, go)
 
 
