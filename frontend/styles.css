@@ -976,3 +976,7 @@ html.desk .core.turning { cursor: grabbing; }
   color: var(--down); font: inherit; font-size: 13px; line-height: 1; cursor: pointer; }
 .pos-close:hover { background: rgba(242,100,124,.22); border-color: rgba(242,100,124,.7); }
 .pos-close.busy { color: var(--muted); border-color: var(--line-2); background: none; cursor: default; }
+/* group row: name, and its account's equity right beside it -- only the number */
+.row.grp .gtop { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
+.row.grp .gname { font-style: normal; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.row.grp .grp-eq { flex: none; font-family: var(--mono); font-weight: 600; color: var(--text); font-size: 12.5px; }

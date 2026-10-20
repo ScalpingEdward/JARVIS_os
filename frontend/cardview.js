@@ -20,7 +20,7 @@
   const SIZES = [0.9, 1, 1.12, 1.25, 1.4, 1.55];
   const NUMS = [0.9, 1, 1.12, 1.25, 1.4, 1.55];   // on top of the text size, numbers only
   // numbers -- and everything inside them (the coloured +/− spans in Heute/Woche/Offen/Gesamt)
-  const NUM_SEL = '.tile-figure b, .kpis b, .tile-list .row > span:last-child, .tile-list .row.grp > span:nth-child(3), .mono, .wpx, .wch';
+  const NUM_SEL = '.tile-figure b, .kpis b, .tile-list .row > span:last-child, .tile-list .row.grp > span:nth-child(3), .mono, .wpx, .wch, .grp-eq';
   const DEFAULT = { size: 1.12, font: 'std', num: 1 };   // a little larger than before (Brano, 2026-10-19)
   const load = (k) => { try { return JSON.parse(localStorage.getItem(k) || '{}'); } catch { return {}; } };
   let views = load(KEY), styles = load(STYLE_KEY);

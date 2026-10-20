@@ -301,9 +301,11 @@ function renderTradingTile(o) {
     const accs = o.accounts.filter((a) => (g.accounts || []).includes(a.profile));
     const bal = accs.reduce((x, a) => x + (a.balance || 0), 0), eq = accs.reduce((x, a) => x + (a.equity || 0), 0);
     const cur = accs[0]?.currency || '';
-    const size = accs.length ? `Konto ${fmt(bal)} ${esc(cur)}${open.length ? ` · Equity ${fmt(eq)}` : ''}` : '';
-    return `<div class="row grp"><span class="dot ${copier(g)}" title="Kopierer ${copier(g) === 'ok' ? 'online' : 'nicht online'}"></span><span>${esc(g.name)}`
-      + `${size ? ` <small class="grp-open">${size}</small>` : ''}`
+    // the group's account beside its name: the equity alone, a number and nothing else (Brano, 2026-10-20);
+    // balance and currency in the tooltip
+    const size = accs.length ? `<b class="grp-eq" title="Equity ${fmt(eq)} ${esc(cur)} · Konto ${fmt(bal)} ${esc(cur)}">${fmt(eq)}</b>` : '';
+    return `<div class="row grp"><span class="dot ${copier(g)}" title="Kopierer ${copier(g) === 'ok' ? 'online' : 'nicht online'}"></span><span>`
+      + `<div class="gtop"><i class="gname">${esc(g.name)}</i>${size}</div>`
       + `${open.length ? ` <small class="grp-open">${open.length} offen · ${pl(sum)}</small>` : ''}</span>`
       + `<span class="mono">${signed(g.pnl_today)}</span><span>${signed(g.pnl_total)}</span></div>`
       + (open.length ? `<div class="grp-pos">${open.slice(0, 4).map((p) => `<div><span class="side ${p.side}">${esc(p.side.toUpperCase())}</span>`
