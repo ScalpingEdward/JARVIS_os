@@ -189,21 +189,41 @@ function renderGroups(o) {
 }
 
 function renderPositions(o) {
-  const rows = o.accounts.flatMap((a) => a.open_positions.map((p) => ({ ...p, profile: nameOf(a), currency: a.currency })));
+  const rows = o.accounts.flatMap((a) => a.open_positions.map((p) => ({ ...p, profile: nameOf(a), copier: a.profile, currency: a.currency })));
   $('#openCount').textContent = rows.length;
   $('#noPositions').style.display = rows.length ? 'none' : '';
-  $('#positions').innerHTML = rows.length ? '<tr><th>ACCOUNT</th><th>SYMBOL</th><th></th><th>LOTS</th><th>ENTRY</th><th>SL</th><th>TP</th><th>PROFIT</th><th>GROUP</th></tr>' +
+  $('#positions').innerHTML = rows.length ? '<tr><th>ACCOUNT</th><th>SYMBOL</th><th></th><th>LOTS</th><th>ENTRY</th><th>SL</th><th>TP</th><th>PROFIT</th><th>GROUP</th><th></th></tr>' +
     rows.map((p) => `<tr>
       <td>${esc(p.profile)}</td><td>${esc(p.symbol)}</td><td><span class="side ${esc(p.side)}">${esc(p.side).toUpperCase()}</span></td>
       <td class="num">${fmt(p.volume)}</td><td class="num">${fmt(p.price_open)}</td><td class="num">${p.sl ? fmt(p.sl) : '–'}</td>
       <td class="num">${p.tp ? fmt(p.tp) : 'runner'}</td><td class="num"><span data-k="pp-${p.ticket}" id="pp-${p.ticket}"></span></td>
-      <td>${esc(p.group)}</td></tr>`).join('') : '';
+      <td>${esc(p.group)}</td>
+      <td><button type="button" class="pos-close${closing.has(p.ticket) ? ' busy' : ''}" data-t="${p.ticket}" data-p="${esc(p.copier)}"
+        data-d="${esc(`${p.side.toUpperCase()} ${p.symbol} ${fmt(p.volume)} Lots (#${p.ticket})`)}" title="Diese Position schließen"
+        ${closing.has(p.ticket) ? 'disabled' : ''}>${closing.has(p.ticket) ? '…' : '✕'}</button></td></tr>`).join('') : '';
   rows.forEach((p) => {
     const el = $(`#pp-${p.ticket}`);
     tween(el, p.profit);
     el.className = p.profit > 0 ? 'up' : p.profit < 0 ? 'down' : '';
   });
 }
+
+// ✕ in a row: close that one position. Asks first; the copier picks it up with its next report (≤ 20 s)
+// and closes it at market -- only its own trades, never one opened by hand.
+const closing = new Set();
+$('#positions').addEventListener('click', async (e) => {
+  const b = e.target.closest('button.pos-close');
+  if (!b || b.disabled) return;
+  const ticket = Number(b.dataset.t);
+  if (!confirm(`Position schließen?
+${b.dataset.d}
+Wird zum Marktpreis geschlossen.`)) return;
+  closing.add(ticket); b.disabled = true; b.textContent = '…'; b.classList.add('busy');
+  try {
+    await send('POST', '/v1/copier/commands', { profile: b.dataset.p, action: `close:${ticket}`, confirmed: true });
+  } catch (err) { closing.delete(ticket); b.disabled = false; b.textContent = '✕'; alert(`Fehler: ${err.message}`); return; }
+  setTimeout(() => closing.delete(ticket), 60000);   // still open after a minute: the ✕ comes back
+});
 
 // --- closed trades, newest first, filterable by group -----------------------------
 let histGroup = '';

@@ -349,3 +349,12 @@ def test_risk_can_differ_per_symbol_on_one_account():
     # 1 % of 10 000 = 100 instead of 50 -> twice the lots of the default 0.5 %
     assert [p.volume for p in t.positions.values()] == [0.1, 0.1]
     assert c._risk_pct("BTCUSD") == c.profile.risk_per_position_pct
+
+
+def test_one_position_is_closed_by_its_ticket_and_only_the_copiers_own():
+    c, t, said, now = make()
+    c.on_message(CHAT, 1, None, SIGNAL)
+    first, second = sorted(t.positions)
+    assert c.command(f"close:{first}") == f"closed #{first}"
+    assert list(t.positions) == [second] and "CLOSED by Brano" in said[-1]
+    assert "not open" in c.command("close:999999")

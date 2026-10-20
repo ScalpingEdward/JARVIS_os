@@ -86,3 +86,11 @@ def test_offline_copier_is_reported_once_and_its_return_too(monkeypatch):
     assert w.check() == []
     state["s"] = CopierState.live
     assert w.check() == ["✅ VIP läuft wieder."]
+
+
+def test_closing_one_position_takes_a_ticket_and_waits_for_confirmation_unless_given(clean):
+    from app.copier_status import commands
+    assert commands.create("demo", "close:123456789", "auron")["status"] == "awaiting_confirmation"
+    assert commands.create("demo", "close:123456789", "dashboard", confirmed=True)["status"] == "pending"
+    with pytest.raises(commands.CommandError):
+        commands.create("demo", "close:abc", "dashboard", confirmed=True)

@@ -1,4 +1,4 @@
-"""Commands for the copiers: pause, resume, close all.
+"""Commands for the copiers: pause, resume, close all, close one position (close:<ticket>).
 
 The copier runs on the laptop and pushes its status every 15 s; the answer to that push
 carries its pending commands, and it acks each one when done. So a command takes effect
@@ -10,6 +10,7 @@ Brano confirms -- the button in Telegram or the dashboard's own dialog. AURON's 
 from __future__ import annotations
 
 import os
+import re
 import uuid
 from datetime import datetime, timedelta, timezone
 
@@ -46,10 +47,14 @@ def _telegram(text: str, keyboard: list | None = None) -> None:
         pass
 
 
+CLOSE_ONE = re.compile(r"^close:\d{1,14}$")   # one position by its ticket -- the dashboard's ✕ per row
+
+
 def create(profile: str, action: str, source: str, confirmed: bool = False, label: str = "") -> dict:
-    if action not in ACTIONS:
+    if action not in ACTIONS and not CLOSE_ONE.match(action):
         raise CommandError(f"unknown action {action}")
-    needs = action in NEEDS_CONFIRMATION and not confirmed
+    # closing one position asks first, like close_all: the dashboard asks in its own dialog
+    needs = (action in NEEDS_CONFIRMATION or action.startswith("close:")) and not confirmed
     r = CopierCommandRow(id=str(uuid.uuid4()), profile=profile, action=action, source=source,
                          status="awaiting_confirmation" if needs else "pending", created_at=datetime.now(timezone.utc))
     with SessionLocal() as s:
@@ -57,7 +62,8 @@ def create(profile: str, action: str, source: str, confirmed: bool = False, labe
         s.commit()
         out = _dict(r)
     if needs:
-        _telegram(f"Bestätigen: {label or profile} -- {ACTIONS[action]}?\n(läuft in 10 Minuten ab)",
+        what = ACTIONS.get(action) or f"Position #{action.split(':', 1)[1]} schließen"
+        _telegram(f"Bestätigen: {label or profile} -- {what}?\n(läuft in 10 Minuten ab)",
                   [[{"text": "✅ Ja, ausführen", "callback_data": f"cmd:z:{out['id']}"},
                     {"text": "✖ Abbrechen", "callback_data": f"cmd:q:{out['id']}"}]])
     return out

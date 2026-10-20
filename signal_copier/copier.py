@@ -700,6 +700,17 @@ class Copier:
             text = f"CLOSE ALL by Brano: {len(positions)} positions closed, {len(orders)} limits cancelled"
             self._say(text + (f" -- FAILED: {'; '.join(failed)}" if failed else ""))
             return text + (f"; failed: {'; '.join(failed)}" if failed else "")
+        if action.startswith("close:"):
+            # one position, from the ✕ in its row -- only one of this copier's own (magic), never by hand
+            ticket = int(action.split(":", 1)[1])
+            pos = next((p for p in self.ex.bot_positions() if p.ticket == ticket), None)
+            if pos is None:
+                return f"position #{ticket} is not open (or not this copier's)"
+            if self.dry:
+                return f"dry run: #{ticket} not closed"
+            self.ex.close_position(pos)
+            self._say(f"CLOSED by Brano: #{ticket} {pos.symbol} ({pos.volume} lots) at market")
+            return f"closed #{ticket}"
         return f"unknown command {action}"
 
     # --- watchdog -------------------------------------------------------
