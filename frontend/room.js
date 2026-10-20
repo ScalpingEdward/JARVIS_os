@@ -13,7 +13,7 @@
     if (ROOMS[q]) return q;
     try { const k = localStorage.getItem('auron_room'); return ROOMS[k] ? k : 'lounge'; } catch { return 'lounge'; }
   };
-  let key = pick(), room = ROOMS[key], rect = [0, 0, 1, 1], fade = 0;
+  let key = pick(), room = ROOMS[key], rect = [0, 0, 1, 1], fade = 0, phone = false;
 
   // ---- placement: the picture's pedestal right under the planet ----------------------------
   // Scaled so the pedestal's top is about as wide as the planet's orbits, never smaller than
@@ -23,19 +23,23 @@
     const px = core.left + core.width / 2, py = core.top + core.height * (document.documentElement.classList.contains('desk') ? 0.8 : 0.88);  // desk: planet closer to its pedestal
     const vw = innerWidth, vh = innerHeight, [x, y, top] = room.ped;
     if (vw <= 700) {
-      // phone held upright: the room as a room -- a little wider than the screen, pedestal under the
-      // planet, top and bottom fading into the dark -- instead of blown up to fill the tall window
-      // the page scrolls here: the room is drawn in page coordinates and scrolls with the planet
-      // (the canvas sits at the top of the page, not fixed) -- else the planet slid off its pedestal
+      // phone held upright: the room as a still picture behind the page, a little wider than the
+      // screen, pedestal under the planet, top and bottom fading into the dark. It scrolls with the
+      // page (attachment "scroll", page coordinates), so the planet stays on its pedestal. No WebGL
+      // here: a scrolling canvas went black on the iPhone (2026-10-20), and the phone saves battery.
       const W = Math.max(vw * 1.9, (core.width * 0.8) / top), H = W * room.h / room.w, sy = scrollY;
-      rect = [px - x * W, py + sy - y * H, W, H]; fade = 1;
-      document.body.style.backgroundImage = `url("${room.src}")`;
-      document.body.style.backgroundSize = `${W}px ${H}px`;
-      document.body.style.backgroundPosition = `${rect[0]}px ${rect[1]}px`;
-      document.body.style.backgroundRepeat = 'no-repeat';
+      const bx = px - x * W, by = py + sy - y * H;
+      phone = true;
+      const b = document.body.style;
+      b.backgroundImage = `linear-gradient(180deg, #03060c 0%, rgba(3,6,12,0) 14%, rgba(3,6,12,0) 78%, #03060c 100%), url("${room.src}")`;
+      b.backgroundSize = `${W}px ${H}px, ${W}px ${H}px`;
+      b.backgroundPosition = `${bx}px ${by}px, ${bx}px ${by}px`;
+      b.backgroundRepeat = 'no-repeat, no-repeat';
+      b.backgroundAttachment = 'scroll, scroll';
       return;
     }
-    fade = 0;
+    fade = 0; phone = false;
+    document.body.style.backgroundAttachment = '';
     let scale = Math.max(vw / room.w, vh / room.h, (core.width * 0.8) / (top * room.w));  // 0.8: less zoom, sharper room
     for (let i = 0; i < 40; i++) {
       const W = room.w * scale, H = room.h * scale, bx = px - x * W, by = py - y * H;
@@ -184,7 +188,7 @@ void main() {
 
   function frame(now) {
     raf = 0;
-    if (!img) return;
+    if (!img || phone) return;      // upright phone: the still picture only (place())
     if (!still && document.hidden) return;
     if (now - last >= 33 || still) {  // ~30 fps is plenty for a breathing room, and spares the laptop
       last = now;

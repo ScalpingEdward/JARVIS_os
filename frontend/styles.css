@@ -965,4 +965,5 @@ html.noplanet .core { visibility: hidden; }
 /* the group's account line (Konto … · Equity …) and its open count read in white, not grey (Brano, 2026-10-19) */
 .row.grp .grp-open { color: var(--text); opacity: .9; }
 /* phone held upright: the page scrolls, so the room scrolls with it (room.js draws it in page coordinates) */
-@media (max-width: 700px) { .room { position: absolute; top: 0; left: 0; } }
+/* phone held upright: no WebGL room, the still picture on <body> scrolls with the page (room.js) */
+@media (max-width: 700px) { .room { display: none; } }
