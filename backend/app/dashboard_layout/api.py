@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from . import service
+from . import look, service
 
 router = APIRouter(prefix="/v1/dashboard", tags=["dashboard"])
 
@@ -51,3 +51,15 @@ def add_note(body: NoteIn) -> list[dict]:
 @router.patch("/notes/{note_id}")
 def patch_note(note_id: str, body: NotePatch) -> list[dict]:
     return _guard(service.set_note, note_id, body.done, body.delete)
+
+
+@router.get("/look")
+def get_look() -> dict:
+    """Colours, glass, clock, planet, room and the cards' text -- every dashboard polls it."""
+    return look.get()
+
+
+@router.put("/look")
+def put_look(payload: dict) -> dict:
+    """A change made by hand in a dashboard's settings."""
+    return _guard(look.save, payload.get("look") or {}, "dashboard")

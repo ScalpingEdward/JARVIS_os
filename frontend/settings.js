@@ -51,7 +51,11 @@
     document.documentElement.dataset.core = t.core;
     r.setProperty('--clock-color', t.clockColor === 'accent' ? t.accent : t.clockColor);
   }
-  const save = () => { try { localStorage.setItem(KEY, JSON.stringify(t)); } catch { /* private window */ } };
+  const save = () => { try { localStorage.setItem(KEY, JSON.stringify(t)); } catch { /* private window */ } window.AURON_look?.changed(); };
+  // look.js: the look from AURON's database (AURON may change it) -- and back when changed here
+  window.AURON_theme = { get: () => ({ ...t }), set(next) {
+    t = { ...DEFAULT, ...next }; try { localStorage.setItem(KEY, JSON.stringify(t)); } catch { /* private window */ }
+    apply(); if (!panel.hidden) paint(); } };
 
   const panel = document.getElementById('themePanel'), btn = document.getElementById('themeBtn');
   const swatches = (list, cur, key) => `<div class="sw">${list.map(([c, n]) =>

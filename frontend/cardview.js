@@ -24,7 +24,8 @@
   const DEFAULT = { size: 1.12, font: 'std', num: 1 };   // a little larger than before (Brano, 2026-10-19)
   const load = (k) => { try { return JSON.parse(localStorage.getItem(k) || '{}'); } catch { return {}; } };
   let views = load(KEY), styles = load(STYLE_KEY);
-  const save = () => { try { localStorage.setItem(KEY, JSON.stringify(views)); localStorage.setItem(STYLE_KEY, JSON.stringify(styles)); } catch { /* private window */ } };
+  const store = () => { try { localStorage.setItem(KEY, JSON.stringify(views)); localStorage.setItem(STYLE_KEY, JSON.stringify(styles)); } catch { /* private window */ } };
+  const save = () => { store(); window.AURON_look?.changed(); };
   const styleOf = (id) => ({ ...DEFAULT, ...(styles[id] || {}) });
 
   // Only the letters grow -- paddings, gaps and the card's width stay. Nothing is dropped from the
@@ -157,6 +158,20 @@
   }
   addEventListener('resize', refitNow);
   document.fonts?.ready.then(refitNow);
+  // look.js: {cardId: {size, num, font, view}} from AURON's database, and back when changed here
+  window.AURON_cards = {
+    get: () => Object.fromEntries(Object.keys(CARDS).map((id) => [id, { ...styleOf(id), view: views[id] || 'list' }])),
+    set(cards) {
+      for (const [id, c] of Object.entries(cards || {})) {
+        if (!CARDS[id]) continue;
+        const { view, ...st } = c;
+        styles[id] = { ...styleOf(id), ...st };
+        if (view) views[id] = view;
+        apply(id);
+      }
+      store();
+    },
+  };
   const closeAll = () => document.querySelectorAll('.card-menu').forEach((m) => {
     if (!m.hidden) { m.hidden = true; document.getElementById(m.dataset.card)?.classList.remove('menu-open'); } });
   document.addEventListener('click', closeAll);

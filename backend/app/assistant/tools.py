@@ -168,6 +168,21 @@ def _group_rename(group: str, new_name: str) -> dict:
         return {"error": str(exc)}
 
 
+def _design(action: str, theme: dict | None = None, room: str | None = None, card: str | None = None,
+            card_style: dict | None = None) -> dict:
+    from app.dashboard_layout import look
+    try:
+        if action == "change":
+            d = look.change(theme, room, card, card_style)
+        elif action == "undo":
+            d = look.undo()
+        else:
+            return {**look.get(), "catalog": look.CATALOG}
+    except look.LayoutError as exc:
+        return {"error": str(exc), "catalog": look.CATALOG}
+    return {**d, "note": "shows on every screen within about 2 seconds"}
+
+
 TOOLS: list[dict] = [
     {"name": "trading_status",
      "description": "Brano's copier accounts right now: balance, equity, open positions, P&L per signal group "
@@ -214,6 +229,21 @@ TOOLS: list[dict] = [
                     "asks for it in this conversation. group: the current or original name or a unique part of it.",
      "input_schema": {"type": "object", "properties": {"group": {"type": "string"}, "new_name": {"type": "string"}},
                       "required": ["group", "new_name"]}},
+    {"name": "dashboard_design",
+     "description": "The dashboard's look, on Brano's word -- he tries things out with you: 'get' shows the current look "
+                    "and every option (catalog); 'change' sets parts of it at once: theme (accent colour, tint = the cards' "
+                    "glass colour, style, strength, clock, clockSize, clockColor, planet colour, core), room (the background), "
+                    "and card + card_style (size, num = the numbers' size, font, view list/tiles; card 'all' for every card). "
+                    "It shows on every screen within ~2 s; nothing to confirm, all of it reversible. When he says "
+                    "'nächste'/'andere'/'noch eine', change the SAME thing again to a different option than any tried so far in "
+                    "this conversation; 'gut'/'ok'/'passt'/'lass so' = keep it, do nothing; 'zurück'/'vorher war besser' = 'undo' "
+                    "(steps back one change at a time). Say in a few words what you set.",
+     "input_schema": {"type": "object", "properties": {
+         "action": {"type": "string", "enum": ["get", "change", "undo"]},
+         "theme": {"type": "object", "description": "e.g. {\"accent\": \"#f5b84a\", \"style\": \"solid\"}"},
+         "room": {"type": "string"}, "card": {"type": "string", "description": "a card name or 'all'"},
+         "card_style": {"type": "object", "description": "e.g. {\"size\": 1.25, \"font\": \"sora\"}"}},
+         "required": ["action"]}},
     {"name": "dashboard_cards",
      "description": "Brano's dashboard cards. 'list' shows where each card is and the catalog. Changing actions -- "
                     "'place' (card to side left/right at position 1=top, or side 'hidden'), 'add' (card_type price/copier/notes; "
@@ -248,6 +278,8 @@ _RUN: dict[str, Callable[..., dict]] = {
     "copier_command": lambda target, action, **_: _copier_command(target, action),
     "dashboard_cards": lambda action, card=None, side=None, position=None, card_type=None, name=None, **_:
         _dashboard_cards(action, card, side, position, card_type, name),
+    "dashboard_design": lambda action, theme=None, room=None, card=None, card_style=None, **_:
+        _design(action, theme, room, card, card_style),
     "group_rename": lambda group, new_name="", **_: _group_rename(group, new_name),
     "notes": lambda action, text=None, note_id=None, **_: _notes(action, text, note_id),
     "instagram_approve": lambda candidate_id=None, **_: _instagram_approve(candidate_id),
