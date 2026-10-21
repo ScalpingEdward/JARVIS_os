@@ -15,6 +15,7 @@ def _guard(fn, *a, **k):
 
 class TaskIn(BaseModel):
     text: str = Field(min_length=8, max_length=4000)
+    kind: str = "code"
 
 
 class ReportIn(BaseModel):
@@ -34,7 +35,7 @@ def list_tasks() -> list[dict]:
 
 @router.post("/tasks")
 def create_task(payload: TaskIn) -> dict:
-    return _guard(service.create, payload.text, "dashboard")
+    return _guard(service.create, payload.text, "dashboard", payload.kind)
 
 
 @router.post("/tasks/{task_id}/{action}")

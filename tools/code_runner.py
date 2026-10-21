@@ -180,7 +180,84 @@ def revert(t: dict) -> None:
     call(f"/runner/report/{t['id']}", {"status": "reverted", "tests": "Zurückgenommen: " + notes})
 
 
+# ---- PC jobs (tools/pc_jobs.py): narrow on purpose ----------------------------------------------
+# Claude Code only LOOKS -- file tools, no shell -- inside Desktop, Dokumente and Downloads, and writes a
+# plan with a fixed step list. pc_jobs checks every step (paths inside the three folders, no secrets,
+# nothing overwritten, nothing deleted) and carries it out after Brano's "Freigeben" -- not the AI.
+sys.path.insert(0, str(ROOT / "tools"))
+import pc_jobs  # noqa: E402
+
+NEVER_READ = ",".join(f"Read({p})" for p in (
+    "**/.env", "**/.env.*", "**/secrets/**", "**/*token*", "**/*secret*", "**/*passw*", "**/*.pem", "**/*.key",
+    "**/*.kdbx", "**/gmail_client*", "**/telegram.session", "**/.ssh/**"))
+
+PC_PLAN = """You help Brano with a job on his Windows PC. You may only LOOK, and only inside these folders:
+{roots}
+He asked: <<{text}>>
+
+Look at what you need (file names, folder contents; open a document only when the job is about its content).
+Do not open files with private content (tax, bank, contracts, IDs, health) unless the job is about exactly them.
+Then answer in German:
+- two or three sentences: what you will do;
+- a line "Sensible Daten:" naming private files the plan touches, or "keine";
+- at the very end ONE ```json block: the list of steps. Allowed steps, with absolute paths inside the folders above:
+  {{"op": "mkdir", "path": "..."}}
+  {{"op": "move", "from": "...", "to": "..."}}   (to = an existing or new folder, or the full new path)
+  {{"op": "copy", "from": "...", "to": "..."}}
+  {{"op": "write", "path": "...", "text": "..."}} (a new text file, e.g. a summary)
+  {{"op": "trash", "path": "..."}}  (for anything that should go -- nothing is ever deleted)
+Nothing else is possible. If the job needs more, or is unclear, say so and give an empty list []."""
+
+
+def failure(r: subprocess.CompletedProcess) -> str:
+    err = (r.stderr or r.stdout or "").strip()
+    if "authenticate" in err.lower() or "login" in err.lower():
+        return "Claude Code ist nicht angemeldet: im Terminal `claude` starten und /login eingeben. " + err[:200]
+    return err[:2000] or f"exit {r.returncode}"
+
+
+def pc_plan(t: dict) -> None:
+    roots = list(pc_jobs.ROOTS.values())
+    claude = shutil.which("claude") or "claude"
+    cmd = [claude, "-p", "--allowedTools", "Read,Glob,Grep", "--disallowedTools", "Bash,Edit,Write,WebFetch,WebSearch," + NEVER_READ,
+           "--max-turns", "60"]
+    for r_ in roots[1:]:
+        cmd += ["--add-dir", str(r_)]
+    r = run(cmd, roots[0], timeout=CLAUDE_TIMEOUT_S,
+            stdin=PC_PLAN.format(roots="\n".join(f"  {n}: {d}" for n, d in pc_jobs.ROOTS.items()), text=t["text"]))
+    answer = (r.stdout or "").strip()
+    if r.returncode or not answer:
+        call(f"/runner/report/{t['id']}", {"status": "failed", "error": failure(r)})
+        return
+    try:
+        summary, steps = pc_jobs.parse(answer)
+        if not steps:
+            call(f"/runner/report/{t['id']}", {"status": "failed", "summary": summary, "error": "Kein ausführbarer Plan -- siehe oben."})
+            return
+        readable = pc_jobs.check(steps)
+    except pc_jobs.PlanError as exc:
+        call(f"/runner/report/{t['id']}", {"status": "failed", "summary": answer[:4000], "error": f"Plan abgelehnt: {exc}"})
+        return
+    call(f"/runner/report/{t['id']}", {"status": "ready", "summary": summary + "\n\n" + "\n".join(readable),
+                                       "diff": json.dumps(steps, ensure_ascii=False, indent=1),
+                                       "tests": f"Plan: {len(steps)} Schritte, alle geprüft -- noch nichts geändert."})
+
+
+def pc_do(t: dict) -> None:
+    try:
+        report = pc_jobs.run(json.loads(t.get("diff") or "[]"), t["text"])
+    except (ValueError, pc_jobs.PlanError) as exc:
+        call(f"/runner/report/{t['id']}", {"status": "apply_failed", "error": f"{exc}"})
+        return
+    call(f"/runner/report/{t['id']}", {"status": "applied", "tests": report[:8000]})
+
+
+def pc_discard(t: dict) -> None:
+    call(f"/runner/report/{t['id']}", {"status": "discarded"})
+
+
 STEPS = {"running": do_task, "applying": apply, "discarding": discard, "reverting": revert}
+PC_STEPS = {"running": pc_plan, "applying": pc_do, "discarding": pc_discard}
 
 
 def main() -> None:
@@ -197,7 +274,7 @@ def main() -> None:
             continue
         print(f"{t['status']}: {t['id']} {t['text'][:60]}")
         try:
-            STEPS[t["status"]](t)
+            (PC_STEPS if t.get("kind") == "pc" else STEPS)[t["status"]](t)
         except Exception as e:  # noqa: BLE001 -- the task says what went wrong, the runner goes on
             fail = {"running": "failed", "applying": "apply_failed", "reverting": "revert_failed", "discarding": "discarded"}[t["status"]]
             try:

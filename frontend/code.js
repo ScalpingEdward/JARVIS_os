@@ -29,9 +29,11 @@
       for (const t of tasks) {
         if (seen.get(t.id) === t.status) continue;
         const say = {
-          ready: `Sir, die Code-Änderung ist bereit: ${t.text.slice(0, 80)}. Sie finden sie unter Einstellungen, Code.`,
-          failed: 'Sir, die Code-Änderung hat nicht geklappt. Die Details stehen unter Einstellungen, Code.',
-          applied: 'Sir, die Änderung ist jetzt live.',
+          ready: t.kind === 'pc' ? `Sir, der Plan für Ihren PC-Auftrag ist fertig: ${t.text.slice(0, 80)}. Bitte prüfen und freigeben.`
+            : `Sir, die Code-Änderung ist bereit: ${t.text.slice(0, 80)}. Sie finden sie unter Einstellungen, Code.`,
+          failed: t.kind === 'pc' ? 'Sir, der PC-Auftrag ging nicht. Die Details stehen unter Einstellungen, Code.'
+            : 'Sir, die Code-Änderung hat nicht geklappt. Die Details stehen unter Einstellungen, Code.',
+          applied: t.kind === 'pc' ? 'Sir, der PC-Auftrag ist erledigt.' : 'Sir, die Änderung ist jetzt live.',
         }[t.status];
         if (say) { window.AURON_voice?.note(say, { code: t.id }); claim(say).then((mine) => { if (mine) window.AURON_voice?.say(say); }); }
       }
@@ -39,7 +41,7 @@
       // first look on this screen: a wish already waiting gets its message with buttons, once
       for (const t of tasks) {
         if ((t.status === 'ready' || t.status === 'apply_failed') && !window.AURON_voice?.hasCode(t.id)) {
-          window.AURON_voice?.note(`Sir, eine Code-Änderung wartet auf Ihre Freigabe: ${t.text.slice(0, 120)}`, { code: t.id });
+          window.AURON_voice?.note(`Sir, ${t.kind === 'pc' ? 'ein PC-Auftrag' : 'eine Code-Änderung'} wartet auf Ihre Freigabe: ${t.text.slice(0, 120)}`, { code: t.id });
         }
       }
     }
@@ -57,15 +59,15 @@
       const [label, cls] = STATE[t.status] || [t.status, ''];
       const btns = t.status === 'ready' || t.status === 'apply_failed'
         ? `<button type="button" class="go" data-a="approve" data-id="${t.id}">✅ ${t.status === 'ready' ? 'Freigeben' : 'Nochmal übernehmen'}</button><button type="button" data-a="reject" data-id="${t.id}">Verwerfen</button>`
-        : t.status === 'applied' ? `<button type="button" data-a="revert" data-id="${t.id}">↩ Rückgängig</button>` : '';
+        : t.status === 'applied' && t.kind !== 'pc' ? `<button type="button" data-a="revert" data-id="${t.id}">↩ Rückgängig</button>` : '';
       const more = open.has(t.id);
       const when = new Date(t.created_at).toLocaleString('de-DE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
       return `<article class="ct ${cls}">
-        <div class="ct-top"><b>${esc(t.text)}</b><span class="ct-state">${label}</span></div>
+        <div class="ct-top"><b>${esc(t.text)}</b><span class="ct-state">${t.kind === 'pc' ? '🖥 PC · ' : ''}${label}</span></div>
         ${t.summary ? `<p class="ct-sum">${esc(t.summary)}</p>` : ''}
         ${t.error ? `<p class="ct-err">${esc(t.error)}</p>` : ''}
         ${t.tests ? `<pre class="ct-tests">${esc(t.tests)}</pre>` : ''}
-        ${t.diff ? `<button type="button" class="ct-more" data-more="${t.id}">${more ? 'Änderungen ausblenden' : 'Änderungen ansehen'}</button>` : ''}
+        ${t.diff ? `<button type="button" class="ct-more" data-more="${t.id}">${more ? 'ausblenden' : t.kind === 'pc' ? 'Schritte als Liste (JSON)' : 'Änderungen ansehen'}</button>` : ''}
         ${more && t.diff ? `<pre class="ct-diff">${esc(t.diff)}</pre>` : ''}
         ${btns ? `<div class="ct-btns">${btns}</div>` : ''}
         <small class="muted">${when}</small>
@@ -101,7 +103,7 @@
       const [label] = STATE[t.status] || [t.status];
       const b = t.status === 'ready' || t.status === 'apply_failed'
         ? `<button type="button" class="go" data-a="approve" data-id="${id}">✅ ${t.status === 'ready' ? 'Freigeben' : 'Nochmal übernehmen'}</button><button type="button" data-a="reject" data-id="${id}">Verwerfen</button>`
-        : t.status === 'applied' ? `<button type="button" data-a="revert" data-id="${id}">↩ Rückgängig</button>` : '';
+        : t.status === 'applied' && t.kind !== 'pc' ? `<button type="button" data-a="revert" data-id="${id}">↩ Rückgängig</button>` : '';
       return `<div class="ct-btns msg-code">${b}<button type="button" data-details="${id}">Details</button><span class="muted">${label}</span></div>`;
     },
   };

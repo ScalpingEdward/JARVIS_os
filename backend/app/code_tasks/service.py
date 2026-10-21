@@ -1,4 +1,12 @@
-"""Code wishes, from Brano's word to AURON, done by Claude Code -- live only with his click.
+"""Wishes from Brano's word to AURON, done by Claude Code on the laptop -- only with his click.
+
+Two kinds:
+  code  a change to AURON's own code: built on a branch, merged on approval (see below)
+  pc    a job with Brano's files, only in Desktop, Dokumente and Downloads (tools/pc_jobs.py):
+        Claude Code LOOKS (read-only, no shell) and writes a plan with a fixed step list; after
+        "Freigeben" a checked routine -- not the AI -- carries it out. Never deletes (moves to
+        Dokumente/AURON-Papierkorb), never overwrites, no keys or passwords, nothing elsewhere.
+
 
 AURON (assistant tool code_request) can only file a task. The code runner on the laptop
 (tools/code_runner.py, outside Docker -- Claude Code, git and docker live there) claims it, lets
@@ -63,11 +71,16 @@ def tasks() -> list[dict]:
     return list(reversed(_load()))   # newest first
 
 
-def create(text: str, by: str = "auron") -> dict:
+KINDS = ("code", "pc")
+
+
+def create(text: str, by: str = "auron", kind: str = "code") -> dict:
     text = (text or "").strip()
     if len(text) < 8:
         raise CodeTaskError("describe the change in a sentence")
-    t = {"id": uuid.uuid4().hex[:10], "text": text[:4000], "by": by, "status": "queued",
+    if kind not in KINDS:
+        raise CodeTaskError(f"kind must be one of {KINDS}")
+    t = {"id": uuid.uuid4().hex[:10], "kind": kind, "text": text[:4000], "by": by, "status": "queued",
          "created_at": _now(), "updated_at": _now(), "summary": "", "diff": "", "tests": "", "branch": "", "error": ""}
     with _lock:
         _save(_load() + [t])
@@ -93,6 +106,8 @@ def decide(task_id: str, action: str) -> dict:
     want, to = DECIDE[action]
 
     def go(t):
+        if action == "revert" and t.get("kind") == "pc":
+            raise CodeTaskError("a PC job cannot be reverted automatically -- ask AURON for a job that undoes it")
         if t["status"] not in want:
             raise CodeTaskError(f"task is {t['status']}, not {' or '.join(want)}")
         t["status"] = to

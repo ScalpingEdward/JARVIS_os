@@ -44,3 +44,14 @@ def test_an_approval_that_could_not_be_merged_can_be_given_again():
     service.report(t["id"], "apply_failed", error="local changes would be overwritten")
     again = service.decide(t["id"], "approve")
     assert again["status"] == "approved" and again["error"] == ""
+
+
+def test_a_pc_job_is_planned_first_and_cannot_be_reverted_automatically():
+    out, failed = tools.run("pc_request", {"job": "Desktop aufräumen: Bilder in einen Ordner Bilder"})
+    assert not failed
+    t = service.tasks()[0]
+    assert t["kind"] == "pc" and t["status"] == "queued"
+    service.claim(); service.report(t["id"], "ready", summary="1. ...")
+    service.decide(t["id"], "approve"); service.claim(); service.report(t["id"], "applied")
+    with pytest.raises(service.CodeTaskError, match="cannot be reverted"):
+        service.decide(t["id"], "revert")
