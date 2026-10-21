@@ -194,7 +194,7 @@ def test_tp1_locks_in_once_price_passes_pct_of_the_way_to_the_final_tp_buy():
     assert t.positions[2].sl == 4151.0
     t.prices["XAUUSD.s"] = 4185.5                        # 70.4 % -- locks to TP1
     c.watch()
-    assert t.positions[2].sl == 4170.0 and "70%" in said[-1]
+    assert t.positions[2].sl == 4170.0 and "SL to TP1" in said[-1]
     c.watch()                                            # once: a second watch does not touch it again
     assert t.calls.count(("sltp", 2, 4170.0, None)) == 1
 
@@ -212,7 +212,7 @@ def test_tp1_locks_in_once_price_passes_pct_of_the_way_to_the_final_tp_sell():
     assert t.positions[2].sl == 4151.0
     t.prices["XAUUSD.s"] = 4115.0                        # 70.6 % -- locks to TP1
     c.watch()
-    assert t.positions[2].sl == 4130.0 and "70%" in said[-1]
+    assert t.positions[2].sl == 4130.0 and "SL to TP1" in said[-1]
 
 
 def test_breakeven_too_close_is_retried_by_the_watchdog():
