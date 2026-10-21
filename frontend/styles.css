@@ -1060,3 +1060,9 @@ html.desk .core.turning { cursor: grabbing; }
    the card; the card itself still turns, floats and lifts on hover. */
 .tile { transform-style: flat; }
 .tile-figure, .tile-sub, .tile-spark, .tile-list, .kpis { transform: none; }
+/* Grid-like hairlines over the cards, gone under the mouse (Brano, 2026-10-21): Chrome/Edge render the
+   glass blur (backdrop-filter) in tiles, and on a card turned inside a shared 3D space (preserve-3d) the
+   seams between those tiles show. Each card now carries its own perspective in its transform, the scene
+   and columns are flat -- the card is drawn as one piece, it looks just as turned, and it still lifts on hover. */
+.scene, .col { transform-style: flat; }
+.tile { transform: perspective(900px) translateZ(var(--z, 0px)) rotateY(calc(var(--base-ry, 0deg) + var(--ry, 0deg))) rotateX(var(--rx, 0deg)); }
