@@ -1065,4 +1065,8 @@ html.desk .core.turning { cursor: grabbing; }
    seams between those tiles show. Each card now carries its own perspective in its transform, the scene
    and columns are flat -- the card is drawn as one piece, it looks just as turned, and it still lifts on hover. */
 .scene, .col { transform-style: flat; }
-.tile { transform: perspective(900px) translateZ(var(--z, 0px)) rotateY(calc(var(--base-ry, 0deg) + var(--ry, 0deg))) rotateX(var(--rx, 0deg)); }
+/* ... and seen from the same point as before -- the stage's perspective origin (middle, 35 % from the
+   top): the card shifts by its offset to that point (--pox/--poy, set by app.js), takes the perspective
+   there, and shifts back. Without it each card looked from its own middle and tipped sideways. */
+.tile { transform: translate(var(--pox, 0px), var(--poy, 0px)) perspective(1700px) translate(calc(-1 * var(--pox, 0px)), calc(-1 * var(--poy, 0px)))
+  translateZ(var(--z, 0px)) rotateY(calc(var(--base-ry, 0deg) + var(--ry, 0deg))) rotateX(var(--rx, 0deg)); }

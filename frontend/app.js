@@ -1066,3 +1066,25 @@ async function refreshWatch() {
 }
 refreshWatch();
 setInterval(refreshWatch, 60000);
+
+
+// Each card's way to the stage's perspective origin (styles.css, .tile transform): measured on the
+// untransformed layout box, again when the window or the card layout changes.
+function perspectiveOrigins() {
+  const stage = document.getElementById('stage');
+  if (!stage) return;
+  const st = stage.getBoundingClientRect(), ox = st.left + st.width * 0.5, oy = st.top + st.height * 0.35;
+  document.querySelectorAll('.col > .tile').forEach((t) => {
+    let x = 0, y = 0;
+    for (let e = t; e; e = e.offsetParent) { x += e.offsetLeft; y += e.offsetTop; }   // ignores transforms
+    t.style.setProperty('--pox', `${Math.round(ox - (x + t.offsetWidth / 2))}px`);
+    t.style.setProperty('--poy', `${Math.round(oy - (y + t.offsetHeight / 2))}px`);
+  });
+}
+addEventListener('resize', perspectiveOrigins);
+addEventListener('load', perspectiveOrigins);
+for (const id of ['colLeft', 'colRight']) {
+  const c = document.getElementById(id);
+  if (c) new ResizeObserver(perspectiveOrigins).observe(c);
+}
+setTimeout(perspectiveOrigins, 500);
