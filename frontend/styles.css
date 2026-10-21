@@ -1032,3 +1032,9 @@ html.desk .core.turning { cursor: grabbing; }
 .att-prev button { position: absolute; top: -6px; right: -6px; width: 18px; height: 18px; border-radius: 50%; border: 0;
   background: var(--down); color: #fff; font-size: 10px; line-height: 18px; padding: 0; cursor: pointer; }
 .msg-img { display: block; max-width: 220px; max-height: 160px; border-radius: 10px; margin-bottom: 6px; border: 1px solid var(--line-2); }
+/* ✕ beside each open trade in the Trading card (app.js closeOne) */
+.grp-pos > div { grid-template-columns: 38px minmax(0, 1fr) auto 64px 18px; }
+.pos-x { width: 18px; height: 18px; display: inline-grid; place-items: center; border-radius: 6px; font-size: 10px; line-height: 1;
+  color: var(--down); border: 1px solid rgba(242,100,124,.35); background: rgba(242,100,124,.08); cursor: pointer; }
+.pos-x:hover { background: rgba(242,100,124,.25); border-color: rgba(242,100,124,.7); }
+.pos-x.busy { color: var(--muted); border-color: var(--line-2); background: none; cursor: default; }

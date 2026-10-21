@@ -211,18 +211,28 @@ function renderPositions(o) {
 // ✕ in a row: close that one position. Asks first; the copier picks it up with its next report (≤ 20 s)
 // and closes it at market -- only its own trades, never one opened by hand.
 const closing = new Set();
-$('#positions').addEventListener('click', async (e) => {
-  const b = e.target.closest('button.pos-close');
-  if (!b || b.disabled) return;
+async function closeOne(b) {
   const ticket = Number(b.dataset.t);
+  if (closing.has(ticket)) return;
   if (!confirm(`Position schließen?
 ${b.dataset.d}
 Wird zum Marktpreis geschlossen.`)) return;
-  closing.add(ticket); b.disabled = true; b.textContent = '…'; b.classList.add('busy');
+  closing.add(ticket); b.textContent = '…'; b.classList.add('busy');
   try {
     await send('POST', '/v1/copier/commands', { profile: b.dataset.p, action: `close:${ticket}`, confirmed: true });
-  } catch (err) { closing.delete(ticket); b.disabled = false; b.textContent = '✕'; alert(`Fehler: ${err.message}`); return; }
+  } catch (err) { closing.delete(ticket); b.textContent = '✕'; b.classList.remove('busy'); alert(`Fehler: ${err.message}`); return; }
   setTimeout(() => closing.delete(ticket), 60000);   // still open after a minute: the ✕ comes back
+}
+$('#positions').addEventListener('click', (e) => {
+  const b = e.target.closest('button.pos-close');
+  if (b && !b.disabled) closeOne(b);
+});
+// the ✕ in the Trading card (Brano, 2026-10-21): the card itself opens the view on a click -- not this one
+$('#tGroups').addEventListener('click', (e) => {
+  const b = e.target.closest('.pos-x');
+  if (!b) return;
+  e.stopPropagation(); e.preventDefault();
+  closeOne(b);
 });
 
 // --- closed trades, newest first, filterable by group -----------------------------
@@ -303,7 +313,7 @@ function renderTradingTile(o) {
     return states.length && states.every((x) => x === 'live') ? 'ok' : states.some((x) => x === 'live' || x === 'stale') ? 'warn' : 'bad';
   };
   // under each group: its open trades right now -- symbol, side, lots, profit or loss (Brano, 2026-10-19)
-  const openOf = (name) => o.accounts.flatMap((a) => a.open_positions || []).filter((p) => p.group === name);
+  const openOf = (name) => o.accounts.flatMap((a) => (a.open_positions || []).map((p) => ({ ...p, copier: a.profile }))).filter((p) => p.group === name);
   const pl = (v) => `<span class="${v > 0 ? 'up' : v < 0 ? 'down' : 'muted'}">${v > 0 ? '+' : ''}${fmt(v)}</span>`;
   $('#tGroups').innerHTML = '<div class="cap"><span>Gruppen</span><span>heute</span><span>gesamt</span></div>' + (groups.length ? groups.map((g) => {
     const open = openOf(g.name), sum = open.reduce((x, p) => x + (p.profit || 0), 0);
@@ -319,7 +329,9 @@ function renderTradingTile(o) {
       + `${open.length ? ` <small class="grp-open">${open.length} offen · ${pl(sum)}</small>` : ''}</span>`
       + `<span class="mono">${signed(g.pnl_today)}</span><span>${signed(g.pnl_total)}</span></div>`
       + (open.length ? `<div class="grp-pos">${open.slice(0, 4).map((p) => `<div><span class="side ${p.side}">${esc(p.side.toUpperCase())}</span>`
-        + `<span>${esc(p.symbol)}</span><span class="mono">${fmt(p.volume)}</span><span class="mono">${pl(p.profit || 0)}</span></div>`).join('')}`
+        + `<span>${esc(p.symbol)}</span><span class="mono">${fmt(p.volume)}</span><span class="mono">${pl(p.profit || 0)}</span>`
+        + `<span class="pos-x${closing.has(p.ticket) ? ' busy' : ''}" role="button" title="Diese Position schließen" data-t="${p.ticket}" data-p="${esc(p.copier)}"`
+        + ` data-d="${esc(`${p.side.toUpperCase()} ${p.symbol} ${fmt(p.volume)} Lots (#${p.ticket})`)}">${closing.has(p.ticket) ? '…' : '✕'}</span></div>`).join('')}`
         + `${open.length > 4 ? `<div class="muted">+ ${open.length - 4} weitere</div>` : ''}</div>` : '');
   }).join('')
     : '<div class="row"><span></span><span class="muted">Noch keine Gruppe hat gehandelt</span><span></span></div>');
