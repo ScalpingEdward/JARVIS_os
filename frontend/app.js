@@ -276,6 +276,16 @@ $('#histFilter').addEventListener('click', (e) => {
   if (overview) renderHistory(overview);
 });
 
+// the group's equity starts exactly where the symbol (XAUUSD.s) starts in its open trades below
+// (Brano, 2026-10-21): measured, since text size and font change the columns
+function alignEquity() {
+  const list = $('#tGroups'), sym = list?.querySelector('.grp-pos > div > span:nth-child(2)'), name = list?.querySelector('.row.grp .gtop');
+  if (!sym || !name) return;
+  const left = (el) => { let x = 0; for (let e = el; e && e !== list; e = e.offsetParent) x += e.offsetLeft; return x; };
+  const w = left(sym) - left(name);
+  if (w > 20) list.style.setProperty('--eqx', `${w}px`);
+}
+
 // --- the trading tile: the short list -------------------------------------------
 function renderTradingTile(o) {
   const t = (o.totals || [])[0];
@@ -313,6 +323,7 @@ function renderTradingTile(o) {
         + `${open.length > 4 ? `<div class="muted">+ ${open.length - 4} weitere</div>` : ''}</div>` : '');
   }).join('')
     : '<div class="row"><span></span><span class="muted">Noch keine Gruppe hat gehandelt</span><span></span></div>');
+  alignEquity();
   $('#kToday').innerHTML = signed(t.pnl_today, t.currency);
   $('#kWeek').innerHTML = signed(t.pnl_week, t.currency);
   $('#kOpen').innerHTML = `${t.open_positions} <small class="muted">${signed(t.open_pnl)}</small>`;
