@@ -114,6 +114,7 @@ def make(dry=False):
 
 
 SIGNAL = "XAUUSD BUY @ 4151\nSL @ 4141\nTP1 @ 4170\nTP2 @ 4200"
+SELL_SIGNAL = "XAUUSD SELL @ 4151\nSL @ 4161\nTP1 @ 4130\nTP2 @ 4100"
 
 
 def test_signal_opens_one_leg_per_tp_each_with_full_risk():
@@ -170,6 +171,48 @@ def test_close_half_closes_the_tp1_leg_then_breakeven_the_rest():
     c.on_message(CHAT, 10, None, SIGNAL)
     c.on_message(CHAT, 12, 10, "Close half and set breakeven")
     assert list(t.positions) == [2] and t.positions[2].sl == 4151.0
+
+
+def test_tp1_lock_at_pct_is_off_by_default_even_past_the_final_tp():
+    c, t, said, _ = make()                              # CONFIG has no tp1_lock_at_pct -- other groups (NINJA)
+    c.on_message(CHAT, 10, None, SIGNAL)
+    c.on_message(CHAT, 11, 10, "Close half and set breakeven")
+    t.prices["XAUUSD.s"] = 4199.0                       # almost at TP2 4200, way past 70 %
+    c.watch()
+    assert t.positions[2].sl == 4151.0
+
+
+def test_tp1_locks_in_once_price_passes_pct_of_the_way_to_the_final_tp_buy():
+    t, said, now = FakeTerminal(), [], [1000.0]
+    c = Copier(t, Book(initial_balance=10_000.0, account=t.account), PROFILE,
+               {**CONFIG, "tp1_lock_at_pct": 70}, said.append, clock=lambda: now[0])
+    c.on_message(CHAT, 10, None, SIGNAL)                 # buy 4151, TP1 4170, TP2 (final) 4200
+    c.on_message(CHAT, 11, 10, "Close half and set breakeven")
+    assert t.positions[2].sl == 4151.0
+    t.prices["XAUUSD.s"] = 4185.0                        # 69.4 % of the way to 4200 -- not yet
+    c.watch()
+    assert t.positions[2].sl == 4151.0
+    t.prices["XAUUSD.s"] = 4185.5                        # 70.4 % -- locks to TP1
+    c.watch()
+    assert t.positions[2].sl == 4170.0 and "70%" in said[-1]
+    c.watch()                                            # once: a second watch does not touch it again
+    assert t.calls.count(("sltp", 2, 4170.0, None)) == 1
+
+
+def test_tp1_locks_in_once_price_passes_pct_of_the_way_to_the_final_tp_sell():
+    t, said, now = FakeTerminal(), [], [1000.0]
+    t.prices["XAUUSD.s"] = 4151.0
+    c = Copier(t, Book(initial_balance=10_000.0, account=t.account), PROFILE,
+               {**CONFIG, "tp1_lock_at_pct": 70}, said.append, clock=lambda: now[0])
+    c.on_message(CHAT, 10, None, SELL_SIGNAL)            # sell 4151, TP1 4130, TP2 (final) 4100
+    c.on_message(CHAT, 11, 10, "Close half and set breakeven")
+    assert t.positions[2].sl == 4151.0
+    t.prices["XAUUSD.s"] = 4116.0                        # 68.6 % of the way to 4100 -- not yet
+    c.watch()
+    assert t.positions[2].sl == 4151.0
+    t.prices["XAUUSD.s"] = 4115.0                        # 70.6 % -- locks to TP1
+    c.watch()
+    assert t.positions[2].sl == 4130.0 and "70%" in said[-1]
 
 
 def test_breakeven_too_close_is_retried_by_the_watchdog():

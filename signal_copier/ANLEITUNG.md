@@ -116,6 +116,7 @@ Entfernen: die Verknüpfung „Copier <name>“ im Autostart-Ordner löschen
 | `max_entry_deviation_pips` | wie weit der Preis vom Einstieg weg sein darf (Gold 60 Pips = 6 $). Ist er weiter weg, wird das Signal ausgelassen. |
 | `max_signal_age_seconds` | Signale, die älter sind (verpasst, weil der Kopierer aus war), werden **nicht** eröffnet. Standard 60. Antworten auf offene Trades (TP Hit, BE, Close all) führt er trotzdem aus. |
 | `legs_without_tp` | Anzahl Positionen bei einem Signal ohne TP (die TPs kommen später) |
+| `tp1_lock_at_pct` | Nur `"strategy": "signals"`. Hat die verbleibende Position (SL schon auf Break-even) diesen Anteil des Wegs vom Einstieg zum letzten TP erreicht, geht der SL einmalig auf TP1 hoch -- kein weiteres Nachziehen. `null` = aus. Für ICT CRT auf 70 (Brano, 2026-10-21). |
 | `symbol_overrides` | falls dein Broker ein Symbol anders nennt, z. B. `{"XAUUSD": "GOLD.pro"}` |
 
 ## Layering-Gruppen (`"strategy": "layers"`)
