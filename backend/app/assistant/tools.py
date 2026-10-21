@@ -216,6 +216,24 @@ def _telegram_notifications(action: str, category: str = "all", on: bool | None 
             "always_sent": "cards with buttons (approvals) and copier trouble (errors, failed orders, trading stopped)"}
 
 
+def _spotify(action: str, query: str | None = None, kind: str = "track", volume: int | None = None,
+             device: str | None = None) -> dict:
+    from app.spotify.client import Spotify, SpotifyError
+    sp = Spotify()
+    try:
+        if action == "play":
+            return sp.play(query, kind or "track", device)
+        if action == "volume":
+            return sp.volume(volume if volume is not None else 50)
+        if action in ("pause", "next", "previous"):
+            return getattr(sp, action)()
+        if action == "devices":
+            return {"devices": sp.devices()}
+        return sp.now()
+    except SpotifyError as exc:
+        return {"error": str(exc)}
+
+
 TOOLS: list[dict] = [
     {"name": "trading_status",
      "description": "Brano's copier accounts right now: balance, equity, open positions, P&L per signal group "
@@ -299,6 +317,16 @@ TOOLS: list[dict] = [
          "action": {"type": "string", "enum": ["get", "set"]},
          "category": {"type": "string", "enum": ["mail", "markets", "watchlist", "copier", "trades", "system", "other", "all"]},
          "on": {"type": "boolean"}}, "required": ["action"]}},
+    {"name": "spotify",
+     "description": "Brano's Spotify (Premium): 'now' = what is playing; 'play' with query = a song, artist, album or one "
+                    "of his playlists (kind track/artist/album/playlist; for a mood such as 'zum Konzentrieren' search a "
+                    "fitting playlist), without query = resume; 'pause', 'next', 'previous', 'volume' (0-100), 'devices'. "
+                    "device: a device name to play on (e.g. 'iPhone' or the PC). Do it right away when he asks and say in a "
+                    "few words what plays now.",
+     "input_schema": {"type": "object", "properties": {
+         "action": {"type": "string", "enum": ["now", "play", "pause", "next", "previous", "volume", "devices"]},
+         "query": {"type": "string"}, "kind": {"type": "string", "enum": ["track", "artist", "album", "playlist"]},
+         "volume": {"type": "integer"}, "device": {"type": "string"}}, "required": ["action"]}},
     {"name": "code_request",
      "description": "A change to AURON's own code that no other tool can make -- layout, a new column, wording, a "
                     "behaviour of a card (e.g. 'show the equity as a plain number beside each group name'). Files a task "
@@ -345,6 +373,7 @@ _RUN: dict[str, Callable[..., dict]] = {
     "dashboard_design": lambda action, theme=None, room=None, card=None, card_style=None, **_:
         _design(action, theme, room, card, card_style),
     "code_request": lambda change, **_: _code_request(change),
+    "spotify": lambda action, query=None, kind="track", volume=None, device=None, **_: _spotify(action, query, kind, volume, device),
     "telegram_notifications": lambda action, category="all", on=None, **_: _telegram_notifications(action, category, on),
     "pc_request": lambda job, **_: _pc_request(job),
     "group_rename": lambda group, new_name="", **_: _group_rename(group, new_name),
