@@ -32,7 +32,7 @@ CATALOG = {
         "core": ["planet Planet", "bare Ohne Ringe", "rings Nur Ringe", "off Aus"],
     },
     "room": ["lounge Lounge bei Nacht", "noir Noir", "gold Gold", "orbit Orbit", "alps Alpen bei Sonnenuntergang",
-             "earth Über der Erde", "forest Wald mit Wasserfall"],
+             "earth Über der Erde", "forest Wald mit Wasserfall", "earth2 Orbit-Lounge", "clouds Über den Wolken", "ocean Unter Wasser"],
     "cards": {
         "ids": ["tileTrading Trading", "tileWatch Watchlist", "tileInstagram Instagram", "tileMail Post", "tileSmart Smart Money", "all"],
         "size": [0.9, 1, 1.12, 1.25, 1.4, 1.55],

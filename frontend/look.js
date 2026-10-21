@@ -7,18 +7,21 @@
   const API_BASE = typeof API !== 'undefined' ? API : '/api';
   const wide = () => innerWidth > 1000;
   let version = -1, ready = false, applying = false, timer = 0;
+  const fixedRoom = new URLSearchParams(location.search).has('room');
 
   function take(look) {
     applying = true;
     try {
       if (look.theme && Object.keys(look.theme).length) window.AURON_theme?.set(look.theme);
-      if (look.room && window.AURON_room && look.room !== window.AURON_room.get()) window.AURON_room.set(look.room);
+      // a room in the address (?room=forest: a wallpaper, a preview, the theme pictures) wins over the shared one
+      if (look.room && window.AURON_room && !fixedRoom && look.room !== window.AURON_room.get()) window.AURON_room.set(look.room);
       if (look.cards && wide()) window.AURON_cards?.set(look.cards);
     } finally { applying = false; }
   }
 
   async function push() {
-    const look = { theme: window.AURON_theme?.get(), room: window.AURON_room?.get() };
+    const look = { theme: window.AURON_theme?.get() };
+    if (!fixedRoom) look.room = window.AURON_room?.get();   // a ?room= screen never changes the shared room
     if (wide()) look.cards = window.AURON_cards?.get();
     try {
       const r = await fetch(`${API_BASE}/v1/dashboard/look`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ look }) });
