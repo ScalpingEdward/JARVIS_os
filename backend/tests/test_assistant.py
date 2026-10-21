@@ -114,3 +114,17 @@ def test_only_the_first_screen_may_speak_an_announcement():
     assert api.announce_claim(api.ClaimIn(key="Sir, NINJA hat einen Trade geschlossen.")) == {"speak": True}
     assert api.announce_claim(api.ClaimIn(key="Sir, NINJA hat einen Trade geschlossen.")) == {"speak": False}
     assert api.announce_claim(api.ClaimIn(key="Sir, eine wichtige E-Mail")) == {"speak": True}
+
+
+def test_a_picture_goes_to_claude_as_an_image_block_and_bad_ones_are_refused():
+    import pytest
+    from pydantic import ValidationError
+    from app.assistant import api
+    tiny = "data:image/png;base64,iVBORw0KGgo="
+    msgs = api.ChatIn(messages=[{"role": "user", "content": "Was siehst du?", "image": tiny}]).messages
+    out = api._turns(msgs)
+    assert out[0]["content"][0] == {"type": "image", "source": {"type": "base64", "media_type": "image/png", "data": "iVBORw0KGgo="}}
+    assert out[0]["content"][1] == {"type": "text", "text": "Was siehst du?"}
+    assert api._turns(api.ChatIn(messages=[{"role": "user", "content": "hi"}]).messages) == [{"role": "user", "content": "hi"}]
+    with pytest.raises(ValidationError):
+        api.ChatIn(messages=[{"role": "user", "content": "x", "image": "data:text/html;base64,PHNjcmlwdD4="}])

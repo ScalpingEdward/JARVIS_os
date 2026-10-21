@@ -14,12 +14,12 @@
 
   let turns = [];
   try { turns = JSON.parse(localStorage.getItem(KEY) || '[]'); } catch { turns = []; }
-  const save = () => { try { localStorage.setItem(KEY, JSON.stringify(turns.slice(-100))); } catch { /* private window */ } };
+  const save = () => { try { localStorage.setItem(KEY, JSON.stringify(turns.slice(-100).map(({ _img, ...t }) => t))); } catch { /* private window */ } };
   // only what the assistant speaks; the website once wrote es/ru/ar under the same key
   const lang = () => { try { const l = localStorage.getItem('auron_lang'); return ['de', 'en', 'sk'].includes(l) ? l : 'de'; } catch { return 'de'; } };
 
   function render() {
-    log.innerHTML = turns.map((t, i) => `<div class="msg ${t.role}${t.error ? ' err' : ''}">${esc(t.content.replace(TAGS, ''))}`
+    log.innerHTML = turns.map((t, i) => `<div class="msg ${t.role}${t.error ? ' err' : ''}">${t.thumb ? `<img class="msg-img" src="${t.thumb}" alt="Bild" />` : ''}${esc(t.content.replace(TAGS, ''))}`
       + `${t.tools?.length ? `<small>${[...new Set(t.tools)].map((n) => TOOL_NAMES[n] || n).join(' · ')}</small>` : ''}`
       + `${t.code ? window.AURON_code?.buttons(t.code) || '' : ''}`
       + `${t.role === 'assistant' && !t.error && !t.pending ? `<button type="button" class="msg-say" data-say="${i}" title="Vorlesen">▶ Vorlesen</button>` : ''}</div>`).join('')
@@ -32,8 +32,8 @@
     if (on) { render(); input.focus(); }
   }
 
-  async function ask(text, spoken = false) {  // spoken: he talked -- AURON talks back; typed: text only
-    turns.push({ role: 'user', content: text });
+  async function ask(text, spoken = false, image = null) {  // spoken: he talked -- AURON talks back; typed: text only
+    turns.push({ role: 'user', content: text, ...(image ? { thumb: image.thumb, _img: image.full } : {}) });
     const thinking = { role: 'assistant', content: 'AURON denkt nach …', pending: true };
     turns.push(thinking); render();
     form.classList.add('busy');
@@ -52,7 +52,8 @@
       }
     };
     try {
-      const messages = turns.filter((t) => !t.pending && !t.error).slice(-KEEP).map(({ role, content }) => ({ role, content }));
+      const sent = turns.filter((t) => !t.pending && !t.error).slice(-KEEP);
+      const messages = sent.map((t, i) => ({ role: t.role, content: t.content, ...(t._img && i === sent.length - 1 ? { image: t._img } : {}) }));
       while (messages.length && messages[0].role !== 'user') messages.shift();
       const r = await fetch(`${API}/v1/assistant/chat/stream`, { method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ messages, lang: lang() }) });
@@ -258,13 +259,47 @@
   }
   mic.addEventListener('click', listen);
 
+  // ---- a picture for AURON: 📎 or Ctrl+V. Made small here (1568 px, what Claude reads anyway) ----
+  const attachBtn = document.getElementById('chatAttach'), fileIn = document.getElementById('chatFile');
+  const prev = document.getElementById('chatAttPrev');
+  let attached = null;
+  function shrink(file, max, q) {
+    return new Promise((ok, bad) => {
+      const url = URL.createObjectURL(file), im = new Image();
+      im.onload = () => {
+        const s = Math.min(1, max / Math.max(im.width, im.height)), c = document.createElement('canvas');
+        c.width = Math.round(im.width * s); c.height = Math.round(im.height * s);
+        c.getContext('2d').drawImage(im, 0, 0, c.width, c.height);
+        URL.revokeObjectURL(url); ok(c.toDataURL('image/jpeg', q));
+      };
+      im.onerror = () => { URL.revokeObjectURL(url); bad(new Error('kein Bild')); };
+      im.src = url;
+    });
+  }
+  async function attach(file) {
+    if (!file || !file.type.startsWith('image/')) return;
+    try { attached = { full: await shrink(file, 1568, 0.85), thumb: await shrink(file, 240, 0.7) }; } catch { attached = null; return; }
+    prev.innerHTML = `<img src="${attached.thumb}" alt="" /><button type="button" title="Bild entfernen">✕</button>`;
+    prev.hidden = false; open(true); input.focus();
+  }
+  const detach = () => { attached = null; prev.hidden = true; prev.innerHTML = ''; };
+  attachBtn.addEventListener('click', () => fileIn.click());
+  fileIn.addEventListener('change', () => { attach(fileIn.files[0]); fileIn.value = ''; });
+  prev.addEventListener('click', (e) => { if (e.target.closest('button')) detach(); });
+  input.addEventListener('paste', (e) => {
+    const item = [...(e.clipboardData?.items || [])].find((x) => x.type.startsWith('image/'));
+    if (item) { e.preventDefault(); attach(item.getAsFile()); }
+  });
+
   form.addEventListener('submit', (e) => {
     e.preventDefault();
-    const text = input.value.trim();
-    if (!text || form.classList.contains('busy')) return;
-    input.value = '';
+    let text = input.value.trim();
+    if ((!text && !attached) || form.classList.contains('busy')) return;
+    if (!text) text = 'Schau dir das Bild an.';
+    const image = attached;
+    input.value = ''; detach();
     open(true);
-    ask(text);
+    ask(text, false, image);
   });
   input.addEventListener('focus', () => open(true));
   document.getElementById('chatClose').addEventListener('click', () => open(false));

@@ -234,7 +234,10 @@
       <div class="chat-log" id="chatLog" aria-live="polite"></div>
     </div>
     <form class="chat-form" id="chatForm" autocomplete="off">
+      <span class="att-prev" id="chatAttPrev" hidden></span>
       <input id="chatInput" placeholder="Sprich mit AURON …" maxlength="4000" aria-label="Nachricht an AURON" />
+      <button type="button" class="mic att" id="chatAttach" aria-label="Bild anhängen" title="Bild anhängen (oder Strg+V)">📎</button>
+      <input type="file" id="chatFile" accept="image/*" hidden />
       <button type="button" class="mic" id="chatMic" aria-label="Sprechen" title="Sprechen – stoppt von selbst, wenn Sie aufhören">🎙</button>
       <button type="submit" aria-label="Senden">➤</button>
     </form>

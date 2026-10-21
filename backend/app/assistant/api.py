@@ -1,10 +1,11 @@
 from typing import Literal
 
 import json
+import re
 
 from fastapi import APIRouter, HTTPException, Request, Response
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from . import voice
 from .brain import AssistantError, reply, reply_stream
@@ -12,14 +13,47 @@ from .brain import AssistantError, reply, reply_stream
 router = APIRouter(prefix="/v1/assistant", tags=["assistant"])
 
 
+IMAGE = re.compile(r"^data:(image/(?:jpeg|png|webp|gif));base64,([A-Za-z0-9+/=]+)$")
+
+
 class Turn(BaseModel):
     role: Literal["user", "assistant"]
     content: str = Field(min_length=1, max_length=8000)
+    # a picture Brano attached (📎 or pasted): a data URL, already made small by the dashboard
+    image: str | None = Field(default=None, max_length=7_000_000)
+
+    @field_validator("image")
+    @classmethod
+    def _image(cls, v: str | None) -> str | None:
+        if v is not None and not IMAGE.match(v):
+            raise ValueError("image must be a base64 data URL of a jpeg, png, webp or gif")
+        return v
 
 
 class ChatIn(BaseModel):
     messages: list[Turn] = Field(min_length=1, max_length=40)
     lang: Literal["de", "en", "sk"] = "de"
+
+    @field_validator("messages")
+    @classmethod
+    def _few_images(cls, v: list[Turn]) -> list[Turn]:
+        if sum(1 for t in v if t.image) > 3:
+            raise ValueError("at most 3 pictures per request -- older ones are sent as text only")
+        return v
+
+
+def _turns(messages: list[Turn]) -> list[dict]:
+    """For Claude: a turn with a picture becomes [image, text] -- the way the Messages API takes images."""
+    out = []
+    for m in messages:
+        if m.image and m.role == "user":
+            kind, data = IMAGE.match(m.image).groups()
+            out.append({"role": "user", "content": [
+                {"type": "image", "source": {"type": "base64", "media_type": kind, "data": data}},
+                {"type": "text", "text": m.content}]})
+        else:
+            out.append({"role": m.role, "content": m.content})
+    return out
 
 
 class ChatOut(BaseModel):
@@ -33,7 +67,7 @@ def chat(payload: ChatIn) -> ChatOut:
     if payload.messages[-1].role != "user":
         raise HTTPException(status_code=422, detail="the last message must be Brano's")
     try:
-        return ChatOut(**reply([m.model_dump() for m in payload.messages], payload.lang))
+        return ChatOut(**reply(_turns(payload.messages), payload.lang))
     except AssistantError as exc:
         raise HTTPException(status_code=502, detail=str(exc))
 
@@ -47,7 +81,7 @@ def chat_stream(payload: ChatIn) -> StreamingResponse:
 
     def lines():
         try:
-            for ev in reply_stream([m.model_dump() for m in payload.messages], payload.lang):
+            for ev in reply_stream(_turns(payload.messages), payload.lang):
                 yield json.dumps(ev, ensure_ascii=False) + "\n"
         except AssistantError as exc:
             yield json.dumps({"error": str(exc)}, ensure_ascii=False) + "\n"

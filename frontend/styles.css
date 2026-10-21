@@ -1025,3 +1025,10 @@ html.desk .core.turning { cursor: grabbing; }
 /* group row: the equity starts where the symbol (XAUUSD.s) starts in the rows below -- app.js measures it */
 .row.grp .gtop { display: grid; grid-template-columns: minmax(var(--eqx, 56px), max-content) auto; column-gap: 0; }
 .row.grp .gname { padding-right: 8px; }
+
+/* a picture for AURON (chat.js): its preview in the form, and small in the conversation */
+.att-prev { position: relative; flex: none; display: inline-flex; }
+.att-prev img { width: 38px; height: 38px; object-fit: cover; border-radius: 8px; border: 1px solid var(--line-2); }
+.att-prev button { position: absolute; top: -6px; right: -6px; width: 18px; height: 18px; border-radius: 50%; border: 0;
+  background: var(--down); color: #fff; font-size: 10px; line-height: 18px; padding: 0; cursor: pointer; }
+.msg-img { display: block; max-width: 220px; max-height: 160px; border-radius: 10px; margin-bottom: 6px; border: 1px solid var(--line-2); }
