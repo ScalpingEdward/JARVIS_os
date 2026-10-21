@@ -92,7 +92,7 @@ void main() {
       wWater = max(wWater, e);
     } else if (k == 3.) {     // clouds: a slow flow
       vec2 s = uv * 6. + vec2(t * .035, 0.);
-      d += e * .0045 * vec2(noise(s) - .5, (noise(s + 17.) - .5) * .4);
+      d += e * .0018 * vec2(noise(s) - .5, (noise(s + 17.) - .5) * .4);
     } else if (k == 4.) { wStars = max(wStars, e); }
     else if (k == 5.) { wCity = max(wCity, e); }
     else if (k == 6.) { wSun = max(wSun, e); sunC = (r.xy + r.zw) * .5; }
@@ -157,14 +157,22 @@ void main() {
     tex = gl.createTexture();
   }
 
+  // The 4K picture is shown smaller than it is. WebGL 1 cannot mipmap a 3840x2160 texture, so the GPU
+  // simply skipped pixels: straight lines turned into stairs and edges shimmered (Brano, 2026-10-21).
+  // The picture is scaled down once, smoothly, to the size it is drawn at -- like a normal photo.
+  let uploadedW = 0;
   function upload(image) {
     let src = image;
     const max = gl.getParameter(gl.MAX_TEXTURE_SIZE);
-    if (image.width > max) {  // an old GPU: shrink to what it can hold
-      const c = document.createElement('canvas'), s = max / image.width;
-      c.width = max; c.height = Math.floor(image.height * s);
-      c.getContext('2d').drawImage(image, 0, 0, c.width, c.height); src = c;
+    const want = Math.min(max, image.width, Math.ceil(rect[2] * Math.min(devicePixelRatio || 1, 1.5) * 1.15));
+    if (want < image.width * 0.92) {
+      const c = document.createElement('canvas'), s = want / image.width;
+      c.width = want; c.height = Math.round(image.height * s);
+      const g2 = c.getContext('2d');
+      g2.imageSmoothingEnabled = true; g2.imageSmoothingQuality = 'high';
+      g2.drawImage(image, 0, 0, c.width, c.height); src = c;
     }
+    uploadedW = src.width;
     gl.bindTexture(gl.TEXTURE_2D, tex);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, src);
     for (const [p, v] of [[gl.TEXTURE_MIN_FILTER, gl.LINEAR], [gl.TEXTURE_MAG_FILTER, gl.LINEAR],
@@ -196,7 +204,7 @@ void main() {
       gl.uniform4f(u.rect, rect[0] * dpr, rect[1] * dpr, rect[2] * dpr, rect[3] * dpr);
       gl.uniform1f(u.t, now / 1000);
       gl.uniform1f(u.fade, fade);
-      gl.uniform1f(u.sharp, Math.min(1.1, Math.max(.35, (rect[2] * dpr / texW - .5) * 1.2)));
+      gl.uniform1f(u.sharp, Math.min(.3, Math.max(0, (rect[2] * dpr / texW - 1) * .6)));   // a touch only: more drew halos on edges
       gl.drawArrays(gl.TRIANGLES, 0, 3);
       canvas.classList.add('on');
     }
@@ -217,7 +225,16 @@ void main() {
     document.dispatchEvent(new CustomEvent('auron:room', { detail: k }));
   }
 
-  const relayout = () => { place(); if (gl && prog) { size(); last = 0; kick(); } };
+  const relayout = () => {
+    place();
+    if (gl && prog) {
+      size();
+      // drawn much larger or smaller than before: scale the picture again for this size
+      const want = Math.ceil(rect[2] * Math.min(devicePixelRatio || 1, 1.5) * 1.15);
+      if (img && Math.abs(want - uploadedW) / uploadedW > 0.2 && !(uploadedW >= img.width && want >= img.width)) upload(img);
+      last = 0; kick();
+    }
+  };
   addEventListener('resize', relayout);
   // iOS reports the new size a moment after turning the phone: measure again once it has settled
   addEventListener('orientationchange', () => { setTimeout(relayout, 250); setTimeout(relayout, 800); });

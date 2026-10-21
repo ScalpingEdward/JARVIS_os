@@ -95,6 +95,18 @@
   const chosen = () => { try { return JSON.parse(pref('auron_voice2', '')) || null; } catch { return null; } };
   const DEFAULT_VOICE = { provider: 'elevenlabs', voice: 'JBFqnCBsd6RMkjVDRZzb', model: 'eleven_v4', name: 'George', accent: 'British accent' }  // Brano's pick, 2026-10-16;
   const player = new Audio();
+  // The iPhone plays sound only from an element that was started by a touch. AURON's answers and
+  // announcements come later, after loading -- so they played sometimes and sometimes not. The first
+  // touch on the page starts this player once, silently; from then on it may speak (Brano, 2026-10-21).
+  const SILENT = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YQAAAAA=';
+  const unlock = () => {
+    if (player.dataset.unlocked) return;
+    player.dataset.unlocked = '1';
+    if (player.src && !player.paused) return;          // already speaking: it is unlocked
+    player.src = SILENT;
+    player.play().then(() => player.pause()).catch(() => { delete player.dataset.unlocked; });
+  };
+  ['touchend', 'pointerdown', 'keydown'].forEach((ev) => document.addEventListener(ev, unlock, { capture: true, passive: true }));
   let lastUrl = '';
 
   // AURON speaking on his own (announce.js): one after the other, never over an answer
