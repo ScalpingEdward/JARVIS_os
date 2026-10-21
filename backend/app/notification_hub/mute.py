@@ -4,6 +4,7 @@
 Categories:
   mail      important mail, Gmail sign-in expired
   markets   insider buys, macro dates
+  watchlist price alerts of the watchlist (e.g. Verizon down 5 %)
   copier    a copier offline / back, results of commands
   trades    every trade report of the copier bot (opened, BE, SL to TP1, closed)
   system    backups
@@ -23,12 +24,12 @@ from app.db import SessionLocal
 from app.db_models import AppSettingRow
 
 KEY = "telegram.mute"
-CATEGORIES = ("mail", "markets", "copier", "trades", "system", "other")
+CATEGORIES = ("mail", "markets", "watchlist", "copier", "trades", "system", "other")
 TITLES = {
     "Wichtige Post": "mail", "Mail": "mail", "Gmail": "mail",
     "Beobachteter Insider": "markets", "Insider-Kauf": "markets", "Mehrere Insider kaufen": "markets",
     "Makro in 30 Minuten": "markets",
-    "Kopierer": "copier", "Backup": "system",
+    "Watchlist": "watchlist", "Kopierer": "copier", "Backup": "system",
 }
 # a copier's message that is trouble, not news: it always gets through
 TROUBLE = re.compile(r"ERROR|FAILED|FEHLER|STOPPED|ABGEBROCHEN|not traded|loss stop|could not", re.I)

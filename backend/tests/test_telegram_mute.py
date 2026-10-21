@@ -26,9 +26,15 @@ def test_a_muted_category_is_not_sent_but_cards_with_buttons_always_are(monkeypa
 def test_only_trades_and_the_copier_learns_it():
     tools.run("telegram_notifications", {"action": "set", "category": "all", "on": False})
     tools.run("telegram_notifications", {"action": "set", "category": "trades", "on": True})
-    assert mute.muted() == {"mail": True, "markets": True, "copier": True, "trades": False, "system": True, "other": True}
+    assert mute.muted() == {"mail": True, "markets": True, "watchlist": True, "copier": True, "trades": False, "system": True, "other": True}
     assert mute.trades_quiet() is False
     mute.set_muted("trades", True)
     assert mute.trades_quiet() is True
     with pytest.raises(mute.MuteError):
         mute.set_muted("weather", True)
+
+
+def test_watchlist_alerts_have_their_own_switch():
+    assert mute.category_of("Watchlist") == "watchlist"
+    mute.set_muted("watchlist", True)
+    assert not mute.allows("Watchlist") and mute.allows("Insider-Kauf")

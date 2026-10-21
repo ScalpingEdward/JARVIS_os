@@ -289,14 +289,15 @@ TOOLS: list[dict] = [
      "input_schema": {"type": "object", "properties": {"job": {"type": "string"}}, "required": ["job"]}},
     {"name": "telegram_notifications",
      "description": "Which Telegram messages Brano gets. 'get' shows what is muted; 'set' with on=false mutes, on=true "
-                    "turns back on. category: mail (important mail), markets (insider buys, macro dates), copier (a copier "
+                    "turns back on. category: mail (important mail), markets (insider buys, macro dates), watchlist (price alerts of "
+                    "the watchlist), copier (a copier "
                     "offline, command results), trades (every trade report of the copier bot), system (backups), other, or "
                     "'all'. Do it when Brano says so ('keine Telegram-Nachrichten mehr', 'nur noch Trades', 'Mails wieder "
                     "an') -- for 'nur noch X' mute all, then turn X on. Approvals with buttons and copier trouble always "
                     "get through; say so when he mutes everything.",
      "input_schema": {"type": "object", "properties": {
          "action": {"type": "string", "enum": ["get", "set"]},
-         "category": {"type": "string", "enum": ["mail", "markets", "copier", "trades", "system", "other", "all"]},
+         "category": {"type": "string", "enum": ["mail", "markets", "watchlist", "copier", "trades", "system", "other", "all"]},
          "on": {"type": "boolean"}}, "required": ["action"]}},
     {"name": "code_request",
      "description": "A change to AURON's own code that no other tool can make -- layout, a new column, wording, a "
