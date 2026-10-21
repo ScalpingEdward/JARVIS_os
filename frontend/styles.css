@@ -1054,3 +1054,9 @@ html.desk .core.turning { cursor: grabbing; }
 .pc-wait { position: absolute; left: 50%; top: 50%; translate: -50% -50%; margin: 0; }
 .grp-pos > div[data-ticket], .positions tr[data-ticket] { cursor: pointer; }
 .grp-pos > div[data-ticket]:hover, .positions tr[data-ticket]:hover { background: rgba(255,255,255,.04); }
+/* Black hairlines left and right on the cards, gone under the mouse (Brano, 2026-10-21): the card's
+   contents floated a few px in front of it as their own 3D layers (translateZ), and Chrome/Edge draw
+   seams at the edges of such layers above a blurred, turned glass card. The contents now lie flat on
+   the card; the card itself still turns, floats and lifts on hover. */
+.tile { transform-style: flat; }
+.tile-figure, .tile-sub, .tile-spark, .tile-list, .kpis { transform: none; }
