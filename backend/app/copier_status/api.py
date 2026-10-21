@@ -37,10 +37,41 @@ _live: dict[str, tuple[float, LiveIn]] = {}
 LIVE_FOR_S = 10   # older than this: the copier has stopped sending, the 15 s report counts again
 
 
-@router.post("/live", status_code=204)
-def push_live(payload: LiveIn) -> None:
-    """Every second from each copier: balance, equity, each open position's profit."""
+@router.post("/live")
+def push_live(payload: LiveIn) -> dict:
+    """Every second from each copier: balance, equity, each open position's profit. The answer names
+    the symbols whose chart is open on a dashboard -- the copier then sends their candles (/rates)."""
     _live[payload.profile] = (time.monotonic(), payload)
+    now = time.monotonic()
+    return {"want_rates": sorted({sym for (prof, sym), at in list(_chart_wanted.items())
+                                  if prof == payload.profile and now - at <= CHART_FOR_S})}
+
+
+# ---- a position's chart (dashboard click) -- five-minute candles straight from the copier's MT5 ----
+_chart_wanted: dict[tuple[str, str], float] = {}     # (profile, symbol) -> last asked
+_rates: dict[tuple[str, str], tuple[float, list]] = {}
+CHART_FOR_S = 30   # a closed chart: the copier stops sending after this
+
+
+class RatesIn(BaseModel):
+    profile: str = Field(pattern=r"^[a-z0-9][a-z0-9_-]{0,39}$")
+    symbol: str = Field(min_length=1, max_length=40)
+    bars: list[list[float]] = Field(default_factory=list, max_length=1000)
+
+
+@router.post("/rates", status_code=204)
+def push_rates(payload: RatesIn) -> None:
+    _rates[(payload.profile, payload.symbol)] = (time.monotonic(), payload.bars)
+
+
+@router.get("/chart")
+def chart(profile: str, symbol: str) -> dict:
+    """The dashboard asks every 2 s while the chart is open; the first ask starts the copier sending."""
+    _chart_wanted[(profile, symbol)] = time.monotonic()
+    got = _rates.get((profile, symbol))
+    if not got:
+        return {"bars": [], "pending": True}
+    return {"bars": got[1], "age_s": round(time.monotonic() - got[0], 1)}
 
 
 @router.get("/live")

@@ -255,6 +255,17 @@ def report_inputs() -> tuple[dict, list[dict], list[dict]]:
     return account, positions, deals
 
 
+def rates(symbol: str, n: int = 240) -> list[list[float]]:
+    """The last n five-minute candles as [time (real UTC), open, high, low, close] -- what the dashboard's
+    chart draws when Brano clicks a position. MT5 stamps them in server time, like the deals."""
+    mt5.symbol_select(symbol, True)
+    r = mt5.copy_rates_from_pos(symbol, mt5.TIMEFRAME_M5, 0, n)
+    if r is None:
+        return []
+    off = _server_offset_seconds(symbol)
+    return [[int(x["time"]) - off, float(x["open"]), float(x["high"]), float(x["low"]), float(x["close"])] for x in r]
+
+
 def live_inputs() -> dict:
     """The small, fast part of report_inputs(): balance, equity and each open position's profit --
     two light MT5 calls, read every second for the dashboard's live sums."""

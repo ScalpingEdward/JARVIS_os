@@ -1038,3 +1038,18 @@ html.desk .core.turning { cursor: grabbing; }
   color: var(--down); border: 1px solid rgba(242,100,124,.35); background: rgba(242,100,124,.08); cursor: pointer; }
 .pos-x:hover { background: rgba(242,100,124,.25); border-color: rgba(242,100,124,.7); }
 .pos-x.busy { color: var(--muted); border-color: var(--line-2); background: none; cursor: default; }
+/* a position's chart (chart.js): large, over the planet, edge to edge with the side cards */
+.pos-chart { position: fixed; z-index: 9; display: grid; grid-template-rows: auto 1fr; border-radius: 18px; padding: 12px 16px 10px;
+  background: rgba(8, 12, 20, .92); border: 1px solid var(--line-2); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+  box-shadow: 0 30px 80px rgba(0,0,0,.55); }
+.pos-chart[hidden] { display: none; }
+.pc-head { display: flex; align-items: center; gap: 14px; margin-bottom: 8px; }
+.pc-title { font-size: 14px; letter-spacing: .04em; }
+.pc-pl { font-size: 16px; font-weight: 700; }
+.pc-btns { margin-left: auto; display: flex; gap: 8px; }
+.pc-btns button { font: inherit; font-size: 12.5px; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--line-2); background: rgba(255,255,255,.05); color: var(--text); cursor: pointer; }
+.pc-btns .pc-close-pos { color: var(--down); border-color: rgba(242,100,124,.4); }
+.pc-body { min-height: 0; position: relative; }
+.pc-wait { position: absolute; left: 50%; top: 50%; translate: -50% -50%; margin: 0; }
+.grp-pos > div[data-ticket], .positions tr[data-ticket] { cursor: pointer; }
+.grp-pos > div[data-ticket]:hover, .positions tr[data-ticket]:hover { background: rgba(255,255,255,.04); }

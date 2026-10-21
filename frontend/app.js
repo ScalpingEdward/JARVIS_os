@@ -193,7 +193,7 @@ function renderPositions(o) {
   $('#openCount').textContent = rows.length;
   $('#noPositions').style.display = rows.length ? 'none' : '';
   $('#positions').innerHTML = rows.length ? '<tr><th>ACCOUNT</th><th>SYMBOL</th><th></th><th>LOTS</th><th>ENTRY</th><th>SL</th><th>TP</th><th>PROFIT</th><th>GROUP</th><th></th></tr>' +
-    rows.map((p) => `<tr>
+    rows.map((p) => `<tr data-ticket="${p.ticket}" data-copier="${esc(p.copier)}" title="Chart öffnen">
       <td>${esc(p.profile)}</td><td>${esc(p.symbol)}</td><td><span class="side ${esc(p.side)}">${esc(p.side).toUpperCase()}</span></td>
       <td class="num">${fmt(p.volume)}</td><td class="num">${fmt(p.price_open)}</td><td class="num">${p.sl ? fmt(p.sl) : '–'}</td>
       <td class="num">${p.tp ? fmt(p.tp) : 'runner'}</td><td class="num"><span data-k="pp-${p.ticket}" id="pp-${p.ticket}"></span></td>
@@ -328,7 +328,7 @@ function renderTradingTile(o) {
       + `<div class="gtop"><i class="gname">${esc(g.name)}</i>${size}</div>`
       + `${open.length ? ` <small class="grp-open">${open.length} offen · ${pl(sum)}</small>` : ''}</span>`
       + `<span class="mono">${signed(g.pnl_today)}</span><span>${signed(g.pnl_total)}</span></div>`
-      + (open.length ? `<div class="grp-pos">${open.slice(0, 4).map((p) => `<div><span class="side ${p.side}">${esc(p.side.toUpperCase())}</span>`
+      + (open.length ? `<div class="grp-pos">${open.slice(0, 4).map((p) => `<div data-ticket="${p.ticket}" data-copier="${esc(p.copier)}" title="Chart öffnen"><span class="side ${p.side}">${esc(p.side.toUpperCase())}</span>`
         + `<span>${esc(p.symbol)}</span><span class="mono">${fmt(p.volume)}</span><span class="mono">${pl(p.profit || 0)}</span>`
         + `<span class="pos-x${closing.has(p.ticket) ? ' busy' : ''}" role="button" title="Diese Position schließen" data-t="${p.ticket}" data-p="${esc(p.copier)}"`
         + ` data-d="${esc(`${p.side.toUpperCase()} ${p.symbol} ${fmt(p.volume)} Lots (#${p.ticket})`)}">${closing.has(p.ticket) ? '…' : '✕'}</span></div>`).join('')}`

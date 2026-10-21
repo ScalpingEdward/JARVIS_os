@@ -87,3 +87,18 @@ def test_live_numbers_are_kept_in_memory_and_only_while_fresh(monkeypatch):
     t = api.time.monotonic() + api.LIVE_FOR_S + 1
     monkeypatch.setattr(api.time, "monotonic", lambda: t)
     assert api.live() == {}
+
+
+def test_an_open_chart_asks_its_copier_for_candles_until_it_is_closed(monkeypatch):
+    from app.copier_status import api
+    api._chart_wanted.clear(); api._rates.clear()
+    live = api.LiveIn(profile="demo", balance=1, equity=1)
+    assert api.push_live(live) == {"want_rates": []}
+    assert api.chart("demo", "XAUUSD.s") == {"bars": [], "pending": True}
+    assert api.push_live(live) == {"want_rates": ["XAUUSD.s"]}
+    assert api.push_live(api.LiveIn(profile="other", balance=1, equity=1)) == {"want_rates": []}
+    api.push_rates(api.RatesIn(profile="demo", symbol="XAUUSD.s", bars=[[1, 2, 3, 1, 2]]))
+    assert api.chart("demo", "XAUUSD.s")["bars"] == [[1, 2, 3, 1, 2]]
+    t = api.time.monotonic() + api.CHART_FOR_S + 1
+    monkeypatch.setattr(api.time, "monotonic", lambda: t)
+    assert api.push_live(live) == {"want_rates": []}

@@ -840,9 +840,27 @@ class LivePusher:
 
     def __init__(self, base_url: str, profile: str):
         self.url = base_url.rstrip("/") + "/v1/copier/live"
+        self.rates_url = base_url.rstrip("/") + "/v1/copier/rates"
         self.profile = profile
         self.q: queue.Queue[dict] = queue.Queue(maxsize=1)
+        self.wanted: set[str] = set()        # symbols whose chart is open on a dashboard (AURON's answer says so)
+        self.rq: queue.Queue[dict] = queue.Queue(maxsize=4)
         threading.Thread(target=self._run, daemon=True).start()
+        threading.Thread(target=self._run_rates, daemon=True).start()
+
+    def rates(self, symbol: str, bars: list) -> None:
+        try:
+            self.rq.put_nowait({"profile": self.profile, "symbol": symbol, "bars": bars})
+        except queue.Full:
+            pass
+
+    def _run_rates(self) -> None:
+        while True:
+            body = json.dumps(self.rq.get()).encode()
+            try:
+                urllib.request.urlopen(urllib.request.Request(self.rates_url, body, {"Content-Type": "application/json"}), timeout=10).read()
+            except Exception:  # noqa: BLE001 -- a chart that stays still is all that happens
+                time.sleep(2)
 
     def __call__(self, live: dict) -> None:
         try:
@@ -854,7 +872,11 @@ class LivePusher:
         while True:
             body = json.dumps(self.q.get()).encode()
             try:
-                urllib.request.urlopen(urllib.request.Request(self.url, body, {"Content-Type": "application/json"}), timeout=5).read()
+                answer = urllib.request.urlopen(urllib.request.Request(self.url, body, {"Content-Type": "application/json"}), timeout=5).read()
+                try:
+                    self.wanted = set(json.loads(answer or b"{}").get("want_rates", []))
+                except ValueError:
+                    self.wanted = set()
             except Exception:  # noqa: BLE001 -- the 15 s report says when AURON is gone; this one stays quiet
                 time.sleep(5)
 
@@ -1007,9 +1029,14 @@ async def main(profile: str | None, dry: bool) -> None:
 
     async def live_to_auron() -> None:
         push = LivePusher(os.environ["AURON_URL"], name)
+        tick = 0
         while True:
             try:
                 push(execution.live_inputs())   # MT5 stays on this loop, the sending on push's thread
+                tick += 1
+                if tick % 2 == 0:               # an open chart: its five-minute candles every 2 s
+                    for symbol in list(push.wanted)[:3]:
+                        push.rates(symbol, execution.rates(symbol))
             except Exception:  # noqa: BLE001
                 log.debug("live numbers", exc_info=True)
             await asyncio.sleep(LIVE_EVERY_S)
