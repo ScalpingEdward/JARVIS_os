@@ -24,6 +24,7 @@
     }
   },
   "legs_without_tp": 2,
+  "tp1_lock_at_pct": null,
   "symbol_overrides": {},
   "channel_labels": {}
 }

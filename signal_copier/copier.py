@@ -498,6 +498,28 @@ class Copier:
             if (price >= s.tps[1]) if s.side == "buy" else (price <= s.tps[1]):
                 self._say(f"#{s.msg_id} {s.symbol}: TP2 {s.tps[1]} reached\n" + "\n".join(self._lock_tp1(s, open_)))
 
+    def _tp1_lock_at_pct(self) -> None:
+        """Watchdog part for 'signals' groups with tp1_lock_at_pct set (ICT CRT, Brano 2026-10-21):
+        once the remaining leg, already at breakeven, has covered that share of the way from entry
+        to the final TP, its SL goes up to TP1 -- the same one-time step _lock_tp1 does for layers,
+        so a winner can no longer fall all the way back to breakeven."""
+        pct = self.config.get("tp1_lock_at_pct")
+        if not pct:
+            return
+        for s in self.book.signals.values():
+            if s.strategy != "signals" or s.sl_at_tp1 or not s.tps:
+                continue
+            open_ = {n: p for n, p in self._open_layer(s).items() if p.sl == p.price_open}
+            if not open_:
+                continue
+            close_side = "sell" if s.side == "buy" else "buy"
+            price = self.ex.price(s.symbol, close_side)
+            moved = (price - s.entry) if s.side == "buy" else (s.entry - price)
+            total = (s.tps[-1] - s.entry) if s.side == "buy" else (s.entry - s.tps[-1])
+            if total > 0 and moved / total * 100 >= pct:
+                self._say(f"#{s.msg_id} {s.symbol}: {moved / total * 100:.0f}% to {s.tps[-1]} reached\n"
+                          + "\n".join(self._lock_tp1(s, open_)))
+
     def _breakeven_at_tp1(self) -> None:
         """Watchdog part for layers: a "shaky" setup goes to breakeven once price reaches TP1."""
         for s in self.book.signals.values():
@@ -724,6 +746,7 @@ class Copier:
             self._retry_breakeven()
             self._breakeven_at_tp1()
             self._tp1_lock_at_tp2()
+            self._tp1_lock_at_pct()
             self._trail()
         except Exception as e:
             log.exception("watchdog")
