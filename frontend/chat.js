@@ -224,7 +224,7 @@
     const chunks = [];
     rec = new MediaRecorder(stream);
     rec.ondataavailable = (e) => e.data.size && chunks.push(e.data);
-    // Silence detection: once he has spoken, 1.6 s of quiet ends the recording; 60 s at most.
+    // Silence detection: once he has spoken, 10 s of quiet ends the recording; 2 minutes at most.
     const ctx = new AudioContext(), an = ctx.createAnalyser();
     ctx.createMediaStreamSource(stream).connect(an);
     const buf = new Uint8Array(an.fftSize);
@@ -236,7 +236,9 @@
       const level = Math.sqrt(buf.reduce((a, v) => a + (v - 128) ** 2, 0) / buf.length);
       const now = performance.now();
       if (level > 6) { spoke = true; quietSince = now; }
-      if ((spoke && now - quietSince > 1600) || now - started > 60000 || (!spoke && now - started > 8000)) rec.stop();
+      // 10 s of quiet after he spoke ends it (Brano, 2026-10-21: 1.6 s cut him off while thinking); a tap on 🎙
+      // ends it at once; 2 minutes at most; nothing said within 12 s: nothing to send
+      if ((spoke && now - quietSince > 10000) || now - started > 120000 || (!spoke && now - started > 12000)) rec.stop();
       else requestAnimationFrame(tick);
     };
     rec.onstop = async () => {
