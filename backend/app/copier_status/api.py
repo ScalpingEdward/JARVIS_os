@@ -15,6 +15,8 @@ def push_status(payload: CopierStatusIn) -> CopierStatus:
     """Called by each copier profile every 15 seconds; the answer carries its pending commands."""
     st = copier_status_service.push(payload)
     st.commands = commands.pending_for(payload.profile)
+    from app.notification_hub import mute
+    st.telegram_quiet = mute.trades_quiet()
     return st
 
 

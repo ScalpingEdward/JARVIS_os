@@ -34,6 +34,9 @@ class TelegramDeliveryClient:
         self._client = client
 
     def send(self, title: str, message: str) -> None:
+        from . import mute   # Brano switched this kind of message off (AURON's telegram_notifications tool)
+        if not mute.allows(title):
+            return
         self._post_message(f"*{title}*\n{message}" if title else message)
 
     def get_me(self) -> dict:

@@ -68,6 +68,7 @@ class CopierState(StrEnum):
 class CopierStatus(CopierStatusIn):
     received_at: datetime
     state: CopierState
+    telegram_quiet: bool = False   # trade reports muted by Brano -- the copier then sends only trouble
     commands: list[dict] = Field(default_factory=list)  # for the copier: pause / resume / close_all to run now
 
 

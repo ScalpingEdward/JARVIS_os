@@ -800,6 +800,12 @@ class Copier:
 
 # --- around it: Telegram, the bot, the terminal ---------------------------
 
+# Brano muted the trade reports in AURON ("keine Trade-Meldungen"): AuronReporter sets this from every
+# status answer. Trouble -- errors, failed orders, trading stopped -- is sent anyway.
+QUIET = {"on": False}
+TROUBLE = re.compile(r"ERROR|FAILED|FEHLER|STOPPED|ABGEBROCHEN|not traded|loss stop|could not", re.I)
+
+
 class BotNotifier:
     """Sends through @Auronsignalbot on its own thread, so a slow Telegram never delays an order."""
 
@@ -811,6 +817,8 @@ class BotNotifier:
         threading.Thread(target=self._run, daemon=True).start()
 
     def __call__(self, text: str) -> None:
+        if QUIET["on"] and not TROUBLE.search(text):
+            return
         self.q.put(self.prefix + text)
 
     def _run(self) -> None:
@@ -876,6 +884,7 @@ class AuronReporter:
             try:
                 answer = urllib.request.urlopen(req, timeout=15).read()
                 try:
+                    QUIET["on"] = bool(json.loads(answer or b"{}").get("telegram_quiet"))
                     for c in json.loads(answer or b"{}").get("commands", []):
                         if c.get("id") and c["id"] not in self.seen:
                             self.seen.add(c["id"])
