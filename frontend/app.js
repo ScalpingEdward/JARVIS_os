@@ -542,6 +542,8 @@ async function close(push = true) {
 }
 
 const history_ = window.history;
+// for AURON's "öffne Trading" / "mach zu" (ui.js)
+window.AURON_view = { open: (v) => open(v, $(`.tile[data-view="${v}"]`)), close: () => close() };
 document.querySelectorAll('.tile[data-view]').forEach((tile) => tile.addEventListener('click', () => open(tile.dataset.view, tile)));
 $('#close').addEventListener('click', () => close());
 $('#detail').addEventListener('click', (e) => { if (e.target.id === 'detail') close(); });

@@ -270,6 +270,20 @@ def _own_code(action: str, query: str | None = None, path: str | None = None, st
     return {"tools": [t["name"] for t in TOOLS]}
 
 
+def _dashboard_show(action: str, view: str | None = None, group: str | None = None, symbol: str | None = None) -> dict:
+    from app.dashboard_layout import ui
+    try:
+        if action == "open_view":
+            ui.open_view(view or "")
+            return {"ok": True, "shown": view}
+        if action == "close":
+            ui.close_view()
+            return {"ok": True}
+        return {"ok": True, **ui.show_chart(group, symbol)}
+    except ui.UiError as exc:
+        return {"error": str(exc)}
+
+
 TOOLS: list[dict] = [
     {"name": "trading_status",
      "description": "Brano's copier accounts right now: balance, equity, open positions, P&L per signal group "
@@ -372,6 +386,14 @@ TOOLS: list[dict] = [
      "input_schema": {"type": "object", "properties": {
          "action": {"type": "string", "enum": ["search", "read", "tools"]},
          "query": {"type": "string"}, "path": {"type": "string"}, "start": {"type": "integer"}}, "required": ["action"]}},
+    {"name": "dashboard_show",
+     "description": "Show something on Brano's dashboard right now, on every open screen: 'open_view' opens a card's full "
+                    "view (view: Trading, Watchlist, Instagram, Smart Money), 'close' closes it, 'show_chart' opens the "
+                    "five-minute chart of an open trade -- of a group (e.g. NINJA, ICT CRT) and/or a symbol (Gold, BTC). "
+                    "Use it when he says 'öffne ...', 'zeig mir ...', 'mach zu'. Say it in a few words.",
+     "input_schema": {"type": "object", "properties": {
+         "action": {"type": "string", "enum": ["open_view", "close", "show_chart"]},
+         "view": {"type": "string"}, "group": {"type": "string"}, "symbol": {"type": "string"}}, "required": ["action"]}},
     {"name": "code_request",
      "description": "A change to AURON's own code that no other tool can make -- layout, a new column, wording, a "
                     "behaviour of a card (e.g. 'show the equity as a plain number beside each group name'). Files a task "
@@ -418,6 +440,7 @@ _RUN: dict[str, Callable[..., dict]] = {
     "dashboard_design": lambda action, theme=None, room=None, card=None, card_style=None, **_:
         _design(action, theme, room, card, card_style),
     "code_request": lambda change, **_: _code_request(change),
+    "dashboard_show": lambda action, view=None, group=None, symbol=None, **_: _dashboard_show(action, view, group, symbol),
     "own_code": lambda action, query=None, path=None, start=1, **_: _own_code(action, query, path, start),
     "spotify": lambda action, query=None, kind="track", volume=None, device=None, **_: _spotify(action, query, kind, volume, device),
     "telegram_notifications": lambda action, category="all", on=None, **_: _telegram_notifications(action, category, on),

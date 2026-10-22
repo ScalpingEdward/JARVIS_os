@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from . import look, service
+from . import look, service, ui
 
 router = APIRouter(prefix="/v1/dashboard", tags=["dashboard"])
 
@@ -63,3 +63,9 @@ def get_look() -> dict:
 def put_look(payload: dict) -> dict:
     """A change made by hand in a dashboard's settings."""
     return _guard(look.save, payload.get("look") or {}, "dashboard")
+
+
+@router.get("/ui")
+def ui_commands(after: int = 0) -> dict:
+    """What AURON asked the dashboard to show since command number `after` (ui.py)."""
+    return ui.since(after)
