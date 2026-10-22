@@ -220,7 +220,7 @@
   document.getElementById('chatVoices').addEventListener('click', showVoices);
 
   // ---- listening: record, stop on silence, transcribe, ask ----------------
-  const mic = document.getElementById('chatMic');
+  const mic = document.getElementById('chatRing');
   let rec = null;
   async function listen() {
     if (rec) { rec.stop(); return; }                      // second click: stop now
@@ -267,7 +267,31 @@
     mic.classList.add('rec');
     tick();
   }
-  mic.addEventListener('click', listen);
+  // The AURON ring (Brano, 2026-10-22): one button in the middle instead of a field and five buttons.
+  // Tap: talk -- live with ElevenLabs; while live can't start (the key lacks the agents permission) it
+  // records over the mic instead. That fallback is no switch to remove later: it only runs when live
+  // refuses, and stops on its own the moment the key is right. Hold (or just start typing): the field opens.
+  let liveDownUntil = 0, held = false, holdTimer = 0;
+  async function talk() {
+    if (rec) { rec.stop(); return; }
+    const L = window.AURON_live;
+    if (L?.active()) { L.stop(); return; }
+    if (L && Date.now() > liveDownUntil) {
+      if (await L.start(true)) return;
+      liveDownUntil = Date.now() + 10 * 60000;          // not every tap waits for a refusal again
+    }
+    listen();
+  }
+  mic.addEventListener('pointerdown', () => { held = false; holdTimer = setTimeout(() => { held = true; open(true); }, 450); });
+  ['pointerup', 'pointerleave', 'pointercancel'].forEach((ev) => mic.addEventListener(ev, () => clearTimeout(holdTimer)));
+  mic.addEventListener('contextmenu', (e) => e.preventDefault());
+  mic.addEventListener('click', () => { if (held) { held = false; return; } talk(); });
+  // a letter typed anywhere on the dashboard (no field in focus) opens the field with it
+  document.addEventListener('keydown', (e) => {
+    if (e.ctrlKey || e.metaKey || e.altKey || e.key.length !== 1 || e.key === ' ') return;
+    if (e.target.closest?.('input, textarea, select, [contenteditable]') || dock.classList.contains('open')) return;
+    open(true);
+  });
 
   // ---- a picture for AURON: 📎 or Ctrl+V. Made small here (1568 px, what Claude reads anyway) ----
   const attachBtn = document.getElementById('chatAttach'), fileIn = document.getElementById('chatFile');

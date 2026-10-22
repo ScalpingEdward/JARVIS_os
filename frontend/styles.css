@@ -1097,3 +1097,23 @@ html.desk .core.turning { cursor: grabbing; }
 .pc-list tr[data-ticket] { cursor: pointer; }
 .pc-list tr[data-ticket]:hover { background: rgba(255,255,255,.04); }
 .pc-list tr.on { background: rgba(255,255,255,.08); }
+
+/* the AURON ring (chat.js): the chat bar's only button while closed -- tap talks, hold or typing opens the field */
+.chat-bar { display: flex; align-items: center; justify-content: center; gap: 10px; }
+.chat:not(.open) .chat-form { display: none; }
+.chat.open .chat-form { flex: 1; min-width: 0; }
+.chat-form button.att { display: grid; place-items: center; }
+.auron-ring { position: relative; flex: none; width: 54px; height: 54px; border-radius: 50%; cursor: pointer; padding: 0;
+  border: 2.5px solid var(--accent); background: radial-gradient(circle, color-mix(in srgb, var(--accent) 22%, transparent) 0 40%, rgba(4,10,20,.55) 72%);
+  box-shadow: 0 0 18px color-mix(in srgb, var(--accent) 65%, transparent), inset 0 0 12px color-mix(in srgb, var(--accent) 55%, transparent);
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); transition: transform .15s, box-shadow .2s; -webkit-touch-callout: none; user-select: none; }
+.auron-ring:hover { transform: scale(1.06); box-shadow: 0 0 28px color-mix(in srgb, var(--accent) 80%, transparent), inset 0 0 14px color-mix(in srgb, var(--accent) 65%, transparent); }
+.auron-ring i { position: absolute; inset: 7px; border-radius: 50%; border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
+  border-top-color: var(--accent); animation: ringspin 6s linear infinite; }
+@keyframes ringspin { to { transform: rotate(360deg); } }
+.auron-ring.rec { border-color: var(--down); box-shadow: 0 0 22px rgba(242,100,124,.7); animation: micpulse 1.2s ease-in-out infinite; }
+.auron-ring.rec i { border-top-color: var(--down); animation-duration: 1.2s; }
+.auron-ring.busy, .auron-ring[data-state="wait"] { opacity: .6; cursor: wait; }
+.auron-ring[data-state="on"] { border-color: var(--up); box-shadow: 0 0 24px rgba(61,220,151,.65); animation: livepulse 1.6s infinite; }
+.auron-ring[data-state="on"] i { border-top-color: var(--up); animation-duration: 2s; }
+.auron-ring[data-state="on"][data-mode="speaking"] { border-color: var(--accent); box-shadow: 0 0 30px color-mix(in srgb, var(--accent) 85%, transparent); }
