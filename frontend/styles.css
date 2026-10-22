@@ -1132,3 +1132,13 @@ html.desk .core.turning { cursor: grabbing; }
 .ps-mem button { flex: none; border: 0; background: none; color: var(--muted); cursor: pointer; }
 .ps-mem button:hover { color: var(--down); }
 .pc-head { flex-wrap: wrap; row-gap: 6px; }
+
+/* moving a card by hand (layout.js) */
+.drag-ghost { position: fixed; z-index: 30; margin: 0; pointer-events: none; opacity: .85; animation: none !important;
+  transform: rotate(-1.5deg) scale(1.02) !important; box-shadow: 0 30px 80px rgba(0,0,0,.6), 0 0 40px -10px var(--accent) !important; }
+.tile.dragging { opacity: .25; }
+body.card-drag, body.card-drag * { cursor: grabbing !important; user-select: none; }
+.drop-mark { position: fixed; z-index: 29; height: 3px; margin-top: -1px; border-radius: 3px; pointer-events: none;
+  background: var(--accent); box-shadow: 0 0 14px var(--accent); }
+.drop-mark[hidden] { display: none; }
+.card-menu span.off { opacity: .35; cursor: default; }

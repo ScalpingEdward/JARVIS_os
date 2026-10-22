@@ -26,7 +26,7 @@
       el = document.createElement('div');
       el.id = `card-${id}`; el.className = `tile a-${c.type} added`; el.dataset.card = id;
       el.style.setProperty('--d', `${-(id.charCodeAt(id.length - 1) % 5)}s`);
-      el.innerHTML = '<span class="corner"></span><div class="tile-head"><span class="ac-title"></span><span class="badge ac-badge">–</span></div><div class="ac-body"></div>';
+      el.innerHTML = '<span class="corner"></span><span class="card-gear" role="button" title="Karte">⚙</span><div class="tile-head"><span class="ac-title"></span><span class="badge ac-badge">–</span></div><div class="ac-body"></div>';
     }
     if (el && c) paintCard(el, c);
     return el;
@@ -195,6 +195,119 @@
     isOpen: () => !!(box && box.isConnected),
     paint: paintEditor,
   };
+
+  // ---- moving a card by hand: hold and drag it, let go where it should stand (Brano, 2026-10-22) ----
+  // A short click still opens the card; only a press that moves more than 8 px drags. The card follows
+  // the mouse as a see-through copy, a line shows where it lands -- in either column.
+  const idOf = (el) => el.dataset.card || Object.keys(BUILTIN).find((k) => BUILTIN[k] === el.id);
+  function moveTo(id, side, index) {
+    const next = strip();
+    for (const s of ['left', 'right', 'hidden']) {
+      const i = next[s].indexOf(id);
+      if (i >= 0) { next[s].splice(i, 1); if (s === side && i < index) index--; }
+    }
+    next[side].splice(Math.max(0, Math.min(index, next[side].length)), 0, id);
+    return save(next);
+  }
+  let drag = null, swallowClick = false;
+  const mark = document.createElement('div'); mark.className = 'drop-mark'; mark.hidden = true; document.body.append(mark);
+  function target(x, y) {   // which column and which place in it the pointer points at
+    const side = x < innerWidth / 2 ? 'left' : 'right', col = side === 'left' ? left : right;
+    const cards = [...col.children].filter((el) => el.classList.contains('tile') && el !== drag.card);
+    let k = cards.length;
+    for (let i = 0; i < cards.length; i++) { const r = cards[i].getBoundingClientRect(); if (y < r.top + r.height / 2) { k = i; break; } }
+    const cr = col.getBoundingClientRect();
+    const lineY = k < cards.length ? cards[k].getBoundingClientRect().top - 11
+      : cards.length ? cards[cards.length - 1].getBoundingClientRect().bottom + 11 : cr.top + cr.height / 2;
+    const ids = cards.map(idOf);
+    const index = k < ids.length ? layout[side].indexOf(ids[k]) : layout[side].length;
+    return { side, index, lineY, cr };
+  }
+  document.addEventListener('pointerdown', (e) => {
+    if (e.button !== 0 || e.pointerType === 'touch' || innerWidth <= 1000 || document.documentElement.classList.contains('desk')) return;
+    const card = e.target.closest('#colLeft > .tile, #colRight > .tile');
+    if (!card || !layout) return;
+    const ctl = e.target.closest('button, input, select, textarea, a, label, .card-gear, .pos-x, [role="button"]');
+    if (ctl && ctl !== card) return;                    // the card is a button itself; its own controls are not a drag
+    e.preventDefault();                                 // no text selection while dragging
+    drag = { card, x0: e.clientX, y0: e.clientY, on: false };
+  });
+  addEventListener('pointermove', (e) => {
+    if (!drag) return;
+    if (!drag.on) {
+      if (Math.hypot(e.clientX - drag.x0, e.clientY - drag.y0) < 8) return;
+      const r = drag.card.getBoundingClientRect();
+      drag.on = true; drag.dx = drag.x0 - r.left; drag.dy = drag.y0 - r.top;
+      drag.ghost = drag.card.cloneNode(true); drag.ghost.removeAttribute('id'); drag.ghost.classList.add('drag-ghost');
+      Object.assign(drag.ghost.style, { width: `${r.width}px`, height: `${r.height}px` });
+      document.body.append(drag.ghost); drag.card.classList.add('dragging'); document.body.classList.add('card-drag');
+    }
+    drag.ghost.style.left = `${e.clientX - drag.dx}px`; drag.ghost.style.top = `${e.clientY - drag.dy}px`;
+    const t = target(e.clientX, e.clientY);
+    drag.t = t; mark.hidden = false;
+    Object.assign(mark.style, { left: `${t.cr.left}px`, width: `${t.cr.width}px`, top: `${t.lineY}px` });
+  });
+  addEventListener('pointerup', () => {
+    if (!drag) return;
+    const d = drag; drag = null;
+    if (!d.on) return;
+    swallowClick = true; setTimeout(() => { swallowClick = false; }, 0);   // the click that ends a drag opens nothing
+    d.ghost.remove(); d.card.classList.remove('dragging'); document.body.classList.remove('card-drag'); mark.hidden = true;
+    if (d.t) moveTo(idOf(d.card), d.t.side, d.t.index);
+  });
+  document.addEventListener('click', (e) => { if (swallowClick) { e.stopPropagation(); e.preventDefault(); swallowClick = false; } }, true);
+
+  // ---- the card's own place, for the gear on each card (cardview.js, and added cards below) -----------
+  function cardActions(el) {
+    const id = idOf(el);
+    if (!layout || !id) return '';
+    const side = ['left', 'right'].find((s) => layout[s].includes(id));
+    if (!side) return '';
+    const i = layout[side].indexOf(id), n = layout[side].length;
+    return [['up', '↑ Nach oben', i === 0], ['down', '↓ Nach unten', i === n - 1],
+      ['swap', side === 'left' ? '⇥ Nach rechts' : '⇤ Nach links', false], ['hide', '◌ Ausblenden', false],
+      ...(layout.custom[id] ? [['del', '✕ Entfernen', false]] : []), ['all', '▦ Alle Karten …', false]]
+      .map(([k, t, off]) => `<span role="button" data-place="${k}" class="${off ? 'off' : ''}">${t}</span>`).join('');
+  }
+  async function cardAct(el, act) {
+    if (act === 'all') { window.AURON_settings?.open('cards'); return; }
+    const id = idOf(el), next = strip(), side = ['left', 'right'].find((s) => next[s].includes(id));
+    if (!side) return;
+    const a = next[side], i = a.indexOf(id);
+    if (act === 'up' || act === 'down') { const j = act === 'up' ? i - 1 : i + 1; if (j < 0 || j >= a.length) return; [a[i], a[j]] = [a[j], a[i]]; }
+    else if (act === 'swap') { a.splice(i, 1); next[side === 'left' ? 'right' : 'left'].push(id); }
+    else if (act === 'hide') { a.splice(i, 1); next.hidden.push(id); }
+    else if (act === 'del') { if (!confirm('Diese Karte entfernen?')) return; a.splice(i, 1); delete next.custom[id]; }
+    await save(next);
+  }
+  window.AURON_layout = { actions: cardActions, act: cardAct };
+
+  // added cards (price, copier, notes) get a gear too -- only their place, they have no text settings
+  document.addEventListener('click', (e) => {
+    const g = e.target.closest('.tile.added > .card-gear');
+    const open = document.querySelector('.added-menu:not([hidden])');
+    if (open && !e.target.closest('.added-menu') && !g) open.hidden = true;
+    if (!g) return;
+    e.stopPropagation(); e.preventDefault();
+    const card = g.parentElement;
+    let menu = document.querySelector(`.added-menu[data-card="${card.id}"]`);
+    if (!menu) {
+      menu = document.createElement('span'); menu.className = 'card-menu added-menu'; menu.dataset.card = card.id; menu.hidden = true;
+      document.body.append(menu);
+      menu.addEventListener('click', async (ev) => {
+        ev.stopPropagation();
+        const b = ev.target.closest('[data-place]');
+        if (!b || b.classList.contains('off')) return;
+        menu.hidden = true; await cardAct(card, b.dataset.place);
+      });
+    }
+    if (!menu.hidden) { menu.hidden = true; return; }
+    if (open) open.hidden = true;
+    menu.innerHTML = `<b class="cm-h">Karte</b>${cardActions(card)}`; menu.hidden = false;
+    const r = card.getBoundingClientRect(), w = menu.offsetWidth;
+    menu.style.left = `${r.left + r.width / 2 < innerWidth / 2 ? r.right + 10 : r.left - w - 10}px`;
+    menu.style.top = `${Math.max(8, r.top + 8)}px`;
+  }, true);
 
   refreshLayout();
   setInterval(refreshLayout, 8000);     // AURON may have moved something

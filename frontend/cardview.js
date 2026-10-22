@@ -108,7 +108,8 @@
         + `<b class="cm-h">Schriftart</b>`
         + Object.entries(FONTS).map(([k, [n, fam]]) =>
           `<span role="button" data-font="${k}" class="${st.font === k ? 'on' : ''}" style='font-family:${fam}'>${n}</span>`).join('')
-        + `<span role="button" data-all="1" class="cm-all">Für alle Karten übernehmen</span>`;
+        + `<span role="button" data-all="1" class="cm-all">Für alle Karten übernehmen</span>`
+        + (window.AURON_layout?.actions(card) ? `<b class="cm-h">Karte</b>${window.AURON_layout.actions(card)}` : '');
     };
     card.append(gear);
     // The menu lives on the page, not in the card: inside, it covered the card's own content and a
@@ -133,8 +134,9 @@
     });
     menu.addEventListener('click', (e) => {
       e.stopPropagation(); e.preventDefault();
-      const b = e.target.closest('[data-v], [data-size], [data-num], [data-font], [data-all]');
+      const b = e.target.closest('[data-v], [data-size], [data-num], [data-font], [data-all], [data-place]');
       if (!b || b.classList.contains('off')) return;
+      if (b.dataset.place) { menu.hidden = true; card.classList.remove('menu-open'); window.AURON_layout?.act(card, b.dataset.place); return; }
       const st = styleOf(id);
       if (b.dataset.v) views[id] = b.dataset.v;
       if (b.dataset.size) {
