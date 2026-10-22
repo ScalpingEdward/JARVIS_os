@@ -234,6 +234,42 @@ def _spotify(action: str, query: str | None = None, kind: str = "track", volume:
         return {"error": str(exc)}
 
 
+def _own_code(action: str, query: str | None = None, path: str | None = None, start: int = 1) -> dict:
+    """AURON reads his own backend code -- read only, no secrets: to know what he can do and where a
+    message or a setting comes from, instead of guessing (Brano, 2026-10-22)."""
+    import os
+    import re
+    root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))      # the app package
+    secret = re.compile(r"\.env|secret|token|password|credential", re.I)
+    if action == "search":
+        if not query:
+            return {"error": "query fehlt"}
+        hits, pat = [], re.compile(re.escape(query), re.I)
+        for d, _, files in os.walk(root):
+            for f in files:
+                if not f.endswith(".py") or "/api/routes/" in d.replace("\\", "/") + "/":
+                    continue
+                p = os.path.join(d, f)
+                with open(p, encoding="utf-8", errors="replace") as fh:
+                    for i, line in enumerate(fh, 1):
+                        if pat.search(line) and not secret.search(line):
+                            hits.append(f"{os.path.relpath(p, root)}:{i}: {line.strip()[:160]}")
+                            if len(hits) >= 40:
+                                return {"hits": hits, "note": "first 40"}
+        return {"hits": hits}
+    if action == "read":
+        if not path:
+            return {"error": "path fehlt"}
+        p = os.path.abspath(os.path.join(root, path))
+        if not p.startswith(root) or not p.endswith(".py") or secret.search(os.path.basename(p)):
+            return {"error": "nur .py-Dateien aus dem eigenen Code"}
+        with open(p, encoding="utf-8", errors="replace") as fh:
+            lines = fh.readlines()
+        s = max(1, int(start))
+        return {"path": path, "from": s, "lines": "".join(f"{s + i}: {l}" for i, l in enumerate(lines[s - 1:s + 159]))}
+    return {"tools": [t["name"] for t in TOOLS]}
+
+
 TOOLS: list[dict] = [
     {"name": "trading_status",
      "description": "Brano's copier accounts right now: balance, equity, open positions, P&L per signal group "
@@ -308,14 +344,14 @@ TOOLS: list[dict] = [
     {"name": "telegram_notifications",
      "description": "Which Telegram messages Brano gets. 'get' shows what is muted; 'set' with on=false mutes, on=true "
                     "turns back on. category: mail (important mail), markets (insider buys, macro dates), watchlist (price alerts of "
-                    "the watchlist), copier (a copier "
+                    "the watchlist), instagram (the posting schedule's reminders: a card still waiting, a slot missed), copier (a copier "
                     "offline, command results), trades (every trade report of the copier bot), system (backups), other, or "
                     "'all'. Do it when Brano says so ('keine Telegram-Nachrichten mehr', 'nur noch Trades', 'Mails wieder "
                     "an') -- for 'nur noch X' mute all, then turn X on. Approvals with buttons and copier trouble always "
                     "get through; say so when he mutes everything.",
      "input_schema": {"type": "object", "properties": {
          "action": {"type": "string", "enum": ["get", "set"]},
-         "category": {"type": "string", "enum": ["mail", "markets", "watchlist", "copier", "trades", "system", "other", "all"]},
+         "category": {"type": "string", "enum": ["mail", "markets", "watchlist", "instagram", "copier", "trades", "system", "other", "all"]},
          "on": {"type": "boolean"}}, "required": ["action"]}},
     {"name": "spotify",
      "description": "Brano's Spotify (Premium): 'now' = what is playing; 'play' with query = a song, artist, album or one "
@@ -327,6 +363,15 @@ TOOLS: list[dict] = [
          "action": {"type": "string", "enum": ["now", "play", "pause", "next", "previous", "volume", "devices"]},
          "query": {"type": "string"}, "kind": {"type": "string", "enum": ["track", "artist", "album", "playlist"]},
          "volume": {"type": "integer"}, "device": {"type": "string"}}, "required": ["action"]}},
+    {"name": "own_code",
+     "description": "Your own backend code, read only -- to know exactly what you can do and where something comes "
+                    "from (e.g. which Telegram message is sent where, which setting a switch changes). 'search' a word in "
+                    "all modules (file:line: text), 'read' a file (path as in the hits, from line 'start', 160 lines), "
+                    "'tools' your tool list. Use it before you say something is impossible or unknown. Never quote code "
+                    "to Brano -- tell him the result in a sentence.",
+     "input_schema": {"type": "object", "properties": {
+         "action": {"type": "string", "enum": ["search", "read", "tools"]},
+         "query": {"type": "string"}, "path": {"type": "string"}, "start": {"type": "integer"}}, "required": ["action"]}},
     {"name": "code_request",
      "description": "A change to AURON's own code that no other tool can make -- layout, a new column, wording, a "
                     "behaviour of a card (e.g. 'show the equity as a plain number beside each group name'). Files a task "
@@ -373,6 +418,7 @@ _RUN: dict[str, Callable[..., dict]] = {
     "dashboard_design": lambda action, theme=None, room=None, card=None, card_style=None, **_:
         _design(action, theme, room, card, card_style),
     "code_request": lambda change, **_: _code_request(change),
+    "own_code": lambda action, query=None, path=None, start=1, **_: _own_code(action, query, path, start),
     "spotify": lambda action, query=None, kind="track", volume=None, device=None, **_: _spotify(action, query, kind, volume, device),
     "telegram_notifications": lambda action, category="all", on=None, **_: _telegram_notifications(action, category, on),
     "pc_request": lambda job, **_: _pc_request(job),

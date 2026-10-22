@@ -43,8 +43,23 @@ if not log.handlers:
 
 def alert(message: str) -> None:
     """Tell Brano on Telegram that a slot did not produce a card, and why.
-    Module-level so tests can replace it; a delivery failure only logs."""
-    telegram_instagram_service._safe_send(message)
+    Module-level so tests can replace it; a delivery failure only logs. Its own title, so Brano can
+    switch these reminders off (telegram_notifications "instagram") and still get the replies to his taps."""
+    telegram_instagram_service._safe_send(message, title="Instagram-Zeitplan")
+
+
+def _reported(key: str) -> bool:
+    """Whether a missed slot was already reported -- kept in the database: in memory only, every
+    restart of AURON reported the same missed slot again (Brano, 2026-10-22)."""
+    from app.db import SessionLocal
+    from app.db_models import AppSettingRow
+    with SessionLocal() as s:
+        row = s.get(AppSettingRow, "instagram.missed_reported")
+        if row and row.value == key:
+            return True
+        s.merge(AppSettingRow(key="instagram.missed_reported", value=key, updated_at=datetime.now(_timezone())))
+        s.commit()
+    return False
 
 #: How late a slot may still fire. Started 40 minutes after the slot (a
 #: reboot, a long ingest run), the card is still useful; an hour later it
@@ -148,6 +163,8 @@ class PostingScheduler:
         if minutes_late <= _GRACE_MINUTES:
             return None
         self._fired[key] = True
+        if _reported(f"{key[0]} {slot.hour:02d}:{slot.minute:02d}"):
+            return None
         return slot
 
     def fire(self, slot: Slot, now: datetime) -> str:

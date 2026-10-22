@@ -486,12 +486,12 @@ class TelegramInstagramService:
         except TelegramDeliveryError as exc:
             log.warning("telegram_instagram: could not clear the old card's buttons: %s", exc)
 
-    def _safe_send(self, message: str) -> None:
+    def _safe_send(self, message: str, title: str = "Instagram") -> None:
         """A confirmation nobody depends on. The decision is already
         recorded by the time this runs, so a delivery failure here must not
         turn a successful decision into an error."""
         try:
-            self._client.send("Instagram", message)
+            self._client.send(title, message)
         except TelegramDeliveryError as exc:
             log.warning("telegram_instagram: could not send confirmation: %s", exc)
 

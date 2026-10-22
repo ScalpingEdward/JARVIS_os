@@ -128,3 +128,16 @@ def test_a_picture_goes_to_claude_as_an_image_block_and_bad_ones_are_refused():
     assert api._turns(api.ChatIn(messages=[{"role": "user", "content": "hi"}]).messages) == [{"role": "user", "content": "hi"}]
     with pytest.raises(ValidationError):
         api.ChatIn(messages=[{"role": "user", "content": "x", "image": "data:text/html;base64,PHNjcmlwdD4="}])
+
+
+def test_auron_finds_where_a_message_comes_from_in_his_own_code_but_no_secrets():
+    import json
+    from app.assistant import tools
+    out, failed = tools.run("own_code", {"action": "search", "query": "Instagram-Zeitplan"})
+    hits = json.loads(out)["hits"]
+    assert not failed and any("telegram_instagram/schedule.py" in h.replace("\\", "/") for h in hits)
+    path = next(h for h in hits if "schedule.py" in h).split(":")[0]
+    out, _ = tools.run("own_code", {"action": "read", "path": path, "start": 1})
+    assert "def alert" in out or "posting" in out
+    out, _ = tools.run("own_code", {"action": "read", "path": "../../.env"})
+    assert "nur .py" in out

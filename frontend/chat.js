@@ -144,7 +144,7 @@
     const audio = fetches = fetches.then(() => (run === speechRun ? fetchAudio(text, v) : null));
     chain = chain.then(async () => {
       const blob = await audio;
-      if (!blob || run !== speechRun) return;
+      if (!blob || run !== speechRun || listening) return;
       if (lastUrl) URL.revokeObjectURL(lastUrl);
       player.src = lastUrl = URL.createObjectURL(blob);
       await player.play().catch(() => {});
@@ -152,7 +152,11 @@
     });
   }
 
+  // while Brano speaks into the mic AURON says nothing -- no answer still being read, no announcement
+  // (Brano, 2026-10-22); what he would have said stays in the chat
+  let listening = false;
   async function say(text, v = chosen() || DEFAULT_VOICE) {
+    if (listening) return;
     const r = await fetch(`${API}/v1/assistant/speak`, { method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ text, provider: v.provider, voice: v.voice, model: v.model, accent: v.accent ?? DEFAULT_VOICE.accent }) });
     if (!r.ok) { const d = await r.json().catch(() => ({})); throw new Error(d.detail || `HTTP ${r.status}`); }
@@ -221,6 +225,7 @@
     try { stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } }); }
     catch (e) { open(true); turns.push({ role: 'assistant', content: `Mikrofon nicht verfügbar: ${e.message}`, error: true }); render(); return; }
     player.pause();                                        // don't record AURON talking
+    listening = true; speechRun++;                         // and nothing queued plays while he speaks
     const chunks = [];
     rec = new MediaRecorder(stream);
     rec.ondataavailable = (e) => e.data.size && chunks.push(e.data);
@@ -243,7 +248,7 @@
     };
     rec.onstop = async () => {
       stream.getTracks().forEach((t) => t.stop()); ctx.close();
-      rec = null; mic.classList.remove('rec');
+      rec = null; mic.classList.remove('rec'); listening = false;
       if (!spoke || !chunks.length) return;
       const blob = new Blob(chunks, { type: chunks[0].type || 'audio/webm' });
       mic.classList.add('busy');
