@@ -236,6 +236,7 @@
     <form class="chat-form" id="chatForm" autocomplete="off">
       <span class="att-prev" id="chatAttPrev" hidden></span>
       <input id="chatInput" placeholder="Sprich mit AURON …" maxlength="4000" aria-label="Nachricht an AURON" />
+      <button type="button" class="mic live" id="chatLive" aria-label="Live-Gespräch">📞</button>
       <button type="button" class="mic att" id="chatAttach" aria-label="Bild anhängen" title="Bild anhängen (oder Strg+V)">📎</button>
       <input type="file" id="chatFile" accept="image/*" hidden />
       <button type="button" class="mic" id="chatMic" aria-label="Sprechen" title="Sprechen – stoppt nach 10 s Stille oder bei erneutem Tippen">🎙</button>
@@ -262,6 +263,7 @@
   <script src="./look.js"></script>
   <script src="./code.js"></script>
   <script src="./chart.js"></script>
+  <script src="./live.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/d3-array@3.2.4/dist/d3-array.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/d3-geo@3.1.1/dist/d3-geo.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js"></script>

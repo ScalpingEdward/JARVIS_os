@@ -119,6 +119,9 @@
     // extra.code: a code wish -- its buttons (Freigeben / Verwerfen / Details) stand under the message
     note: (text, extra = {}) => { turns.push({ role: 'assistant', content: text, ...extra }); save(); if (dock.classList.contains('open')) render(); },
     refresh: () => { if (dock.classList.contains('open')) render(); },
+    // the live talk (live.js): what both sides said goes into the chat; the chat's own voice keeps quiet
+    live: (role, text) => { turns.push({ role, content: text }); save(); open(true); },
+    hush: () => { speechRun++; player.pause(); },
     hasCode: (id) => turns.some((t) => t.code === id),
   };
 

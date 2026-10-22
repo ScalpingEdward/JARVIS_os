@@ -89,6 +89,35 @@ def chat_stream(payload: ChatIn) -> StreamingResponse:
     return StreamingResponse(lines(), media_type="application/x-ndjson", headers={"X-Accel-Buffering": "no"})
 
 
+class LiveToolIn(BaseModel):
+    name: str = Field(min_length=1, max_length=80)
+    args: dict = Field(default_factory=dict)
+
+
+@router.post("/live/session")
+def live_session() -> dict:
+    """The browser's one-time address for a live talk with AURON (ElevenLabs agent, see live.py)."""
+    from . import live
+    try:
+        return live.session()
+    except live.LiveError as exc:
+        raise HTTPException(status_code=503, detail=str(exc))
+
+
+@router.get("/live/tools")
+def live_tools() -> list[str]:
+    """The tool names the dashboard offers the live agent."""
+    from . import tools
+    return [t["name"] for t in tools.TOOLS]
+
+
+@router.post("/live/tool")
+def live_tool(payload: LiveToolIn) -> dict:
+    """A tool the live agent asked for -- run here, like in the chat."""
+    from . import live
+    return {"result": live.run_tool(payload.name, payload.args)}
+
+
 class ClaimIn(BaseModel):
     key: str = Field(min_length=1, max_length=600)
 

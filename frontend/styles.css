@@ -1070,3 +1070,9 @@ html.desk .core.turning { cursor: grabbing; }
    there, and shifts back. Without it each card looked from its own middle and tipped sideways. */
 .tile { transform: translate(var(--pox, 0px), var(--poy, 0px)) perspective(1700px) translate(calc(-1 * var(--pox, 0px)), calc(-1 * var(--poy, 0px)))
   translateZ(var(--z, 0px)) rotateY(calc(var(--base-ry, 0deg) + var(--ry, 0deg))) rotateX(var(--rx, 0deg)); }
+
+/* 📞 live talk (live.js): grey off, pulsing green while AURON listens, cyan while he speaks */
+.chat-form .mic.live[data-state="wait"] { opacity: .6; }
+.chat-form .mic.live[data-state="on"] { background: rgba(61,220,151,.22); box-shadow: 0 0 0 0 rgba(61,220,151,.6); animation: livepulse 1.6s infinite; }
+.chat-form .mic.live[data-state="on"][data-mode="speaking"] { background: color-mix(in srgb, var(--accent) 30%, transparent); }
+@keyframes livepulse { 70% { box-shadow: 0 0 0 10px rgba(61,220,151,0); } 100% { box-shadow: 0 0 0 0 rgba(61,220,151,0); } }
