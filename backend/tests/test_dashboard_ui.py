@@ -38,3 +38,9 @@ def test_auron_opens_any_symbols_chart_in_a_timeframe_with_or_without_a_trade():
     with pytest.raises(ui.UiError):
         ui.timeframe("Woche")
     copier_status_service.reset()
+
+
+def test_auron_switches_the_chart_to_full_screen_and_back():
+    start = ui.since(0)["last"]
+    out, failed = tools.run("dashboard_show", {"action": "chart_full", "on": True})
+    assert not failed and ui.since(start)["commands"][-1]["do"] == "chart_full" and ui.since(start)["commands"][-1]["on"] is True

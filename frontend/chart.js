@@ -15,6 +15,7 @@
   box.innerHTML = `<header class="pc-head"><b class="pc-title"></b><span class="pc-pl mono"></span><span class="pc-sum mono"></span>
       <span class="pc-tf">${TFS.map((t) => `<button type="button" data-tf="${t}">${t}</button>`).join('')}</span>
       <span class="pc-btns"><button type="button" class="pc-close-pos">Position schließen</button>
+      <button type="button" class="pc-full" title="Vollbild (an/aus)" aria-label="Vollbild">⤢</button>
       <button type="button" class="pc-x" aria-label="Chart schließen">✕</button></span></header>
     <div class="pc-body"></div><p class="pc-wait muted">Hole die Kerzen aus MT5 …</p>
     <div class="pc-list"><table><thead><tr><th>Symbol</th><th>Seite</th><th class="num">Lots</th><th class="num">Einstieg</th>
@@ -38,12 +39,21 @@
   // the chart library speaks UTC; shifted once, it shows his local time
   const local = (t) => t - new Date(t * 1000).getTimezoneOffset() * 60;
 
+  // Between the two card columns, over the planet -- the cards stay visible (Brano, 2026-10-22); ⤢ or
+  // AURON ("Chart Vollbild") makes it fill the window, and back.
+  let full = false;
   function place() {
     const l = document.getElementById('colLeft')?.getBoundingClientRect(), r = document.getElementById('colRight')?.getBoundingClientRect();
-    if (!l || !r || innerWidth <= 1000) { Object.assign(box.style, { left: '12px', right: '12px', top: '70px', bottom: '110px' }); return; }
-    Object.assign(box.style, { left: `${Math.round(l.left)}px`, right: `${Math.round(innerWidth - r.right)}px`,
+    box.classList.toggle('full', full);
+    if (full || !l || !r || innerWidth <= 1000 || r.left - l.right < 480) {
+      Object.assign(box.style, full ? { left: '12px', right: '12px', top: '12px', bottom: '12px' } : { left: '12px', right: '12px', top: '70px', bottom: '110px' });
+      return;
+    }
+    Object.assign(box.style, { left: `${Math.round(l.right + 14)}px`, right: `${Math.round(innerWidth - r.left + 14)}px`,
       top: `${Math.round(Math.min(l.top, r.top))}px`, bottom: `${Math.round(innerHeight - Math.max(l.bottom, r.bottom))}px` });
   }
+  const setFull = (on) => { full = on ?? !full; place(); };
+  box.querySelector('.pc-full').addEventListener('click', () => setFull());
 
   const openAll = () => (window.overview?.accounts || overview?.accounts || []).flatMap((a) => (a.open_positions || []).map((p) => ({ ...p, copier: a.profile, cur: a.currency })));
   // all open trades together (Brano, 2026-10-22): one sum per currency, in the header and under the list
@@ -226,5 +236,5 @@
     if (!row || e.target.closest('button')) return;
     pick(row.dataset.ticket, row.dataset.copier);
   });
-  window.AURON_chart = { open: pick, symbol, close };
+  window.AURON_chart = { open: pick, symbol, close, full: setFull };
 })();

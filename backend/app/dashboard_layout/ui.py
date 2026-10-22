@@ -44,6 +44,11 @@ def open_view(view: str) -> dict:
     return push({"do": "open_view", "view": v})
 
 
+def chart_full(on: bool | None = None) -> dict:
+    """The open chart fills the window (on), goes back between the cards (off), or switches (None)."""
+    return push({"do": "chart_full", "on": on})
+
+
 def close_view() -> dict:
     return push({"do": "close"})
 

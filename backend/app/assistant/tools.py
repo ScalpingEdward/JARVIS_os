@@ -271,12 +271,15 @@ def _own_code(action: str, query: str | None = None, path: str | None = None, st
 
 
 def _dashboard_show(action: str, view: str | None = None, group: str | None = None, symbol: str | None = None,
-                    tf: str | None = None) -> dict:
+                    tf: str | None = None, on: bool | None = None) -> dict:
     from app.dashboard_layout import ui
     try:
         if action == "open_view":
             ui.open_view(view or "")
             return {"ok": True, "shown": view}
+        if action == "chart_full":
+            ui.chart_full(on)
+            return {"ok": True}
         if action == "close":
             ui.close_view()
             return {"ok": True}
@@ -434,13 +437,15 @@ TOOLS: list[dict] = [
          "query": {"type": "string"}, "path": {"type": "string"}, "start": {"type": "integer"}}, "required": ["action"]}},
     {"name": "dashboard_show",
      "description": "Show something on Brano's dashboard right now, on every open screen: 'open_view' opens a card's full "
-                    "view (view: Trading, Watchlist, Instagram, Smart Money), 'close' closes it, 'show_chart' opens a chart: "
+                    "view (view: Trading, Watchlist, Instagram, Smart Money), 'close' closes it, 'chart_full' makes the open chart fill the screen (on=true) or "
+                    "go back between the cards (on=false; 'Vollbild', 'kleiner'), 'show_chart' opens a chart: "
                     "of an open trade of a group (e.g. NINJA, ICT CRT), or of any symbol (Gold, Bitcoin, EURUSD, NVIDIA -- "
                     "watchlist names work) with or without an open trade; tf: M1, M5, M15, H1, H4, D1 (default M5). "
                     "Use it when he says 'öffne ...', 'zeig mir ...', 'mach zu'. He sees it happen: when it worked, answer "
                     "with nothing but the sign ✓ -- no 'Sir, geöffnet'. Only a failure is worth words.",
      "input_schema": {"type": "object", "properties": {
-         "action": {"type": "string", "enum": ["open_view", "close", "show_chart"]},
+         "action": {"type": "string", "enum": ["open_view", "close", "show_chart", "chart_full"]},
+         "on": {"type": "boolean", "description": "chart_full: true = full screen, false = back between the cards"},
          "view": {"type": "string"}, "group": {"type": "string"}, "symbol": {"type": "string"},
          "tf": {"type": "string", "enum": ["M1", "M5", "M15", "H1", "H4", "D1"]}}, "required": ["action"]}},
     {"name": "smart_money_follow",
@@ -515,7 +520,7 @@ _RUN: dict[str, Callable[..., dict]] = {
     "smart_money_follow": lambda action, owner=None, **_: _smart_money_follow(action, owner),
     "memory": lambda action, text=None, memory_id=None, **_: _memory(action, text, memory_id),
     "humor": lambda action, level=None, style=None, **_: _humor(action, level, style),
-    "dashboard_show": lambda action, view=None, group=None, symbol=None, tf=None, **_: _dashboard_show(action, view, group, symbol, tf),
+    "dashboard_show": lambda action, view=None, group=None, symbol=None, tf=None, on=None, **_: _dashboard_show(action, view, group, symbol, tf, on),
     "own_code": lambda action, query=None, path=None, start=1, **_: _own_code(action, query, path, start),
     "spotify": lambda action, query=None, kind="track", volume=None, device=None, **_: _spotify(action, query, kind, volume, device),
     "telegram_notifications": lambda action, category="all", on=None, **_: _telegram_notifications(action, category, on),
