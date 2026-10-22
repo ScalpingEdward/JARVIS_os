@@ -18,6 +18,7 @@
     ['cards', '▦', 'Karten', 'Welche Karten, wo, in welcher Reihenfolge'],
     ['announce', '📣', 'Durchsagen', 'AURON meldet Wichtiges von selbst'],
     ['voice', '🔊', 'Stimme', 'AURONs Stimme wählen und anhören'],
+    ['auron', '◎', 'AURON', 'Humor und was er sich von dir merkt'],
     ['code', '⌨', 'Code', 'Code-Wünsche an AURON prüfen und freigeben'],
     ['info', 'ℹ', 'Info', 'Was läuft, Versionen, Hinweise'],
   ];
@@ -106,6 +107,11 @@
     if (page === 'code') {
       panel.innerHTML = head('Code', true) + '<div class="ct-list" id="codeEditor"></div>';
       window.AURON_code?.editor(panel.querySelector('#codeEditor'));
+      return;
+    }
+    if (page === 'auron') {
+      panel.innerHTML = head('AURON', true) + '<div class="ps" id="personaEditor"></div>';
+      window.AURON_persona?.editor(panel.querySelector('#personaEditor'));
       return;
     }
     if (page === 'cards') {

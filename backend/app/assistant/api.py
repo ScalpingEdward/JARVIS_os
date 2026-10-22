@@ -174,3 +174,46 @@ async def listen(request: Request, lang: Literal["de", "en", "sk"] = "de") -> di
         return {"text": voice.transcribe(audio, request.headers.get("content-type", ""), lang)}
     except voice.VoiceError as exc:
         raise HTTPException(status_code=502, detail=str(exc))
+
+
+# ---- what Brano taught AURON, and his humor (persona.py) -- Einstellungen > AURON ----
+class HumorIn(BaseModel):
+    level: int | None = Field(default=None, ge=0, le=10)
+    style: str | None = None
+
+
+class MemoryIn(BaseModel):
+    text: str = Field(min_length=1, max_length=300)
+
+
+@router.get("/persona")
+def persona_get() -> dict:
+    from . import persona
+    return {"humor": persona.humor(), "styles": persona.STYLES, "memories": persona.memories()}
+
+
+@router.put("/persona/humor")
+def persona_humor(body: HumorIn) -> dict:
+    from . import persona
+    try:
+        return persona.set_humor(body.level, body.style)
+    except persona.PersonaError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+
+
+@router.post("/persona/memory")
+def persona_remember(body: MemoryIn) -> dict:
+    from . import persona
+    try:
+        return persona.remember(body.text)
+    except persona.PersonaError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+
+
+@router.delete("/persona/memory/{memory_id}")
+def persona_forget(memory_id: int) -> dict:
+    from . import persona
+    try:
+        return persona.forget(memory_id)
+    except persona.PersonaError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))

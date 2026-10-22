@@ -284,6 +284,27 @@ def _dashboard_show(action: str, view: str | None = None, group: str | None = No
         return {"error": str(exc)}
 
 
+def _memory(action: str, text: str | None = None, memory_id: int | None = None) -> dict:
+    from . import persona
+    try:
+        if action == "remember":
+            return {"ok": True, "remembered": persona.remember(text or "")}
+        if action == "forget":
+            return {"ok": True, "forgotten": persona.forget(int(memory_id or 0))}
+    except persona.PersonaError as exc:
+        return {"error": str(exc)}
+    return {"memories": persona.memories()}
+
+
+def _humor(action: str, level: int | None = None, style: str | None = None) -> dict:
+    from . import persona
+    try:
+        h = persona.set_humor(level, style) if action == "set" else persona.humor()
+    except persona.PersonaError as exc:
+        return {"error": str(exc)}
+    return {**h, "styles": list(persona.STYLES), "note": "wirkt ab der nächsten Antwort"}
+
+
 TOOLS: list[dict] = [
     {"name": "trading_status",
      "description": "Brano's copier accounts right now: balance, equity, open positions, P&L per signal group "
@@ -394,6 +415,21 @@ TOOLS: list[dict] = [
      "input_schema": {"type": "object", "properties": {
          "action": {"type": "string", "enum": ["open_view", "close", "show_chart"]},
          "view": {"type": "string"}, "group": {"type": "string"}, "symbol": {"type": "string"}}, "required": ["action"]}},
+    {"name": "memory",
+     "description": "What Brano teaches you, kept for good and put into every conversation: 'remember' stores one "
+                    "short fact or rule in his words (\"merk dir ...\", \"ab jetzt ...\") -- only when he asks, never on "
+                    "your own; 'forget' deletes one by memory_id; 'list' shows all. Already in your prompt, so list "
+                    "only when he asks what you know.",
+     "input_schema": {"type": "object", "properties": {
+         "action": {"type": "string", "enum": ["remember", "forget", "list"]},
+         "text": {"type": "string"}, "memory_id": {"type": "integer"}}, "required": ["action"]}},
+    {"name": "humor",
+     "description": "Your humor setting: level 0 (none) to 10 (almost always, cheeky) and style (trocken, sarkastisch, "
+                    "verspielt, wortwitz, selbstironisch). 'get' tells it, 'set' changes it when Brano says so "
+                    "(\"mehr Humor\" = +2, \"Humor aus\" = 0).",
+     "input_schema": {"type": "object", "properties": {
+         "action": {"type": "string", "enum": ["get", "set"]},
+         "level": {"type": "integer", "minimum": 0, "maximum": 10}, "style": {"type": "string"}}, "required": ["action"]}},
     {"name": "code_request",
      "description": "A change to AURON's own code that no other tool can make -- layout, a new column, wording, a "
                     "behaviour of a card (e.g. 'show the equity as a plain number beside each group name'). Files a task "
@@ -440,6 +476,8 @@ _RUN: dict[str, Callable[..., dict]] = {
     "dashboard_design": lambda action, theme=None, room=None, card=None, card_style=None, **_:
         _design(action, theme, room, card, card_style),
     "code_request": lambda change, **_: _code_request(change),
+    "memory": lambda action, text=None, memory_id=None, **_: _memory(action, text, memory_id),
+    "humor": lambda action, level=None, style=None, **_: _humor(action, level, style),
     "dashboard_show": lambda action, view=None, group=None, symbol=None, **_: _dashboard_show(action, view, group, symbol),
     "own_code": lambda action, query=None, path=None, start=1, **_: _own_code(action, query, path, start),
     "spotify": lambda action, query=None, kind="track", volume=None, device=None, **_: _spotify(action, query, kind, volume, device),
