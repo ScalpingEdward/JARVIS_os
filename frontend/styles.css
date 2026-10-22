@@ -159,8 +159,8 @@ body { background: #03060c url("./lounge.webp") center / cover no-repeat fixed; 
   position: relative; text-align: left; min-width: 0;
   /* glass: see-through, frosted, a bright top edge and a thin slab of thickness below */
   background:
-    linear-gradient(155deg, rgb(var(--tint) / calc(.13 * var(--glass) + var(--solid) * .1)), rgb(var(--tint) / calc(.05 * var(--glass))) 45%,
-      rgb(10 20 36 / calc(.28 + var(--solid) * .62)));
+    linear-gradient(155deg, rgb(var(--tint) / calc(.24 * var(--glass) + var(--solid) * .1)), rgb(var(--tint) / calc(.12 * var(--glass))) 45%,
+      rgb(var(--tint) / calc(.05 * var(--glass))) 80%, rgb(10 20 36 / calc(.22 + var(--solid) * .62)));
   border: 1px solid rgb(var(--tint) / .22); border-top-color: rgb(var(--tint) / .42); border-radius: 16px;
   backdrop-filter: blur(var(--blur)) saturate(140%); -webkit-backdrop-filter: blur(var(--blur)) saturate(140%);
   box-shadow:
@@ -173,11 +173,11 @@ body { background: #03060c url("./lounge.webp") center / cover no-repeat fixed; 
 .tile { cursor: pointer; padding: 20px 20px 16px;
   transform: translateZ(var(--z, 0px)) rotateY(calc(var(--base-ry, 0deg) + var(--ry, 0deg))) rotateX(var(--rx, 0deg));
   transition: transform .6s var(--ease), border-color .3s, box-shadow .3s; }
-.a-insta { border-color: rgba(200,140,255,.30); }
+/* the two featured cards glow in the accent colour too -- they kept purple and orange whatever accent was
+   picked (Brano, 2026-10-22) */
+.a-insta, .a-trading { border-color: color-mix(in srgb, var(--accent) 32%, transparent); }
 .a-insta::after, .a-trading::after { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; }
-.a-insta::after { box-shadow: 0 0 46px -18px rgba(190,110,255,.6); }
-.a-trading { border-color: rgba(255,190,110,.30); }
-.a-trading::after { box-shadow: 0 0 46px -18px rgba(255,160,60,.55); }
+.a-insta::after, .a-trading::after { box-shadow: 0 0 46px -18px color-mix(in srgb, var(--accent) 60%, transparent); }
 @keyframes hover-float { 0%, 100% { translate: 0 0; } 50% { translate: 0 -9px; } }
 .tile .corner { position: absolute; inset: -1px; border-radius: inherit; pointer-events: none;
   background:
