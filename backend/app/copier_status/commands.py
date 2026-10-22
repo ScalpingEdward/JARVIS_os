@@ -48,13 +48,27 @@ def _telegram(text: str, keyboard: list | None = None) -> None:
 
 
 CLOSE_ONE = re.compile(r"^close:\d{1,14}$")   # one position by its ticket -- the dashboard's ✕ per row
+# from the position's chart (Brano, 2026-10-22): move SL/TP of one position, open a trade by hand.
+# An empty sl/tp means "leave" (sltp) or "none" (open).
+SLTP = re.compile(r"^sltp:\d{1,14}:(\d+(\.\d+)?)?:(\d+(\.\d+)?)?$")
+OPEN = re.compile(r"^open:[A-Za-z0-9._#-]{2,30}:(buy|sell):\d+(\.\d+)?:(\d+(\.\d+)?)?:(\d+(\.\d+)?)?$")
+BY_HAND = (CLOSE_ONE, SLTP, OPEN)
+
+
+def _what(action: str) -> str:
+    kind, *a = action.split(":")
+    if kind == "close":
+        return f"Position #{a[0]} schließen"
+    if kind == "sltp":
+        return f"Position #{a[0]}: SL {a[1] or 'bleibt'}, TP {a[2] or 'bleibt'}"
+    return f"{a[1].upper()} {a[0]} {a[2]} Lots, SL {a[3] or '–'}, TP {a[4] or '–'}"
 
 
 def create(profile: str, action: str, source: str, confirmed: bool = False, label: str = "") -> dict:
-    if action not in ACTIONS and not CLOSE_ONE.match(action):
+    if action not in ACTIONS and not any(r.match(action) for r in BY_HAND):
         raise CommandError(f"unknown action {action}")
     # closing one position asks first, like close_all: the dashboard asks in its own dialog
-    needs = (action in NEEDS_CONFIRMATION or action.startswith("close:")) and not confirmed
+    needs = (action in NEEDS_CONFIRMATION or any(r.match(action) for r in BY_HAND)) and not confirmed
     r = CopierCommandRow(id=str(uuid.uuid4()), profile=profile, action=action, source=source,
                          status="awaiting_confirmation" if needs else "pending", created_at=datetime.now(timezone.utc))
     with SessionLocal() as s:
@@ -62,7 +76,7 @@ def create(profile: str, action: str, source: str, confirmed: bool = False, labe
         s.commit()
         out = _dict(r)
     if needs:
-        what = ACTIONS.get(action) or f"Position #{action.split(':', 1)[1]} schließen"
+        what = ACTIONS.get(action) or _what(action)
         _telegram(f"Bestätigen: {label or profile} -- {what}?\n(läuft in 10 Minuten ab)",
                   [[{"text": "✅ Ja, ausführen", "callback_data": f"cmd:z:{out['id']}"},
                     {"text": "✖ Abbrechen", "callback_data": f"cmd:q:{out['id']}"}]])

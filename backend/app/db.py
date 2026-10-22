@@ -20,6 +20,12 @@ def initialize_database() -> None:
     from . import db_models  # noqa: F401
 
     Base.metadata.create_all(engine)
+    # copier commands grew from "pause" to "open:XAUUSD.s:buy:0.05:4100.5:4130" (2026-10-22): the column
+    # was varchar(20); create_all does not change existing tables, so it is widened here once
+    if engine.dialect.name == "postgresql":
+        from sqlalchemy import text
+        with engine.begin() as c:
+            c.execute(text("ALTER TABLE IF EXISTS copier_commands ALTER COLUMN action TYPE VARCHAR(200)"))
 
 
 def get_db() -> Generator[Session, None, None]:

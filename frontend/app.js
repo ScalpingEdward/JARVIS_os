@@ -306,7 +306,8 @@ function renderTradingTile(o) {
   const live = o.accounts.filter((a) => a.state === 'live').length;
   $('#tLive').textContent = live === o.accounts.length ? 'live' : `${live}/${o.accounts.length} live`;
   $('#tLive').classList.toggle('live', live === o.accounts.length);
-  const groups = (o.groups || []).filter((g) => g.name !== '(not from a signal)');
+  // trades opened by hand (chart: Buy / Sell) belong to no signal group -- shown as "Von Hand" while open
+  const groups = (o.groups || []).filter((g) => g.name !== '(not from a signal)' || g.open_positions);
   const stateOf = Object.fromEntries(o.accounts.map((a) => [a.profile, a.state]));
   const copier = (g) => {  // the group's copiers: all live -> ok, any late -> warn, else bad
     const states = (g.accounts || []).map((p) => stateOf[p]);
@@ -325,7 +326,7 @@ function renderTradingTile(o) {
     // balance and currency in the tooltip
     const size = accs.length ? `<b class="grp-eq" title="Equity ${fmt(eq)} ${esc(cur)} · Konto ${fmt(bal)} ${esc(cur)}">${fmt(eq)}</b>` : '';
     return `<div class="row grp"><span class="dot ${copier(g)}" title="Kopierer ${copier(g) === 'ok' ? 'online' : 'nicht online'}"></span><span>`
-      + `<div class="gtop"><i class="gname">${esc(g.name)}</i>${size}</div>`
+      + `<div class="gtop"><i class="gname">${esc(g.name === '(not from a signal)' ? 'Von Hand' : g.name)}</i>${size}</div>`
       + `${open.length ? ` <small class="grp-open">${open.length} offen · ${pl(sum)}</small>` : ''}</span>`
       + `<span class="mono">${signed(g.pnl_today)}</span><span>${signed(g.pnl_total)}</span></div>`
       + (open.length ? `<div class="grp-pos">${open.slice(0, 4).map((p) => `<div data-ticket="${p.ticket}" data-copier="${esc(p.copier)}" title="Chart öffnen"><span class="side ${p.side}">${esc(p.side.toUpperCase())}</span>`

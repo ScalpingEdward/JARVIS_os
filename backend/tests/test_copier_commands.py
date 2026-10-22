@@ -94,3 +94,12 @@ def test_closing_one_position_takes_a_ticket_and_waits_for_confirmation_unless_g
     assert commands.create("demo", "close:123456789", "dashboard", confirmed=True)["status"] == "pending"
     with pytest.raises(commands.CommandError):
         commands.create("demo", "close:abc", "dashboard", confirmed=True)
+
+
+def test_moving_sl_tp_and_opening_by_hand_are_commands_that_wait_for_confirmation(clean):
+    from app.copier_status import commands
+    assert commands.create("demo", "sltp:123:4150.5:", "auron")["status"] == "awaiting_confirmation"
+    assert commands.create("demo", "open:XAUUSD.s:buy:0.05:4100:4160", "dashboard", confirmed=True)["status"] == "pending"
+    for bad in ("open:XAUUSD.s:hold:1::", "sltp:abc::", "open:x:buy:1::;rm"):
+        with pytest.raises(commands.CommandError):
+            commands.create("demo", bad, "dashboard", confirmed=True)

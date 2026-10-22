@@ -722,6 +722,30 @@ class Copier:
             text = f"CLOSE ALL by Brano: {len(positions)} positions closed, {len(orders)} limits cancelled"
             self._say(text + (f" -- FAILED: {'; '.join(failed)}" if failed else ""))
             return text + (f"; failed: {'; '.join(failed)}" if failed else "")
+        if action.startswith("sltp:"):
+            # SL/TP of one position, dragged in the dashboard's chart
+            _, t, sl, tp = action.split(":")
+            pos = next((p for p in self.ex.bot_positions() if p.ticket == int(t)), None)
+            if pos is None:
+                return f"position #{t} is not open (or not this copier's)"
+            if self.dry:
+                return f"dry run: #{t} not changed"
+            self.ex.set_sltp(pos, float(sl) if sl else None, float(tp) if tp else None)
+            self._say(f"SL/TP by Brano: #{t} {pos.symbol} SL {sl or pos.sl} TP {tp or pos.tp}")
+            return f"#{t}: SL {sl or 'unchanged'}, TP {tp or 'unchanged'}"
+        if action.startswith("open:"):
+            # a trade opened by hand from the chart -- not while trading is stopped, never above the lot cap
+            _, symbol, side, lots, sl, tp = action.split(":")
+            if self.book.halted(self.clock()):
+                return f"not opened: trading is stopped ({self.book.halt_reason})"
+            cap = float(self.config.get("manual_max_lots", 1.0))
+            if float(lots) <= 0 or float(lots) > cap:
+                return f"not opened: {lots} lots is outside 0..{cap} (manual_max_lots)"
+            if self.dry:
+                return f"dry run: {side} {symbol} {lots} not opened"
+            o = self.ex.open_manual(symbol, side, float(lots), float(sl) if sl else 0.0, float(tp) if tp else 0.0)
+            self._say(f"OPENED by Brano: {side.upper()} {symbol} {o.volume} lots at {o.price} (#{o.ticket})")
+            return f"opened #{o.ticket} at {o.price}"
         if action.startswith("close:"):
             # one position, from the ✕ in its row -- only one of this copier's own (magic), never by hand
             ticket = int(action.split(":", 1)[1])

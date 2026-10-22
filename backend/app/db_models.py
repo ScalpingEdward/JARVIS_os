@@ -541,7 +541,7 @@ class CopierCommandRow(Base):
     __tablename__ = "copier_commands"
     id: Mapped[str] = mapped_column(String(36), primary_key=True)
     profile: Mapped[str] = mapped_column(String(40), index=True)
-    action: Mapped[str] = mapped_column(String(20))
+    action: Mapped[str] = mapped_column(String(200))   # also sltp:<ticket>:<sl>:<tp>, open:<sym>:<side>:<lots>:<sl>:<tp>
     status: Mapped[str] = mapped_column(String(24))     # awaiting_confirmation / pending / done / failed / cancelled
     source: Mapped[str] = mapped_column(String(20), default="")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))

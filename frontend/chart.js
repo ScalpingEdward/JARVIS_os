@@ -2,6 +2,8 @@
 // trading view -- opens its five-minute candles, straight from the copier's MT5 (/v1/copier/chart),
 // with entry, SL and TP as lines. Large: from the Trading card's left edge to the right column's right
 // edge, over the planet. Esc or ✕ closes it; the copier stops sending 30 s later on its own.
+// Real trading from it (Brano, 2026-10-22), always after a confirmation: drag the SL or TP line and
+// the copier moves it in MT5; Buy / Sell below opens a trade by hand on the same account and symbol.
 (() => {
   const LIB = 'https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js';
   const box = document.createElement('section');
@@ -9,10 +11,17 @@
   box.innerHTML = `<header class="pc-head"><b class="pc-title"></b><span class="pc-pl mono"></span>
       <span class="pc-btns"><button type="button" class="pc-close-pos">Position schließen</button>
       <button type="button" class="pc-x" aria-label="Chart schließen">✕</button></span></header>
-    <div class="pc-body"></div><p class="pc-wait muted">Hole die Kerzen aus MT5 …</p>`;
+    <div class="pc-body"></div><p class="pc-wait muted">Hole die Kerzen aus MT5 …</p>
+    <footer class="pc-trade"><label>Lots <input class="pc-lots" type="number" step="0.01" min="0.01" /></label>
+      <label>SL <input class="pc-sl" type="number" step="any" placeholder="–" /></label>
+      <label>TP <input class="pc-tp" type="number" step="any" placeholder="–" /></label>
+      <button type="button" class="pc-buy">Buy</button><button type="button" class="pc-sell">Sell</button>
+      <small class="muted">SL- und TP-Linie lassen sich mit der Maus ziehen</small></footer>`;
   document.body.append(box);
   const body = box.querySelector('.pc-body'), wait = box.querySelector('.pc-wait');
   let chart = null, series = null, lines = [], pos = null, timer = 0, libReady = null;
+  let lineOf = {}, drag = null, decimals = 2;
+  const moved = {};   // ticket -> {sl|tp: price, until}: a dragged level holds until the copier's next report has it
 
   const lib = () => libReady || (libReady = new Promise((ok, bad) => {
     if (window.LightweightCharts) return ok();
@@ -44,11 +53,60 @@
   }
 
   function levels() {
-    lines.forEach((l) => series.removePriceLine(l)); lines = [];
-    const p = current() || pos;
-    const add = (price, color, title) => { if (price) lines.push(series.createPriceLine({ price, color, lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title })); };
-    add(p.price_open, '#e9edf5', 'Einstieg'); add(p.sl, '#f2647c', 'SL'); add(p.tp, '#3ddc97', 'TP');
+    if (drag) return;                                   // a line in his hand stays where he holds it
+    lines.forEach((l) => series.removePriceLine(l)); lines = []; lineOf = {};
+    const p = { ...(current() || pos) }, m = moved[p.ticket];
+    if (m && Date.now() < m.until) Object.assign(p, m.levels);
+    const add = (key, price, color, title) => { if (!price) return; const l = series.createPriceLine({ price, color, lineWidth: key === 'entry' ? 1 : 2, lineStyle: 2, axisLabelVisible: true, title }); lines.push(l); lineOf[key] = { line: l, price }; };
+    add('entry', p.price_open, '#e9edf5', 'Einstieg'); add('sl', p.sl, '#f2647c', 'SL ↕'); add('tp', p.tp, '#3ddc97', 'TP ↕');
   }
+
+  // ---- drag SL / TP: grab within 7 px of the line, let go, confirm -- the copier moves it in MT5 ----
+  const fix = (v) => Number(v.toFixed(decimals));
+  body.addEventListener('mousedown', (e) => {
+    if (!current() || !series) return;
+    const y = e.clientY - body.getBoundingClientRect().top;
+    const hit = ['sl', 'tp'].find((k) => lineOf[k] && Math.abs(series.priceToCoordinate(lineOf[k].price) - y) < 7);
+    if (!hit) return;
+    drag = { key: hit, price: lineOf[hit].price };
+    chart.applyOptions({ handleScroll: false, handleScale: false });
+    e.preventDefault();
+  });
+  addEventListener('mousemove', (e) => {
+    if (!drag) return;
+    const p = series.coordinateToPrice(e.clientY - body.getBoundingClientRect().top);
+    if (p == null) return;
+    drag.price = fix(p);
+    lineOf[drag.key].line.applyOptions({ price: drag.price, title: `${drag.key.toUpperCase()} ${drag.price}` });
+  });
+  addEventListener('mouseup', async () => {
+    if (!drag) return;
+    const d = drag, p = current();
+    chart.applyOptions({ handleScroll: true, handleScale: true });
+    const ok = p && d.price !== lineOf[d.key].price
+      && confirm(`${d.key.toUpperCase()} von #${p.ticket} (${p.symbol}) auf ${d.price} setzen?\nDer Kopierer ändert es in MT5.`);
+    if (ok) {
+      const sl = d.key === 'sl' ? d.price : '', tp = d.key === 'tp' ? d.price : '';
+      try { await send('POST', '/v1/copier/commands', { profile: p.copier, action: `sltp:${p.ticket}:${sl}:${tp}`, confirmed: true }); }
+      catch (err) { alert(`Fehler: ${err.message}`); }
+      moved[p.ticket] = { levels: { ...(moved[p.ticket]?.levels || {}), [d.key]: d.price }, until: Date.now() + 30000 };
+    }
+    drag = null; levels();
+  });
+
+  // ---- Buy / Sell by hand on this account and symbol ----
+  async function trade(side) {
+    const p = current() || pos;
+    const lots = box.querySelector('.pc-lots').value, sl = box.querySelector('.pc-sl').value, tp = box.querySelector('.pc-tp').value;
+    if (!(Number(lots) > 0)) { alert('Lots angeben'); return; }
+    if (!confirm(`${side.toUpperCase()} ${p.symbol} ${lots} Lots\nSL ${sl || '–'} · TP ${tp || '–'}\nKonto: ${p.copier}\n\nJetzt zum Marktpreis eröffnen?`)) return;
+    try {
+      await send('POST', '/v1/copier/commands', { profile: p.copier, action: `open:${p.symbol}:${side}:${lots}:${sl}:${tp}`, confirmed: true });
+      window.AURON_voice?.note(`Auftrag gesendet: ${side.toUpperCase()} ${p.symbol} ${lots} Lots -- der Kopierer eröffnet ihn in bis zu 20 s.`);
+    } catch (err) { alert(`Fehler: ${err.message}`); }
+  }
+  box.querySelector('.pc-buy').addEventListener('click', () => trade('buy'));
+  box.querySelector('.pc-sell').addEventListener('click', () => trade('sell'));
 
   async function load() {
     if (!pos) return;
@@ -58,11 +116,14 @@
     if (!d.bars?.length) { wait.hidden = false; return; }
     wait.hidden = true;
     series.setData(d.bars.map(([t, o, h, l, c]) => ({ time: local(t), open: o, high: h, low: l, close: c })));
+    decimals = Math.min(5, Math.max(...d.bars.slice(-30).map((b) => (String(b[4]).split('.')[1] || '').length), 1));
     levels();
   }
 
   async function open(p) {
     pos = p; place(); box.hidden = false; wait.hidden = false;
+    box.querySelector('.pc-lots').value = p.volume || 0.01;
+    box.querySelector('.pc-sl').value = ''; box.querySelector('.pc-tp').value = '';
     try { await lib(); } catch (e) { wait.textContent = e.message; return; }
     if (!chart) {
       chart = LightweightCharts.createChart(body, {

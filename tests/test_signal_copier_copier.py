@@ -52,6 +52,9 @@ class FakeTerminal:
                                             sl=sl, tp=tp, profit=0.0, comment=f"sig:{signal_id}:{leg}")
         return Opened(t, self.prices[symbol], volume)
 
+    def open_manual(self, symbol, side, volume, sl, tp):
+        return self.open_position(symbol, side, volume, sl, tp, 0, 1)
+
     def bot_positions(self):
         return list(self.positions.values())
 
@@ -414,3 +417,16 @@ def test_muted_trade_reports_stay_quiet_but_trouble_gets_through(monkeypatch):
     monkeypatch.setitem(cp.QUIET, "on", False)
     bot("closed #3")
     assert sent == ["watchdog ERROR KeyError: x", "closed #3"]
+
+
+def test_by_hand_from_the_chart_sl_tp_move_and_a_trade_opens_within_the_lot_cap():
+    c, t, said, now = make()
+    c.on_message(CHAT, 1, None, SIGNAL)
+    first = sorted(t.positions)[0]
+    assert c.command(f"sltp:{first}:4150.5:") .startswith(f"#{first}: SL 4150.5")
+    assert t.positions[first].sl == 4150.5 and "SL/TP by Brano" in said[-1]
+    out = c.command("open:XAUUSD.s:buy:0.05:4100:4160")
+    assert out.startswith("opened #") and "OPENED by Brano" in said[-1]
+    assert "outside" in c.command("open:XAUUSD.s:buy:5:4100:4160")          # above manual_max_lots (1.0)
+    c.command("pause")
+    assert "trading is stopped" in c.command("open:XAUUSD.s:sell:0.05::")

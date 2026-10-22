@@ -132,6 +132,18 @@ def open_position(symbol: str, side: str, volume: float, sl: float, tp: float, s
     return Opened(result.order, price, result.volume)
 
 
+def open_manual(symbol: str, side: str, volume: float, sl: float, tp: float) -> Opened:
+    """A trade Brano opened by hand from the dashboard's chart: the bot's magic (so the copier sees and can
+    close it), comment "hand" -- no signal behind it."""
+    tick = _tick(symbol)
+    buy = side == "buy"
+    result = _send({"action": mt5.TRADE_ACTION_DEAL, "symbol": symbol, "volume": volume,
+                    "type": mt5.ORDER_TYPE_BUY if buy else mt5.ORDER_TYPE_SELL, "price": tick.ask if buy else tick.bid,
+                    "sl": sl, "tp": tp, "deviation": 20, "magic": MAGIC, "comment": "hand", "type_filling": _filling(symbol)})
+    filled = mt5.positions_get(ticket=result.order)
+    return Opened(result.order, filled[0].price_open if filled else result.price, result.volume)
+
+
 def cancel_order(order) -> None:
     _send({"action": mt5.TRADE_ACTION_REMOVE, "order": order.ticket})
 
