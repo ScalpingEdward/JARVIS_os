@@ -9,7 +9,7 @@
 (() => {
   const LIB = 'https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js';
   const TFS = ['M1', 'M5', 'M15', 'H1', 'H4', 'D1'];
-  let tf = 'M5';
+  let tf = 'M5', real = null;
   const box = document.createElement('section');
   box.className = 'pos-chart'; box.hidden = true;
   box.innerHTML = `<header class="pc-head"><b class="pc-title"></b><span class="pc-pl mono"></span><span class="pc-sum mono"></span>
@@ -89,6 +89,12 @@
   marks();
 
   function header() {
+    if (!pos.ticket) {                                  // a symbol's own chart: no trade behind it
+      const acct = (window.overview?.accounts || overview?.accounts || []).find((a) => a.profile === pos.copier);
+      box.querySelector('.pc-title').textContent = `${real || pos.symbol} · Konto ${acct?.label || pos.copier}`;
+      box.querySelector('.pc-pl').textContent = ''; box.querySelector('.pc-close-pos').hidden = true;
+      return;
+    }
     const p = current() || pos;
     box.querySelector('.pc-title').textContent = `${p.side.toUpperCase()} ${p.symbol} · ${fmt(p.volume)} Lots · ${p.group || ''}`;
     const v = p.profit || 0, pl = box.querySelector('.pc-pl');
@@ -141,7 +147,8 @@
 
   // ---- Buy / Sell by hand on this account and symbol ----
   async function trade(side) {
-    const p = current() || pos;
+    const p = { ...(current() || pos) };
+    if (!p.ticket) p.symbol = real || p.symbol;         // the broker's spelling the copier found (XAUUSD -> XAUUSD.s)
     const lots = box.querySelector('.pc-lots').value, sl = box.querySelector('.pc-sl').value, tp = box.querySelector('.pc-tp').value;
     if (!(Number(lots) > 0)) { alert('Lots angeben'); return; }
     if (!confirm(`${side.toUpperCase()} ${p.symbol} ${lots} Lots\nSL ${sl || '–'} · TP ${tp || '–'}\nKonto: ${p.copier}\n\nJetzt zum Marktpreis eröffnen?`)) return;
@@ -158,6 +165,7 @@
     header(); list();
     let d;
     try { d = await (await fetch(`${API}/v1/copier/chart?profile=${encodeURIComponent(pos.copier)}&symbol=${encodeURIComponent(pos.symbol)}&tf=${tf}`)).json(); } catch { return; }
+    if (d.name) real = d.name;
     if (!d.bars?.length) { wait.hidden = false; return; }
     wait.hidden = true;
     series.setData(d.bars.map(([t, o, h, l, c]) => ({ time: local(t), open: o, high: h, low: l, close: c })));
@@ -165,8 +173,9 @@
     levels();
   }
 
-  async function open(p) {
-    pos = p; place(); box.hidden = false; wait.hidden = false;
+  async function open(p, frame) {
+    pos = p; real = null; place();
+    if (frame) { tf = frame; marks(); } box.hidden = false; wait.hidden = false;
     box.querySelector('.pc-lots').value = p.volume || 0.01;
     box.querySelector('.pc-sl').value = ''; box.querySelector('.pc-tp').value = '';
     try { await lib(); } catch (e) { wait.textContent = e.message; return; }
@@ -199,11 +208,13 @@
   addEventListener('resize', () => { if (!box.hidden) place(); });
 
   // a click on a trade: in the card (not on its ✕ -- that closes the trade), and in the view's table
-  const pick = (ticket, copier) => {
+  const pick = (ticket, copier, frame) => {
     const all = (overview?.accounts || []).flatMap((a) => (a.open_positions || []).map((p) => ({ ...p, copier: a.profile })));
     const p = all.find((x) => String(x.ticket) === String(ticket) && (!copier || x.copier === copier));
-    if (p) open(p);
+    if (p) open(p, frame);
   };
+  // any symbol, with or without a trade (AURON: "zeig mir Gold auf 15 Minuten")
+  const symbol = (sym, copier, frame) => open({ symbol: sym, copier, ticket: null }, frame);
   document.getElementById('tGroups')?.addEventListener('click', (e) => {
     const row = e.target.closest('.grp-pos > div[data-ticket]');
     if (!row || e.target.closest('.pos-x')) return;
@@ -215,5 +226,5 @@
     if (!row || e.target.closest('button')) return;
     pick(row.dataset.ticket, row.dataset.copier);
   });
-  window.AURON_chart = { open: pick, close };
+  window.AURON_chart = { open: pick, symbol, close };
 })();

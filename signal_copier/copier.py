@@ -872,9 +872,9 @@ class LivePusher:
         threading.Thread(target=self._run, daemon=True).start()
         threading.Thread(target=self._run_rates, daemon=True).start()
 
-    def rates(self, symbol: str, bars: list) -> None:
+    def rates(self, symbol: str, bars: list, name: str | None = None) -> None:
         try:
-            self.rq.put_nowait({"profile": self.profile, "symbol": symbol, "bars": bars})
+            self.rq.put_nowait({"profile": self.profile, "symbol": symbol, "bars": bars, "name": name})
         except queue.Full:
             pass
 
@@ -1058,9 +1058,12 @@ async def main(profile: str | None, dry: bool) -> None:
             try:
                 push(execution.live_inputs())   # MT5 stays on this loop, the sending on push's thread
                 tick += 1
-                if tick % 2 == 0:               # an open chart: its five-minute candles every 2 s
-                    for symbol in list(push.wanted)[:3]:
-                        push.rates(symbol, execution.rates(symbol))
+                if tick % 2 == 0:               # an open chart: its candles every 2 s
+                    for wanted in list(push.wanted)[:3]:
+                        # a chart of any symbol (Brano, 2026-10-22): "XAUUSD" is "XAUUSD.s" at this broker
+                        sym, at, tf = wanted.partition("@")
+                        real = sym if sym in copier.symbols else (resolve(sym, copier.symbols, copier.overrides) or sym)
+                        push.rates(wanted, execution.rates(real + at + tf), real)
             except Exception:  # noqa: BLE001
                 log.debug("live numbers", exc_info=True)
             await asyncio.sleep(LIVE_EVERY_S)

@@ -49,7 +49,7 @@ def push_live(payload: LiveIn) -> dict:
 
 # ---- a position's chart (dashboard click) -- five-minute candles straight from the copier's MT5 ----
 _chart_wanted: dict[tuple[str, str], float] = {}     # (profile, symbol) -> last asked
-_rates: dict[tuple[str, str], tuple[float, list]] = {}
+_rates: dict[tuple[str, str], tuple[float, list, str | None]] = {}
 CHART_FOR_S = 30   # a closed chart: the copier stops sending after this
 TIMEFRAMES = ("M1", "M5", "M15", "H1", "H4", "D1")   # the chart's buttons (Brano, 2026-10-22)
 
@@ -62,11 +62,12 @@ class RatesIn(BaseModel):
     profile: str = Field(pattern=r"^[a-z0-9][a-z0-9_-]{0,39}$")
     symbol: str = Field(min_length=1, max_length=40)
     bars: list[list[float]] = Field(default_factory=list, max_length=1000)
+    name: str | None = Field(default=None, max_length=40)   # the broker's spelling it found (XAUUSD -> XAUUSD.s)
 
 
 @router.post("/rates", status_code=204)
 def push_rates(payload: RatesIn) -> None:
-    _rates[(payload.profile, payload.symbol)] = (time.monotonic(), payload.bars)
+    _rates[(payload.profile, payload.symbol)] = (time.monotonic(), payload.bars, payload.name)
 
 
 @router.get("/chart")
@@ -79,7 +80,7 @@ def chart(profile: str, symbol: str, tf: str = "M5") -> dict:
     got = _rates.get((profile, key))
     if not got:
         return {"bars": [], "pending": True}
-    return {"bars": got[1], "age_s": round(time.monotonic() - got[0], 1)}
+    return {"bars": got[1], "name": got[2], "age_s": round(time.monotonic() - got[0], 1)}
 
 
 @router.get("/live")

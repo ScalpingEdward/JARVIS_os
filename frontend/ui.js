@@ -12,7 +12,8 @@
       after = Math.max(after, c.seq);
       if (c.do === 'open_view') { window.AURON_chart?.close(); window.AURON_view?.open(c.view); }
       else if (c.do === 'close') { window.AURON_chart?.close(); window.AURON_view?.close(); }
-      else if (c.do === 'show_chart') { window.AURON_view?.close(); window.AURON_chart?.open(c.ticket, c.copier); }
+      else if (c.do === 'show_chart') { window.AURON_view?.close(); window.AURON_chart?.open(c.ticket, c.copier, c.tf); }
+      else if (c.do === 'show_symbol') { window.AURON_view?.close(); window.AURON_chart?.symbol(c.symbol, c.copier, c.tf); }
     }
   }
   poll();
