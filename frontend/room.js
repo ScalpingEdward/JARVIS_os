@@ -56,7 +56,12 @@
 
   // ---- WebGL ------------------------------------------------------------------------------
   const canvas = document.getElementById('room');
-  const gl = canvas.getContext('webgl', { antialias: false, alpha: false, powerPreference: 'low-power' });
+  // No WebGL on a phone at all (Brano, 2026-10-22: Safari on the iPhone gave up after a while with "wiederholt
+  // ein Problem aufgetreten"). Upright it only ever showed the still picture anyway -- but the context and the
+  // full room texture stayed on the GPU for nothing. Turned sideways it shows the same picture, still.
+  const phoneDevice = matchMedia('(hover: none) and (pointer: coarse)').matches && Math.min(screen.width, screen.height) <= 700;
+  const gl = phoneDevice ? null : canvas.getContext('webgl', { antialias: false, alpha: false, powerPreference: 'low-power' });
+  if (phoneDevice) canvas.hidden = true;
   const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   const FRAG = `

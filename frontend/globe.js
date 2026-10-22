@@ -24,7 +24,7 @@
   const path = d3.geoPath(projection, g);
   function resize() {
     // the layout size (a zoom is a CSS scale on top), drawn finer the more it is zoomed in
-    dpr = Math.min(devicePixelRatio || 1, 2) * Math.max(1, zoom);
+    dpr = Math.min(devicePixelRatio || 1, matchMedia('(pointer: coarse)').matches ? 1.5 : 2) * Math.max(1, zoom);
     size = host.offsetWidth || host.getBoundingClientRect().width;
     canvas.width = canvas.height = Math.round(size * dpr);
     projection.translate([size / 2, size / 2]).scale(size / 2 * 0.985);

@@ -573,7 +573,11 @@ if (!reduced && matchMedia('(hover: hover)').matches) {
 
 // --- a slow field of points behind everything, near ones linked by faint lines ------------
 (function field() {
-  const c = $('#field'), g = c.getContext('2d');
+  const c = $('#field');
+  // not on a phone: a screen-sized canvas at 3x pixels, redrawn 60 times a second with every pair of
+  // points compared, for a faint shimmer -- memory and battery the iPhone needs more (2026-10-22)
+  if (matchMedia('(hover: none) and (pointer: coarse)').matches && Math.min(screen.width, screen.height) <= 700) { c.hidden = true; return; }
+  const g = c.getContext('2d');
   let w, h, pts;
   const size = () => {
     w = c.width = innerWidth * devicePixelRatio; h = c.height = innerHeight * devicePixelRatio;
