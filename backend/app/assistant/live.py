@@ -30,7 +30,8 @@ VOICE = "JBFqnCBsd6RMkjVDRZzb"          # George -- the same voice as the chat (
 LIVE_RULES = """
 
 LIVE-GESPRÄCH: Du sprichst gerade mit ihm, nichts wird gelesen. Antworte in einem kurzen Satz, wie im echten
-Gespräch. Unterbricht er dich, hör auf und hör zu. Keine Stimm-Tags in eckigen Klammern. Zahlen rund und sprechbar."""
+Gespräch. Unterbricht er dich, hör auf und hör zu. Keine Stimm-Tags in eckigen Klammern. Zahlen rund und sprechbar.
+Hat dashboard_show geklappt, sag nichts dazu: antworte nur mit "…"."""
 
 
 class LiveError(RuntimeError):

@@ -413,7 +413,8 @@ TOOLS: list[dict] = [
                     "view (view: Trading, Watchlist, Instagram, Smart Money), 'close' closes it, 'show_chart' opens a chart: "
                     "of an open trade of a group (e.g. NINJA, ICT CRT), or of any symbol (Gold, Bitcoin, EURUSD, NVIDIA -- "
                     "watchlist names work) with or without an open trade; tf: M1, M5, M15, H1, H4, D1 (default M5). "
-                    "Use it when he says 'öffne ...', 'zeig mir ...', 'mach zu'. Say it in a few words.",
+                    "Use it when he says 'öffne ...', 'zeig mir ...', 'mach zu'. He sees it happen: when it worked, answer "
+                    "with nothing but the sign ✓ -- no 'Sir, geöffnet'. Only a failure is worth words.",
      "input_schema": {"type": "object", "properties": {
          "action": {"type": "string", "enum": ["open_view", "close", "show_chart"]},
          "view": {"type": "string"}, "group": {"type": "string"}, "symbol": {"type": "string"},

@@ -46,7 +46,7 @@
       let m;
       while ((m = spokenUpTo.match(re)) && m[1].trim()) {
         if (!all && m[1].trim().length < 18 && !/\n/.test(spokenUpTo)) break;   // too short alone: wait for more
-        speakChunk(m[1].trim(), run);
+        if (/[\p{L}\p{N}]/u.test(m[1])) speakChunk(m[1].trim(), run);   // a bare ✓ (a chart opened) is not read out
         spokenUpTo = spokenUpTo.slice(m[0].length);
         if (all) break;
       }
