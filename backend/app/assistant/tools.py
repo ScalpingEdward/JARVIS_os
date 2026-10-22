@@ -306,6 +306,30 @@ def _humor(action: str, level: int | None = None, style: str | None = None) -> d
     return {**h, "styles": list(persona.STYLES), "note": "wirkt ab der nächsten Antwort"}
 
 
+def _smart_money_follow(action: str, owner: str | None = None) -> dict:
+    """Stars in Smart Money > Profis, set by word (Brano, 2026-10-22: "alle 74 in die Favoriten")."""
+    from app.smartmoney.service import smart_money_service as sm
+    sig = (sm.backtest() or {}).get("summary", {}).get("by_signaler", [])
+    followed = {f["owner"] for f in sm.follows()}
+    if action == "follow_all_profi":
+        new = [x["owner"] for x in sig if x["verdict"] == "profi" and x["owner"] not in followed]
+        for o in new:
+            sm.follow(o)
+        return {"ok": True, "added": len(new), "now_followed": len(followed) + len(new)}
+    if action == "unfollow_all":
+        for o in followed:
+            sm.unfollow(o)
+        return {"ok": True, "removed": len(followed)}
+    name = (owner or "").strip().lower()
+    pool = [x["owner"] for x in sig] if action == "follow" else sorted(followed)
+    hit = [o for o in pool if o.lower() == name] or [o for o in pool if name and name in o.lower()]
+    if len(hit) != 1:
+        return {"error": f"{len(hit)} Insider passen zu {owner!r}" + (f": {hit[:8]}" if hit else "")}
+    if action == "follow":
+        return {"ok": True, "followed": sm.follow(hit[0])}
+    return {"ok": True, "removed": hit[0] if sm.unfollow(hit[0]) else None}
+
+
 TOOLS: list[dict] = [
     {"name": "trading_status",
      "description": "Brano's copier accounts right now: balance, equity, open positions, P&L per signal group "
@@ -419,6 +443,14 @@ TOOLS: list[dict] = [
          "action": {"type": "string", "enum": ["open_view", "close", "show_chart"]},
          "view": {"type": "string"}, "group": {"type": "string"}, "symbol": {"type": "string"},
          "tf": {"type": "string", "enum": ["M1", "M5", "M15", "H1", "H4", "D1"]}}, "required": ["action"]}},
+    {"name": "smart_money_follow",
+     "description": "The stars in Smart Money > Profis: a starred insider's companies are polled and each new trade of "
+                    "theirs goes to Telegram (category markets). 'follow' / 'unfollow' one by name (part of the name is "
+                    "enough if it is unique), 'follow_all_profi' stars every insider with the verdict Profi, "
+                    "'unfollow_all' removes all stars. Only when Brano asks.",
+     "input_schema": {"type": "object", "properties": {
+         "action": {"type": "string", "enum": ["follow", "unfollow", "follow_all_profi", "unfollow_all"]},
+         "owner": {"type": "string"}}, "required": ["action"]}},
     {"name": "memory",
      "description": "What Brano teaches you, kept for good and put into every conversation: 'remember' stores one "
                     "short fact or rule in his words (\"merk dir ...\", \"ab jetzt ...\") -- only when he asks, never on "
@@ -480,6 +512,7 @@ _RUN: dict[str, Callable[..., dict]] = {
     "dashboard_design": lambda action, theme=None, room=None, card=None, card_style=None, **_:
         _design(action, theme, room, card, card_style),
     "code_request": lambda change, **_: _code_request(change),
+    "smart_money_follow": lambda action, owner=None, **_: _smart_money_follow(action, owner),
     "memory": lambda action, text=None, memory_id=None, **_: _memory(action, text, memory_id),
     "humor": lambda action, level=None, style=None, **_: _humor(action, level, style),
     "dashboard_show": lambda action, view=None, group=None, symbol=None, tf=None, **_: _dashboard_show(action, view, group, symbol, tf),
