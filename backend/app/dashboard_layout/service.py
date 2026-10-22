@@ -22,6 +22,10 @@ CATALOG = {
     "price": ("Kurs", "ein Wert aus der Watchlist, z. B. Gold"),
     "copier": ("Kopierer & Bots", "Status je Konto, Pause/Weiter"),
     "notes": ("Notizen", "To-do, von Hand oder von AURON"),
+    # Brano, 2026-10-22
+    "clock": ("Marktuhr", "welche Session läuft, ICT-Killzones mit Countdown"),
+    "positions": ("Offene Trades", "alle Positionen live, ein Klick öffnet den Chart"),
+    "performance": ("Performance", "Equity-Kurve und Gewinn pro Tag, Woche, Monat je Gruppe"),
 }
 DEFAULT = {"left": ["trading", "watch"], "right": ["insta", "mail", "smart"], "hidden": [], "custom": {}}
 MAX_CARDS = 14

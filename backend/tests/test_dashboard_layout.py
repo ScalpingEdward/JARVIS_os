@@ -48,3 +48,10 @@ def test_auron_tools() -> None:
     n = _notes("add", text="EA für ORB besprechen")["notes"][0]
     assert n["by"] == "auron" and not n["done"]
     assert _notes("done", note_id=n["id"])["notes"][0]["done"] is True
+
+
+def test_the_market_clock_open_trades_and_performance_cards_can_be_added() -> None:
+    for t in ("clock", "positions", "performance"):
+        lay.add(t, "left")
+    labels = set(lay.get()["labels"].values())
+    assert {"Marktuhr", "Offene Trades", "Performance"} <= labels

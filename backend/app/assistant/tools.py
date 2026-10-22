@@ -489,7 +489,8 @@ TOOLS: list[dict] = [
          "action": {"type": "string", "enum": ["list", "place", "add", "remove", "reset"]},
          "card": {"type": "string", "description": "card name as listed, e.g. Instagram, Smart Money, Kurs: Gold"},
          "side": {"type": "string", "enum": ["left", "right", "hidden"]}, "position": {"type": "integer"},
-         "card_type": {"type": "string", "enum": ["price", "copier", "notes"]}, "name": {"type": "string"}},
+         "card_type": {"type": "string", "enum": ["price", "copier", "notes", "clock", "positions", "performance"]},
+         "name": {"type": "string"}},
          "required": ["action"]}},
     {"name": "notes",
      "description": "The notes/to-do card on the dashboard: 'list', 'add' (text), 'done' / 'open' / 'delete' (note_id). "

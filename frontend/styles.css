@@ -1142,3 +1142,17 @@ body.card-drag, body.card-drag * { cursor: grabbing !important; user-select: non
   background: var(--accent); box-shadow: 0 0 14px var(--accent); }
 .drop-mark[hidden] { display: none; }
 .card-menu span.off { opacity: .35; cursor: default; }
+
+/* added cards: Marktuhr, Offene Trades, Performance (layout.js) */
+.mc-row, .op-row, .op-sum { grid-template-columns: 10px minmax(0, 1fr) auto; }
+.mc-kz { margin-top: 8px; color: var(--muted); }
+.mc-kz b { color: var(--accent); font-weight: 600; }
+.op-row { cursor: pointer; }
+.op-row:hover .ac-name { color: var(--accent); }
+.op-row small { color: var(--faint); font-size: 10.5px; margin-left: 4px; }
+.op-sum { font-weight: 700; }
+.ac-eq.up, .pf-grid .up, .tile-figure .up { color: var(--up); } .ac-eq.down, .pf-grid .down, .tile-figure .down { color: var(--down); }
+.pf-note { display: block; font-size: 10.5px; margin-top: -2px; }
+.pf-grid { display: grid; grid-template-columns: minmax(0, 1fr) repeat(3, auto); gap: 4px 12px; margin-top: 8px; font-size: 12.5px; align-items: center; }
+.pf-grid small { font-size: 9.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--faint); text-align: right; }
+.pf-grid b { font-family: var(--mono); font-weight: 500; text-align: right; }

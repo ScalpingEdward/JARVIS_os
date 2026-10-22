@@ -70,15 +70,108 @@
           <input type="checkbox" data-note="${n.id}" ${n.done ? 'checked' : ''} /><span>${escH(n.text)}</span>
           ${n.by === 'auron' ? '<small>AURON</small>' : ''}<button type="button" data-del="${n.id}" title="Löschen">✕</button></label>`).join('')
           || '<p class="muted ac-note">Noch nichts notiert. Auch per Chat: „Notier mir …“</p>'}</div>`;
+    } else if (c.type === 'clock') {
+      paintClock(title, badge, body);
+    } else if (c.type === 'positions') {
+      paintPositions(title, badge, body);
+    } else if (c.type === 'performance') {
+      paintPerformance(title, badge, body);
     }
   }
+
+  // ---- Marktuhr: the sessions in their own time zones (summer time included), ICT killzones in New York
+  // time. Killzone hours are the common ICT ones -- v1, to be checked against his own trading.
+  const SESSIONS = [['Asien', 'Asia/Tokyo', 9 * 60, 18 * 60], ['London', 'Europe/London', 8 * 60, 17 * 60],
+    ['New York', 'America/New_York', 8 * 60, 17 * 60]];   // forex sessions, local hours
+  const KILLZONES = [['Asien', 20 * 60, 24 * 60], ['London', 2 * 60, 5 * 60], ['NY AM', 7 * 60, 10 * 60],
+    ['London Close', 10 * 60, 12 * 60], ['NY PM', 13 * 60 + 30, 16 * 60]];
+  function zoneNow(tz) {
+    const p = Object.fromEntries(new Intl.DateTimeFormat('en-GB', { timeZone: tz, hourCycle: 'h23', weekday: 'short', hour: '2-digit', minute: '2-digit' })
+      .formatToParts(new Date()).map((x) => [x.type, x.value]));
+    return { min: Number(p.hour) * 60 + Number(p.minute), weekend: p.weekday === 'Sat' || p.weekday === 'Sun' };
+  }
+  const dur = (m) => (m >= 60 ? `${Math.floor(m / 60)}:${String(m % 60).padStart(2, '0')} h` : `${m} min`);
+  function paintClock(title, badge, body) {
+    title.textContent = 'Marktuhr';
+    const rows = SESSIONS.map(([name, tz, a, b]) => {
+      const { min, weekend } = zoneNow(tz), open = !weekend && min >= a && min < b;
+      const txt = weekend ? 'Wochenende' : open ? `offen · noch ${dur(b - min)}` : `öffnet in ${dur((a - min + 1440) % 1440)}`;
+      return `<div class="ac-row mc-row"><span class="dot ${open ? 'ok' : ''}"></span><span class="ac-name">${name}</span><span class="ac-eq">${txt}</span></div>`;
+    }).join('');
+    const ny = zoneNow('America/New_York');
+    const kz = ny.weekend ? null : KILLZONES.find(([, a, b]) => ny.min >= a && ny.min < b);
+    const next = KILLZONES.map(([n, a]) => [n, (a - ny.min + 1440) % 1440]).filter(([, m]) => m > 0).sort((x, y) => x[1] - y[1])[0];
+    badge.textContent = kz ? kz[0] : '–'; badge.className = `badge ac-badge ${kz ? 'live' : ''}`;
+    body.innerHTML = rows + `<p class="ac-note mc-kz">${kz ? `Killzone <b>${kz[0]}</b> · noch ${dur(kz[2] - ny.min)}`
+      : ny.weekend ? 'Keine Killzone am Wochenende' : `Nächste Killzone: <b>${next[0]}</b> in ${dur(next[1])}`}</p>`;
+  }
+
+  // ---- Offene Trades: every position live (app.js keeps overview fresh every second) ----
+  const liveOverview = () => (typeof overview !== 'undefined' && overview) || copier;
+  function paintPositions(title, badge, body) {
+    title.textContent = 'Offene Trades';
+    const accs = liveOverview()?.accounts || [];
+    const all = accs.flatMap((a) => (a.open_positions || []).map((p) => ({ ...p, copier: a.profile, cur: a.currency })));
+    badge.textContent = all.length;
+    if (!all.length) { body.innerHTML = '<p class="muted ac-note">Keine offenen Trades.</p>'; return; }
+    const sum = all.reduce((t, p) => t + (p.profit || 0), 0);
+    body.innerHTML = all.map((p) => `<div class="ac-row op-row" data-tk="${p.ticket}" data-cp="${escH(p.copier)}" title="Chart öffnen">
+        <span class="dot ${p.side === 'buy' ? 'ok' : 'bad'}"></span>
+        <span class="ac-name">${escH(p.symbol)} <small>${p.side.toUpperCase()} ${fmtN(p.volume)} · ${escH(p.group || '')}</small></span>
+        <span class="ac-eq ${p.profit > 0 ? 'up' : p.profit < 0 ? 'down' : ''}">${p.profit > 0 ? '+' : ''}${fmtN(p.profit)}</span></div>`).join('')
+      + `<div class="ac-row op-sum"><span></span><span class="ac-name">Summe</span><span class="ac-eq ${sum > 0 ? 'up' : sum < 0 ? 'down' : ''}">${sum > 0 ? '+' : ''}${fmtN(sum)} ${escH(all[0].cur || '')}</span></div>`;
+  }
+
+  // ---- Performance: equity of all accounts over 7 days, and per group today / week / month ----
+  let equity = null, equityAt = 0;
+  function paintPerformance(title, badge, body) {
+    title.textContent = 'Performance';
+    const accs = liveOverview()?.accounts || [];
+    const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).getTime() / 1000;
+    const g = {};
+    for (const a of accs) {
+      for (const x of a.groups || []) { const r = g[x.name] ||= { today: 0, week: 0, month: 0 }; r.today += x.pnl_today; r.week += x.pnl_week; }
+      for (const t of a.closed || []) if (t.closed >= monthStart) (g[t.group] ||= { today: 0, week: 0, month: 0 }).month += t.profit;
+    }
+    const month = Object.values(g).reduce((s, r) => s + r.month, 0), cur = accs[0]?.currency || '';
+    badge.textContent = 'Monat'; badge.className = 'badge ac-badge';
+    const sign = (v) => `<span class="${v > 0 ? 'up' : v < 0 ? 'down' : ''}">${v > 0 ? '+' : ''}${fmtN(v)}</span>`;
+    const pts = equity || [];
+    body.innerHTML = `<div class="tile-figure"><b class="${month > 0 ? 'up' : month < 0 ? 'down' : ''}">${month > 0 ? '+' : ''}${fmtN(month)}</b> <small class="muted">${escH(cur)} diesen Monat</small></div>
+      ${pts.length > 2 ? spark(pts, pts[pts.length - 1] >= pts[0]) + '<small class="muted pf-note">Equity aller Konten · 7 Tage</small>' : ''}
+      <div class="pf-grid"><span></span><small>Heute</small><small>Woche</small><small>Monat</small>
+      ${Object.entries(g).filter(([, r]) => r.today || r.week || r.month).map(([n, r]) => `<span class="ac-name">${escH(n)}</span><b>${sign(r.today)}</b><b>${sign(r.week)}</b><b>${sign(r.month)}</b>`).join('')}</div>`;
+  }
+  async function refreshEquity() {
+    if (Date.now() - equityAt < 5 * 60000 && equity) return;
+    try {
+      const h = await call('GET', '/v1/copier/history?hours=168');
+      // summed across accounts per five minutes -- only where every account reported, else the sum jumps
+      const sums = {}, counts = {}, n = Object.keys(h).length;
+      for (const pts of Object.values(h)) for (const p of pts) {
+        const k = Math.round(new Date(p.at).getTime() / 300000); sums[k] = (sums[k] || 0) + p.equity; counts[k] = (counts[k] || 0) + 1;
+      }
+      const full = Object.keys(sums).map(Number).sort((a, b) => a - b).filter((k) => counts[k] === n).map((k) => sums[k]);
+      const step = Math.max(1, Math.floor(full.length / 160));
+      equity = full.filter((_, i) => i % step === 0); equityAt = Date.now();
+    } catch (e) { console.warn('equity', e); }
+  }
+
+  // the live cards repaint every second (clock, trades), performance with the data refresh
+  setInterval(() => {
+    document.querySelectorAll('.tile.added.a-clock, .tile.added.a-positions').forEach((el) => {
+      const c = layout?.custom[el.dataset.card]; if (c) paintCard(el, c);
+    });
+  }, 1000);
 
   // clicks inside added cards stay in the card
   document.addEventListener('click', async (e) => {
     const card = e.target.closest('.tile.added');
     if (!card) return;
     e.stopPropagation();
-    const cp = e.target.closest('[data-cp]'), del = e.target.closest('[data-del]');
+    const tk = e.target.closest('[data-tk]');
+    if (tk) { window.AURON_chart?.open(tk.dataset.tk, tk.dataset.cp); return; }
+    const cp = e.target.closest('button[data-cp]'), del = e.target.closest('[data-del]');
     if (cp) {
       cp.disabled = true;
       try { await call('POST', '/v1/copier/commands', { profile: cp.dataset.cp, action: cp.dataset.act }); cp.textContent = '…'; }
@@ -123,7 +216,8 @@
     const types = new Set(Object.values(layout?.custom || {}).map((c) => c.type));
     try {
       if (types.has('price')) watch = await call('GET', '/v1/watchlist');
-      if (types.has('copier')) copier = await call('GET', '/v1/copier/overview');
+      if (types.has('copier') || types.has('positions') || types.has('performance')) copier = await call('GET', '/v1/copier/overview');
+      if (types.has('performance')) await refreshEquity();
       if (types.has('notes')) notes = await call('GET', '/v1/dashboard/notes');
     } catch (e) { console.warn('cards', e); }
     render();
