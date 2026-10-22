@@ -51,6 +51,11 @@ def push_live(payload: LiveIn) -> dict:
 _chart_wanted: dict[tuple[str, str], float] = {}     # (profile, symbol) -> last asked
 _rates: dict[tuple[str, str], tuple[float, list]] = {}
 CHART_FOR_S = 30   # a closed chart: the copier stops sending after this
+TIMEFRAMES = ("M1", "M5", "M15", "H1", "H4", "D1")   # the chart's buttons (Brano, 2026-10-22)
+
+
+def _key(symbol: str, tf: str) -> str:
+    return symbol if tf == "M5" else f"{symbol}@{tf}"
 
 
 class RatesIn(BaseModel):
@@ -65,10 +70,13 @@ def push_rates(payload: RatesIn) -> None:
 
 
 @router.get("/chart")
-def chart(profile: str, symbol: str) -> dict:
+def chart(profile: str, symbol: str, tf: str = "M5") -> dict:
     """The dashboard asks every 2 s while the chart is open; the first ask starts the copier sending."""
-    _chart_wanted[(profile, symbol)] = time.monotonic()
-    got = _rates.get((profile, symbol))
+    if tf not in TIMEFRAMES:
+        raise HTTPException(status_code=422, detail=f"timeframe {tf!r}; es gibt {list(TIMEFRAMES)}")
+    key = _key(symbol, tf)
+    _chart_wanted[(profile, key)] = time.monotonic()
+    got = _rates.get((profile, key))
     if not got:
         return {"bars": [], "pending": True}
     return {"bars": got[1], "age_s": round(time.monotonic() - got[0], 1)}

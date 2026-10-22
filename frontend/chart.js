@@ -4,14 +4,21 @@
 // edge, over the planet. Esc or ✕ closes it; the copier stops sending 30 s later on its own.
 // Real trading from it (Brano, 2026-10-22), always after a confirmation: drag the SL or TP line and
 // the copier moves it in MT5; Buy / Sell below opens a trade by hand on the same account and symbol.
+// Timeframes M1..D1 at the top, and every open trade listed below the chart -- a click shows its chart,
+// its ✕ closes it (after the same question as everywhere else).
 (() => {
   const LIB = 'https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js';
+  const TFS = ['M1', 'M5', 'M15', 'H1', 'H4', 'D1'];
+  let tf = 'M5';
   const box = document.createElement('section');
   box.className = 'pos-chart'; box.hidden = true;
   box.innerHTML = `<header class="pc-head"><b class="pc-title"></b><span class="pc-pl mono"></span>
+      <span class="pc-tf">${TFS.map((t) => `<button type="button" data-tf="${t}">${t}</button>`).join('')}</span>
       <span class="pc-btns"><button type="button" class="pc-close-pos">Position schließen</button>
       <button type="button" class="pc-x" aria-label="Chart schließen">✕</button></span></header>
     <div class="pc-body"></div><p class="pc-wait muted">Hole die Kerzen aus MT5 …</p>
+    <div class="pc-list"><table><thead><tr><th>Symbol</th><th>Seite</th><th class="num">Lots</th><th class="num">Einstieg</th>
+      <th class="num">SL</th><th class="num">TP</th><th>Gruppe</th><th class="num">P/L</th><th></th></tr></thead><tbody></tbody></table></div>
     <footer class="pc-trade"><label>Lots <input class="pc-lots" type="number" step="0.01" min="0.01" /></label>
       <label>SL <input class="pc-sl" type="number" step="any" placeholder="–" /></label>
       <label>TP <input class="pc-tp" type="number" step="any" placeholder="–" /></label>
@@ -38,10 +45,38 @@
       top: `${Math.round(Math.min(l.top, r.top))}px`, bottom: `${Math.round(innerHeight - Math.max(l.bottom, r.bottom))}px` });
   }
 
+  const openAll = () => (window.overview?.accounts || overview?.accounts || []).flatMap((a) => (a.open_positions || []).map((p) => ({ ...p, copier: a.profile })));
   function current() {   // the position as the last report and the live numbers know it
-    const all = (window.overview?.accounts || overview?.accounts || []).flatMap((a) => (a.open_positions || []).map((p) => ({ ...p, copier: a.profile })));
-    return all.find((p) => p.ticket === pos.ticket) || null;
+    return openAll().find((p) => p.ticket === pos.ticket) || null;
   }
+
+  function list() {      // every open trade, the shown one marked; ✕ closes, a click shows its chart
+    const n = (v) => (v ? String(v) : '–');
+    box.querySelector('.pc-list tbody').innerHTML = openAll().map((p) => {
+      const busy = typeof closing !== 'undefined' && closing.has(p.ticket);
+      return `<tr data-ticket="${p.ticket}" data-copier="${esc(p.copier)}" class="${p.ticket === pos.ticket ? 'on' : ''}">
+        <td>${esc(p.symbol)}</td><td class="${p.side === 'buy' ? 'up' : 'down'}">${p.side.toUpperCase()}</td>
+        <td class="num mono">${fmt(p.volume)}</td><td class="num mono">${n(p.price_open)}</td><td class="num mono">${n(p.sl)}</td>
+        <td class="num mono">${n(p.tp)}</td><td>${esc(p.group || '')}</td>
+        <td class="num mono ${p.profit > 0 ? 'up' : p.profit < 0 ? 'down' : ''}">${p.profit > 0 ? '+' : ''}${fmt(p.profit || 0)}</td>
+        <td><span class="pos-x${busy ? ' busy' : ''}" role="button" title="Diese Position schließen" data-t="${p.ticket}" data-p="${esc(p.copier)}"
+          data-d="${esc(`${p.side.toUpperCase()} ${p.symbol} ${fmt(p.volume)} Lots (#${p.ticket})`)}">${busy ? '…' : '✕'}</span></td></tr>`;
+    }).join('') || '<tr><td colspan="9" class="muted">Keine offenen Trades</td></tr>';
+  }
+  box.querySelector('.pc-list').addEventListener('click', (e) => {
+    const x = e.target.closest('.pos-x');
+    if (x) { window.closeOne?.(x); return; }
+    const row = e.target.closest('tr[data-ticket]');
+    if (row && Number(row.dataset.ticket) !== pos?.ticket) pick(row.dataset.ticket, row.dataset.copier);
+  });
+  box.querySelector('.pc-tf').addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-tf]');
+    if (!b || b.dataset.tf === tf) return;
+    tf = b.dataset.tf; marks(); series?.setData([]); wait.hidden = false;
+    load().then(() => chart?.timeScale().scrollToRealTime());
+  });
+  const marks = () => box.querySelectorAll('.pc-tf button').forEach((b) => b.classList.toggle('on', b.dataset.tf === tf));
+  marks();
 
   function header() {
     const p = current() || pos;
@@ -110,9 +145,9 @@
 
   async function load() {
     if (!pos) return;
-    header();
+    header(); list();
     let d;
-    try { d = await (await fetch(`${API}/v1/copier/chart?profile=${encodeURIComponent(pos.copier)}&symbol=${encodeURIComponent(pos.symbol)}`)).json(); } catch { return; }
+    try { d = await (await fetch(`${API}/v1/copier/chart?profile=${encodeURIComponent(pos.copier)}&symbol=${encodeURIComponent(pos.symbol)}&tf=${tf}`)).json(); } catch { return; }
     if (!d.bars?.length) { wait.hidden = false; return; }
     wait.hidden = true;
     series.setData(d.bars.map(([t, o, h, l, c]) => ({ time: local(t), open: o, high: h, low: l, close: c })));

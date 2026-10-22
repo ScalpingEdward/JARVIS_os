@@ -268,10 +268,16 @@ def report_inputs() -> tuple[dict, list[dict], list[dict]]:
 
 
 def rates(symbol: str, n: int = 240) -> list[list[float]]:
-    """The last n five-minute candles as [time (real UTC), open, high, low, close] -- what the dashboard's
-    chart draws when Brano clicks a position. MT5 stamps them in server time, like the deals."""
+    """The last n candles as [time (real UTC), open, high, low, close] -- what the dashboard's chart draws
+    when Brano clicks a position. Five-minute ones, or "XAUUSD.s@H1" for another timeframe (M1..D1).
+    MT5 stamps them in server time, like the deals."""
+    symbol, _, tf = symbol.partition("@")
+    tf = tf or "M5"
+    if tf not in ("M1", "M5", "M15", "H1", "H4", "D1"):
+        return []
+    frame = getattr(mt5, f"TIMEFRAME_{tf}")
     mt5.symbol_select(symbol, True)
-    r = mt5.copy_rates_from_pos(symbol, mt5.TIMEFRAME_M5, 0, n)
+    r = mt5.copy_rates_from_pos(symbol, frame, 0, n)
     if r is None:
         return []
     off = _server_offset_seconds(symbol)

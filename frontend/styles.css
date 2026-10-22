@@ -1040,7 +1040,7 @@ html.desk .core.turning { cursor: grabbing; }
 .pos-x:hover { background: rgba(242,100,124,.25); border-color: rgba(242,100,124,.7); }
 .pos-x.busy { color: var(--muted); border-color: var(--line-2); background: none; cursor: default; }
 /* a position's chart (chart.js): large, over the planet, edge to edge with the side cards */
-.pos-chart { position: fixed; z-index: 9; display: grid; grid-template-rows: auto 1fr auto; border-radius: 18px; padding: 12px 16px 10px;
+.pos-chart { position: fixed; z-index: 9; display: grid; grid-template-rows: auto 1fr auto auto; border-radius: 18px; padding: 12px 16px 10px;
   background: rgba(8, 12, 20, .92); border: 1px solid var(--line-2); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
   box-shadow: 0 30px 80px rgba(0,0,0,.55); }
 .pos-chart[hidden] { display: none; }
@@ -1084,3 +1084,16 @@ html.desk .core.turning { cursor: grabbing; }
 .pc-trade button { font: inherit; font-size: 13px; font-weight: 700; padding: 6px 18px; border-radius: 999px; border: 0; cursor: pointer; color: #04120c; }
 .pc-trade .pc-buy { background: var(--up); } .pc-trade .pc-sell { background: var(--down); color: #fff; }
 .pc-trade small { margin-left: auto; font-size: 11px; }
+
+/* chart: timeframes and the list of open trades (chart.js) */
+.pc-tf { display: flex; gap: 2px; padding: 2px; border-radius: 999px; background: rgba(0,0,0,.25); border: 1px solid var(--line); }
+.pc-tf button { font: inherit; font-size: 11.5px; padding: 3px 9px; border-radius: 999px; border: 0; background: none; color: var(--muted); cursor: pointer; }
+.pc-tf button.on { background: rgba(255,255,255,.12); color: var(--text); }
+.pc-list { max-height: 26vh; overflow: auto; margin-top: 6px; border-top: 1px solid var(--line); }
+.pc-list table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.pc-list th { position: sticky; top: 0; background: rgba(8,12,20,.92); color: var(--muted); font-weight: 500; text-align: left; padding: 5px 8px; font-size: 11px; letter-spacing: .04em; }
+.pc-list td { padding: 4px 8px; border-top: 1px solid rgba(255,255,255,.04); white-space: nowrap; }
+.pc-list .num { text-align: right; }
+.pc-list tr[data-ticket] { cursor: pointer; }
+.pc-list tr[data-ticket]:hover { background: rgba(255,255,255,.04); }
+.pc-list tr.on { background: rgba(255,255,255,.08); }

@@ -102,3 +102,18 @@ def test_an_open_chart_asks_its_copier_for_candles_until_it_is_closed(monkeypatc
     t = api.time.monotonic() + api.CHART_FOR_S + 1
     monkeypatch.setattr(api.time, "monotonic", lambda: t)
     assert api.push_live(live) == {"want_rates": []}
+
+
+def test_a_chart_in_another_timeframe_asks_for_symbol_at_timeframe():
+    import pytest
+    from fastapi import HTTPException
+    from app.copier_status import api
+    api._chart_wanted.clear(); api._rates.clear()
+    live = api.LiveIn(profile="demo", balance=1, equity=1)
+    api.chart("demo", "XAUUSD.s", tf="H1")
+    assert api.push_live(live) == {"want_rates": ["XAUUSD.s@H1"]}
+    api.push_rates(api.RatesIn(profile="demo", symbol="XAUUSD.s@H1", bars=[[1, 2, 3, 1, 2]]))
+    assert api.chart("demo", "XAUUSD.s", tf="H1")["bars"] == [[1, 2, 3, 1, 2]]
+    assert api.chart("demo", "XAUUSD.s")["bars"] == []          # M5 is its own
+    with pytest.raises(HTTPException):
+        api.chart("demo", "XAUUSD.s", tf="W9")
