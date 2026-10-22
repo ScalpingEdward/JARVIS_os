@@ -1104,12 +1104,11 @@ html.desk .core.turning { cursor: grabbing; }
 .chat.open .chat-form { flex: 1; min-width: 0; }
 .chat-form button.att { display: grid; place-items: center; }
 .auron-ring { position: relative; flex: none; width: 54px; height: 54px; border-radius: 50%; cursor: pointer; padding: 0;
-  border: 2.5px solid var(--accent); background: radial-gradient(circle, color-mix(in srgb, var(--accent) 22%, transparent) 0 40%, rgba(4,10,20,.55) 72%);
+  border: 2.5px solid var(--accent); background: transparent;
   box-shadow: 0 0 18px color-mix(in srgb, var(--accent) 65%, transparent), inset 0 0 12px color-mix(in srgb, var(--accent) 55%, transparent);
-  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); transition: transform .15s, box-shadow .2s; -webkit-touch-callout: none; user-select: none; }
+  transition: transform .15s, box-shadow .2s; -webkit-touch-callout: none; user-select: none; }
 .auron-ring:hover { transform: scale(1.06); box-shadow: 0 0 28px color-mix(in srgb, var(--accent) 80%, transparent), inset 0 0 14px color-mix(in srgb, var(--accent) 65%, transparent); }
-.auron-ring i { position: absolute; inset: 7px; border-radius: 50%; border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
-  border-top-color: var(--accent); animation: ringspin 6s linear infinite; }
+.auron-ring i { display: none; }   /* one ring, like the logo (Brano, 2026-10-22) */
 @keyframes ringspin { to { transform: rotate(360deg); } }
 .auron-ring.rec { border-color: var(--down); box-shadow: 0 0 22px rgba(242,100,124,.7); animation: micpulse 1.2s ease-in-out infinite; }
 .auron-ring.rec i { border-top-color: var(--down); animation-duration: 1.2s; }
