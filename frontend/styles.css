@@ -1117,3 +1117,6 @@ html.desk .core.turning { cursor: grabbing; }
 .auron-ring[data-state="on"] { border-color: var(--up); box-shadow: 0 0 24px rgba(61,220,151,.65); animation: livepulse 1.6s infinite; }
 .auron-ring[data-state="on"] i { border-top-color: var(--up); animation-duration: 2s; }
 .auron-ring[data-state="on"][data-mode="speaking"] { border-color: var(--accent); box-shadow: 0 0 30px color-mix(in srgb, var(--accent) 85%, transparent); }
+/* chart: all open trades together (chart.js) */
+.pc-sum { white-space: nowrap; font-size: 13px; color: var(--muted); padding-left: 14px; border-left: 1px solid var(--line-2); }
+.pc-list tfoot td { position: sticky; bottom: 0; background: rgba(8,12,20,.92); font-weight: 700; padding: 6px 8px; border-top: 1px solid var(--line-2); }

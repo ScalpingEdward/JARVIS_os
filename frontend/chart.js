@@ -12,13 +12,13 @@
   let tf = 'M5';
   const box = document.createElement('section');
   box.className = 'pos-chart'; box.hidden = true;
-  box.innerHTML = `<header class="pc-head"><b class="pc-title"></b><span class="pc-pl mono"></span>
+  box.innerHTML = `<header class="pc-head"><b class="pc-title"></b><span class="pc-pl mono"></span><span class="pc-sum mono"></span>
       <span class="pc-tf">${TFS.map((t) => `<button type="button" data-tf="${t}">${t}</button>`).join('')}</span>
       <span class="pc-btns"><button type="button" class="pc-close-pos">Position schließen</button>
       <button type="button" class="pc-x" aria-label="Chart schließen">✕</button></span></header>
     <div class="pc-body"></div><p class="pc-wait muted">Hole die Kerzen aus MT5 …</p>
     <div class="pc-list"><table><thead><tr><th>Symbol</th><th>Seite</th><th class="num">Lots</th><th class="num">Einstieg</th>
-      <th class="num">SL</th><th class="num">TP</th><th>Gruppe</th><th class="num">P/L</th><th></th></tr></thead><tbody></tbody></table></div>
+      <th class="num">SL</th><th class="num">TP</th><th>Gruppe</th><th class="num">P/L</th><th></th></tr></thead><tbody></tbody><tfoot></tfoot></table></div>
     <footer class="pc-trade"><label>Lots <input class="pc-lots" type="number" step="0.01" min="0.01" /></label>
       <label>SL <input class="pc-sl" type="number" step="any" placeholder="–" /></label>
       <label>TP <input class="pc-tp" type="number" step="any" placeholder="–" /></label>
@@ -45,14 +45,24 @@
       top: `${Math.round(Math.min(l.top, r.top))}px`, bottom: `${Math.round(innerHeight - Math.max(l.bottom, r.bottom))}px` });
   }
 
-  const openAll = () => (window.overview?.accounts || overview?.accounts || []).flatMap((a) => (a.open_positions || []).map((p) => ({ ...p, copier: a.profile })));
+  const openAll = () => (window.overview?.accounts || overview?.accounts || []).flatMap((a) => (a.open_positions || []).map((p) => ({ ...p, copier: a.profile, cur: a.currency })));
+  // all open trades together (Brano, 2026-10-22): one sum per currency, in the header and under the list
+  const total = (all) => {
+    const by = {};
+    all.forEach((p) => { by[p.cur || ''] = (by[p.cur || ''] || 0) + (p.profit || 0); });
+    return Object.entries(by).map(([c, v]) => `<span class="${v > 0 ? 'up' : v < 0 ? 'down' : ''}">${v > 0 ? '+' : ''}${fmt(v)} ${esc(c)}</span>`).join(' · ');
+  };
   function current() {   // the position as the last report and the live numbers know it
     return openAll().find((p) => p.ticket === pos.ticket) || null;
   }
 
   function list() {      // every open trade, the shown one marked; ✕ closes, a click shows its chart
-    const n = (v) => (v ? String(v) : '–');
-    box.querySelector('.pc-list tbody').innerHTML = openAll().map((p) => {
+    const n = (v) => (v ? String(v) : '–'), all = openAll();
+    const sum = all.length ? total(all) : '';
+    box.querySelector('.pc-sum').innerHTML = all.length ? `Alle offen (${all.length}): ${sum}` : '';
+    box.querySelector('.pc-list tfoot').innerHTML = all.length > 1
+      ? `<tr><td colspan="7">Summe · ${all.length} Trades</td><td class="num mono">${sum}</td><td></td></tr>` : '';
+    box.querySelector('.pc-list tbody').innerHTML = all.map((p) => {
       const busy = typeof closing !== 'undefined' && closing.has(p.ticket);
       return `<tr data-ticket="${p.ticket}" data-copier="${esc(p.copier)}" class="${p.ticket === pos.ticket ? 'on' : ''}">
         <td>${esc(p.symbol)}</td><td class="${p.side === 'buy' ? 'up' : 'down'}">${p.side.toUpperCase()}</td>
