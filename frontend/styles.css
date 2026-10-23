@@ -1170,3 +1170,4 @@ body.card-drag, body.card-drag * { cursor: grabbing !important; user-select: non
 .mv-body canvas { display: block; cursor: grab; }
 .mv-stl { font-size: 12.5px; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--line-2); background: rgba(255,255,255,.05); color: var(--text); text-decoration: none; }
 .mv-stl:hover { border-color: var(--accent); }
+.ps-mem > div.auto { border-style: dashed; }

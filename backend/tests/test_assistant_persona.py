@@ -42,3 +42,35 @@ def test_nonsense_is_refused():
         persona.remember("x" * 301)
     with pytest.raises(persona.PersonaError):
         persona.forget(999)
+
+
+def test_auron_learns_from_branos_words_and_forgets_what_is_over(monkeypatch):
+    from app.assistant import learn
+    monkeypatch.setattr(learn, "decide", lambda u, a, client=None: {"add": [
+        {"text": "Brano arbeitet im Schichtdienst.", "kind": "fact"},
+        {"text": "Brano ist bis 18 Uhr auf Arbeit.", "kind": "now", "days": 0.5},
+        {"text": "Sein Passwort ist hunter2.", "kind": "fact"}], "drop": []})
+    stored = learn.learn("Ich bin jetzt auf Arbeit bis 18 Uhr, Schichtdienst halt.", "Viel Erfolg, Sir.")
+    assert [m["text"] for m in stored] == ["Brano arbeitet im Schichtdienst.", "Brano ist bis 18 Uhr auf Arbeit."]
+    assert all(m["by"] == "auron" for m in stored)
+    p = system_prompt("de")
+    assert "Schichtdienst" in p and "Gerade aktuell" in p and "hunter2" not in p
+    work = next(m for m in persona.memories() if m["kind"] == "now")
+    fact = next(m for m in persona.memories() if m["kind"] == "fact")
+    monkeypatch.setattr(learn, "decide", lambda u, a, client=None: {"add": [], "drop": [work["id"], fact["id"]]})
+    learn.learn("So, ich bin wieder zu Hause, endlich.", "Wie war die Arbeit, Sir?")
+    assert [m["text"] for m in persona.memories()] == ["Brano arbeitet im Schichtdienst."]   # facts are never dropped
+
+
+def test_secrets_and_short_words_teach_nothing(monkeypatch):
+    from app.assistant import learn
+    monkeypatch.setattr(learn, "decide", lambda *a, **k: (_ for _ in ()).throw(AssertionError("must not ask")))
+    assert learn.learn("ok", "") == []
+    assert learn.learn("Meine IBAN ist DE12 3456 7890 1234 5678 90", "") == []
+
+
+def test_a_now_entry_runs_out_by_itself(monkeypatch):
+    m = persona.remember("Brano ist beim Zahnarzt.", by="auron", kind="now", days=1)
+    assert m in persona.memories()
+    monkeypatch.setattr(persona.time, "time", lambda: m["until"] + 1)
+    assert persona.memories() == []

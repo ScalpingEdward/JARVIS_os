@@ -120,7 +120,15 @@
     note: (text, extra = {}) => { turns.push({ role: 'assistant', content: text, ...extra }); save(); if (dock.classList.contains('open')) render(); },
     refresh: () => { if (dock.classList.contains('open')) render(); },
     // the live talk (live.js): what both sides said goes into the chat; the chat's own voice keeps quiet
-    live: (role, text) => { turns.push({ role, content: text }); save(); open(true); },
+    live: (role, text) => {
+      turns.push({ role, content: text }); save(); open(true);
+      // the live talk runs in the browser: Brano's words and AURON's answer go to the memory from here
+      const prev = turns[turns.length - 2];
+      if (role === 'assistant' && prev?.role === 'user') {
+        fetch(`${API}/v1/assistant/learn`, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ user: prev.content.slice(0, 4000), assistant: text.slice(0, 4000) }) }).catch(() => {});
+      }
+    },
     hush: () => { speechRun++; player.pause(); },
     hasCode: (id) => turns.some((t) => t.code === id),
   };

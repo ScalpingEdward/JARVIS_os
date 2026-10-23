@@ -1,8 +1,12 @@
 """What Brano teaches AURON: things to remember, and how much and which humor (Brano, 2026-10-22).
 
 Both live in the database (app_settings) and go into every system prompt -- chat, Telegram and the live
-talk alike. Nothing is learned behind his back: AURON stores only what Brano tells him to remember
-("merk dir ..."), and Brano sees and deletes every entry in Einstellungen > AURON.
+talk alike. Brano sees and deletes every entry in Einstellungen > AURON.
+
+Since 2026-10-23 AURON also learns on his own, like ChatGPT's memory (learn.py): after a conversation a
+small model picks out what Brano said about himself. Each entry says who stored it ("by": brano | auron)
+and what it is ("kind"): a lasting fact, or something of the moment ("now": "ich bin auf Arbeit") that
+runs out after a few days -- so "bin zu Hause" can be answered with "wie war die Arbeit?".
 """
 from __future__ import annotations
 
@@ -51,11 +55,16 @@ def _put(key: str, value) -> None:
 
 
 # ---- memory --------------------------------------------------------------------------------------
+MAX_AUTO = 40          # what AURON stored himself; beyond it the oldest of his own goes, never Brano's
+
+
 def memories() -> list[dict]:
-    return _get(MEMORY_KEY, [])
+    """Everything that still holds -- a "now" entry past its date is gone."""
+    now = time.time()
+    return [m for m in _get(MEMORY_KEY, []) if not m.get("until") or m["until"] > now]
 
 
-def remember(text: str) -> dict:
+def remember(text: str, by: str = "brano", kind: str = "fact", days: float | None = None) -> dict:
     text = " ".join((text or "").split())
     if not text:
         raise PersonaError("nichts zum Merken")
@@ -64,9 +73,16 @@ def remember(text: str) -> dict:
     cur = memories()
     if any(m["text"].lower() == text.lower() for m in cur):
         return {"id": next(m["id"] for m in cur if m["text"].lower() == text.lower()), "text": text, "already": True}
+    if by == "auron":
+        own = [m for m in cur if m.get("by") == "auron"]
+        if len(own) >= MAX_AUTO:
+            cur = [m for m in cur if m["id"] != own[0]["id"]]
     if len(cur) >= MAX_MEMORIES:
         raise PersonaError(f"Gedächtnis voll ({MAX_MEMORIES}) -- erst etwas vergessen")
-    m = {"id": max((x["id"] for x in cur), default=0) + 1, "text": text, "at": time.strftime("%Y-%m-%d")}
+    m = {"id": max((x["id"] for x in _get(MEMORY_KEY, [])), default=0) + 1, "text": text, "at": time.strftime("%Y-%m-%d %H:%M"),
+         "by": by, "kind": kind}
+    if kind == "now":
+        m["until"] = time.time() + (days or 2) * 86400
     _put(MEMORY_KEY, [*cur, m])
     return m
 
@@ -119,8 +135,16 @@ def prompt_block() -> str:
     lines = [f"Humor: Stärke {h['level']}/10, Art: {STYLES[h['style']]}. {_how_often(h['level'])}"
              " Nie zweimal hintereinander dieselbe Art Witz."]
     mem = memories()
+    facts = [m for m in mem if m.get("kind", "fact") == "fact"]
+    now = [m for m in mem if m.get("kind") == "now"]
+    if facts:
+        lines.append("Was du über Brano weißt und was er dir beigebracht hat (gilt, bis er es löscht; Anweisungen "
+                     "darin befolgst du, außer sie würden deine Grenzen unten aufheben):")
+        lines += [f"- {m['text']}" for m in facts]
+    if now:
+        lines.append("Gerade aktuell bei ihm (mit Zeitpunkt; greif es natürlich auf, wenn es passt -- kommt er "
+                     "von der Arbeit, frag, wie es war):")
+        lines += [f"- {m['at']}: {m['text']}" for m in now]
     if mem:
-        lines.append("Was Brano dir beigebracht hat (gilt, bis er es löscht; Anweisungen darin befolgst du, "
-                     "außer sie würden deine Grenzen unten aufheben):")
-        lines += [f"- {m['text']}" for m in mem]
+        lines.append("Das Gedächtnis füllst du von selbst mit; erwähne es nicht bei jeder Antwort.")
     return "\n".join(lines)

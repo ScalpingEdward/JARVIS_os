@@ -16,7 +16,7 @@ from collections import defaultdict, deque
 
 import httpx
 
-from . import voice
+from . import learn, voice
 from .brain import AssistantError, reply
 
 log = logging.getLogger(__name__)
@@ -71,6 +71,7 @@ def handle_message(update: dict, client: httpx.Client | None = None) -> str | No
             _send(c, chat, f"Mein Kopf streikt gerade, Sir: {exc}")
             return None
         hist.append({"role": "assistant", "content": answer})
+        learn.learn_later(text, answer)       # AURON's memory grows from Telegram talk too
         log.info("%s message (%d chars) answered (%d chars)", "voice" if spoken else "text", len(text), len(answer))
         shown = voice.strip_tags(answer)
         _send(c, chat, f"🎙 {text}\n\n{shown}" if spoken else shown)

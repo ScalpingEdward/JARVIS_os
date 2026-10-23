@@ -22,9 +22,9 @@
             `<button type="button" data-p="style" data-v="${k}" class="${k === d.humor.style ? 'on' : ''}" title="${esc(d.styles[k])}">${NAMES[k] || k}</button>`).join('')}</div>
           <p class="th-text">${esc(d.styles[d.humor.style])}</p></section>
         <section class="th-sec"><h4>Was AURON sich merkt</h4>
-          <p class="th-text">Sag im Chat „merk dir …“ oder schreib es hier hinein. Es gilt in jedem Gespräch, bis du es löschst.</p>
+          <p class="th-text">AURON merkt sich von selbst, was du über dich erzählst; dazu „merk dir …“ oder hier hineinschreiben. Alles gilt, bis du es löschst – Momentanes („bin auf Arbeit“) läuft von selbst ab.</p>
           <form class="ps-add"><input maxlength="300" placeholder="z. B. Bei Verlusten keine Witze." /><button type="submit">Merken</button></form>
-          <div class="ps-mem">${d.memories.map((m) => `<div><span>${esc(m.text)}<small>${esc(m.at)}</small></span>
+          <div class="ps-mem">${d.memories.map((m) => `<div class="${m.by === 'auron' ? 'auto' : ''}"><span>${esc(m.text)}<small>${esc(m.at)} · ${m.by === 'auron' ? 'von AURON gemerkt' : 'von dir'}${m.kind === 'now' && m.until ? ` · gilt bis ${new Date(m.until * 1000).toLocaleString('de-DE', { weekday: 'short', hour: '2-digit', minute: '2-digit' })}` : ''}</small></span>
             <button type="button" data-p="forget" data-v="${m.id}" title="Vergessen">✕</button></div>`).join('') || '<p class="th-text">Noch nichts.</p>'}</div></section>`;
     };
     paint();

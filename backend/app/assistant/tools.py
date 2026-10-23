@@ -551,9 +551,10 @@ TOOLS: list[dict] = [
          "required": ["action"]}},
     {"name": "memory",
      "description": "What Brano teaches you, kept for good and put into every conversation: 'remember' stores one "
-                    "short fact or rule in his words (\"merk dir ...\", \"ab jetzt ...\") -- only when he asks, never on "
-                    "your own; 'forget' deletes one by memory_id; 'list' shows all. Already in your prompt, so list "
-                    "only when he asks what you know.",
+                    "short fact or rule in his words (\"merk dir ...\", \"ab jetzt ...\") when he asks; 'forget' deletes "
+                    "one by memory_id; 'list' shows all. Besides, what he tells about himself and his day is remembered "
+                    "automatically after each conversation -- you need not store that, and never tell him you only "
+                    "remember on 'merk dir'. Already in your prompt, so list only when he asks what you know.",
      "input_schema": {"type": "object", "properties": {
          "action": {"type": "string", "enum": ["remember", "forget", "list"]},
          "text": {"type": "string"}, "memory_id": {"type": "integer"}}, "required": ["action"]}},

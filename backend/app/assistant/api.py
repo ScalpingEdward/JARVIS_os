@@ -7,7 +7,7 @@ from fastapi import APIRouter, HTTPException, Request, Response
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field, field_validator
 
-from . import voice
+from . import learn, voice
 from .brain import AssistantError, reply, reply_stream
 
 router = APIRouter(prefix="/v1/assistant", tags=["assistant"])
@@ -67,7 +67,9 @@ def chat(payload: ChatIn) -> ChatOut:
     if payload.messages[-1].role != "user":
         raise HTTPException(status_code=422, detail="the last message must be Brano's")
     try:
-        return ChatOut(**reply(_turns(payload.messages), payload.lang))
+        out = reply(_turns(payload.messages), payload.lang)
+        learn.learn_later(payload.messages[-1].content, out["text"])   # AURON's memory grows on its own
+        return ChatOut(**out)
     except AssistantError as exc:
         raise HTTPException(status_code=502, detail=str(exc))
 
@@ -82,11 +84,25 @@ def chat_stream(payload: ChatIn) -> StreamingResponse:
     def lines():
         try:
             for ev in reply_stream(_turns(payload.messages), payload.lang):
+                if ev.get("done"):
+                    learn.learn_later(payload.messages[-1].content, ev.get("text") or "")
                 yield json.dumps(ev, ensure_ascii=False) + "\n"
         except AssistantError as exc:
             yield json.dumps({"error": str(exc)}, ensure_ascii=False) + "\n"
 
     return StreamingResponse(lines(), media_type="application/x-ndjson", headers={"X-Accel-Buffering": "no"})
+
+
+class LearnIn(BaseModel):
+    user: str = Field(min_length=1, max_length=4000)
+    assistant: str = Field(default="", max_length=4000)
+
+
+@router.post("/learn", status_code=202)
+def learn_from_live(body: LearnIn) -> dict:
+    """The live talk (ElevenLabs) runs in the browser: what Brano said there reaches the memory this way."""
+    learn.learn_later(body.user, body.assistant)
+    return {"ok": True}
 
 
 class LiveToolIn(BaseModel):
