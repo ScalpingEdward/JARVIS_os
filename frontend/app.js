@@ -1009,7 +1009,7 @@ function spark(values, w = 58, h = 20) {
 }
 function renderWatch(w) {
   const top = w.items.filter((i) => i.top).sort((a, b) => a.top - b.top);
-  $('#wTop').innerHTML = top.map((i) => `<div class="row"><span class="wname">${esc(i.name)}</span>${spark(i.spark)}`
+  $('#wTop').innerHTML = top.map((i) => `<div class="row wchart" data-sym="${esc(i.symbol || '')}" data-name="${esc(i.name)}" title="Chart öffnen"><span class="wname">${esc(i.name)}</span>${spark(i.spark)}`
     + `<span class="wpx">${priceTxt(i.price)}</span><span class="wch ${pctCls(i.change_pct)}">${pctTxt(i.change_pct)}</span></div>`).join('');
   $('#wBadge').textContent = w.stale ? 'keine Daten' : `+${w.items.length - top.length} weitere`;
   $('#wBadge').classList.toggle('live', !w.stale);
@@ -1032,11 +1032,12 @@ function renderWatchView(w) {
       ${i.analysis ? `<div class="wanalysis">${esc(i.analysis)}<small>AURON · ${new Date(i.analysis_at).toLocaleString('de-DE')} · Beobachtung, keine Empfehlung</small></div>` : ''}
     </td></tr>`;
   const row = (i) => (i.price === null || i.price === undefined
-    ? `<tr class="wrow" data-name="${esc(i.name)}"><td>${name(i)}</td><td></td><td class="nodata" colspan="6">keine Daten – bei PU Prime nicht handelbar</td></tr>`
-    : `<tr class="wrow" data-name="${esc(i.name)}"><td>${name(i)}</td><td>${spark(i.spark, 80, 22)}</td><td class="num">${priceTxt(i.price)}</td>`
+    ? `<tr class="wrow" data-name="${esc(i.name)}"><td>${name(i)}</td><td></td><td class="nodata" colspan="5">keine Daten – bei PU Prime nicht handelbar</td><td><button type="button" class="wmore">Details</button></td></tr>`
+    : `<tr class="wrow wchart" data-sym="${esc(i.symbol || '')}" data-name="${esc(i.name)}"><td>${name(i)}</td><td>${spark(i.spark, 80, 22)}</td><td class="num">${priceTxt(i.price)}</td>`
       + `<td class="num ${pctCls(i.change_pct)}">${pctTxt(i.change_pct)}</td><td class="num ${pctCls(i.from_high_pct)}">${pctTxt(i.from_high_pct)}</td>`
       + `<td class="num ${pctCls(i.vs_sma200_pct)}">${pctTxt(i.vs_sma200_pct)}</td><td class="num">${i.rsi14 ?? '–'}</td>`
-      + `<td class="notes">${(i.notes || []).map((n) => `<span class="note">${esc(n)}</span>`).join('')}${i.analysis ? '<span class="note ai">AURON-Analyse</span>' : ''}</td></tr>`) + detail(i);
+      + `<td class="notes">${(i.notes || []).map((n) => `<span class="note">${esc(n)}</span>`).join('')}${i.analysis ? '<span class="note ai">AURON-Analyse</span>' : ''}`
+      + `<button type="button" class="wmore" title="Grund, Empfehlung, AURON-Analyse">Details</button></td></tr>`) + detail(i);
   $('#watchGroups').innerHTML = Object.keys(groups).sort((a, b) => order.indexOf(a) - order.indexOf(b)).map((g) =>
     `<section class="card"><div class="label">${esc(g)} <span class="count">${groups[g].length}</span></div><div class="table-wrap"><table class="watch-table">`
     + '<tr><th>NAME</th><th></th><th>KURS</th><th>HEUTE</th><th>VOM 52W-HOCH</th><th>VS 200 TAGE</th><th>RSI</th><th>HINWEISE</th></tr>'
@@ -1046,6 +1047,8 @@ function renderWatchView(w) {
 
 // one listener for the whole view: open a row, save its reason, ask AURON
 $('#watchGroups').addEventListener('click', async (e) => {
+  const chartRow = e.target.closest('.wrow.wchart');
+  if (chartRow && !e.target.closest('.wmore')) { openWatchChart(chartRow); return; }
   const rowEl = e.target.closest('.wrow');
   if (rowEl) {
     const n = rowEl.dataset.name, d = rowEl.nextElementSibling;
@@ -1066,6 +1069,20 @@ $('#watchGroups').addEventListener('click', async (e) => {
     watch = await get('/v1/watchlist');
     renderWatch(watch);
   } catch (err) { msg.textContent = `Fehler: ${err.message}`; btn.disabled = false; }
+});
+
+// a value's chart: its MT5 symbol from the watchlist, candles from a copier's terminal (chart.js)
+function openWatchChart(el) {
+  const sym = el.dataset.sym, acc = (overview?.accounts || []).find((a) => a.state === 'live') || overview?.accounts?.[0];
+  if (!sym) { alert(`${el.dataset.name}: keine Kursdaten bei PU Prime – kein Chart.`); return; }
+  if (!acc) { alert('Kein Kopierer meldet sich – ohne MT5 kein Chart.'); return; }
+  window.AURON_chart?.symbol(sym, acc.profile, 'H1');   // over the view: closing the chart leaves the list as it was
+}
+$('#wTop').addEventListener('click', (e) => {
+  const row = e.target.closest('.wchart');
+  if (!row) return;
+  e.stopPropagation(); e.preventDefault();       // the card itself opens the watchlist view -- a value opens its chart
+  openWatchChart(row);
 });
 
 async function refreshWatch() {
