@@ -77,3 +77,9 @@ def test_quick_order_in_pips_opens_at_once(setup):
     out, _ = tools.run("trade_ticket", {"action": "open_now", "symbol": "Gold", "side": "sell", "lots": 0.2, "sl_pips": 50},
                        "dashboard", said="zeig mir Gold")
     assert "nicht gesagt" in out and len(setup) == 1
+
+
+def test_risk_in_money_and_targets_as_rr():
+    t = tickets.prepare("Gold", "buy", 0, [], risk_money=200, sl_pips=100, rr=[2, 3])
+    # 100 pips = 10.00 -> 1000 EUR per lot; 200 EUR -> 0.20 lots; targets 2 R and 3 R from 4050.30
+    assert t["sl"] == 4040.3 and t["tps"] == [4070.3, 4080.3] and t["lots"] == 0.2 and t["risk_money"] == 200.0

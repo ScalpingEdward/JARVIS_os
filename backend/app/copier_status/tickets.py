@@ -69,8 +69,11 @@ def lots_for(balance: float, risk_pct: float, entry: float, sl: float, q: dict) 
 
 
 def prepare(symbol: str, side: str, sl: float, tps: list[float], risk_pct: float | None = None, lots: float | None = None,
-            account: str | None = None, sl_pips: float | None = None, tp_pips: list[float] | None = None) -> dict:
-    """sl_pips / tp_pips: distances from the entry in pips (gold: 1 pip = 0.10), instead of prices."""
+            account: str | None = None, sl_pips: float | None = None, tp_pips: list[float] | None = None,
+            risk_money: float | None = None, rr: list[float] | None = None) -> dict:
+    """sl_pips / tp_pips: distances from the entry in pips (gold: 1 pip = 0.10), instead of prices.
+    risk_money: the risk in the account's currency instead of % ("100 Euro Risiko").
+    rr: targets as multiples of the stop distance ("1:2" -> [2])."""
     global _ticket, _seq
     side = side.lower()
     if side not in ("buy", "sell"):
@@ -85,6 +88,8 @@ def prepare(symbol: str, side: str, sl: float, tps: list[float], risk_pct: float
     if sl_pips:
         sl = round(entry - sign * float(sl_pips) * pip, nd)
     tps = [round(entry + sign * float(p) * pip, nd) for p in tp_pips][:4] if tp_pips else [float(t) for t in (tps or [])][:4]
+    if rr and sl:
+        tps = [round(entry + sign * float(x) * abs(entry - sl), nd) for x in rr][:4]
     if sl and (entry - sl) * sign <= 0:
         raise TicketError(f"der Stop {sl} liegt auf der falschen Seite des Kurses {entry}")
     for t in tps:
@@ -93,7 +98,8 @@ def prepare(symbol: str, side: str, sl: float, tps: list[float], risk_pct: float
     if lots is None:
         if not sl:
             raise TicketError("ohne Stop kein Risiko-Lot -- Stop oder feste Lots angeben")
-        lots = lots_for(a.balance, float(risk_pct or 1.0), entry, sl, q)
+        pct = float(risk_money) / a.balance * 100 if risk_money and a.balance else float(risk_pct or 1.0)
+        lots = lots_for(a.balance, pct, entry, sl, q)
     lots = round(float(lots), 2)
     if q.get("vol_max") and lots > q["vol_max"]:
         raise TicketError(f"{lots} Lots sind über dem Maximum des Brokers ({q['vol_max']})")
