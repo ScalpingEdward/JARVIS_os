@@ -40,17 +40,22 @@ LIVE_FOR_S = 10   # older than this: the copier has stopped sending, the 15 s re
 
 @router.post("/live")
 def push_live(payload: LiveIn) -> dict:
-    """Every second from each copier: balance, equity, each open position's profit. The answer names
-    the symbols whose chart is open on a dashboard -- the copier then sends their candles (/rates)."""
+    """Every second from each copier: balance, equity, each open position's profit. The answer says when a
+    command waits. Charts are no longer the copiers' job: signal_copier/chart_feed.py serves them (/feed/wants)."""
     _live[payload.profile] = (time.monotonic(), payload)
     now = time.monotonic()
-    # newest ask first: the copier serves three a second, and a timeframe just switched to must not wait
-    # behind the ones left a moment ago (Brano, 2026-10-23: up to 40 s)
-    return {"want_rates": [sym for (prof, sym), at in sorted(_chart_wanted.items(), key=lambda kv: -kv[1])
-                           if prof == payload.profile and now - at <= CHART_FOR_S],
-            "want_hist": [h for (prof, _k), (at, h) in list(_hist_wanted.items()) if prof == payload.profile and now - at <= 60],
-            "want_quote": [q for (prof, _k), (at, q) in list(_quote_wanted.items()) if prof == payload.profile and now - at <= 20],
-            "commands_waiting": commands.wake(payload.profile)}
+    return {"commands_waiting": commands.wake(payload.profile)}
+
+
+@router.get("/feed/wants")
+def feed_wants() -> dict:
+    """What the chart feed (signal_copier/chart_feed.py) should fetch from MT5 now -- for every profile.
+    Newest chart first: a timeframe just switched to must not wait behind the ones left a moment ago."""
+    now = time.monotonic()
+    return {"rates": [{"profile": p, "key": k} for (p, k), at in sorted(_chart_wanted.items(), key=lambda kv: -kv[1])
+                      if now - at <= CHART_FOR_S],
+            "hist": [{"profile": p, **h} for (p, _k), (at, h) in list(_hist_wanted.items()) if now - at <= 60],
+            "quote": [{"profile": p, **q} for (p, _k), (at, q) in list(_quote_wanted.items()) if now - at <= 20]}
 
 
 # ---- a position's chart (dashboard click) -- five-minute candles straight from the copier's MT5 ----

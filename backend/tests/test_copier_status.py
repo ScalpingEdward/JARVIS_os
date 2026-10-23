@@ -93,15 +93,15 @@ def test_an_open_chart_asks_its_copier_for_candles_until_it_is_closed(monkeypatc
     from app.copier_status import api
     api._chart_wanted.clear(); api._rates.clear()
     live = api.LiveIn(profile="demo", balance=1, equity=1)
-    assert api.push_live(live)["want_rates"] == []
+    assert [r["key"] for r in api.feed_wants()["rates"] if r["profile"] == "demo"] == []
     assert api.chart("demo", "XAUUSD.s") == {"bars": [], "pending": True}
-    assert api.push_live(live)["want_rates"] == ["XAUUSD.s"]
-    assert api.push_live(api.LiveIn(profile="other", balance=1, equity=1))["want_rates"] == []
+    assert [r["key"] for r in api.feed_wants()["rates"] if r["profile"] == "demo"] == ["XAUUSD.s"]
+    assert [r["key"] for r in api.feed_wants()["rates"] if r["profile"] == "other"] == []
     api.push_rates(api.RatesIn(profile="demo", symbol="XAUUSD.s", bars=[[1, 2, 3, 1, 2]]))
     assert api.chart("demo", "XAUUSD.s")["bars"] == [[1, 2, 3, 1, 2]]
     t = api.time.monotonic() + api.CHART_FOR_S + 1
     monkeypatch.setattr(api.time, "monotonic", lambda: t)
-    assert api.push_live(live)["want_rates"] == []
+    assert [r["key"] for r in api.feed_wants()["rates"] if r["profile"] == "demo"] == []
 
 
 def test_a_chart_in_another_timeframe_asks_for_symbol_at_timeframe():
@@ -111,7 +111,7 @@ def test_a_chart_in_another_timeframe_asks_for_symbol_at_timeframe():
     api._chart_wanted.clear(); api._rates.clear()
     live = api.LiveIn(profile="demo", balance=1, equity=1)
     api.chart("demo", "XAUUSD.s", tf="H1")
-    assert api.push_live(live)["want_rates"] == ["XAUUSD.s@H1"]
+    assert [r["key"] for r in api.feed_wants()["rates"] if r["profile"] == "demo"] == ["XAUUSD.s@H1"]
     api.push_rates(api.RatesIn(profile="demo", symbol="XAUUSD.s@H1", bars=[[1, 2, 3, 1, 2]]))
     assert api.chart("demo", "XAUUSD.s", tf="H1")["bars"] == [[1, 2, 3, 1, 2]]
     assert api.chart("demo", "XAUUSD.s")["bars"] == []          # M5 is its own
@@ -126,4 +126,4 @@ def test_the_timeframe_just_switched_to_comes_first(monkeypatch):
     monkeypatch.setattr(api.time, "monotonic", lambda: t[0])
     for tf in ("M5", "H1", "H4", "D1"):
         api.chart("demo", "XAUUSD.s", tf=tf); t[0] += 1
-    assert api.push_live(api.LiveIn(profile="demo", balance=1, equity=1))["want_rates"][:3] == ["XAUUSD.s@D1", "XAUUSD.s@H4", "XAUUSD.s@H1"]
+    assert [r["key"] for r in api.feed_wants()["rates"]][:3] == ["XAUUSD.s@D1", "XAUUSD.s@H4", "XAUUSD.s@H1"]

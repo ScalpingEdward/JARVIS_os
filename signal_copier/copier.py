@@ -882,35 +882,14 @@ class BotNotifier:
 
 class LivePusher:
     """Sends the second-by-second numbers to AURON on its own thread; only the newest one counts,
-    so a slow AURON never builds a queue -- and never touches trading."""
+    so a slow AURON never builds a queue -- and never touches trading. Charts are not served here any more
+    (signal_copier/chart_feed.py): MT5 loading a timeframe's history froze this loop for seconds."""
 
     def __init__(self, base_url: str, profile: str):
         self.url = base_url.rstrip("/") + "/v1/copier/live"
-        self.rates_url = base_url.rstrip("/") + "/v1/copier/rates"
         self.profile = profile
         self.q: queue.Queue[dict] = queue.Queue(maxsize=1)
-        self.wanted: list[str] = []          # charts open on a dashboard, newest first (AURON's answer says so)
-        self.hist: list[dict] = []           # past stretches AURON wants for a trade review, each sent once
-        self.quotes: list[dict] = []         # a trade AURON prepares: price and contract data, asked by key
-        self.quote_url = base_url.rstrip("/") + "/v1/copier/quote"
-        self.hist_sent: set[str] = set()
-        self.rq: queue.Queue[dict] = queue.Queue(maxsize=4)
         threading.Thread(target=self._run, daemon=True).start()
-        threading.Thread(target=self._run_rates, daemon=True).start()
-
-    def rates(self, symbol: str, bars: list, name: str | None = None) -> None:
-        try:
-            self.rq.put_nowait({"profile": self.profile, "symbol": symbol, "bars": bars, "name": name})
-        except queue.Full:
-            pass
-
-    def _run_rates(self) -> None:
-        while True:
-            body = json.dumps(self.rq.get()).encode()
-            try:
-                urllib.request.urlopen(urllib.request.Request(self.rates_url, body, {"Content-Type": "application/json"}), timeout=10).read()
-            except Exception:  # noqa: BLE001 -- a chart that stays still is all that happens
-                time.sleep(2)
 
     def __call__(self, live: dict) -> None:
         try:
@@ -924,14 +903,10 @@ class LivePusher:
             try:
                 answer = urllib.request.urlopen(urllib.request.Request(self.url, body, {"Content-Type": "application/json"}), timeout=5).read()
                 try:
-                    a = json.loads(answer or b"{}")
-                    self.wanted = list(a.get("want_rates", []))
-                    self.hist = [h for h in a.get("want_hist", []) if h.get("key") not in self.hist_sent]
-                    self.quotes = a.get("want_quote", [])
-                    if a.get("commands_waiting"):
+                    if json.loads(answer or b"{}").get("commands_waiting"):
                         WAKE.set()
                 except ValueError:
-                    self.wanted = []
+                    pass
             except Exception:  # noqa: BLE001 -- the 15 s report says when AURON is gone; this one stays quiet
                 time.sleep(5)
 
@@ -995,6 +970,8 @@ async def main(profile: str | None, dry: bool) -> None:
     from signal_copier.telegram_check import _plain
 
     load_dotenv(HERE / ".env")
+    from signal_copier import fast_auron_url
+    fast_auron_url()
     try:
         name = profiles.pick(profile)
     except profiles.ProfileError as e:
@@ -1092,26 +1069,6 @@ async def main(profile: str | None, dry: bool) -> None:
         while True:
             try:
                 push(execution.live_inputs())   # MT5 stays on this loop, the sending on push's thread
-                # an open chart: its candles every second (was every 2 s -- a new timeframe felt slow, 2026-10-23)
-                for wanted in push.wanted[:3]:
-                    # a chart of any symbol (Brano, 2026-10-22): "XAUUSD" is "XAUUSD.s" at this broker
-                    sym, at, tf = wanted.partition("@")
-                    real = sym if sym in copier.symbols else (resolve(sym, copier.symbols, copier.overrides) or sym)
-                    push.rates(wanted, execution.rates(real + at + tf), real)
-                for h in push.hist[:2]:              # a trade review: one past stretch each, once
-                    sym = h["symbol"] if h["symbol"] in copier.symbols else (resolve(h["symbol"], copier.symbols, copier.overrides) or h["symbol"])
-                    push.rates(h["key"], execution.rates_range(sym, h.get("tf", "M5"), h["from"], h["to"]), sym)
-                    push.hist_sent.add(h["key"])
-                push.hist = [h for h in push.hist if h["key"] not in push.hist_sent]
-                for q in push.quotes[:2]:               # a trade ticket waits for its numbers
-                    sym = q["symbol"] if q["symbol"] in copier.symbols else (resolve(q["symbol"], copier.symbols, copier.overrides) or q["symbol"])
-                    try:
-                        body = {"profile": name, "key": q["key"], **execution.quote(sym)}
-                    except Exception as e:  # noqa: BLE001 -- an unknown symbol: AURON says so
-                        body = {"profile": name, "key": q["key"], "symbol": sym, "error": str(e)[:200]}
-                    urllib.request.urlopen(urllib.request.Request(push.quote_url, json.dumps(body).encode(),
-                                                                  {"Content-Type": "application/json"}), timeout=5).read()
-                push.quotes = []
             except Exception:  # noqa: BLE001
                 log.debug("live numbers", exc_info=True)
             await asyncio.sleep(LIVE_EVERY_S)

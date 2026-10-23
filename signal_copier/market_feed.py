@@ -89,10 +89,12 @@ def main() -> None:
     from dotenv import load_dotenv
 
     load_dotenv(HERE / ".env")
+    from signal_copier import fast_auron_url
+    fast_auron_url()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s",
                         handlers=[logging.FileHandler(HERE / "market_feed.log", encoding="utf-8"), logging.StreamHandler()])
     cfg = json.loads((HERE / "watchlist.json").read_text(encoding="utf-8"))
-    url = os.environ.get("AURON_URL") or "http://localhost:8000"
+    url = os.environ.get("AURON_URL") or "http://127.0.0.1:8000"
     if not mt5.initialize(path=cfg["terminal"]):
         raise SystemExit(f"MT5 initialize failed: {mt5.last_error()}")
     items = cfg["items"]
