@@ -1,3 +1,4 @@
+import httpx
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
@@ -69,3 +70,28 @@ def put_look(payload: dict) -> dict:
 def ui_commands(after: int = 0) -> dict:
     """What AURON asked the dashboard to show since command number `after` (ui.py)."""
     return ui.since(after)
+
+
+class I18nIn(BaseModel):
+    texts: list[str] = []
+
+
+@router.get("/i18n")
+def i18n_table() -> dict:
+    """AURON's language and every dashboard text already translated into it (i18n.py)."""
+    from app.assistant import persona
+    from . import i18n
+    lang = persona.language()
+    return {"lang": lang, "table": i18n.table(lang) if lang != "de" else {}}
+
+
+@router.post("/i18n")
+def i18n_translate(body: I18nIn) -> dict:
+    """Texts the dashboard shows that are not translated yet -- translated now, kept for every screen."""
+    from app.assistant import persona
+    from . import i18n
+    lang = persona.language()
+    try:
+        return {"lang": lang, "table": i18n.translate(lang, body.texts[:600], persona.LANGS[lang][0])}
+    except (i18n.I18nError, httpx.HTTPError) as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
