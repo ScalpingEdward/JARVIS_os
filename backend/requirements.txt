@@ -17,3 +17,4 @@ openai>=1.99.0,<2.0.0
 SQLAlchemy>=2.0.43,<3.0.0
 alembic>=1.16.4,<2.0.0
 psycopg[binary]>=3.2.9,<4.0.0
+pywebpush==2.5.0

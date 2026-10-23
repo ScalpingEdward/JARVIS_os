@@ -410,7 +410,7 @@ def test_muted_trade_reports_stay_quiet_but_trouble_gets_through(monkeypatch):
     from signal_copier import copier as cp
     sent = []
     bot = cp.BotNotifier.__new__(cp.BotNotifier)
-    bot.prefix, bot.q = "", type("Q", (), {"put": lambda self, t: sent.append(t)})()
+    bot.prefix, bot.push_url, bot.q = "", None, type("Q", (), {"put": lambda self, t: sent.append(t)})()
     monkeypatch.setitem(cp.QUIET, "on", True)
     bot("#10 XAUUSD: SL to entry 4151")
     bot("watchdog ERROR KeyError: x")

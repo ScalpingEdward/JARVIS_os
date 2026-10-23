@@ -19,6 +19,7 @@
     ['announce', '📣', 'Durchsagen', 'AURON meldet Wichtiges von selbst'],
     ['voice', '🔊', 'Stimme', 'AURONs Stimme wählen und anhören'],
     ['auron', '◎', 'AURON', 'Humor und was er sich von dir merkt'],
+    ['notify', '🔔', 'Benachrichtigungen', 'Mitteilungen von AURON auf Laptop und iPhone'],
     ['code', '⌨', 'Code', 'Code-Wünsche an AURON prüfen und freigeben'],
     ['info', 'ℹ', 'Info', 'Was läuft, Versionen, Hinweise'],
   ];
@@ -107,6 +108,11 @@
     if (page === 'code') {
       panel.innerHTML = head('Code', true) + '<div class="ct-list" id="codeEditor"></div>';
       window.AURON_code?.editor(panel.querySelector('#codeEditor'));
+      return;
+    }
+    if (page === 'notify') {
+      panel.innerHTML = head('Benachrichtigungen', true) + '<div class="nf" id="pushEditor"></div>';
+      window.AURON_push?.editor(panel.querySelector('#pushEditor'));
       return;
     }
     if (page === 'auron') {

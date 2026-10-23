@@ -37,6 +37,14 @@ class TelegramDeliveryClient:
         from . import mute   # Brano switched this kind of message off (AURON's telegram_notifications tool)
         if not mute.allows(title):
             return
+        # AURON's own notifications (app/push): per category to the app, to Telegram, or both
+        from app.push import service as push
+        category = mute.category_of(title)
+        if push.devices():
+            if push.wants(category, "app"):
+                push.send_later(title, message, category)
+            if not push.wants(category, "telegram"):
+                return
         self._post_message(f"*{title}*\n{message}" if title else message)
 
     def get_me(self) -> dict:

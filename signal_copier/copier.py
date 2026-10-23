@@ -833,17 +833,37 @@ TROUBLE = re.compile(r"ERROR|FAILED|FEHLER|STOPPED|ABGEBROCHEN|not traded|loss s
 class BotNotifier:
     """Sends through @Auronsignalbot on its own thread, so a slow Telegram never delays an order."""
 
-    def __init__(self, token: str, chat_id: str, prefix: str = ""):
+    def __init__(self, token: str, chat_id: str, prefix: str = "", auron_url: str | None = None):
         self.prefix = prefix  # several profiles report to the same bot
         self.url = f"https://api.telegram.org/bot{token}/sendMessage"
         self.chat_id = chat_id
+        # the same message as an AURON app notification (Brano, 2026-10-23); AURON applies mute and routes
+        self.push_url = auron_url.rstrip("/") + "/v1/push/notify" if auron_url else None
         self.q: queue.Queue[str] = queue.Queue()
+        self.pq: queue.Queue[dict] = queue.Queue(maxsize=50)
         threading.Thread(target=self._run, daemon=True).start()
+        if self.push_url:
+            threading.Thread(target=self._run_push, daemon=True).start()
 
     def __call__(self, text: str) -> None:
-        if QUIET["on"] and not TROUBLE.search(text):
+        trouble = bool(TROUBLE.search(text))
+        if self.push_url:
+            try:
+                self.pq.put_nowait({"title": f"Kopierer {self.prefix.strip(' []')}".strip(), "body": text[:900],
+                                    "category": "copier" if trouble else "trades"})
+            except queue.Full:
+                pass
+        if QUIET["on"] and not trouble:
             return
         self.q.put(self.prefix + text)
+
+    def _run_push(self) -> None:
+        while True:
+            body = json.dumps(self.pq.get()).encode()
+            try:
+                urllib.request.urlopen(urllib.request.Request(self.push_url, body, {"Content-Type": "application/json"}), timeout=15).read()
+            except Exception as e:  # noqa: BLE001 -- the app notification is extra; Telegram still has it
+                log.debug("app notification failed: %s", e)
 
     def _run(self) -> None:
         while True:
@@ -977,7 +997,8 @@ async def main(profile: str | None, dry: bool) -> None:
                         handlers=[logging.FileHandler(folder / "copier.log", encoding="utf-8"), logging.StreamHandler()])
     # What people call this account: its group's name, not the folder name (Brano, 2026-10-15).
     label = config.get("label") or name
-    notify = BotNotifier(os.environ["TELEGRAM_BOT_TOKEN"], os.environ["TELEGRAM_NOTIFY_CHAT_ID"], f"[{label}] ")
+    notify = BotNotifier(os.environ["TELEGRAM_BOT_TOKEN"], os.environ["TELEGRAM_NOTIFY_CHAT_ID"], f"[{label}] ",
+                         os.environ.get("AURON_URL"))
 
     execution.connect(config.get("allow_live", False), config.get("terminal"), config.get("login"))
     account = execution.account_id()

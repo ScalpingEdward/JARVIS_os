@@ -16,7 +16,8 @@ def push_status(payload: CopierStatusIn) -> CopierStatus:
     st = copier_status_service.push(payload)
     st.commands = commands.pending_for(payload.profile)
     from app.notification_hub import mute
-    st.telegram_quiet = mute.trades_quiet()
+    from app.push import service as push
+    st.telegram_quiet = mute.trades_quiet() or bool(push.devices() and not push.wants("trades", "telegram"))
     return st
 
 
