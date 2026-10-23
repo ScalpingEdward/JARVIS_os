@@ -1,6 +1,6 @@
 // AURON's 3D parts (backend/app/cad): the part he designed, between the card columns like the chart --
 // drag turns it, the wheel zooms, it turns slowly on its own. "Bauplan" draws it as glowing edges in the
-// accent colour (a CAD blueprint), "Massiv" as a solid part. STL saves the file for the printer's slicer.
+// accent colour (a CAD blueprint), "Gitter" (the default) cuts it into a fine grid on a floor grid, "Massiv" as a solid part. STL saves the file for the printer's slicer.
 (() => {
   const API_BASE = typeof API !== 'undefined' ? API : '/api';
   const LIBS = ['https://unpkg.com/three@0.147.0/build/three.min.js',
@@ -9,14 +9,15 @@
   const box = document.createElement('section');
   box.className = 'pos-chart model-view'; box.hidden = true;
   box.innerHTML = `<header class="pc-head"><b class="pc-title mv-title"></b><span class="pc-sum mono mv-size"></span>
-      <span class="pc-tf mv-mode"><button type="button" data-mode="plan" class="on">Bauplan</button><button type="button" data-mode="solid">Massiv</button></span>
+      <span class="pc-tf mv-mode"><button type="button" data-mode="plan">Bauplan</button><button type="button" data-mode="grid" class="on">Gitter</button><button type="button" data-mode="solid">Massiv</button></span>
       <span class="pc-btns"><a class="mv-stl" download>STL</a>
       <button type="button" class="pc-full mv-full" title="Vollbild (an/aus)">⤢</button>
       <button type="button" class="pc-x mv-x" aria-label="Schließen">✕</button></span></header>
     <div class="pc-body mv-body"></div><p class="pc-wait muted mv-wait">Lade das Teil …</p>`;
   document.body.append(box);
   const body = box.querySelector('.mv-body'), wait = box.querySelector('.mv-wait');
-  let ready = null, three = null, mode = 'plan', full = false, raf = 0;
+  let ready = null, three = null, mode = 'grid',   // Gitter first (Brano, 2026-10-23)
+    full = false, raf = 0;
 
   const load = (src) => new Promise((ok, bad) => { const s = document.createElement('script'); s.src = src; s.onload = ok; s.onerror = () => bad(new Error('3D-Bibliothek lädt nicht')); document.head.append(s); });
   const lib = () => ready || (ready = (async () => { if (!window.THREE) await load(LIBS[0]); await load(LIBS[1]); await load(LIBS[2]); })());
@@ -55,15 +56,53 @@
     if (mode === 'plan') {
       g.add(new T.Mesh(geo, new T.MeshBasicMaterial({ color: accent, transparent: true, opacity: 0.07, depthWrite: false })));
       g.add(new T.LineSegments(new T.EdgesGeometry(geo, 18), new T.LineBasicMaterial({ color: accent })));
+    } else if (mode === 'grid') {
+      // "Gitter" (Brano, 2026-10-23: more lines, like a CAD screen): the part cut every few millimetres in
+      // two directions -- the cuts draw rings and ribs over every surface -- plus its edges, on a floor grid
+      g.add(new T.Mesh(geo, new T.MeshBasicMaterial({ color: accent, transparent: true, opacity: 0.05, depthWrite: false })));
+      g.add(new T.LineSegments(slices(geo, [0, 1]), new T.LineBasicMaterial({ color: accent, transparent: true, opacity: 0.38 })));
+      g.add(new T.LineSegments(new T.EdgesGeometry(geo, 18), new T.LineBasicMaterial({ color: 0xe6f6ff })));
     } else {
       g.add(new T.Mesh(geo, new T.MeshStandardMaterial({ color: 0xc9d3e0, metalness: 0.35, roughness: 0.45 })));
     }
     g.rotation.x = -Math.PI / 2;                       // CAD's z is up; three's y is up
     sc.add(g); three.group = g;
-    geo.computeBoundingSphere();
+    geo.computeBoundingSphere(); geo.computeBoundingBox();
+    if (three.floor) { sc.remove(three.floor); three.floor = null; }
+    if (mode === 'grid') {
+      const bb = geo.boundingBox, span = Math.max(bb.max.x - bb.min.x, bb.max.y - bb.min.y) * 1.8;
+      const floor = new T.GridHelper(span, 24, accent, accent);
+      floor.material.transparent = true; floor.material.opacity = 0.14;
+      floor.position.y = bb.min.z;                      // the part's bottom (CAD z) is the floor
+      sc.add(floor); three.floor = floor;
+    }
     const r = geo.boundingSphere.radius || 10;
     camera.position.set(r * 1.6, r * 1.1, r * 2.0); camera.near = r / 100; camera.far = r * 100; camera.updateProjectionMatrix();
     controls.target.set(0, 0, 0); controls.update();
+  }
+
+  // every triangle cut by planes across the given axes, about 28 cuts over the part's length per axis
+  function slices(geo, axes) {
+    const pos = geo.attributes.position.array, out = [];
+    geo.computeBoundingBox();
+    const bb = geo.boundingBox, lo = [bb.min.x, bb.min.y, bb.min.z], hi = [bb.max.x, bb.max.y, bb.max.z];
+    for (const ax of axes) {
+      const step = (hi[ax] - lo[ax]) / 28 || 1;
+      for (let i = 0; i < pos.length; i += 9) {
+        const v = [0, 1, 2].map((k) => [pos[i + k * 3], pos[i + k * 3 + 1], pos[i + k * 3 + 2]]);
+        const a = Math.min(v[0][ax], v[1][ax], v[2][ax]), b = Math.max(v[0][ax], v[1][ax], v[2][ax]);
+        for (let c = Math.ceil((a - lo[ax]) / step) * step + lo[ax]; c < b; c += step) {
+          const pts = [];
+          for (const [p, q] of [[v[0], v[1]], [v[1], v[2]], [v[2], v[0]]]) {
+            if ((p[ax] - c) * (q[ax] - c) < 0) { const t = (c - p[ax]) / (q[ax] - p[ax]); pts.push(p.map((x, k) => x + (q[k] - x) * t)); }
+          }
+          if (pts.length === 2) out.push(...pts[0], ...pts[1]);
+        }
+      }
+    }
+    const g = new window.THREE.BufferGeometry();
+    g.setAttribute('position', new window.THREE.Float32BufferAttribute(out, 3));
+    return g;
   }
 
   let geometry = null;
