@@ -31,7 +31,7 @@ def _env(monkeypatch):
 
 def test_a_voice_note_gets_text_and_a_voice_note_back(monkeypatch):
     _env(monkeypatch)
-    monkeypatch.setattr(telegram, "reply", lambda hist, lang: {"text": "[chuckles] Ruhig, Sir.", "tools": []})
+    monkeypatch.setattr(telegram, "reply", lambda hist, lang, channel=None: {"text": "[chuckles] Ruhig, Sir.", "tools": []})
     calls: list = []
     upd = {"message": {"chat": {"id": 42}, "voice": {"file_id": "F", "mime_type": "audio/ogg"}}}
     assert telegram.is_for_auron(upd)
@@ -47,7 +47,7 @@ def test_a_voice_note_gets_text_and_a_voice_note_back(monkeypatch):
 def test_typed_message_gets_typed_answer_and_history_carries_on(monkeypatch):
     _env(monkeypatch)
     seen = []
-    monkeypatch.setattr(telegram, "reply", lambda hist, lang: (seen.append(list(hist)), {"text": "Ja, Sir.", "tools": []})[1])
+    monkeypatch.setattr(telegram, "reply", lambda hist, lang, channel=None: (seen.append(list(hist)), {"text": "Ja, Sir.", "tools": []})[1])
     calls: list = []
     for t in ("Hallo", "Und jetzt?"):
         telegram.handle_message({"message": {"chat": {"id": 42}, "text": t}}, client=_client(calls))

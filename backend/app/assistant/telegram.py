@@ -65,7 +65,7 @@ def handle_message(update: dict, client: httpx.Client | None = None) -> str | No
         hist = _history[chat]
         hist.append({"role": "user", "content": text})
         try:
-            answer = reply(list(hist), "de")["text"]
+            answer = reply(list(hist), "de", channel="telegram")["text"]
         except AssistantError as exc:
             hist.pop()
             _send(c, chat, f"Mein Kopf streikt gerade, Sir: {exc}")

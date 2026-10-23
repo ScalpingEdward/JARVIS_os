@@ -75,7 +75,7 @@ def _model() -> str:
     return os.getenv("AURON_CHAT_MODEL") or "claude-sonnet-5-5"
 
 
-def reply(history: list[dict], lang: str = "de", client: httpx.Client | None = None) -> dict:
+def reply(history: list[dict], lang: str = "de", client: httpx.Client | None = None, channel: str = "dashboard") -> dict:
     """history: [{role: user|assistant, content: str}], last one from the user.
     Returns {text, tools: [names used]}."""
     key = os.getenv("ANTHROPIC_API_KEY")
@@ -89,7 +89,7 @@ def reply(history: list[dict], lang: str = "de", client: httpx.Client | None = N
             r = c.post(ANTHROPIC_MESSAGES_URL, timeout=120, headers={
                 "x-api-key": key, "anthropic-version": ANTHROPIC_API_VERSION, "content-type": "application/json"},
                 json={"model": _model(), "max_tokens": MAX_TOKENS, "system": system_prompt(lang),
-                      "tools": [*tools.TOOLS, tools.WEB_SEARCH], "messages": messages})
+                      "tools": [*tools.for_channel(channel), tools.WEB_SEARCH], "messages": messages})
             if r.status_code >= 400:
                 raise AssistantError(f"Anthropic API returned {r.status_code}: {r.text[:300]}")
             body = r.json()
@@ -109,7 +109,7 @@ def reply(history: list[dict], lang: str = "de", client: httpx.Client | None = N
             results = []
             for b in content:
                 if b.get("type") == "tool_use":
-                    out, failed = tools.run(b["name"], b.get("input") or {})
+                    out, failed = tools.run(b["name"], b.get("input") or {}, channel)
                     results.append({"type": "tool_result", "tool_use_id": b["id"], "content": out, "is_error": failed})
             messages.append({"role": "user", "content": results})
         raise AssistantError(f"no answer after {MAX_ROUNDS} tool rounds")

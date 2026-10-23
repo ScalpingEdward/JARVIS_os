@@ -631,11 +631,22 @@ _RUN: dict[str, Callable[..., dict]] = {
 }
 
 
-def run(name: str, args: dict) -> tuple[str, bool]:
+# Steps at the laptop only from the dashboard and its app -- text, voice, live -- never over Telegram
+# (Brano, 2026-10-23: "per Telegram kannst du das ausschalten")
+DASHBOARD_ONLY = {"desk"}
+
+
+def for_channel(channel: str) -> list[dict]:
+    return [t for t in TOOLS if channel != "telegram" or t["name"] not in DASHBOARD_ONLY]
+
+
+def run(name: str, args: dict, channel: str = "dashboard") -> tuple[str, bool]:
     """The tool's answer as JSON text, and whether it failed."""
     fn = _RUN.get(name)
     if fn is None:
         return f"unknown tool {name}", True
+    if channel == "telegram" and name in DASHBOARD_ONLY:
+        return "Über Telegram gesperrt -- Schritte am Laptop nur im AURON-Dashboard oder in der App.", True
     if name in EXTERNAL_READS:
         mark_external()
     try:

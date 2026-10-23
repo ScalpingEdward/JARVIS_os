@@ -54,3 +54,10 @@ def test_no_runner_no_pretending(monkeypatch):
     monkeypatch.setattr(desk, "_runner_seen", 0.0)
     out, _ = tools.run("desk", {"action": "windows"})
     assert "läuft nicht" in out
+
+
+def test_telegram_cannot_reach_the_laptop():
+    assert "desk" not in [t["name"] for t in tools.for_channel("telegram")]
+    assert "desk" in [t["name"] for t in tools.for_channel("dashboard")]
+    out, failed = tools.run("desk", {"action": "windows"}, "telegram")
+    assert failed and "Telegram gesperrt" in out and desk._cmds == {}
