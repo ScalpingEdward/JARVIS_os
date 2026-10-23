@@ -175,11 +175,10 @@ body { background: #03060c url("./lounge.webp") center / cover no-repeat fixed; 
 .tile { cursor: pointer; padding: 20px 20px 16px;
   transform: translateZ(var(--z, 0px)) rotateY(calc(var(--base-ry, 0deg) + var(--ry, 0deg))) rotateX(var(--rx, 0deg));
   transition: transform .6s var(--ease), border-color .3s, box-shadow .3s; }
-/* the two featured cards glow in the accent colour too -- they kept purple and orange whatever accent was
-   picked (Brano, 2026-10-22) */
-.a-insta, .a-trading { border-color: color-mix(in srgb, var(--accent) 32%, transparent); }
-.a-insta::after, .a-trading::after { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; }
-.a-insta::after, .a-trading::after { box-shadow: 0 0 46px -18px color-mix(in srgb, var(--accent) 60%, transparent); }
+/* every card glows at its edge in the accent colour -- first only Trading and Instagram did (Brano, 2026-10-23) */
+.tile { border-color: color-mix(in srgb, var(--accent) 32%, transparent); }
+.tile::after { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+  box-shadow: 0 0 46px -18px color-mix(in srgb, var(--accent) 60%, transparent); }
 @keyframes hover-float { 0%, 100% { translate: 0 0; } 50% { translate: 0 -9px; } }
 .tile .corner { position: absolute; inset: -1px; border-radius: inherit; pointer-events: none;
   background:
