@@ -375,6 +375,13 @@
     await save(next);
   }
   window.AURON_layout = { actions: cardActions, act: cardAct };
+  // a phone has no hover: a finger on a card (scrolling over it, or a tap) shows its gear for a few seconds
+  document.addEventListener('touchstart', (e) => {
+    const card = e.target.closest('.tile');
+    if (!card) return;
+    card.classList.add('touched');
+    clearTimeout(card._touchT); card._touchT = setTimeout(() => card.classList.remove('touched'), 4000);
+  }, { passive: true });
 
   // added cards (price, copier, notes) get a gear too -- only their place, they have no text settings
   document.addEventListener('click', (e) => {
