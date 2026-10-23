@@ -13,17 +13,25 @@ OUT = Path(__file__).resolve().parent.parent / "frontend"
 BG, RING = (3, 5, 10, 255), (79, 216, 255)
 
 
+def _band(img: Image.Image, c: float, rc: float, width: float, color: tuple) -> None:
+    """A ring of this width centred on radius rc -- PIL draws an outline inward from its box, so the box
+    is grown by half the width: the glow then spreads to both sides of the line, like the button's."""
+    o = rc + width / 2
+    ImageDraw.Draw(img).ellipse([c - o, c - o, c + o, c + o], outline=color, width=int(width))
+
+
 def ring(size: int, scale: float = 1.0, bg: bool = True) -> Image.Image:
+    """Lit inside and outside like the dashboard button (box-shadow outside + inset glow), Brano 2026-10-23:
+    the first version glowed only inward."""
     s = size * 4                                            # drawn large, scaled down smooth
     img = Image.new("RGBA", (s, s), BG if bg else (0, 0, 0, 0))
-    r, w = s * 0.31 * scale, max(2, s * 0.04 * scale)
+    rc, w = s * 0.29 * scale, max(2, s * 0.034 * scale)
     c = s / 2
-    glow = Image.new("RGBA", (s, s), (0, 0, 0, 0))
-    g = ImageDraw.Draw(glow)
-    g.ellipse([c - r, c - r, c + r, c + r], outline=RING + (255,), width=int(w * 2.2))
-    img.alpha_composite(glow.filter(ImageFilter.GaussianBlur(s * 0.035)))
-    d = ImageDraw.Draw(img)
-    d.ellipse([c - r, c - r, c + r, c + r], outline=RING + (255,), width=int(w))
+    for width, blur, alpha in ((w * 4, s * 0.045, 120), (w * 2, s * 0.018, 200)):   # soft halo, then a tighter one
+        glow = Image.new("RGBA", (s, s), (0, 0, 0, 0))
+        _band(glow, c, rc, width, RING + (alpha,))
+        img.alpha_composite(glow.filter(ImageFilter.GaussianBlur(blur)))
+    _band(img, c, rc, w, RING + (255,))                       # one cyan line, like the logo -- no white core
     return img.resize((size, size), Image.LANCZOS)
 
 
