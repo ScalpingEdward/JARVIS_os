@@ -95,6 +95,8 @@ def reply(history: list[dict], lang: str = "de", client: httpx.Client | None = N
             body = r.json()
             content = body.get("content", [])
             used += [b["name"] for b in content if b.get("type") in ("tool_use", "server_tool_use")]
+            if any(b.get("type") == "server_tool_use" for b in content):
+                tools.mark_external()                  # read the web: the laptop waits for Brano (tools.py)
             messages.append({"role": "assistant", "content": content})
             stop = body.get("stop_reason")
             if stop == "pause_turn":       # a long web search: Anthropic wants us to let it continue
@@ -186,6 +188,8 @@ def reply_stream(history: list[dict], lang: str = "de", client: httpx.Client | N
                     else:
                         content, stop = value
             names = [b["name"] for b in content if b.get("type") in ("tool_use", "server_tool_use")]
+            if any(b.get("type") == "server_tool_use" for b in content):
+                tools.mark_external()
             used += names
             for n in names:
                 yield {"tool": n}

@@ -90,6 +90,7 @@ from .dashboard_layout.api import router as dashboard_layout_router
 from .code_tasks.api import router as code_tasks_router
 from .spotify.api import router as spotify_router
 from .cad.api import router as cad_router
+from .desk.api import router as desk_router
 from .backup.api import router as backup_router
 from .orderflow.api import router as orderflow_router
 from .orchestrator.models import (
@@ -368,6 +369,7 @@ app.include_router(dashboard_layout_router)
 app.include_router(code_tasks_router)
 app.include_router(spotify_router)
 app.include_router(cad_router)
+app.include_router(desk_router)
 app.include_router(backup_router)
 app.include_router(orderflow_router)
 app.include_router(planner_router)
