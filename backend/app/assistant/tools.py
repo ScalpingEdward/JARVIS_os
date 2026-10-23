@@ -10,7 +10,8 @@ import json
 from collections.abc import Callable
 
 # Anthropic runs this one itself; no key of ours, no Tavily needed.
-WEB_SEARCH = {"type": "web_search_20250305", "name": "web_search", "max_uses": 3}
+WEB_SEARCH = {"type": "web_search_20260209", "name": "web_search", "max_uses": 3}   # filters pages before reading: fewer tokens
+MAX_RESULT = 9000   # characters of one tool answer the model reads
 
 
 def _trading() -> dict:
@@ -763,6 +764,11 @@ def run(name: str, args: dict, channel: str = "dashboard", said: str = "") -> tu
     if name in EXTERNAL_READS:
         mark_external()
     try:
-        return json.dumps(fn(**(args or {})), default=str, ensure_ascii=False), False
+        out = json.dumps(fn(**(args or {})), default=str, ensure_ascii=False)
+        # a tool's answer is read in full on every following round -- the longest ones (the whole trading status,
+        # the whole watchlist) are cut, with a note, instead of costing thousands of tokens each time (2026-10-23)
+        if len(out) > MAX_RESULT:
+            out = out[:MAX_RESULT] + f' ... [gekürzt: {len(out) - MAX_RESULT} Zeichen mehr -- frag gezielter nach]'
+        return out, False
     except Exception as exc:  # noqa: BLE001 -- the model gets the error and says so, instead of the chat dying
         return f"{type(exc).__name__}: {exc}", True
