@@ -64,6 +64,17 @@ def _what(action: str) -> str:
     return f"{a[1].upper()} {a[0]} {a[2]} Lots, SL {a[3] or '–'}, TP {a[4] or '–'}"
 
 
+_wake: set[str] = set()   # profiles with a command waiting -- told in the copier's next live answer (api.py)
+
+
+def wake(profile: str) -> bool:
+    """Whether this copier should fetch its commands now; cleared when asked."""
+    if profile in _wake:
+        _wake.discard(profile)
+        return True
+    return False
+
+
 def create(profile: str, action: str, source: str, confirmed: bool = False, label: str = "") -> dict:
     if action not in ACTIONS and not any(r.match(action) for r in BY_HAND):
         raise CommandError(f"unknown action {action}")
@@ -75,6 +86,8 @@ def create(profile: str, action: str, source: str, confirmed: bool = False, labe
         s.add(r)
         s.commit()
         out = _dict(r)
+    if not needs:
+        _wake.add(profile)
     if needs:
         what = ACTIONS.get(action) or _what(action)
         _telegram(f"Bestätigen: {label or profile} -- {what}?\n(läuft in 10 Minuten ab)",
@@ -95,6 +108,7 @@ def confirm(command_id: str) -> dict:
             s.commit()
             raise CommandError("expired -- ask again")
         r.status = "pending"
+        _wake.add(r.profile)
         s.commit()
         return _dict(r)
 

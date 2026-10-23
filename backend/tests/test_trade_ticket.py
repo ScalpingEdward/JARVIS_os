@@ -35,10 +35,10 @@ def test_lots_follow_the_risk_and_split_over_the_targets():
 def test_wrong_sides_and_limits_are_refused():
     with pytest.raises(tickets.TicketError):
         tickets.prepare("Gold", "buy", 4060, [4080])          # stop above the price of a buy
+    assert tickets.prepare("Gold", "buy", 4040, [4080], risk_pct=3)["lots"] > 0     # his risk, no limit of ours
+    assert tickets.prepare("Gold", "buy", 4040, [4080], lots=1.5)["lots"] == 1.5
     with pytest.raises(tickets.TicketError):
-        tickets.prepare("Gold", "buy", 4040, [4080], risk_pct=3)
-    with pytest.raises(tickets.TicketError):
-        tickets.prepare("Gold", "buy", 4040, [4080], lots=1.5)
+        tickets.prepare("Gold", "buy", 4040, [4080], lots=150)                       # above the broker's maximum
 
 
 def test_it_opens_only_on_his_own_order(setup):
@@ -68,3 +68,12 @@ def test_plain_open_words():
     w = tickets.OPEN_WORDS.search
     assert w("Eröffne jetzt") and w("open it") and w("öffne den Trade jetzt") and w("führ ihn aus")
     assert not w("öffne den Chart von Gold") and not w("zeig mir Gold")
+
+
+def test_quick_order_in_pips_opens_at_once(setup):
+    out, _ = tools.run("trade_ticket", {"action": "open_now", "symbol": "Gold", "side": "buy", "lots": 0.2, "tp_pips": [100]},
+                       "dashboard", said="Auron, öffne schnell eine Position in Gold, 0,2 Lot, TP 100 Pips, jetzt")
+    assert '"ok": true' in out and setup == ["open:XAUUSD.s:buy:0.2::4060.3"]      # 100 pips of gold = 10.00
+    out, _ = tools.run("trade_ticket", {"action": "open_now", "symbol": "Gold", "side": "sell", "lots": 0.2, "sl_pips": 50},
+                       "dashboard", said="zeig mir Gold")
+    assert "nicht gesagt" in out and len(setup) == 1

@@ -6,8 +6,10 @@ prepare  symbol, side, stop, one or more targets, risk in % (or lots) -> the cop
          over the targets (one position per TP). One ticket at a time; a new one replaces the old.
 open     only on Brano's own order: his click on the ticket card, or his own last words in the dashboard or
          the app ("eröffne jetzt") -- checked here, not left to AURON. Never over Telegram. Right after AURON
-         read a mail or the web, a spoken order is not enough: the card asks for his click. Limits: at most
-         MAX_LOTS in all and MAX_RISK_PCT; the copier itself refuses while trading is stopped.
+         read a mail or the web, a spoken order is not enough: the card asks for his click. No size limit of
+         our own -- Brano says lots and risk (2026-10-23); only the broker's maximum volume applies, and the
+         copier refuses while trading is stopped.
+open_now "öffne schnell Gold, 0,2 Lot, TP 100 Pips, jetzt": prepare and open in one go -- same checks.
 """
 from __future__ import annotations
 
@@ -15,8 +17,6 @@ import math
 import re
 import time
 
-MAX_LOTS = 1.0
-MAX_RISK_PCT = 2.0
 TICKET_FOR_S = 15 * 60
 # "eröffne jetzt", "open it", "platzier den Trade", "führ aus" -- a plain "öffne" only with the trade in it
 # ("öffne den Chart" must never open a position)
@@ -69,17 +69,22 @@ def lots_for(balance: float, risk_pct: float, entry: float, sl: float, q: dict) 
 
 
 def prepare(symbol: str, side: str, sl: float, tps: list[float], risk_pct: float | None = None, lots: float | None = None,
-            account: str | None = None) -> dict:
+            account: str | None = None, sl_pips: float | None = None, tp_pips: list[float] | None = None) -> dict:
+    """sl_pips / tp_pips: distances from the entry in pips (gold: 1 pip = 0.10), instead of prices."""
     global _ticket, _seq
     side = side.lower()
     if side not in ("buy", "sell"):
         raise TicketError("Richtung buy oder sell")
-    tps = [float(t) for t in (tps or [])][:4]
     a = _account(account)
+    from app.copier_status.review import pip_size
     from app.dashboard_layout.ui import _symbol
     q = _quote(a.profile, _symbol(symbol))
     entry = q["ask"] if side == "buy" else q["bid"]
     sign = 1 if side == "buy" else -1
+    pip, nd = pip_size(q["symbol"]), q.get("digits", 2)
+    if sl_pips:
+        sl = round(entry - sign * float(sl_pips) * pip, nd)
+    tps = [round(entry + sign * float(p) * pip, nd) for p in tp_pips][:4] if tp_pips else [float(t) for t in (tps or [])][:4]
     if sl and (entry - sl) * sign <= 0:
         raise TicketError(f"der Stop {sl} liegt auf der falschen Seite des Kurses {entry}")
     for t in tps:
@@ -88,13 +93,10 @@ def prepare(symbol: str, side: str, sl: float, tps: list[float], risk_pct: float
     if lots is None:
         if not sl:
             raise TicketError("ohne Stop kein Risiko-Lot -- Stop oder feste Lots angeben")
-        risk_pct = float(risk_pct or 1.0)
-        if risk_pct > MAX_RISK_PCT:
-            raise TicketError(f"{risk_pct} % ist über der Grenze von {MAX_RISK_PCT} %")
-        lots = lots_for(a.balance, risk_pct, entry, sl, q)
+        lots = lots_for(a.balance, float(risk_pct or 1.0), entry, sl, q)
     lots = round(float(lots), 2)
-    if lots > MAX_LOTS:
-        raise TicketError(f"{lots} Lots sind über der Grenze von {MAX_LOTS}")
+    if q.get("vol_max") and lots > q["vol_max"]:
+        raise TicketError(f"{lots} Lots sind über dem Maximum des Brokers ({q['vol_max']})")
     n = max(1, len(tps))
     step = q["vol_step"] or 0.01
     each = math.floor(lots / n / step + 1e-9) * step

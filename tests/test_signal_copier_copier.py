@@ -427,6 +427,7 @@ def test_by_hand_from_the_chart_sl_tp_move_and_a_trade_opens_within_the_lot_cap(
     assert t.positions[first].sl == 4150.5 and "SL/TP by Brano" in said[-1]
     out = c.command("open:XAUUSD.s:buy:0.05:4100:4160")
     assert out.startswith("opened #") and "OPENED by Brano" in said[-1]
-    assert "outside" in c.command("open:XAUUSD.s:buy:5:4100:4160")          # above manual_max_lots (1.0)
+    c.config["manual_max_lots"] = 1.0                                         # a cap only when a profile sets one
+    assert "outside" in c.command("open:XAUUSD.s:buy:5:4100:4160")
     c.command("pause")
     assert "trading is stopped" in c.command("open:XAUUSD.s:sell:0.05::")

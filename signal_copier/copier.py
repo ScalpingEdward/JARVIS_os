@@ -43,6 +43,7 @@ WATCH_EVERY_S = 5
 # already open are still followed: they close or protect, they open nothing.
 MAX_SIGNAL_AGE_S = 60
 REPORT_EVERY_S = 15  # the dashboard polls every 5 s; AURON keeps a curve point every 5 min
+WAKE = threading.Event()   # AURON has a command waiting (its live answer says so): report -- and fetch it -- now
 LIVE_EVERY_S = 1     # balance, equity, open profits only -- the dashboard's sums move with the market
 
 log = logging.getLogger("copier")
@@ -738,8 +739,9 @@ class Copier:
             _, symbol, side, lots, sl, tp = action.split(":")
             if self.book.halted(self.clock()):
                 return f"not opened: trading is stopped ({self.book.halt_reason})"
-            cap = float(self.config.get("manual_max_lots", 1.0))
-            if float(lots) <= 0 or float(lots) > cap:
+            # Brano says the size himself (2026-10-23) -- a cap only if a profile sets manual_max_lots
+            cap = self.config.get("manual_max_lots")
+            if float(lots) <= 0 or (cap is not None and float(lots) > float(cap)):
                 return f"not opened: {lots} lots is outside 0..{cap} (manual_max_lots)"
             if self.dry:
                 return f"dry run: {side} {symbol} {lots} not opened"
@@ -926,6 +928,8 @@ class LivePusher:
                     self.wanted = set(a.get("want_rates", []))
                     self.hist = [h for h in a.get("want_hist", []) if h.get("key") not in self.hist_sent]
                     self.quotes = a.get("want_quote", [])
+                    if a.get("commands_waiting"):
+                        WAKE.set()
                 except ValueError:
                     self.wanted = set()
             except Exception:  # noqa: BLE001 -- the 15 s report says when AURON is gone; this one stays quiet
@@ -1077,7 +1081,11 @@ async def main(profile: str | None, dry: bool) -> None:
                 auron(status.to_json())
             except Exception:
                 log.exception("building the AURON status")
-            await asyncio.sleep(REPORT_EVERY_S)
+            for _ in range(REPORT_EVERY_S * 4):           # every 15 s -- or at once when a command waits
+                if WAKE.is_set():
+                    WAKE.clear()
+                    break
+                await asyncio.sleep(0.25)
 
     async def live_to_auron() -> None:
         push = LivePusher(os.environ["AURON_URL"], name)
