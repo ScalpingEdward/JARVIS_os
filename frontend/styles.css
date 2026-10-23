@@ -157,10 +157,12 @@ body { background: #03060c url("./lounge.webp") center / cover no-repeat fixed; 
 /* --- floating glass cards ---------------------------------------------------------- */
 .tile, .mini-tile {
   position: relative; text-align: left; min-width: 0;
-  /* glass: see-through, frosted, a bright top edge and a thin slab of thickness below */
+  /* glass: see-through, frosted, a bright top edge and a thin slab of thickness below. The card colour always
+     shows a little, even on clear glass at low strength (Brano, 2026-10-23: at "Klar" 30 % only 4 % of it
+     arrived -- picking a colour seemed to do nothing); the strength adds to that */
   background:
-    linear-gradient(155deg, rgb(var(--tint) / calc(.24 * var(--glass) + var(--solid) * .1)), rgb(var(--tint) / calc(.12 * var(--glass))) 45%,
-      rgb(var(--tint) / calc(.05 * var(--glass))) 80%, rgb(10 20 36 / calc(.22 + var(--solid) * .62)));
+    linear-gradient(155deg, rgb(var(--tint) / calc(.10 + .22 * var(--glass) + var(--solid) * .1)), rgb(var(--tint) / calc(.05 + .11 * var(--glass))) 45%,
+      rgb(var(--tint) / calc(.02 + .05 * var(--glass))) 80%, rgb(10 20 36 / calc(.22 + var(--solid) * .62)));
   border: 1px solid rgb(var(--tint) / .22); border-top-color: rgb(var(--tint) / .42); border-radius: 16px;
   backdrop-filter: blur(var(--blur)) saturate(140%); -webkit-backdrop-filter: blur(var(--blur)) saturate(140%);
   box-shadow:
