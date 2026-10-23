@@ -399,8 +399,10 @@
     if (open) open.hidden = true;
     menu.innerHTML = `<b class="cm-h">Karte</b>${cardActions(card)}`; menu.hidden = false;
     const r = card.getBoundingClientRect(), w = menu.offsetWidth;
-    menu.style.left = `${r.left + r.width / 2 < innerWidth / 2 ? r.right + 10 : r.left - w - 10}px`;
-    menu.style.top = `${Math.max(8, r.top + 8)}px`;
+    let x = r.left + r.width / 2 < innerWidth / 2 ? r.right + 10 : r.left - w - 10;
+    if (x < 8 || x + w > innerWidth - 8) x = Math.min(Math.max(8, r.right - w - 10), innerWidth - w - 8);   // phone: over the card
+    menu.style.left = `${x}px`;
+    menu.style.top = `${Math.min(Math.max(8, r.top + 8), innerHeight - menu.offsetHeight - 8)}px`;
   }, true);
 
   refreshLayout();

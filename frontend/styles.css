@@ -1156,3 +1156,10 @@ body.card-drag, body.card-drag * { cursor: grabbing !important; user-select: non
 .pf-grid { display: grid; grid-template-columns: minmax(0, 1fr) repeat(3, auto); gap: 4px 12px; margin-top: 8px; font-size: 12.5px; align-items: center; }
 .pf-grid small { font-size: 9.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--faint); text-align: right; }
 .pf-grid b { font-family: var(--mono); font-weight: 500; text-align: right; }
+/* phone (no hover): the gear is always there, a little bigger for a finger, and its menu stays where the
+   card is on screen even when the page is scrolled (Brano, 2026-10-23: menu did not open on the iPhone) */
+.card-menu { position: fixed; }
+@media (hover: none) {
+  .card-gear { opacity: .85; width: 32px; height: 32px; font-size: 16px; top: 8px; right: 8px; }
+  .tile .tile-head { padding-right: 40px; }
+}
