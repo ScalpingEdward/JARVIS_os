@@ -302,7 +302,6 @@ function renderTradingTile(o) {
   if (!t) return;
   tween($('#tTotal'), t.equity);
   $('#tCurrency').textContent = t.currency + (o.totals.length > 1 ? ` + ${o.totals.length - 1} more` : '');
-  $('#tToday').innerHTML = `heute ${signed(t.pnl_today, t.currency)}`;
   const live = o.accounts.filter((a) => a.state === 'live').length;
   $('#tLive').textContent = live === o.accounts.length ? 'live' : `${live}/${o.accounts.length} live`;
   $('#tLive').classList.toggle('live', live === o.accounts.length);

@@ -5,8 +5,8 @@
   --line: rgba(255, 255, 255, 0.07);
   --line-2: rgba(255, 255, 255, 0.12);
   --text: #e9edf5;
-  --muted: #7b8496;
-  --faint: #4b5262;
+  --muted: #8d96a8;   /* a step brighter: labels on the glass were hard to read (Brano, 2026-10-23) */
+  --faint: #6a7386;
   --accent: #4fd8ff;           /* the one colour AURON speaks in: hologram cyan */
   /* the glass of the cards -- settings.js changes these (tint as "r g b") */
   --tint: 150 200 255;
@@ -1217,3 +1217,9 @@ body.card-drag, body.card-drag * { cursor: grabbing !important; user-select: non
 .pc-tools button.on { color: var(--text); background: color-mix(in srgb, var(--accent) 24%, transparent); }
 .pc-draw { position: absolute; inset: 0; z-index: 3; pointer-events: none; }
 .pc-body.drawing { cursor: crosshair; }
+
+/* Trading card: the equity line right of the big number, under the "live" badge */
+.t-figrow { display: flex; align-items: center; gap: 14px; }
+.t-figrow .tile-figure { flex: none; }
+.t-figrow .tile-spark { flex: 1; min-width: 60px; height: 40px; margin: 10px 0 0; }
+.a-trading .kpis { margin-top: 12px; }

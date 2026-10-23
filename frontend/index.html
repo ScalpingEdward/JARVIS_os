@@ -70,15 +70,15 @@
       <button class="tile a-trading" data-view="trading" id="tileTrading" style="--d:0s">
         <span class="corner"></span>
         <div class="tile-head"><span>Trading</span><span class="badge live" id="tLive">live</span></div>
-        <div class="tile-figure"><b id="tTotal">–</b><small id="tCurrency"></small></div>
-        <div class="tile-sub" id="tToday"></div>
+        <!-- the equity line beside the big number, under "live"; "heute" only once, in its block (Brano, 2026-10-23) -->
+        <div class="t-figrow"><div class="tile-figure"><b id="tTotal">–</b><small id="tCurrency"></small></div>
+          <svg class="tile-spark" id="tSpark" viewBox="0 0 800 60" preserveAspectRatio="none"></svg></div>
         <div class="kpis">
           <div><small>Heute</small><b id="kToday">–</b></div>
           <div><small>Woche</small><b id="kWeek">–</b></div>
           <div><small>Offen</small><b id="kOpen">–</b></div>
           <div><small>Gesamt</small><b id="kTotal">–</b></div>
         </div>
-        <svg class="tile-spark" id="tSpark" viewBox="0 0 800 60" preserveAspectRatio="none"></svg>
         <div class="tile-list" id="tGroups"></div>
       </button>
 
