@@ -14,6 +14,8 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
+import time
 from datetime import datetime, timezone
 
 import httpx
@@ -122,11 +124,26 @@ def ensure_agent(http: httpx.Client) -> str:
     return d["agent_id"]
 
 
+_refused: tuple[float, str] = (0.0, "")
+REFUSED_FOR_S = 600
+
+
 def session(http: httpx.Client | None = None) -> dict:
-    """A one-time address for the browser to talk to AURON's agent."""
+    """A one-time address for the browser to talk to AURON's agent.
+
+    A key ElevenLabs refuses (missing permission, 401/403) is remembered for 10 minutes: asking again took
+    8 s each time, and the AURON ring looked dead before it fell back to the microphone (2026-10-23)."""
+    global _refused
+    if time.time() < _refused[0]:
+        raise LiveError(_refused[1])
     c = http or httpx.Client(timeout=30)
-    agent = ensure_agent(c)
-    d = _check(c.get(f"{BASE}/conversation/get-signed-url", params={"agent_id": agent}, headers={"xi-api-key": _key()}))
+    try:
+        agent = ensure_agent(c)
+        d = _check(c.get(f"{BASE}/conversation/get-signed-url", params={"agent_id": agent}, headers={"xi-api-key": _key()}))
+    except LiveError as exc:
+        if re.search(r"\b40[13]\b|permission|missing", str(exc), re.I):
+            _refused = (time.time() + REFUSED_FOR_S, str(exc))
+        raise
     return {"signed_url": d["signed_url"], "agent_id": agent}
 
 

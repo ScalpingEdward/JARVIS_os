@@ -280,14 +280,19 @@
   // Tap: talk -- live with ElevenLabs; while live can't start (the key lacks the agents permission) it
   // records over the mic instead. That fallback is no switch to remove later: it only runs when live
   // refuses, and stops on its own the moment the key is right. Hold (or just start typing): the field opens.
-  let liveDownUntil = 0, held = false, holdTimer = 0;
+  // live refused (the key lacks the agents permission): remembered across reloads, so a tap goes straight to
+  // the microphone instead of waiting for the refusal first (Brano, 2026-10-23: "the ring does nothing")
+  let liveDownUntil = Number(pref('auron_live_down', '0')) || 0, held = false, holdTimer = 0, connecting = false;
   async function talk() {
     if (rec) { rec.stop(); return; }
+    if (connecting) return;                             // a second tap while live is connecting changes nothing
     const L = window.AURON_live;
     if (L?.active()) { L.stop(); return; }
     if (L && Date.now() > liveDownUntil) {
-      if (await L.start(true)) return;
+      connecting = true;
+      try { if (await L.start(true)) return; } finally { connecting = false; }
       liveDownUntil = Date.now() + 10 * 60000;          // not every tap waits for a refusal again
+      setPref('auron_live_down', String(liveDownUntil));
     }
     listen();
   }
