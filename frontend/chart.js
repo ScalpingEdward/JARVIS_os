@@ -14,6 +14,12 @@
   box.className = 'pos-chart'; box.hidden = true;
   box.innerHTML = `<header class="pc-head"><b class="pc-title"></b><span class="pc-pl mono"></span><span class="pc-sum mono"></span>
       <span class="pc-tf">${TFS.map((t) => `<button type="button" data-tf="${t}">${t}</button>`).join('')}</span>
+      <span class="pc-tools" title="Zeichnen: Klick, Klick -- Rechtsklick auf eine Zeichnung löscht sie, Esc beendet">
+        <button type="button" data-tool="hline" title="Horizontale Linie">─</button><button type="button" data-tool="trend" title="Trendlinie">╱</button>
+        <button type="button" data-tool="zone" title="Zone">▭</button><button type="button" data-tool="fib" title="Fibonacci">Fib</button>
+        <button type="button" data-tool="measure" title="Messen: Pips, Prozent, Kerzen, Zeit">📏</button>
+        <button type="button" data-ema="20" title="EMA 20">20</button><button type="button" data-ema="50" title="EMA 50">50</button>
+        <button type="button" data-ema="200" title="EMA 200">200</button><button type="button" data-clear="1" title="Alle Zeichnungen löschen">🗑</button></span>
       <span class="pc-btns"><button type="button" class="pc-close-pos">Position schließen</button>
       <button type="button" class="pc-full" title="Vollbild (an/aus)" aria-label="Vollbild">⤢</button>
       <button type="button" class="pc-x" aria-label="Chart schließen">✕</button></span></header>
@@ -28,7 +34,20 @@
   document.body.append(box);
   const body = box.querySelector('.pc-body'), wait = box.querySelector('.pc-wait');
   let chart = null, series = null, lines = [], pos = null, timer = 0, libReady = null;
-  let lineOf = {}, drag = null, decimals = 2;
+  let lineOf = {}, drag = null, decimals = 2, bars = [], themeKey = '';
+  // the chart in the dashboard's colours: accent for the crosshair and scales, the card glass around it
+  function paintTheme() {
+    const ac = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#4fd8ff';
+    if (!chart || ac === themeKey) return;
+    themeKey = ac;
+    const n = parseInt(ac.replace('#', '').padEnd(6, '0').slice(0, 6), 16);
+    const a = (alpha) => `rgba(${n >> 16 & 255}, ${n >> 8 & 255}, ${n & 255}, ${alpha})`;
+    chart.applyOptions({ grid: { vertLines: { color: a(0.05) }, horzLines: { color: a(0.05) } },
+      rightPriceScale: { borderColor: a(0.25) }, timeScale: { borderColor: a(0.25) },
+      crosshair: { vertLine: { color: a(0.6), labelBackgroundColor: ac }, horzLine: { color: a(0.6), labelBackgroundColor: ac } } });
+  }
+  const pipOf = (sym) => { const s = (sym || '').toUpperCase().split(/[._#-]/)[0];
+    return s === 'XAUUSD' ? 0.1 : s === 'XAGUSD' ? 0.01 : /NAS100|US30|DJ30|US500|SP500|GER40|BTCUSD/.test(s) ? 1 : s.endsWith('JPY') ? 0.01 : 0.0001; };
   const moved = {};   // ticket -> {sl|tp: price, until}: a dragged level holds until the copier's next report has it
 
   const lib = () => libReady || (libReady = new Promise((ok, bad) => {
@@ -97,8 +116,8 @@
   box.querySelector('.pc-tf').addEventListener('click', (e) => {
     const b = e.target.closest('button[data-tf]');
     if (!b || b.dataset.tf === tf) return;
-    tf = b.dataset.tf; marks(); series?.setData([]); wait.hidden = false;
-    load().then(() => chart?.timeScale().scrollToRealTime());
+    tf = b.dataset.tf; marks(); series?.setData([]); bars = []; wait.hidden = false;
+    fast(() => chart?.timeScale().scrollToRealTime());
   });
   const marks = () => box.querySelectorAll('.pc-tf button').forEach((b) => b.classList.toggle('on', b.dataset.tf === tf));
   marks();
@@ -183,9 +202,11 @@
     if (d.name) real = d.name;
     if (!d.bars?.length) { wait.hidden = false; return; }
     wait.hidden = true;
-    series.setData(d.bars.map(([t, o, h, l, c]) => ({ time: local(t), open: o, high: h, low: l, close: c })));
+    bars = d.bars.map(([t, o, h, l, c]) => ({ time: local(t), open: o, high: h, low: l, close: c }));
+    series.setData(bars);
     decimals = Math.min(5, Math.max(...d.bars.slice(-30).map((b) => (String(b[4]).split('.')[1] || '').length), 1));
-    levels();
+    levels(); paintTheme();
+    document.dispatchEvent(new CustomEvent('auron:chartdata'));   // charttools.js: EMAs and drawings
   }
 
   async function open(p, frame) {
@@ -206,13 +227,24 @@
       new ResizeObserver(fit).observe(body);
       series = chart.addCandlestickSeries({ upColor: '#3ddc97', downColor: '#f2647c', borderVisible: false, wickUpColor: '#3ddc97', wickDownColor: '#f2647c' });
     } else series.setData([]);
-    clearInterval(timer);
-    await load();
-    chart.timeScale().scrollToRealTime();
-    timer = setInterval(load, 2000);
+    fast(() => chart.timeScale().scrollToRealTime());
   }
 
-  function close() { box.hidden = true; pos = null; clearInterval(timer); }
+  // while the candles of a new chart or timeframe are on their way: ask every 0.4 s, then back to every 2 s
+  // (Brano, 2026-10-23: switching the timeframe took too long)
+  function fast(then) {
+    clearInterval(timer);
+    const want = `${pos?.symbol}@${tf}`;
+    const start = Date.now();
+    timer = setInterval(async () => {
+      await load();
+      if (`${pos?.symbol}@${tf}` !== want) return;
+      if (bars.length || Date.now() - start > 15000) { clearInterval(timer); then?.(); timer = setInterval(load, 2000); }
+    }, 400);
+    load();
+  }
+
+  function close() { box.hidden = true; pos = null; clearInterval(timer); document.dispatchEvent(new CustomEvent('auron:chartclose')); }
 
   box.querySelector('.pc-x').addEventListener('click', close);
   box.querySelector('.pc-close-pos').addEventListener('click', (e) => {
@@ -243,5 +275,8 @@
     if (!row || e.target.closest('button')) return;
     pick(row.dataset.ticket, row.dataset.copier);
   });
-  window.AURON_chart = { open: pick, symbol, close, full: setFull };
+  window.AURON_chart = { open: pick, symbol, close, full: setFull,
+    // for charttools.js: what is drawn where
+    ctx: () => (chart && pos ? { chart, series, body, box, bars, decimals, sym: real || pos.symbol, pip: pipOf(real || pos.symbol),
+      step: bars.length > 1 ? (bars[bars.length - 1].time - bars[0].time) / (bars.length - 1) : 60 } : null) };
 })();

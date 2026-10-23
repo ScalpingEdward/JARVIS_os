@@ -44,8 +44,10 @@ def push_live(payload: LiveIn) -> dict:
     the symbols whose chart is open on a dashboard -- the copier then sends their candles (/rates)."""
     _live[payload.profile] = (time.monotonic(), payload)
     now = time.monotonic()
-    return {"want_rates": sorted({sym for (prof, sym), at in list(_chart_wanted.items())
-                                  if prof == payload.profile and now - at <= CHART_FOR_S}),
+    # newest ask first: the copier serves three a second, and a timeframe just switched to must not wait
+    # behind the ones left a moment ago (Brano, 2026-10-23: up to 40 s)
+    return {"want_rates": [sym for (prof, sym), at in sorted(_chart_wanted.items(), key=lambda kv: -kv[1])
+                           if prof == payload.profile and now - at <= CHART_FOR_S],
             "want_hist": [h for (prof, _k), (at, h) in list(_hist_wanted.items()) if prof == payload.profile and now - at <= 60],
             "want_quote": [q for (prof, _k), (at, q) in list(_quote_wanted.items()) if prof == payload.profile and now - at <= 20],
             "commands_waiting": commands.wake(payload.profile)}
@@ -54,7 +56,7 @@ def push_live(payload: LiveIn) -> dict:
 # ---- a position's chart (dashboard click) -- five-minute candles straight from the copier's MT5 ----
 _chart_wanted: dict[tuple[str, str], float] = {}     # (profile, symbol) -> last asked
 _rates: dict[tuple[str, str], tuple[float, list, str | None]] = {}
-CHART_FOR_S = 30   # a closed chart: the copier stops sending after this
+CHART_FOR_S = 8    # not asked for this long (closed, or another timeframe): the copier stops sending it
 # past stretches for AURON's trade review (review.py): asked once, the copier sends each once
 _hist_wanted: dict[tuple[str, str], tuple[float, dict]] = {}
 

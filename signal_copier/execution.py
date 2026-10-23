@@ -260,7 +260,9 @@ def report_inputs() -> tuple[dict, list[dict], list[dict]]:
     # Deposits and withdrawals are deals too; only buy/sell is trading.
     # the SL/TP a trade was opened with -- on its order; AURON's trade review measures them (2026-10-23)
     since, until = datetime(2000, 1, 1), datetime.now() + timedelta(days=1)
-    levels = {o.ticket: (o.sl, o.tp) for o in mt5.history_orders_get(since, until) or ()}
+    # only the last 90 days: the whole order history since 2000 blocked the copier's loop for seconds on every
+    # report, and the dashboard's charts waited behind it (2026-10-23); older trades simply show no SL/TP
+    levels = {o.ticket: (o.sl, o.tp) for o in mt5.history_orders_get(datetime.now() - timedelta(days=90), until) or ()}
     why = {getattr(mt5, "DEAL_REASON_SL", 4): "sl", getattr(mt5, "DEAL_REASON_TP", 5): "tp", getattr(mt5, "DEAL_REASON_SO", 6): "stopout"}
     deals = [{"position_id": d.position_id, "time": d.time - offset, "profit": d.profit,
               "commission": d.commission, "swap": d.swap, "fee": d.fee, "closing": d.entry in closing,

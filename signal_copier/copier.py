@@ -889,7 +889,7 @@ class LivePusher:
         self.rates_url = base_url.rstrip("/") + "/v1/copier/rates"
         self.profile = profile
         self.q: queue.Queue[dict] = queue.Queue(maxsize=1)
-        self.wanted: set[str] = set()        # symbols whose chart is open on a dashboard (AURON's answer says so)
+        self.wanted: list[str] = []          # charts open on a dashboard, newest first (AURON's answer says so)
         self.hist: list[dict] = []           # past stretches AURON wants for a trade review, each sent once
         self.quotes: list[dict] = []         # a trade AURON prepares: price and contract data, asked by key
         self.quote_url = base_url.rstrip("/") + "/v1/copier/quote"
@@ -925,13 +925,13 @@ class LivePusher:
                 answer = urllib.request.urlopen(urllib.request.Request(self.url, body, {"Content-Type": "application/json"}), timeout=5).read()
                 try:
                     a = json.loads(answer or b"{}")
-                    self.wanted = set(a.get("want_rates", []))
+                    self.wanted = list(a.get("want_rates", []))
                     self.hist = [h for h in a.get("want_hist", []) if h.get("key") not in self.hist_sent]
                     self.quotes = a.get("want_quote", [])
                     if a.get("commands_waiting"):
                         WAKE.set()
                 except ValueError:
-                    self.wanted = set()
+                    self.wanted = []
             except Exception:  # noqa: BLE001 -- the 15 s report says when AURON is gone; this one stays quiet
                 time.sleep(5)
 
@@ -1089,22 +1089,20 @@ async def main(profile: str | None, dry: bool) -> None:
 
     async def live_to_auron() -> None:
         push = LivePusher(os.environ["AURON_URL"], name)
-        tick = 0
         while True:
             try:
                 push(execution.live_inputs())   # MT5 stays on this loop, the sending on push's thread
-                tick += 1
-                if tick % 2 == 0:               # an open chart: its candles every 2 s
-                    for wanted in list(push.wanted)[:3]:
-                        # a chart of any symbol (Brano, 2026-10-22): "XAUUSD" is "XAUUSD.s" at this broker
-                        sym, at, tf = wanted.partition("@")
-                        real = sym if sym in copier.symbols else (resolve(sym, copier.symbols, copier.overrides) or sym)
-                        push.rates(wanted, execution.rates(real + at + tf), real)
-                    for h in push.hist[:2]:              # a trade review: one past stretch each, once
-                        sym = h["symbol"] if h["symbol"] in copier.symbols else (resolve(h["symbol"], copier.symbols, copier.overrides) or h["symbol"])
-                        push.rates(h["key"], execution.rates_range(sym, h.get("tf", "M5"), h["from"], h["to"]), sym)
-                        push.hist_sent.add(h["key"])
-                    push.hist = [h for h in push.hist if h["key"] not in push.hist_sent]
+                # an open chart: its candles every second (was every 2 s -- a new timeframe felt slow, 2026-10-23)
+                for wanted in push.wanted[:3]:
+                    # a chart of any symbol (Brano, 2026-10-22): "XAUUSD" is "XAUUSD.s" at this broker
+                    sym, at, tf = wanted.partition("@")
+                    real = sym if sym in copier.symbols else (resolve(sym, copier.symbols, copier.overrides) or sym)
+                    push.rates(wanted, execution.rates(real + at + tf), real)
+                for h in push.hist[:2]:              # a trade review: one past stretch each, once
+                    sym = h["symbol"] if h["symbol"] in copier.symbols else (resolve(h["symbol"], copier.symbols, copier.overrides) or h["symbol"])
+                    push.rates(h["key"], execution.rates_range(sym, h.get("tf", "M5"), h["from"], h["to"]), sym)
+                    push.hist_sent.add(h["key"])
+                push.hist = [h for h in push.hist if h["key"] not in push.hist_sent]
                 for q in push.quotes[:2]:               # a trade ticket waits for its numbers
                     sym = q["symbol"] if q["symbol"] in copier.symbols else (resolve(q["symbol"], copier.symbols, copier.overrides) or q["symbol"])
                     try:

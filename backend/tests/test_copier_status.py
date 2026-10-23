@@ -117,3 +117,13 @@ def test_a_chart_in_another_timeframe_asks_for_symbol_at_timeframe():
     assert api.chart("demo", "XAUUSD.s")["bars"] == []          # M5 is its own
     with pytest.raises(HTTPException):
         api.chart("demo", "XAUUSD.s", tf="W9")
+
+
+def test_the_timeframe_just_switched_to_comes_first(monkeypatch):
+    from app.copier_status import api
+    api._chart_wanted.clear(); api._rates.clear()
+    t = [1000.0]
+    monkeypatch.setattr(api.time, "monotonic", lambda: t[0])
+    for tf in ("M5", "H1", "H4", "D1"):
+        api.chart("demo", "XAUUSD.s", tf=tf); t[0] += 1
+    assert api.push_live(api.LiveIn(profile="demo", balance=1, equity=1))["want_rates"][:3] == ["XAUUSD.s@D1", "XAUUSD.s@H4", "XAUUSD.s@H1"]
