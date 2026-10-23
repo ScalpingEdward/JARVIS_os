@@ -306,8 +306,11 @@ function renderTradingTile(o) {
   const live = o.accounts.filter((a) => a.state === 'live').length;
   $('#tLive').textContent = live === o.accounts.length ? 'live' : `${live}/${o.accounts.length} live`;
   $('#tLive').classList.toggle('live', live === o.accounts.length);
-  // trades opened by hand (chart: Buy / Sell) belong to no signal group -- shown as "Von Hand" while open
-  const groups = (o.groups || []).filter((g) => g.name !== '(not from a signal)' || g.open_positions);
+  // trades opened by hand (chart: Buy / Sell, AURON's tickets) belong to no signal group -- shown as "Von Hand"
+  // whenever they made or lost something, so the groups add up to the total (Brano, 2026-10-23: "Gesamt" was
+  // 73,80 below the shown groups); a hand group with nothing in it stays out
+  const HAND = '(not from a signal)';
+  const groups = (o.groups || []).filter((g) => g.name !== HAND || g.open_positions || g.pnl_total || g.pnl_today);
   const stateOf = Object.fromEntries(o.accounts.map((a) => [a.profile, a.state]));
   const copier = (g) => {  // the group's copiers: all live -> ok, any late -> warn, else bad
     const states = (g.accounts || []).map((p) => stateOf[p]);
@@ -324,9 +327,9 @@ function renderTradingTile(o) {
     const cur = accs[0]?.currency || '';
     // the group's account beside its name: the equity alone, a number and nothing else (Brano, 2026-10-20);
     // balance and currency in the tooltip
-    const size = accs.length ? `<b class="grp-eq" title="Equity ${fmt(eq)} ${esc(cur)} · Konto ${fmt(bal)} ${esc(cur)}">${fmt(eq)}</b>` : '';
+    const size = accs.length && g.name !== HAND ? `<b class="grp-eq" title="Equity ${fmt(eq)} ${esc(cur)} · Konto ${fmt(bal)} ${esc(cur)}">${fmt(eq)}</b>` : '';
     return `<div class="row grp"><span class="dot ${copier(g)}" title="Kopierer ${copier(g) === 'ok' ? 'online' : 'nicht online'}"></span><span>`
-      + `<div class="gtop"><i class="gname">${esc(g.name === '(not from a signal)' ? 'Von Hand' : g.name)}</i>${size}</div>`
+      + `<div class="gtop"><i class="gname">${esc(g.name === HAND ? 'Von Hand' : g.name)}</i>${size}</div>`
       + `${open.length ? ` <small class="grp-open">${open.length} offen · ${pl(sum)}</small>` : ''}</span>`
       + `<span class="mono">${signed(g.pnl_today)}</span><span>${signed(g.pnl_total)}</span></div>`
       + (open.length ? `<div class="grp-pos">${open.slice(0, 4).map((p) => `<div data-ticket="${p.ticket}" data-copier="${esc(p.copier)}" title="Chart öffnen"><span class="side ${p.side}">${esc(p.side.toUpperCase())}</span>`
@@ -1000,16 +1003,18 @@ let watch = null;
 const pctTxt = (v) => (v === null || v === undefined ? '–' : `${v > 0 ? '+' : ''}${fmt(v)} %`);
 const pctCls = (v) => (v > 0 ? 'up' : v < 0 ? 'down' : '');
 const priceTxt = (v) => (v === null || v === undefined ? '–' : fmt(v, v >= 1000 ? 0 : v >= 10 ? 2 : 4));
-function spark(values, w = 58, h = 20) {
+// up: the line's colour -- today's change when given (Brano, 2026-10-23: Bitcoin +0,28 % drew a red line,
+// because the line spans 30 days); without it the line's own direction
+function spark(values, w = 58, h = 20, up = null) {
   if (!values || values.length < 2) return `<svg viewBox="0 0 ${w} ${h}"></svg>`;
   const lo = Math.min(...values), hi = Math.max(...values), span = hi - lo || 1;
   const pts = values.map((v, i) => `${(i / (values.length - 1) * w).toFixed(1)},${(h - 2 - (v - lo) / span * (h - 4)).toFixed(1)}`).join(' ');
-  const c = values[values.length - 1] >= values[0] ? '#3ddc97' : '#f2647c';
+  const c = (up ?? values[values.length - 1] >= values[0]) ? '#3ddc97' : '#f2647c';
   return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none"><polyline points="${pts}" fill="none" stroke="${c}" stroke-width="1.6"/></svg>`;
 }
 function renderWatch(w) {
   const top = w.items.filter((i) => i.top).sort((a, b) => a.top - b.top);
-  $('#wTop').innerHTML = top.map((i) => `<div class="row wchart" data-sym="${esc(i.symbol || '')}" data-name="${esc(i.name)}" title="Chart öffnen"><span class="wname">${esc(i.name)}</span>${spark(i.spark)}`
+  $('#wTop').innerHTML = top.map((i) => `<div class="row wchart" data-sym="${esc(i.symbol || '')}" data-name="${esc(i.name)}" title="Chart öffnen"><span class="wname">${esc(i.name)}</span>${spark(i.spark, 58, 20, i.change_pct == null ? null : i.change_pct >= 0)}`
     + `<span class="wpx">${priceTxt(i.price)}</span><span class="wch ${pctCls(i.change_pct)}">${pctTxt(i.change_pct)}</span></div>`).join('');
   $('#wBadge').textContent = w.stale ? 'keine Daten' : `+${w.items.length - top.length} weitere`;
   $('#wBadge').classList.toggle('live', !w.stale);
@@ -1033,7 +1038,7 @@ function renderWatchView(w) {
     </td></tr>`;
   const row = (i) => (i.price === null || i.price === undefined
     ? `<tr class="wrow" data-name="${esc(i.name)}"><td>${name(i)}</td><td></td><td class="nodata" colspan="5">keine Daten – bei PU Prime nicht handelbar</td><td><button type="button" class="wmore">Details</button></td></tr>`
-    : `<tr class="wrow wchart" data-sym="${esc(i.symbol || '')}" data-name="${esc(i.name)}"><td>${name(i)}</td><td>${spark(i.spark, 80, 22)}</td><td class="num">${priceTxt(i.price)}</td>`
+    : `<tr class="wrow wchart" data-sym="${esc(i.symbol || '')}" data-name="${esc(i.name)}"><td>${name(i)}</td><td>${spark(i.spark, 80, 22, i.change_pct == null ? null : i.change_pct >= 0)}</td><td class="num">${priceTxt(i.price)}</td>`
       + `<td class="num ${pctCls(i.change_pct)}">${pctTxt(i.change_pct)}</td><td class="num ${pctCls(i.from_high_pct)}">${pctTxt(i.from_high_pct)}</td>`
       + `<td class="num ${pctCls(i.vs_sma200_pct)}">${pctTxt(i.vs_sma200_pct)}</td><td class="num">${i.rsi14 ?? '–'}</td>`
       + `<td class="notes">${(i.notes || []).map((n) => `<span class="note">${esc(n)}</span>`).join('')}${i.analysis ? '<span class="note ai">AURON-Analyse</span>' : ''}`
