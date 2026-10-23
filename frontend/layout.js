@@ -375,13 +375,32 @@
     await save(next);
   }
   window.AURON_layout = { actions: cardActions, act: cardAct };
-  // a phone has no hover: a finger on a card (scrolling over it, or a tap) shows its gear for a few seconds
+  // a phone has no hover: a finger on a card (scrolling over it, or a tap) shows its gear for a few seconds --
+  // and holding the finger on a card opens its settings right away (Brano, 2026-10-23: a tap opens the card's
+  // view, so the gear was hard to reach). A short tap still opens the view; moving the finger is scrolling.
+  let hold = null;
   document.addEventListener('touchstart', (e) => {
     const card = e.target.closest('.tile');
     if (!card) return;
     card.classList.add('touched');
     clearTimeout(card._touchT); card._touchT = setTimeout(() => card.classList.remove('touched'), 4000);
+    const ctl = e.target.closest('button, input, a, .card-gear, [role="button"]');
+    if (ctl && ctl !== card) return;                    // the card is a button itself; its own controls are not a hold
+    const t = e.touches[0];
+    hold = { card, x: t.clientX, y: t.clientY, timer: setTimeout(() => {
+      hold = null;
+      navigator.vibrate?.(15);
+      card.querySelector(':scope > .card-gear')?.click();
+      swallowClick = true; setTimeout(() => { swallowClick = false; }, 600);   // the lifted finger opens nothing
+    }, 550) };
   }, { passive: true });
+  document.addEventListener('touchmove', (e) => {
+    if (!hold) return;
+    const t = e.touches[0];
+    if (Math.hypot(t.clientX - hold.x, t.clientY - hold.y) > 10) { clearTimeout(hold.timer); hold = null; }
+  }, { passive: true });
+  ['touchend', 'touchcancel'].forEach((ev) => document.addEventListener(ev, () => { if (hold) { clearTimeout(hold.timer); hold = null; } }, { passive: true }));
+  document.addEventListener('contextmenu', (e) => { if (e.target.closest('.tile') && matchMedia('(hover: none)').matches) e.preventDefault(); });
 
   // added cards (price, copier, notes) get a gear too -- only their place, they have no text settings
   document.addEventListener('click', (e) => {
