@@ -46,7 +46,8 @@ def push_live(payload: LiveIn) -> dict:
     now = time.monotonic()
     return {"want_rates": sorted({sym for (prof, sym), at in list(_chart_wanted.items())
                                   if prof == payload.profile and now - at <= CHART_FOR_S}),
-            "want_hist": [h for (prof, _k), (at, h) in list(_hist_wanted.items()) if prof == payload.profile and now - at <= 60]}
+            "want_hist": [h for (prof, _k), (at, h) in list(_hist_wanted.items()) if prof == payload.profile and now - at <= 60],
+            "want_quote": [q for (prof, _k), (at, q) in list(_quote_wanted.items()) if prof == payload.profile and now - at <= 20]}
 
 
 # ---- a position's chart (dashboard click) -- five-minute candles straight from the copier's MT5 ----
@@ -62,6 +63,31 @@ def want_hist(profile: str, symbol: str, start: float, end: float, tf: str = "M5
     if (profile, key) not in _rates:
         _hist_wanted[(profile, key)] = (time.monotonic(), {"key": key, "symbol": symbol, "tf": tf, "from": start, "to": end})
     return key
+
+
+# a trade AURON prepares (tickets.py): the copier sends price and contract data for the key
+_quote_wanted: dict[tuple[str, str], tuple[float, dict]] = {}
+_quotes: dict[tuple[str, str], dict] = {}
+
+
+def want_quote(profile: str, symbol: str) -> str:
+    key = f"q{time.monotonic_ns()}"
+    _quote_wanted[(profile, key)] = (time.monotonic(), {"key": key, "symbol": symbol})
+    return key
+
+
+def quote_for(profile: str, key: str) -> dict | None:
+    got = _quotes.pop((profile, key), None)
+    if got:
+        _quote_wanted.pop((profile, key), None)
+    return got
+
+
+@router.post("/quote", status_code=204)
+def push_quote(payload: dict) -> None:
+    prof, key = str(payload.get("profile", "")), str(payload.get("key", ""))
+    if (prof, key) in _quote_wanted:
+        _quotes[(prof, key)] = payload
 
 
 def hist(profile: str, key: str) -> list | None:
@@ -184,3 +210,29 @@ def command_done(command_id: str, payload: DoneIn) -> dict:
         return commands.done(command_id, payload.ok, payload.result)
     except commands.CommandError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
+
+
+# ---- a trade AURON prepared (tickets.py): the card on the dashboard shows it, Brano's click opens it ----
+@router.get("/tickets/active")
+def ticket_active() -> dict:
+    from . import tickets
+    return {"ticket": tickets.active()}
+
+
+@router.post("/tickets/open")
+def ticket_open() -> dict:
+    """Brano's click on the ticket card."""
+    from . import tickets
+    try:
+        return tickets.open_ticket("click")
+    except tickets.TicketError as exc:
+        raise HTTPException(status_code=409, detail=str(exc))
+
+
+@router.post("/tickets/cancel")
+def ticket_cancel() -> dict:
+    from . import tickets
+    try:
+        return tickets.cancel()
+    except tickets.TicketError as exc:
+        raise HTTPException(status_code=409, detail=str(exc))

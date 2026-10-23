@@ -130,7 +130,7 @@ def session(http: httpx.Client | None = None) -> dict:
     return {"signed_url": d["signed_url"], "agent_id": agent}
 
 
-def run_tool(name: str, args: dict) -> str:
+def run_tool(name: str, args: dict, said: str = "") -> str:
     """A tool the agent asked for, run like in the chat. Object parameters come as JSON text."""
     spec = next((t for t in tools.TOOLS if t["name"] == name), None)
     if spec is None:
@@ -144,5 +144,5 @@ def run_tool(name: str, args: dict) -> str:
             except ValueError:
                 pass
         clean[k] = v
-    out, _failed = tools.run(name, clean)
+    out, _failed = tools.run(name, clean, "dashboard", said)
     return out[:6000]

@@ -289,6 +289,13 @@ def rates(symbol: str, n: int = 240) -> list[list[float]]:
     return [[int(x["time"]) - off, float(x["open"]), float(x["high"]), float(x["low"]), float(x["close"])] for x in r]
 
 
+def quote(symbol: str) -> dict:
+    """Price and contract data for a trade AURON prepares (lots from risk) -- read only."""
+    tick, s, i = _tick(symbol), spec(symbol), mt5.symbol_info(symbol)
+    return {"symbol": symbol, "bid": tick.bid, "ask": tick.ask, "tick_size": s.tick_size, "tick_value": s.tick_value,
+            "vol_min": s.volume_min, "vol_max": s.volume_max, "vol_step": s.volume_step, "digits": i.digits if i else 2}
+
+
 def rates_range(symbol: str, tf: str, start: float, end: float) -> list[list[float]]:
     """Candles of a past stretch, [time (real UTC), o, h, l, c] -- for AURON's look back at a group's trades."""
     if tf not in ("M1", "M5", "M15", "H1"):

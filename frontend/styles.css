@@ -1180,3 +1180,19 @@ body.card-drag, body.card-drag * { cursor: grabbing !important; user-select: non
 .theme-panel .nf-seg { grid-template-columns: repeat(3, auto); }
 .theme-panel .nf-seg button { padding: 5px 9px; }
 .nf-devs { font-size: 11.5px; }
+/* a prepared trade (ticket.js) -- above the AURON ring */
+.ticket { position: fixed; left: 50%; bottom: 120px; transform: translateX(-50%); z-index: 8; width: min(440px, calc(100vw - 32px));
+  padding: 14px 16px; border-radius: 18px; background: var(--surface); border: 1px solid color-mix(in srgb, var(--accent) 55%, transparent);
+  backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px); box-shadow: 0 20px 60px rgba(0,0,0,.5), 0 0 40px -14px var(--accent); display: grid; gap: 10px; }
+.ticket[hidden] { display: none; }
+.ticket header { display: flex; align-items: baseline; gap: 10px; }
+.ticket header b { font-size: 16px; letter-spacing: .04em; } .ticket header b.buy { color: var(--up); } .ticket header b.sell { color: var(--down); }
+.ticket header small { color: var(--muted); font-size: 12px; }
+.ticket .tk-x { margin-left: auto; border: 0; background: none; color: var(--muted); cursor: pointer; font-size: 14px; }
+.tk-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 14px; font-size: 13px; color: var(--muted); }
+.tk-grid b, .tk-legs b { color: var(--text); font-family: var(--mono); font-weight: 600; }
+.tk-legs { display: grid; gap: 3px; font-size: 13px; color: var(--muted); }
+.tk-btns { display: flex; align-items: center; gap: 12px; }
+.tk-open { font: inherit; font-weight: 700; padding: 8px 20px; border-radius: 999px; border: 0; background: var(--accent); color: #001018; cursor: pointer; }
+.tk-btns small { color: var(--muted); font-size: 12px; }
+.tk-sent { margin: 0; font-size: 13px; color: var(--up); }

@@ -18,7 +18,7 @@
     const names = await (await fetch(`${API_BASE}/v1/assistant/live/tools`)).json().catch(() => []);
     return Object.fromEntries((names || []).map((name) => [name, async (args) => {
       const r = await fetch(`${API_BASE}/v1/assistant/live/tool`, { method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, args: args || {} }) });
+        body: JSON.stringify({ name, args: args || {}, said: window.AURON_voice?.lastUser?.() || '' }) });
       return r.ok ? (await r.json()).result : `Fehler ${r.status}`;
     }]));
   }

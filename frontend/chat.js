@@ -120,6 +120,7 @@
     note: (text, extra = {}) => { turns.push({ role: 'assistant', content: text, ...extra }); save(); if (dock.classList.contains('open')) render(); },
     refresh: () => { if (dock.classList.contains('open')) render(); },
     // the live talk (live.js): what both sides said goes into the chat; the chat's own voice keeps quiet
+    lastUser: () => [...turns].reverse().find((t) => t.role === 'user')?.content || '',
     live: (role, text) => {
       turns.push({ role, content: text }); save(); open(true);
       // the live talk runs in the browser: Brano's words and AURON's answer go to the memory from here

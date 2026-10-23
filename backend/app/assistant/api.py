@@ -108,6 +108,7 @@ def learn_from_live(body: LearnIn) -> dict:
 class LiveToolIn(BaseModel):
     name: str = Field(min_length=1, max_length=80)
     args: dict = Field(default_factory=dict)
+    said: str = Field(default="", max_length=2000)   # Brano's last words in the live talk (trade_ticket checks them)
 
 
 @router.post("/live/session")
@@ -131,7 +132,7 @@ def live_tools() -> list[str]:
 def live_tool(payload: LiveToolIn) -> dict:
     """A tool the live agent asked for -- run here, like in the chat."""
     from . import live
-    return {"result": live.run_tool(payload.name, payload.args)}
+    return {"result": live.run_tool(payload.name, payload.args, payload.said)}
 
 
 class ClaimIn(BaseModel):
