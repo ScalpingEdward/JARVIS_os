@@ -49,6 +49,11 @@ def chart_full(on: bool | None = None) -> dict:
     return push({"do": "chart_full", "on": on})
 
 
+def show_model(part_id: str) -> dict:
+    """A 3D part (app/cad) in the dashboard's 3D view."""
+    return push({"do": "show_model", "id": part_id})
+
+
 def close_view() -> dict:
     return push({"do": "close"})
 

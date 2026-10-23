@@ -10,8 +10,9 @@ WORKDIR /app
 # duration and sampling still frames out of it. Videos have no EXIF and no
 # thumbnail, so without this there is nothing for the vision step to look at
 # and every video lands in the pool as a placeholder.
+# openscad: AURON's 3D parts (app/cad) -- headless, the STL export needs no display.
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends ffmpeg \
+    && apt-get install -y --no-install-recommends ffmpeg openscad \
     && rm -rf /var/lib/apt/lists/*
 
 RUN addgroup --system jarvis && adduser --system --ingroup jarvis jarvis

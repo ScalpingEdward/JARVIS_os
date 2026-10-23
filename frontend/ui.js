@@ -13,6 +13,7 @@
       if (c.do === 'open_view') { window.AURON_chart?.close(); window.AURON_view?.open(c.view); }
       else if (c.do === 'close') { window.AURON_chart?.close(); window.AURON_view?.close(); }
       else if (c.do === 'show_chart') { window.AURON_view?.close(); window.AURON_chart?.open(c.ticket, c.copier, c.tf); }
+      else if (c.do === 'show_model') { window.AURON_view?.close(); window.AURON_chart?.close(); window.AURON_model?.open(c.id); }
       else if (c.do === 'chart_full') window.AURON_chart?.full(c.on);
       else if (c.do === 'show_symbol') { window.AURON_view?.close(); window.AURON_chart?.symbol(c.symbol, c.copier, c.tf); }
     }

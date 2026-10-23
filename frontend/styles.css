@@ -1164,3 +1164,9 @@ body.card-drag, body.card-drag * { cursor: grabbing !important; user-select: non
   .tile.touched .card-gear { opacity: .9; }   /* shows once a finger is on the card (layout.js), like hover */
   .tile .tile-head { padding-right: 40px; }
 }
+/* 3D parts (model.js) -- same frame as the position chart */
+.model-view { grid-template-rows: auto 1fr; }
+.mv-body { position: relative; min-height: 0; overflow: hidden; }
+.mv-body canvas { display: block; cursor: grab; }
+.mv-stl { font-size: 12.5px; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--line-2); background: rgba(255,255,255,.05); color: var(--text); text-decoration: none; }
+.mv-stl:hover { border-color: var(--accent); }

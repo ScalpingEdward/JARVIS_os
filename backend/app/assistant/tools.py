@@ -333,6 +333,33 @@ def _smart_money_follow(action: str, owner: str | None = None) -> dict:
     return {"ok": True, "removed": hit[0] if sm.unfollow(hit[0]) else None}
 
 
+def _cad(action: str, name: str | None = None, source: str | None = None, description: str = "",
+         part: str | None = None) -> dict:
+    """AURON designs 3D parts (app/cad): he writes the source, the engine builds the STL, the dashboard shows it."""
+    from app.cad import service
+    from app.cad.engine import CadError
+    from app.dashboard_layout import ui
+    try:
+        if action == "list":
+            return {"parts": [{k: p[k] for k in ("id", "name", "size_mm", "version")} for p in service.parts()]}
+        if action in ("show", "source", "update", "delete"):
+            p = service.find(part or name or "")
+            if action == "show":
+                ui.show_model(p["id"])
+                return {"ok": True, "shown": p["name"]}
+            if action == "source":
+                return service.get(p["id"])
+            if action == "delete":
+                return {"ok": True, "deleted": service.delete(p["id"])["name"]}
+            meta = service.save(name or p["name"], source or "", description or p.get("description", ""), part_id=p["id"])
+        else:
+            meta = service.save(name or "", source or "", description)
+        ui.show_model(meta["id"])
+        return {"ok": True, "part": meta, "note": "built and shown on the dashboard"}
+    except CadError as exc:
+        return {"error": str(exc), "hint": "fix the source and call again"}
+
+
 TOOLS: list[dict] = [
     {"name": "trading_status",
      "description": "Brano's copier accounts right now: balance, equity, open positions, P&L per signal group "
@@ -456,6 +483,18 @@ TOOLS: list[dict] = [
      "input_schema": {"type": "object", "properties": {
          "action": {"type": "string", "enum": ["follow", "unfollow", "follow_all_profi", "unfollow_all"]},
          "owner": {"type": "string"}}, "required": ["action"]}},
+    {"name": "cad",
+     "description": "Design 3D parts for Brano -- to look at on the dashboard and to 3D-print later. 'create': write the "
+                    "part yourself in OpenSCAD (millimetres; the part rests on z=0 with a flat bottom so it prints "
+                    "without supports where possible; $fn at most 96; no include/use/import/surface); it is built, "
+                    "stored and opened in the 3D view. On an error, read it, fix the source and call again. 'update' "
+                    "replaces the source of an existing part (part = its name) -- for 'mach es 2 mm dicker' read it "
+                    "first with 'source'. 'show' opens a stored part, 'list' lists them, 'delete' only when he asks. "
+                    "Use parameters at the top of the source (breite = 80;) so changes are easy. Tell him the size.",
+     "input_schema": {"type": "object", "properties": {
+         "action": {"type": "string", "enum": ["create", "update", "show", "source", "list", "delete"]},
+         "name": {"type": "string"}, "source": {"type": "string"}, "description": {"type": "string"},
+         "part": {"type": "string"}}, "required": ["action"]}},
     {"name": "memory",
      "description": "What Brano teaches you, kept for good and put into every conversation: 'remember' stores one "
                     "short fact or rule in his words (\"merk dir ...\", \"ab jetzt ...\") -- only when he asks, never on "
@@ -519,6 +558,7 @@ _RUN: dict[str, Callable[..., dict]] = {
         _design(action, theme, room, card, card_style),
     "code_request": lambda change, **_: _code_request(change),
     "smart_money_follow": lambda action, owner=None, **_: _smart_money_follow(action, owner),
+    "cad": lambda action, name=None, source=None, description="", part=None, **_: _cad(action, name, source, description, part),
     "memory": lambda action, text=None, memory_id=None, **_: _memory(action, text, memory_id),
     "humor": lambda action, level=None, style=None, **_: _humor(action, level, style),
     "dashboard_show": lambda action, view=None, group=None, symbol=None, tf=None, on=None, **_: _dashboard_show(action, view, group, symbol, tf, on),
