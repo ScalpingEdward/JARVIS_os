@@ -148,3 +148,73 @@ def prompt_block() -> str:
     if mem:
         lines.append("Das Gedächtnis füllst du von selbst mit; erwähne es nicht bei jeder Antwort.")
     return "\n".join(lines)
+
+
+# ---- language and how AURON addresses Brano (Brano, 2026-10-23: "more languages, more customers") ----------
+# The languages that AURON's ear (ElevenLabs Scribe), his voice (ElevenLabs flash/v3) and Claude all speak --
+# 32 in all. code -> (name in that language, the live talk's first words)
+LANGS = {
+    "de": ("Deutsch", "Ja, Sir?"), "en": ("English", "Yes, sir?"), "cs": ("Čeština", "Ano, pane?"),
+    "sk": ("Slovenčina", "Áno, pane?"), "pl": ("Polski", "Tak, proszę pana?"), "ru": ("Русский", "Да, сэр?"),
+    "uk": ("Українська", "Так, сер?"), "ar": ("العربية", "نعم يا سيدي؟"), "es": ("Español", "¿Sí, señor?"),
+    "fr": ("Français", "Oui, monsieur ?"), "it": ("Italiano", "Sì, signore?"), "pt": ("Português", "Sim, senhor?"),
+    "nl": ("Nederlands", "Ja, meneer?"), "tr": ("Türkçe", "Evet efendim?"), "hu": ("Magyar", "Igen, uram?"),
+    "ro": ("Română", "Da, domnule?"), "bg": ("Български", "Да, сър?"), "hr": ("Hrvatski", "Da, gospodine?"),
+    "el": ("Ελληνικά", "Ναι, κύριε;"), "sv": ("Svenska", "Ja, sir?"), "da": ("Dansk", "Ja, sir?"),
+    "no": ("Norsk", "Ja, sir?"), "fi": ("Suomi", "Niin, herra?"), "zh": ("中文", "先生，您好？"),
+    "ja": ("日本語", "はい、何でしょう？"), "ko": ("한국어", "네, 말씀하세요?"), "hi": ("हिन्दी", "जी, सर?"),
+    "id": ("Bahasa Indonesia", "Ya, Pak?"), "ms": ("Bahasa Melayu", "Ya, tuan?"), "fil": ("Filipino", "Opo, sir?"),
+    "vi": ("Tiếng Việt", "Vâng, thưa ngài?"), "ta": ("தமிழ்", "சொல்லுங்கள், சார்?"),
+}
+LANG_KEY = "assistant.language"
+ADDRESS_KEY = "assistant.address"
+ADDRESS = {
+    "sir": "Sprich ihn mit \"Sir\" an (in seiner Sprache die passende höfliche Anrede) und sieze ihn, nie mit seinem "
+           "Namen -- so wie ein Butler, der seinen Chef mag: natürlich eingestreut, nicht in jedem Satz.",
+    "name": "Sprich ihn mit seinem Namen Brano an und duze ihn -- wie ein guter Freund, nicht in jedem Satz.",
+}
+
+
+def language() -> str:
+    code = _get(LANG_KEY, "de")
+    return code if code in LANGS else "de"
+
+
+def set_language(lang: str) -> dict:
+    """lang: a code (cs) or a name in any form (Tschechisch, Čeština, czech)."""
+    w = (lang or "").strip().lower()
+    names = {"deutsch": "de", "german": "de", "englisch": "en", "english": "en", "tschechisch": "cs", "czech": "cs",
+             "slowakisch": "sk", "slovak": "sk", "polnisch": "pl", "polish": "pl", "russisch": "ru", "russian": "ru",
+             "ukrainisch": "uk", "arabisch": "ar", "arabic": "ar", "spanisch": "es", "französisch": "fr", "italienisch": "it",
+             "portugiesisch": "pt", "niederländisch": "nl", "holländisch": "nl", "türkisch": "tr", "ungarisch": "hu",
+             "rumänisch": "ro", "bulgarisch": "bg", "kroatisch": "hr", "griechisch": "el", "schwedisch": "sv",
+             "dänisch": "da", "norwegisch": "no", "finnisch": "fi", "chinesisch": "zh", "japanisch": "ja",
+             "koreanisch": "ko", "indisch": "hi", "hindi": "hi", "indonesisch": "id", "malaiisch": "ms",
+             "philippinisch": "fil", "vietnamesisch": "vi", "tamil": "ta"}
+    code = w if w in LANGS else names.get(w) or next((k for k, (n, _) in LANGS.items() if n.lower() == w), None)
+    if not code:
+        raise PersonaError(f"keine Sprache {lang!r}; es gibt {', '.join(n for n, _ in LANGS.values())}")
+    _put(LANG_KEY, code)
+    return {"language": code, "name": LANGS[code][0]}
+
+
+def address() -> dict:
+    a = _get(ADDRESS_KEY, {"style": "sir"})
+    return a if a.get("style") in ("sir", "name", "custom") else {"style": "sir"}
+
+
+def set_address(style: str, text: str = "") -> dict:
+    if style not in ("sir", "name", "custom"):
+        raise PersonaError("Anrede: sir, name oder custom")
+    if style == "custom" and not text.strip():
+        raise PersonaError("eigene Anrede braucht einen Text, z. B. 'Boss, du'")
+    a = {"style": style, **({"text": text.strip()[:120]} if style == "custom" else {})}
+    _put(ADDRESS_KEY, a)
+    return a
+
+
+def address_line() -> str:
+    a = address()
+    if a["style"] == "custom":
+        return f"Sprich ihn so an: {a['text']} -- natürlich eingestreut, nicht in jedem Satz."
+    return ADDRESS[a["style"]]

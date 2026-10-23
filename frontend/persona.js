@@ -1,4 +1,5 @@
-// Einstellungen > AURON (Brano, 2026-10-22): how much and which humor, and everything he taught AURON
+// Einstellungen > AURON (Brano, 2026-10-22): his language and how he addresses Brano (2026-10-23), how much
+// and which humor, and everything he taught AURON
 // ("merk dir ...") -- visible, deletable, and new entries by hand. backend/app/assistant/persona.py
 (() => {
   const API_BASE = typeof API !== 'undefined' ? API : '/api';
@@ -11,11 +12,22 @@
     return d;
   };
 
+  const a0 = (d) => d.address || {};
   async function editor(el) {
     let d;
     try { d = await req('GET', ''); } catch (e) { el.innerHTML = `<p class="th-text">Nicht erreichbar: ${esc(e.message)}</p>`; return; }
     const paint = () => {
-      el.innerHTML = `<section class="th-sec"><h4>Humor</h4>
+      const a = d.address || { style: 'sir' };
+      el.innerHTML = `<section class="th-sec"><h4>Sprache</h4>
+          <select class="ps-lang" data-p="language">${Object.entries(d.languages || {}).map(([k, n]) =>
+            `<option value="${k}" ${k === d.language ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select>
+          <p class="th-text">Darin spricht, hört und antwortet AURON – überall. Auch per Zuruf: „Sprich Tschechisch“.</p>
+          <span class="th-label">Anrede</span><div class="seg ps-addr">
+            <button type="button" data-p="address" data-v="sir" class="${a.style === 'sir' ? 'on' : ''}">„Sir“ · Sie</button>
+            <button type="button" data-p="address" data-v="name" class="${a.style === 'name' ? 'on' : ''}">„Brano“ · Du</button>
+            <button type="button" data-p="address" data-v="custom" class="${a.style === 'custom' ? 'on' : ''}">Eigene</button></div>
+          ${a.style === 'custom' ? `<p class="th-text">Jetzt: ${esc(a.text)}</p>` : ''}</section>
+        <section class="th-sec"><h4>Humor</h4>
           <span class="th-label">Stärke <b data-out>${d.humor.level} / 10</b></span>
           <input type="range" min="0" max="10" step="1" data-p="level" value="${d.humor.level}" />
           <span class="th-label">Art</span><div class="seg ps-styles">${Object.keys(d.styles).map((k) =>
@@ -33,12 +45,21 @@
       if (!b) return;
       try {
         if (b.dataset.p === 'style') { d.humor = await req('PUT', '/humor', { style: b.dataset.v }); }
+        if (b.dataset.p === 'address') {
+          const text = b.dataset.v === 'custom' ? prompt('Wie soll AURON dich ansprechen? z. B. „Boss, mit Du“', a0(d).text || '') : '';
+          if (b.dataset.v === 'custom' && !text) return;
+          Object.assign(d, await req('PUT', '/language', { address: b.dataset.v, text: text || '' }));
+        }
         if (b.dataset.p === 'forget') { await req('DELETE', `/memory/${b.dataset.v}`); d.memories = d.memories.filter((m) => String(m.id) !== b.dataset.v); }
         paint();
       } catch (err) { alert(`Fehler: ${err.message}`); }
     };
     el.oninput = (e) => { if (e.target.dataset.p === 'level') el.querySelector('[data-out]').textContent = `${e.target.value} / 10`; };
     el.onchange = async (e) => {
+      if (e.target.dataset.p === 'language') {
+        try { Object.assign(d, await req('PUT', '/language', { language: e.target.value })); paint(); } catch (err) { alert(`Fehler: ${err.message}`); }
+        return;
+      }
       if (e.target.dataset.p !== 'level') return;
       try { d.humor = await req('PUT', '/humor', { level: Number(e.target.value) }); } catch (err) { alert(`Fehler: ${err.message}`); }
     };

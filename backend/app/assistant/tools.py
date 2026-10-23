@@ -439,6 +439,21 @@ def _trade_ticket(action: str, said: str = "", channel: str = "dashboard", symbo
         return {"error": str(exc)}
 
 
+def _language(action: str, language: str | None = None, address: str | None = None, text: str = "") -> dict:
+    from . import persona
+    try:
+        if action == "set_language":
+            out = persona.set_language(language or "")
+        elif action == "set_address":
+            out = persona.set_address(address or "", text)
+        else:
+            out = {"language": persona.language(), "address": persona.address()}
+        return {**out, "languages": [n for n, _ in persona.LANGS.values()],
+                "note": "from your next answer on; say it once in the new language"}
+    except persona.PersonaError as exc:
+        return {"error": str(exc)}
+
+
 TOOLS: list[dict] = [
     {"name": "trading_status",
      "description": "Brano's copier accounts right now: balance, equity, open positions, P&L per signal group "
@@ -623,6 +638,18 @@ TOOLS: list[dict] = [
          "sl": {"type": "number"}, "tps": {"type": "array", "items": {"type": "number"}, "maxItems": 4},
          "risk_pct": {"type": "number", "minimum": 0.01}, "lots": {"type": "number", "minimum": 0.01},
          "account": {"type": "string"}}, "required": ["action"]}},
+    {"name": "language",
+     "description": "The language you speak, hear and answer in, for good and on every screen, and how you address "
+                    "Brano. 'set_language' when he says 'sprich Tschechisch', 'speak English', 'hovor po slovensky' "
+                    "(32 languages: Deutsch, English, Čeština, Slovenčina, Polski, Русский, Українська, العربية, Español, "
+                    "Français, Italiano, Português, Nederlands, Türkçe, Magyar, Română, Български, Hrvatski, Ελληνικά, "
+                    "Svenska, Dansk, Norsk, Suomi, 中文, 日本語, 한국어, हिन्दी, Bahasa Indonesia, Bahasa Melayu, Filipino, "
+                    "Tiếng Việt, தமிழ்). 'set_address': 'sir' (Sir, formal -- the default), 'name' (Brano, informal) "
+                    "or 'custom' with text ('nenn mich Boss'). 'get' tells both.",
+     "input_schema": {"type": "object", "properties": {
+         "action": {"type": "string", "enum": ["get", "set_language", "set_address"]},
+         "language": {"type": "string"}, "address": {"type": "string", "enum": ["sir", "name", "custom"]},
+         "text": {"type": "string"}}, "required": ["action"]}},
     {"name": "memory",
      "description": "What Brano teaches you, kept for good and put into every conversation: 'remember' stores one "
                     "short fact or rule in his words (\"merk dir ...\", \"ab jetzt ...\") when he asks; 'forget' deletes "
@@ -692,6 +719,7 @@ _RUN: dict[str, Callable[..., dict]] = {
     "trade_review": lambda group, last=12, **_: _trade_review(group, last),
     "trade_ticket": lambda action, _said="", _channel="dashboard", **kw: _trade_ticket(action, _said, _channel, **{
         k: v for k, v in kw.items() if k in ("symbol", "side", "sl", "tps", "risk_pct", "lots", "account", "sl_pips", "tp_pips", "risk_money", "rr")}),
+    "language": lambda action, language=None, address=None, text="", **_: _language(action, language, address, text),
     "memory": lambda action, text=None, memory_id=None, **_: _memory(action, text, memory_id),
     "humor": lambda action, level=None, style=None, **_: _humor(action, level, style),
     "dashboard_show": lambda action, view=None, group=None, symbol=None, tf=None, on=None, **_: _dashboard_show(action, view, group, symbol, tf, on),

@@ -107,7 +107,9 @@ def speak(text: str, provider: str, voice: str, model: str, accent: str = "",
 
 
 STT_URL = "https://api.elevenlabs.io/v1/speech-to-text"
-STT_LANG = {"de": "de", "en": "en", "sk": "sk"}
+def _lang() -> str:
+    from . import persona
+    return persona.language()
 MAX_AUDIO = 10 * 1024 * 1024  # about ten minutes of browser webm/opus
 
 
@@ -124,7 +126,8 @@ def transcribe(audio: bytes, content_type: str, lang: str = "de", client: httpx.
     c, close = (client, False) if client else (httpx.Client(), True)
     try:
         r = c.post(STT_URL, timeout=60, headers={"xi-api-key": api_key},
-                   data={"model_id": "scribe_v2", "language_code": STT_LANG.get(lang, "de"), "tag_audio_events": "false"},
+                   # the language AURON speaks now (Einstellungen > AURON, or "sprich Tschechisch") -- not the browser's
+                   data={"model_id": "scribe_v2", "language_code": _lang(), "tag_audio_events": "false"},
                    files={"file": (f"speech.{ext}", audio, content_type or "application/octet-stream")})
         if r.status_code >= 400:
             raise VoiceError(f"elevenlabs returned {r.status_code}: {r.text[:300]}")

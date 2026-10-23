@@ -74,3 +74,20 @@ def test_a_now_entry_runs_out_by_itself(monkeypatch):
     assert m in persona.memories()
     monkeypatch.setattr(persona.time, "time", lambda: m["until"] + 1)
     assert persona.memories() == []
+
+
+def test_language_and_address_by_word_reach_prompt_ear_and_live_talk():
+    from app.assistant import live, voice
+    try:
+        out, failed = tools.run("language", {"action": "set_language", "language": "Tschechisch"})
+        assert not failed and '"cs"' in out
+        assert "Sprache der Antwort: Čeština" in system_prompt("de")      # the browser's lang no longer decides
+        assert voice._lang() == "cs" and live.agent_config()["conversation_config"]["agent"]["language"] == "cs"
+        assert live._first_words() == "Ano, pane?"
+        tools.run("language", {"action": "set_address", "address": "name"})
+        assert "Brano an und duze" in system_prompt("de") and live._first_words() == "Ano?"
+        out, _ = tools.run("language", {"action": "set_language", "language": "Klingonisch"})
+        assert "keine Sprache" in out
+        assert len(persona.LANGS) == 32
+    finally:
+        persona.set_language("de"); persona.set_address("sir")

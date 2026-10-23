@@ -23,7 +23,7 @@ import httpx
 from app.db import SessionLocal
 from app.db_models import AppSettingRow
 
-from . import tools
+from . import persona, tools
 from .brain import system_prompt
 
 BASE = "https://api.elevenlabs.io/v1/convai"
@@ -70,10 +70,19 @@ def client_tools() -> list[dict]:
     return out
 
 
+def _first_words() -> str:
+    """The live talk's first words, in AURON's language: "Ja, Sir?" -- or without the Sir when he is not addressed so."""
+    code = persona.language()
+    sir = persona.LANGS[code][1]
+    if persona.address()["style"] == "sir":
+        return sir
+    return {"de": "Ja, Brano?", "en": "Yes, Brano?"}.get(code, sir.split(",")[0].rstrip("?") + "?")
+
+
 def agent_config() -> dict:
     llm = os.getenv("ELEVENLABS_AGENT_LLM", "claude-sonnet-4")
     return {"name": "AURON", "conversation_config": {
-        "agent": {"first_message": "Ja, Sir?", "language": "de",
+        "agent": {"first_message": _first_words(), "language": persona.language(),
                   "prompt": {"prompt": system_prompt("de") + LIVE_RULES, "llm": llm, "tools": client_tools()}},
         "tts": {"voice_id": VOICE, "model_id": "eleven_flash_v2_5"},
         "turn": {"turn_timeout": 10}}}

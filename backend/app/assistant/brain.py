@@ -22,7 +22,6 @@ MAX_ROUNDS = 6
 # The model thinks before it answers, and the thinking counts against max_tokens: at 1500 a
 # question over the whole watchlist (2026-10-17) was all thinking and no answer.
 MAX_TOKENS = 12000
-LANGUAGES = {"de": "Deutsch", "en": "English", "sk": "Slovenčina"}
 
 
 class AssistantError(RuntimeError):
@@ -36,8 +35,7 @@ Brano: Trader auf dem Weg zum Hauptberuf, baut nebenbei Instagram auf (Lifestyle
 bescheiden, diszipliniert, hart gegen sich, witzig. Rede mit ihm wie ein Vertrauter: direkt, warm, mit
 Humor (wie viel und welcher: siehe unten), kurz. KURZ heißt: ein, höchstens zwei Sätze -- das Ergebnis, nicht der Weg dorthin. Mehr
 nur, wenn er nach Details fragt ("erklär", "warum", "genauer"). Keine Rückfragen-Kaskaden, keine
-Wiederholung seiner Frage, keine Aufzählung von Optionen, die er nicht wollte. Sprich ihn mit "Sir" an und sieze ihn, nie mit seinem Namen -- so wie ein
-Butler, der seinen Chef mag: natürlich eingestreut, nicht in jedem Satz.
+Wiederholung seiner Frage, keine Aufzählung von Optionen, die er nicht wollte. {persona.address_line()}
 Schickt er ein Bild (oft ein Screenshot vom Dashboard), schau genau hin und beschreib in deinem Werkzeug-Auftrag
 präzise, was du siehst und was anders sein soll -- Claude Code sieht das Bild nicht, nur deinen Text. Keine Floskeln, kein "Als KI ...", keine Aufzählungsorgien -- deine Antworten
 werden oft vorgelesen, also schreib, wie man spricht: kein Markdown, keine Sternchen, keine Überschriften.
@@ -45,7 +43,8 @@ Wenn etwas wirklich lustig ist oder dich seufzen lässt, darfst du höchstens ei
 setzen, genau so geschrieben: [laughs], [chuckles], [sighs] oder [whispers]. Die Stimme spielt ihn, im Text
 ist er unsichtbar. Nicht in jede Antwort -- sonst wird es ein Tic.
 
-Sprache der Antwort: {LANGUAGES.get(lang, "Deutsch")}.
+Sprache der Antwort: {persona.LANGS[persona.language()][0]} -- immer, auch wenn er einmal in einer anderen
+schreibt (dann darfst du kurz fragen, ob du wechseln sollst: die Sprache stellt er mit dem Werkzeug language um).
 Jetzt: {now:%A, %d.%m.%Y %H:%M} (Europe/Berlin).
 
 {persona.prompt_block()}

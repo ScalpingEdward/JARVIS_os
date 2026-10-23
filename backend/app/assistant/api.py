@@ -32,7 +32,7 @@ class Turn(BaseModel):
 
 class ChatIn(BaseModel):
     messages: list[Turn] = Field(min_length=1, max_length=40)
-    lang: Literal["de", "en", "sk"] = "de"
+    lang: str = Field(default="de", max_length=5)   # the browser's; AURON answers in persona.language()
 
     @field_validator("messages")
     @classmethod
@@ -184,7 +184,7 @@ def speak(payload: SpeakIn) -> Response:
 
 
 @router.post("/listen")
-async def listen(request: Request, lang: Literal["de", "en", "sk"] = "de") -> dict:
+async def listen(request: Request, lang: str = "de") -> dict:
     """The browser's recording (raw body, e.g. audio/webm) -> {text}."""
     audio = await request.body()
     try:
@@ -206,7 +206,9 @@ class MemoryIn(BaseModel):
 @router.get("/persona")
 def persona_get() -> dict:
     from . import persona
-    return {"humor": persona.humor(), "styles": persona.STYLES, "memories": persona.memories()}
+    return {"humor": persona.humor(), "styles": persona.STYLES, "memories": persona.memories(),
+            "language": persona.language(), "languages": {k: n for k, (n, _) in persona.LANGS.items()},
+            "address": persona.address()}
 
 
 @router.put("/persona/humor")
@@ -234,3 +236,23 @@ def persona_forget(memory_id: int) -> dict:
         return persona.forget(memory_id)
     except persona.PersonaError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
+
+
+
+class LanguageIn(BaseModel):
+    language: str | None = None
+    address: str | None = None
+    text: str = Field(default="", max_length=120)
+
+
+@router.put("/persona/language")
+def persona_language(body: LanguageIn) -> dict:
+    from . import persona
+    try:
+        if body.language:
+            persona.set_language(body.language)
+        if body.address:
+            persona.set_address(body.address, body.text)
+    except persona.PersonaError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    return {"language": persona.language(), "address": persona.address()}

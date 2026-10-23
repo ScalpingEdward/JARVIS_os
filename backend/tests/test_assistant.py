@@ -48,7 +48,14 @@ def test_a_failing_tool_reaches_the_model_as_an_error_not_a_crash(monkeypatch):
 
 
 def test_language_is_part_of_the_prompt():
-    assert "English" in brain.system_prompt("en") and "Deutsch" in brain.system_prompt("de")
+    # AURON's own setting decides (Einstellungen > AURON, "sprich Englisch") -- not the browser's
+    from app.assistant import persona
+    try:
+        persona.set_language("en")
+        assert "Sprache der Antwort: English" in brain.system_prompt("de")
+    finally:
+        persona.set_language("de")
+    assert "Sprache der Antwort: Deutsch" in brain.system_prompt("en")
 
 
 def test_gives_up_after_too_many_tool_rounds(monkeypatch):
