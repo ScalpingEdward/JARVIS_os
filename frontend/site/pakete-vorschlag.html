@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>AURON Pakete – drei Vorschläge</title>
+<link rel="stylesheet" href="./site.css" />
+<style>
+  /* the price packages as software boxes (Brano, 2026-10-23) -- three looks to pick from; not linked, a preview */
+  body { background: #05070c; }
+  .v { padding: 80px clamp(16px, 4vw, 64px) 90px; position: relative; overflow: hidden; }
+  .v + .v { border-top: 1px solid rgba(170,220,255,.12); }
+  .lbl { display: block; text-align: center; font: 600 12px/1 Inter, sans-serif; letter-spacing: .3em; color: #8a94a8; margin-bottom: 14px; }
+  .v h2 { font-family: Inter, 'Segoe UI', system-ui, sans-serif; text-align: center; font-size: clamp(26px, 3vw, 40px); margin-bottom: 46px; }
+
+  .stage { position: relative; max-width: 1200px; margin: 0 auto; }
+  .devices { position: relative; height: 300px; margin-bottom: -150px; }
+  .laptop { position: absolute; width: 44%; left: 28%; top: 0; }
+  .laptop .scr { border: 9px solid #111621; border-bottom-width: 12px; border-radius: 12px 12px 3px 3px; overflow: hidden; aspect-ratio: 16/10;
+    box-shadow: 0 30px 60px -30px rgba(0,0,0,.9); }
+  .laptop img, .tablet img, .phone img { width: 100%; height: 100%; object-fit: cover; object-position: left top; }
+  .laptop .base { height: 12px; margin: 0 -8%; border-radius: 0 0 12px 12px; background: linear-gradient(180deg, #2a3140, #0e1219); }
+  .tablet { position: absolute; width: 21%; left: 9%; top: 50px; transform: rotate(-4deg); border: 8px solid #10141c; border-radius: 16px; overflow: hidden; aspect-ratio: 4/3; }
+  .phone { position: absolute; width: 9%; right: 13%; top: 60px; transform: rotate(5deg); border: 5px solid #10141c; border-radius: 22px; overflow: hidden; aspect-ratio: 9/19.5; }
+  .phone img { object-position: top; }
+
+  .boxes { position: relative; display: flex; justify-content: center; align-items: flex-end; gap: 4%; perspective: 1500px; padding-top: 20px; }
+  .box { position: relative; width: 20%; aspect-ratio: 3/4.2; transform-style: preserve-3d; transform: rotateY(-26deg); }
+  .box.feat { transform: rotateY(-26deg) translateY(-22px) scale(1.07); }
+  .front { position: absolute; inset: 0; border-radius: 5px; overflow: hidden; display: flex; flex-direction: column; padding: 10% 10% 9%; }
+  .front .art { position: absolute; inset: 0; z-index: 0; }
+  .front > *:not(.art):not(.ribbon) { position: relative; z-index: 1; }
+  .front::after { content: ""; position: absolute; inset: 0; z-index: 2; pointer-events: none;
+    background: linear-gradient(112deg, transparent 38%, rgba(255,255,255,.10) 47%, transparent 56%); }
+  .side { position: absolute; top: 0; bottom: 0; right: 0; width: 15%; transform-origin: right; transform: rotateY(90deg); display: grid; place-items: center; border-radius: 0 4px 4px 0; }
+  .side span { writing-mode: vertical-rl; font: 700 10px/1 Inter, sans-serif; letter-spacing: .32em; }
+  .brandrow { display: flex; align-items: center; gap: 8px; }
+  .brandrow .r { width: 20px; height: 20px; border-radius: 50%; border: 2px solid currentColor; box-shadow: 0 0 10px currentColor, inset 0 0 6px currentColor; position: relative; }
+  .brandrow .r::after { content: ""; position: absolute; width: 4px; height: 4px; border-radius: 50%; background: #fff; right: 0; top: 1px; box-shadow: 0 0 6px #fff; }
+  .brandrow b { font: 700 11px/1 Inter, sans-serif; letter-spacing: .42em; }
+  .icon { width: 30%; aspect-ratio: 1; margin-top: 14%; }
+  .name { margin-top: 8%; font: 800 clamp(14px, 1.6vw, 23px)/1.05 Inter, sans-serif; letter-spacing: .01em; }
+  .name small { display: block; margin-top: 6px; font: 600 clamp(9px, .8vw, 11px)/1.2 Inter, sans-serif; letter-spacing: .18em; text-transform: uppercase; opacity: .8; }
+  .price { white-space: nowrap; margin-top: auto; font: 700 clamp(14px, 1.3vw, 18px)/1 Inter, sans-serif; }
+  .price small { font-weight: 400; opacity: .7; font-size: 11px; }
+  .ribbon { position: absolute; top: 12px; right: -30px; z-index: 3; transform: rotate(35deg); padding: 4px 34px; font: 700 9px/1 Inter, sans-serif; letter-spacing: .2em; }
+  .shadow { position: absolute; left: 6%; right: 6%; bottom: -18px; height: 22px; border-radius: 50%; background: rgba(0,0,0,.7); filter: blur(10px); transform: translateZ(-1px); }
+
+  /* package art -- the same in every look, coloured by it */
+  .art svg { width: 100%; height: 100%; display: block; }
+  .art-img img { width: 100%; height: 100%; object-fit: cover; }
+
+  /* ===== A: black and gold, like the reference ===== */
+  .A .front { background: linear-gradient(165deg, #1b1d22, #060708 62%); border: 1px solid rgba(214,180,110,.4); color: #e9cf95;
+    box-shadow: 0 50px 70px -30px rgba(0,0,0,.95); }
+  .A .front .art { opacity: .32; }
+  .A .side { background: linear-gradient(180deg, #d9b56a, #8a6a2e); } .A .side span { color: #140e04; }
+  .A .name { background: linear-gradient(180deg, #fff4d6, #c9a45c); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .A .brandrow { color: #e9cf95; } .A .ribbon { background: #e9cf95; color: #140e04; }
+  .A { background: radial-gradient(1100px 460px at 50% 40%, rgba(214,180,110,.12), transparent 70%), #05070c; }
+
+  /* ===== B: AURON cyan glass ===== */
+  .B .front { background: linear-gradient(165deg, rgba(79,216,255,.18), rgba(8,14,24,.92) 55%); border: 1px solid rgba(79,216,255,.55); color: #dff7ff;
+    box-shadow: 0 50px 70px -30px rgba(0,0,0,.95), 0 0 40px -12px rgba(79,216,255,.6), inset 0 0 30px rgba(79,216,255,.12); }
+  .B .front .art { opacity: .38; }
+  .B .side { background: linear-gradient(180deg, #4fd8ff, #136a8a); } .B .side span { color: #00121a; }
+  .B .name { color: #fff; text-shadow: 0 0 22px rgba(79,216,255,.6); }
+  .B .brandrow { color: #4fd8ff; } .B .ribbon { background: #4fd8ff; color: #00121a; }
+  .B { background: radial-gradient(1100px 460px at 50% 40%, rgba(79,216,255,.13), transparent 70%), #04060a; }
+
+  /* ===== C: each package its own colour, AURON ring on all ===== */
+  .C .front { color: #fff; border: 1px solid rgba(255,255,255,.18); box-shadow: 0 50px 70px -30px rgba(0,0,0,.95); }
+  .C .front .art { opacity: .5; }
+  .C .insta .front { background: linear-gradient(160deg, #feda75 0%, #fa7e1e 22%, #d62976 50%, #962fbf 75%, #4f5bd5 100%); }
+  .C .insta .side { background: linear-gradient(180deg, #d62976, #4f5bd5); }
+  .C .signal .front { background: linear-gradient(160deg, #0f3b2c, #04110c 70%); } .C .signal .side { background: linear-gradient(180deg, #3ddc97, #0f5a3c); }
+  .C .trader .front { background: linear-gradient(160deg, #0d2a4a, #030a14 70%); } .C .trader .side { background: linear-gradient(180deg, #4fd8ff, #134a8a); }
+  .C .business .front { background: linear-gradient(160deg, #3b2f17, #0d0a04 70%); } .C .business .side { background: linear-gradient(180deg, #e9cf95, #8a6a2e); }
+  .C .side span { color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,.5); }
+  .C .brandrow { color: #fff; } .C .ribbon { background: #fff; color: #000; }
+  .C .name { text-shadow: 0 2px 18px rgba(0,0,0,.5); }
+
+  @media (max-width: 900px) { .boxes { flex-wrap: wrap; gap: 26px 6%; } .box { width: 40%; } .devices { display: none; } }
+</style>
+</head>
+<body>
+
+<template id="box">
+  <div class="box"><div class="front"><div class="art"></div>
+      <div class="brandrow"><span class="r"></span><b>AURON</b></div>
+      <div class="icon"></div><div class="name"></div><div class="price"></div></div>
+    <div class="side"><span></span></div><div class="shadow"></div></div>
+</template>
+
+<section class="v A"><span class="lbl">VORSCHLAG A · SCHWARZ &amp; GOLD</span><h2>Wähle dein AURON-Paket</h2><div class="stage"></div></section>
+<section class="v B"><span class="lbl">VORSCHLAG B · AURON-CYAN, GLAS</span><h2>Wähle dein AURON-Paket</h2><div class="stage"></div></section>
+<section class="v C"><span class="lbl">VORSCHLAG C · JEDES PAKET IN SEINER FARBE</span><h2>Wähle dein AURON-Paket</h2><div class="stage"></div></section>
+
+<script>
+// One set of packages, drawn in all three looks: icon and background art per package.
+const ICON = {
+  insta: '<svg viewBox="0 0 48 48"><rect x="5" y="5" width="38" height="38" rx="11" fill="none" stroke="currentColor" stroke-width="3.4"/><circle cx="24" cy="24" r="8.6" fill="none" stroke="currentColor" stroke-width="3.4"/><circle cx="34.6" cy="13.4" r="2.4" fill="currentColor"/></svg>',
+  signal: '<svg viewBox="0 0 48 48"><path d="M5 22 43 6 35 42 24 31 17 38 18 27 34 13 15 25Z" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/></svg>',
+  trader: '<svg viewBox="0 0 48 48" fill="currentColor"><rect x="7" y="18" width="6" height="16" rx="1"/><rect x="9.4" y="12" width="1.2" height="28"/><rect x="21" y="10" width="6" height="18" rx="1"/><rect x="23.4" y="6" width="1.2" height="28"/><rect x="35" y="16" width="6" height="12" rx="1"/><rect x="37.4" y="10" width="1.2" height="26"/></svg>',
+  business: '<svg viewBox="0 0 48 48"><rect x="5" y="14" width="38" height="26" rx="4" fill="none" stroke="currentColor" stroke-width="3.2"/><path d="M17 14v-4a3 3 0 0 1 3-3h8a3 3 0 0 1 3 3v4M5 25h38" fill="none" stroke="currentColor" stroke-width="3.2"/></svg>',
+};
+// candles for the trading art, made up -- never real numbers
+const candles = (seed) => { let p = 60, s = ''; for (let i = 0; i < 22; i++) { const o = p, c = p + Math.sin(i * 1.7 + seed) * 7 + (i % 5 ? -1.5 : 4);
+  const hi = Math.max(o, c) + 4, lo = Math.min(o, c) - 4, x = 6 + i * 9, up = c > o;
+  s += `<line x1="${x}" x2="${x}" y1="${200 - hi * 1.6}" y2="${200 - lo * 1.6}" stroke="currentColor" stroke-width="1.2"/><rect x="${x - 3}" y="${200 - Math.max(o, c) * 1.6}" width="6" height="${Math.max(2, Math.abs(c - o) * 1.6)}" fill="${up ? '#3ddc97' : '#f2647c'}"/>`; p = c; }
+  return `<svg viewBox="0 0 210 260" preserveAspectRatio="xMidYMid slice"><path d="M0 230 L210 230" stroke="currentColor" opacity=".3"/>${s}</svg>`; };
+const grid = () => `<svg viewBox="0 0 210 280" preserveAspectRatio="xMidYMid slice">${Array.from({ length: 16 }, (_, i) =>
+  `<rect x="${(i % 4) * 53}" y="${Math.floor(i / 4) * 70 + 40}" width="50" height="66" rx="4" fill="currentColor" opacity="${.25 + (i * 7 % 5) / 10}"/>`).join('')}</svg>`;
+const ART = { insta: grid(), signal: candles(1) + '', trader: candles(3), business: '<div class="art-img" style="height:100%"><img src="img/dashboard.webp" alt=""/></div>' };
+const PACKS = [
+  ['insta', 'Insta-Manager', 'Content auf Autopilot', '29 €', 'INSTA-MANAGER'],
+  ['signal', 'Signal', 'Signale kopieren', '39 €', 'SIGNAL'],
+  ['trader', 'Trader', 'Konten · Bots · Smart Money', '69 €', 'TRADER', true],
+  ['business', 'Business', 'Alles, unbegrenzt', '99 €', 'BUSINESS'],
+];
+document.querySelectorAll('.stage').forEach((stage) => {
+  stage.innerHTML = `<div class="devices"><div class="tablet"><img src="img/dashboard.webp" alt=""/></div>
+    <div class="laptop"><div class="scr"><img src="img/dashboard.webp" alt="AURON Dashboard"/></div><div class="base"></div></div>
+    <div class="phone"><img src="img/phone-demo.webp" alt=""/></div></div><div class="boxes"></div>`;
+  const row = stage.querySelector('.boxes');
+  for (const [k, name, sub, price, side, feat] of PACKS) {
+    const b = document.getElementById('box').content.firstElementChild.cloneNode(true);
+    b.classList.add(k); if (feat) b.classList.add('feat');
+    b.querySelector('.art').innerHTML = ART[k];
+    b.querySelector('.icon').innerHTML = ICON[k];
+    b.querySelector('.name').innerHTML = `${name.toUpperCase()}<small>${sub}</small>`;
+    b.querySelector('.price').innerHTML = `${price}<small> /Monat</small>`;
+    b.querySelector('.side span').textContent = `AURON · ${side}`;
+    if (feat) b.querySelector('.front').insertAdjacentHTML('beforeend', '<span class="ribbon">BELIEBT</span>');
+    row.append(b);
+  }
+});
+</script>
+</body>
+</html>

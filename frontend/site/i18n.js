@@ -5,6 +5,12 @@
   const LANGS = { en: 'English', es: 'Español', ru: 'Русский', de: 'Deutsch', cs: 'Čeština', ar: 'العربية' };
   // German text -> [en, es, ru, ar]
   const T = {
+    "Content auf Autopilot": ["Content on autopilot", "Contenido en piloto automático", "Контент на автопилоте", "محتوى على الطيار الآلي"],
+    "Signale kopieren": ["Copy signals", "Copiar señales", "Копирование сигналов", "نسخ الإشارات"],
+    "Konten · Bots · Smart Money": ["Accounts · Bots · Smart Money", "Cuentas · Bots · Smart Money", "Счета · Боты · Smart Money", "حسابات · بوتات · Smart Money"],
+    "Alles, unbegrenzt": ["Everything, unlimited", "Todo, sin límites", "Всё, без ограничений", "كل شيء، بلا حدود"],
+    "Details ansehen ›": ["See details ›", "Ver detalles ›", "Подробнее ›", "عرض التفاصيل ›"],
+    "Tippe auf ein Paket – darunter siehst du, was drin ist.": ["Tap a package – below you see what is in it.", "Toca un paquete – debajo verás lo que incluye.", "Нажми на тариф – ниже увидишь, что в него входит.", "اضغط على باقة – وسترى أدناه ما تتضمنه."],
     'Vorteile': ['Benefits', 'Ventajas', 'Преимущества', 'المزايا'],
     'Manager': ['Managers', 'Gestores', 'Модули', 'المديرون'],
     'Kontrolle': ['Control', 'Control', 'Контроль', 'التحكم'],
@@ -293,6 +299,12 @@
   // Czech: its own table, German text -> Czech, informal "ty" like the German "du"; rewritten as natural
   // Czech product copy on 2026-10-21 -- the first version followed the German word for word
   const CS = {
+    "Content auf Autopilot": "Obsah na autopilota",
+    "Signale kopieren": "Kopírování signálů",
+    "Konten · Bots · Smart Money": "Účty · Boti · Smart Money",
+    "Alles, unbegrenzt": "Všechno, bez omezení",
+    "Details ansehen ›": "Zobrazit detaily ›",
+    "Tippe auf ein Paket – darunter siehst du, was drin ist.": "Klepni na balíček – níž uvidíš, co obsahuje.",
     "Vorteile": "Výhody",
     "Manager": "Moduly",
     "Kontrolle": "Kontrola",
