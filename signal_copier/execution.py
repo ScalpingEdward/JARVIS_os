@@ -258,11 +258,16 @@ def report_inputs() -> tuple[dict, list[dict], list[dict]]:
     offset = _server_offset_seconds()
     closing = (mt5.DEAL_ENTRY_OUT, mt5.DEAL_ENTRY_OUT_BY)
     # Deposits and withdrawals are deals too; only buy/sell is trading.
+    # the SL/TP a trade was opened with -- on its order; AURON's trade review measures them (2026-10-23)
+    since, until = datetime(2000, 1, 1), datetime.now() + timedelta(days=1)
+    levels = {o.ticket: (o.sl, o.tp) for o in mt5.history_orders_get(since, until) or ()}
+    why = {getattr(mt5, "DEAL_REASON_SL", 4): "sl", getattr(mt5, "DEAL_REASON_TP", 5): "tp", getattr(mt5, "DEAL_REASON_SO", 6): "stopout"}
     deals = [{"position_id": d.position_id, "time": d.time - offset, "profit": d.profit,
               "commission": d.commission, "swap": d.swap, "fee": d.fee, "closing": d.entry in closing,
               "symbol": d.symbol, "side": "buy" if d.type == mt5.DEAL_TYPE_BUY else "sell",
-              "volume": d.volume, "price": d.price, "comment": d.comment}
-             for d in mt5.history_deals_get(datetime(2000, 1, 1), datetime.now() + timedelta(days=1)) or ()
+              "volume": d.volume, "price": d.price, "comment": d.comment,
+              "sl": levels.get(d.order, (0, 0))[0], "tp": levels.get(d.order, (0, 0))[1], "reason": why.get(d.reason, "hand")}
+             for d in mt5.history_deals_get(since, until) or ()
              if d.type in (mt5.DEAL_TYPE_BUY, mt5.DEAL_TYPE_SELL)]
     return account, positions, deals
 
@@ -281,6 +286,19 @@ def rates(symbol: str, n: int = 240) -> list[list[float]]:
     if r is None:
         return []
     off = _server_offset_seconds(symbol)
+    return [[int(x["time"]) - off, float(x["open"]), float(x["high"]), float(x["low"]), float(x["close"])] for x in r]
+
+
+def rates_range(symbol: str, tf: str, start: float, end: float) -> list[list[float]]:
+    """Candles of a past stretch, [time (real UTC), o, h, l, c] -- for AURON's look back at a group's trades."""
+    if tf not in ("M1", "M5", "M15", "H1"):
+        return []
+    mt5.symbol_select(symbol, True)
+    off = _server_offset_seconds(symbol)
+    r = mt5.copy_rates_range(symbol, getattr(mt5, f"TIMEFRAME_{tf}"), datetime.fromtimestamp(start + off, timezone.utc),
+                             datetime.fromtimestamp(end + off, timezone.utc))
+    if r is None:
+        return []
     return [[int(x["time"]) - off, float(x["open"]), float(x["high"]), float(x["low"]), float(x["close"])] for x in r]
 
 

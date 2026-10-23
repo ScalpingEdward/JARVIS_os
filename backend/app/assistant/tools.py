@@ -399,6 +399,11 @@ def _desk(action: str, target: str | None = None, monitor: int | None = None, di
     return {"ok": True, **(c["result"] or {})}
 
 
+def _trade_review(group: str, last: int = 12) -> dict:
+    from app.copier_status.review import review
+    return review(group, last)
+
+
 TOOLS: list[dict] = [
     {"name": "trading_status",
      "description": "Brano's copier accounts right now: balance, equity, open positions, P&L per signal group "
@@ -549,6 +554,19 @@ TOOLS: list[dict] = [
          "target": {"type": "string"}, "monitor": {"type": "integer", "minimum": 1, "maximum": 9},
          "direction": {"type": "string", "enum": ["up", "down"]}, "amount": {"type": "integer", "minimum": 1, "maximum": 50}},
          "required": ["action"]}},
+    {"name": "trade_review",
+     "description": "Look back at a copier group's closed trades (NINJA, ICT CRT ...) when Brano asks why it loses, "
+                    "whether entries or stops are good. Returns per trade, measured the same way every time: SL "
+                    "distance in pips and in ATR (sl_atr < 1 = inside normal noise), whether the stop sits behind the "
+                    "last swing low/high or in front of it (sl_behind_swing), how far it ran in profit first (mfe_r), "
+                    "whether price reached TP after the stop hit (hunt), how late the signal was (late_pips), R:R -- "
+                    "plus a summary. Give HIS answer: what most likely cost the losses and what you would change "
+                    "(stop placement, entry timing, skipping late signals) -- concrete, with the numbers, short. It is "
+                    "a look at his own trades, not market advice. Say the definitions are a first version. Takes up "
+                    "to 25 s (candles come from MT5).",
+     "input_schema": {"type": "object", "properties": {"group": {"type": "string"},
+                                                        "last": {"type": "integer", "minimum": 1, "maximum": 40}},
+                      "required": ["group"]}},
     {"name": "memory",
      "description": "What Brano teaches you, kept for good and put into every conversation: 'remember' stores one "
                     "short fact or rule in his words (\"merk dir ...\", \"ab jetzt ...\") when he asks; 'forget' deletes "
@@ -615,6 +633,7 @@ _RUN: dict[str, Callable[..., dict]] = {
     "smart_money_follow": lambda action, owner=None, **_: _smart_money_follow(action, owner),
     "cad": lambda action, name=None, source=None, description="", part=None, **_: _cad(action, name, source, description, part),
     "desk": lambda action, target=None, monitor=None, direction=None, amount=None, **_: _desk(action, target, monitor, direction, amount),
+    "trade_review": lambda group, last=12, **_: _trade_review(group, last),
     "memory": lambda action, text=None, memory_id=None, **_: _memory(action, text, memory_id),
     "humor": lambda action, level=None, style=None, **_: _humor(action, level, style),
     "dashboard_show": lambda action, view=None, group=None, symbol=None, tf=None, on=None, **_: _dashboard_show(action, view, group, symbol, tf, on),

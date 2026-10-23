@@ -73,9 +73,9 @@ def test_closed_trades_newest_first_with_the_opening_commission_on_the_first_par
     from signal_copier.report import closed_trades
     deals = [
         {"position_id": 7, "time": 100, "profit": 0, "commission": -1.0, "swap": 0, "fee": 0, "closing": False,
-         "symbol": "XAUUSD", "side": "buy", "volume": 0.2, "price": 4100.0},
+         "symbol": "XAUUSD", "side": "buy", "volume": 0.2, "price": 4100.0, "sl": 4085.0, "tp": 4110.0},
         {"position_id": 7, "time": 200, "profit": 5.0, "commission": 0, "swap": 0, "fee": 0, "closing": True,
-         "symbol": "XAUUSD", "side": "sell", "volume": 0.1, "price": 4110.0, "comment": "[tp 4110]"},
+         "symbol": "XAUUSD", "side": "sell", "volume": 0.1, "price": 4110.0, "comment": "[tp 4110]", "reason": "tp"},
         {"position_id": 7, "time": 300, "profit": -2.0, "commission": 0, "swap": 0, "fee": 0, "closing": True,
          "symbol": "XAUUSD", "side": "sell", "volume": 0.1, "price": 4090.0, "comment": "[sl 4090]"},
         {"position_id": 9, "time": 400, "profit": 3.0, "commission": 0, "swap": 0, "fee": 0, "closing": True},
@@ -84,6 +84,6 @@ def test_closed_trades_newest_first_with_the_opening_commission_on_the_first_par
     assert [r["closed"] for r in rows] == [400, 300, 200]
     assert rows[2] == {"position": 7, "group": "VIP", "symbol": "XAUUSD", "side": "buy", "volume": 0.1,
                        "price_open": 4100.0, "price_close": 4110.0, "opened": 100, "closed": 200,
-                       "comment": "[tp 4110]", "profit": 4.0}
+                       "comment": "[tp 4110]", "sl": 4085.0, "tp": 4110.0, "reason": "tp", "profit": 4.0}
     assert rows[1]["profit"] == -2.0 and rows[0]["group"] == OTHER
     assert sum(r["profit"] for r in rows) == 5.0   # adds up to what the account made

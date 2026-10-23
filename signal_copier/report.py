@@ -95,6 +95,7 @@ def closed_trades(deals: list[dict], owner: dict[int, str], keep: int = CLOSED_K
                      "side": {"buy": "sell", "sell": "buy"}.get(side, side or ""), "volume": d.get("volume", 0),
                      "price_open": o.get("price", 0), "price_close": d.get("price", 0),
                      "opened": o.get("time"), "closed": d["time"], "comment": d.get("comment", ""),
+                     "sl": o.get("sl", 0) or 0, "tp": o.get("tp", 0) or 0, "reason": d.get("reason", ""),
                      "profit": round(amount, 2)})
     return rows[::-1][:keep]
 

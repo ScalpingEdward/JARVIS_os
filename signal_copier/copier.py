@@ -888,6 +888,8 @@ class LivePusher:
         self.profile = profile
         self.q: queue.Queue[dict] = queue.Queue(maxsize=1)
         self.wanted: set[str] = set()        # symbols whose chart is open on a dashboard (AURON's answer says so)
+        self.hist: list[dict] = []           # past stretches AURON wants for a trade review, each sent once
+        self.hist_sent: set[str] = set()
         self.rq: queue.Queue[dict] = queue.Queue(maxsize=4)
         threading.Thread(target=self._run, daemon=True).start()
         threading.Thread(target=self._run_rates, daemon=True).start()
@@ -918,7 +920,9 @@ class LivePusher:
             try:
                 answer = urllib.request.urlopen(urllib.request.Request(self.url, body, {"Content-Type": "application/json"}), timeout=5).read()
                 try:
-                    self.wanted = set(json.loads(answer or b"{}").get("want_rates", []))
+                    a = json.loads(answer or b"{}")
+                    self.wanted = set(a.get("want_rates", []))
+                    self.hist = [h for h in a.get("want_hist", []) if h.get("key") not in self.hist_sent]
                 except ValueError:
                     self.wanted = set()
             except Exception:  # noqa: BLE001 -- the 15 s report says when AURON is gone; this one stays quiet
@@ -1085,6 +1089,11 @@ async def main(profile: str | None, dry: bool) -> None:
                         sym, at, tf = wanted.partition("@")
                         real = sym if sym in copier.symbols else (resolve(sym, copier.symbols, copier.overrides) or sym)
                         push.rates(wanted, execution.rates(real + at + tf), real)
+                    for h in push.hist[:2]:              # a trade review: one past stretch each, once
+                        sym = h["symbol"] if h["symbol"] in copier.symbols else (resolve(h["symbol"], copier.symbols, copier.overrides) or h["symbol"])
+                        push.rates(h["key"], execution.rates_range(sym, h.get("tf", "M5"), h["from"], h["to"]), sym)
+                        push.hist_sent.add(h["key"])
+                    push.hist = [h for h in push.hist if h["key"] not in push.hist_sent]
             except Exception:  # noqa: BLE001
                 log.debug("live numbers", exc_info=True)
             await asyncio.sleep(LIVE_EVERY_S)

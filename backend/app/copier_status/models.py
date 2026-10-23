@@ -37,6 +37,9 @@ class CopierClosedTrade(BaseModel):
     opened: float | None = None   # UTC epoch seconds
     closed: float
     comment: str = ""             # MT5's, e.g. "[tp 4182.0]" or "[sl 4150.0]"
+    sl: float = 0                 # the SL/TP the trade was opened with (its order's) -- 0: none or an older copier
+    tp: float = 0
+    reason: str = ""              # why it closed: sl, tp, stopout, hand
     profit: float                 # after commission and swap
 
 
