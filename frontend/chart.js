@@ -52,7 +52,12 @@
     Object.assign(box.style, { left: `${Math.round(l.right + 14)}px`, right: `${Math.round(innerWidth - r.left + 14)}px`,
       top: `${Math.round(Math.min(l.top, r.top))}px`, bottom: `${Math.round(innerHeight - Math.max(l.bottom, r.bottom))}px` });
   }
-  const setFull = (on) => { full = on ?? !full; place(); };
+  const setFull = (on) => {
+    full = on ?? !full; place();
+    // the chart follows the new size at once (it kept the full-screen width when going back)
+    requestAnimationFrame(fit);
+  };
+  function fit() { if (chart && body.clientWidth && body.clientHeight) chart.resize(body.clientWidth, body.clientHeight); }
   box.querySelector('.pc-full').addEventListener('click', () => setFull());
 
   const openAll = () => (window.overview?.accounts || overview?.accounts || []).flatMap((a) => (a.open_positions || []).map((p) => ({ ...p, copier: a.profile, cur: a.currency })));
@@ -191,12 +196,14 @@
     try { await lib(); } catch (e) { wait.textContent = e.message; return; }
     if (!chart) {
       chart = LightweightCharts.createChart(body, {
-        autoSize: true, layout: { background: { color: 'transparent' }, textColor: '#9fb0c8', fontFamily: 'Inter, "Segoe UI", sans-serif' },
+        width: body.clientWidth, height: body.clientHeight, layout: { background: { color: 'transparent' }, textColor: '#9fb0c8', fontFamily: 'Inter, "Segoe UI", sans-serif' },
         grid: { vertLines: { color: 'rgba(255,255,255,.04)' }, horzLines: { color: 'rgba(255,255,255,.04)' } },
         rightPriceScale: { borderColor: 'rgba(255,255,255,.08)' },
         timeScale: { borderColor: 'rgba(255,255,255,.08)', timeVisible: true, secondsVisible: false },
         crosshair: { mode: 1 },
       });
+      // sized by hand, not autoSize: back from full screen it kept the full-screen width (Brano, 2026-10-23)
+      new ResizeObserver(fit).observe(body);
       series = chart.addCandlestickSeries({ upColor: '#3ddc97', downColor: '#f2647c', borderVisible: false, wickUpColor: '#3ddc97', wickDownColor: '#f2647c' });
     } else series.setData([]);
     clearInterval(timer);
