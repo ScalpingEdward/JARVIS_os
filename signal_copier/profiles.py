@@ -85,17 +85,19 @@ $c.Arguments = '"{config}"'; $c.Save()
 
 
 def autostart_shortcut(name: str) -> Path:
-    """A shortcut in Windows' Startup folder: the profile starts at logon, minimised,
-    and autostart.bat restarts it if it ever stops. Without it, a reboot (Windows
-    updates do that at night) silently ends copying until someone notices."""
+    """A shortcut in Windows' Startup folder: the profile starts at logon, without a window
+    (tools\\run_hidden.vbs; tools\\stop_helpers.bat copiers stops it), and autostart.bat restarts it if it
+    ever stops. Without it, a reboot (Windows updates do that at night) silently ends copying until someone notices."""
     folder(name)  # validates the name
     if name not in names():
         raise ProfileError(f"no profile {name!r}")
     bat = HERE / "autostart.bat"
+    hidden = HERE.parent / "tools" / "run_hidden.vbs"
     ps = f"""
 $s = [Environment]::GetFolderPath('Startup'); $w = New-Object -ComObject WScript.Shell
-$l = $w.CreateShortcut("$s\\Copier {name}.lnk"); $l.TargetPath = '{bat}'; $l.Arguments = '{name}'
-$l.WorkingDirectory = '{HERE.parent}'; $l.WindowStyle = 7; $l.Save(); Write-Output "$s\\Copier {name}.lnk"
+$l = $w.CreateShortcut("$s\\Copier {name}.lnk"); $l.TargetPath = 'C:\\Windows\\System32\\wscript.exe'
+$l.Arguments = '"{hidden}" "{bat}" {name}'
+$l.WorkingDirectory = '{HERE.parent}'; $l.Save(); Write-Output "$s\\Copier {name}.lnk"
 """
     out = subprocess.run(["powershell", "-NoProfile", "-Command", ps], check=True, capture_output=True, text=True)
     return Path(out.stdout.strip())
