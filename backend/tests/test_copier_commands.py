@@ -82,7 +82,7 @@ def test_offline_copier_is_reported_once_and_its_return_too(monkeypatch):
     monkeypatch.setattr(watch.copier_status_service, "list", lambda: [SimpleNamespace(
         profile="vip_demo", label="VIP", state=state["s"], received_at=datetime(2026, 10, 17, 15, 40, tzinfo=timezone.utc))])
     w = watch.CopierWatch()
-    assert len(w.check()) == 1 and "VIP ist offline" in sent[0] and "15:40" in sent[0]
+    assert len(w.check()) == 1 and "VIP ist offline" in sent[0] and "17:40" in sent[0]   # Berlin time
     assert w.check() == []
     state["s"] = CopierState.live
     assert w.check() == ["✅ VIP läuft wieder."]
@@ -103,3 +103,19 @@ def test_moving_sl_tp_and_opening_by_hand_are_commands_that_wait_for_confirmatio
     for bad in ("open:XAUUSD.s:hold:1::", "sltp:abc::", "open:x:buy:1::;rm"):
         with pytest.raises(commands.CommandError):
             commands.create("demo", bad, "dashboard", confirmed=True)
+
+
+def test_a_copier_silent_for_five_minutes_is_reported_four_is_not(monkeypatch):
+    from types import SimpleNamespace
+    from app.copier_status import watch
+    from datetime import datetime, timedelta, timezone
+    sent = []
+    monkeypatch.setattr(watch, "_telegram", sent.append)
+    ago = {"m": 4}
+    monkeypatch.setattr(watch.copier_status_service, "list", lambda: [SimpleNamespace(
+        profile="vip_demo", label="VIP", state=None,
+        received_at=datetime.now(timezone.utc) - timedelta(minutes=ago["m"]))])
+    w = watch.CopierWatch()
+    assert w.check() == []
+    ago["m"] = 6
+    assert len(w.check()) == 1 and "VIP ist offline" in sent[0]

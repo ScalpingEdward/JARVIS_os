@@ -1,18 +1,25 @@
 """A copier that stops reporting is a copier that stops copying -- say so on Telegram.
 
 On 2026-10-17 both copiers and the market feed were gone for 40 minutes and only the
-red dots on the dashboard knew. Now: once a copier has been offline (no push for 10
-minutes) Telegram says so, once; and again when it is back.
+red dots on the dashboard knew. Now: once a copier has sent nothing for 5 minutes, Telegram
+and the AURON app say so (the 'copier' route of app/push), once; and again when it is back.
 """
 from __future__ import annotations
 
 import asyncio
 import logging
+from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 
 from .models import CopierState
 from .service import copier_status_service
 
 log = logging.getLogger(__name__)
+
+# "a few minutes" (Brano, 2026-10-27) -- not the dashboard's 10-minute 'offline': on 2026-10-27 both copiers
+# were gone for an hour while three positions were open. A copier pushes every few seconds, so 5 minutes of
+# nothing is not a hiccup.
+DOWN_AFTER = timedelta(minutes=5)
 
 
 def _telegram(text: str) -> None:
@@ -30,12 +37,14 @@ class CopierWatch:
 
     def check(self) -> list[str]:
         said = []
+        now = datetime.now(timezone.utc)
         for a in copier_status_service.list():
             name = a.label or a.profile
-            if a.state == CopierState.offline and a.profile not in self.down:
+            if now - a.received_at >= DOWN_AFTER and a.profile not in self.down:
                 self.down.add(a.profile)
-                said.append(f"⚠ {name} ist offline -- seit {a.received_at:%H:%M} UTC keine Meldung. "
-                            "Kopiert nicht! Laptop wach? MT5 offen? Fenster 'Copier … (autostart)' da?")
+                since = a.received_at.astimezone(ZoneInfo("Europe/Berlin"))
+                said.append(f"⚠ {name} ist offline -- seit {since:%H:%M} keine Meldung. Kopiert nicht! "
+                            "Laptop wach? MT5 offen? Neu starten: Verknüpfung 'Copier …' im Autostart-Ordner.")
             elif a.state == CopierState.live and a.profile in self.down:
                 self.down.discard(a.profile)
                 said.append(f"✅ {name} läuft wieder.")
@@ -45,7 +54,8 @@ class CopierWatch:
 
     async def _run(self) -> None:
         # a fresh API start knows nothing yet: what is offline now counts as already reported
-        self.down = {a.profile for a in copier_status_service.list() if a.state == CopierState.offline}
+        now = datetime.now(timezone.utc)
+        self.down = {a.profile for a in copier_status_service.list() if now - a.received_at >= DOWN_AFTER}
         while True:
             await asyncio.sleep(60)
             try:
