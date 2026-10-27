@@ -798,6 +798,11 @@ document.querySelectorAll('.hist-filter[data-side]').forEach((f) => f.addEventLi
 }));
 
 let sgVerdict = 'profi', sgData = null, follows = [];
+// a click on a column head sorts by it -- numbers and dates high to low first, names A-Z; a second click turns it round
+let sgSort = { key: null, dir: -1 };
+const SG_COLS = [['owner', 'INSIDER', (x) => x.owner.toLowerCase()], ['firma', 'FIRMA', (x) => (x.tickers[0] || '').toLowerCase()],
+  ['n', 'KÄUFE', (x) => x.n], ['hit', 'TREFFER', (x) => x.hit], ['avg', 'Ø GEWINN', (x) => x.avg],
+  ['market', 'MARKT Ø', (x) => x.market], ['last', 'ZULETZT', (x) => new Date(x.last).getTime()], ['verdict', 'URTEIL', (x) => x.verdict]];
 async function loadFollows() {
   try { follows = await get('/v1/smartmoney/follows'); } catch (e) { console.warn(e); return; }
   $('#fwCount').textContent = follows.length;
@@ -858,8 +863,12 @@ function renderSignalers() {
   $('#sgFilter').innerHTML = [['profi', 'Profi'], ['weg', 'Weg'], ['offen', 'Offen']].map(([k, n]) =>
     `<button type="button" class="hchip${k === sgVerdict ? ' on' : ''}" data-sg="${k}">${n} <small>${d.counts[k]}</small></button>`).join('');
   const watched = new Set(follows.map((f) => f.owner));
-  $('#sgTable').innerHTML = d.rows.length ? '<tr><th></th><th>INSIDER</th><th>FIRMA</th><th>KÄUFE</th><th>TREFFER</th><th>Ø GEWINN</th><th>MARKT Ø</th><th>ZULETZT</th><th>URTEIL</th></tr>'
-    + d.rows.map((x) => `<tr><td><button type="button" class="star${watched.has(x.owner) ? ' on' : ''}" data-follow="${esc(x.owner)}"`
+  const col = SG_COLS.find((c) => c[0] === sgSort.key);
+  const rows = col ? [...d.rows].sort((a, b) => { const x = col[2](a), y = col[2](b);
+    return (x == null) - (y == null) || (x < y ? -1 : x > y ? 1 : 0) * sgSort.dir; }) : d.rows;
+  $('#sgTable').innerHTML = d.rows.length ? '<tr><th></th>' + SG_COLS.map(([k, n]) =>
+      `<th class="sortable${k === sgSort.key ? ' on' : ''}" data-sort="${k}">${n}${k === sgSort.key ? (sgSort.dir < 0 ? ' ▼' : ' ▲') : ''}</th>`).join('') + '</tr>'
+    + rows.map((x) => `<tr><td><button type="button" class="star${watched.has(x.owner) ? ' on' : ''}" data-follow="${esc(x.owner)}"`
       + ` title="${watched.has(x.owner) ? 'Nicht mehr beobachten' : 'Beobachten: jeder neue Trade per Telegram'}">${watched.has(x.owner) ? '★' : '☆'}</button></td>`
       + `<td>${esc(x.owner)} <small class="muted">${esc(x.role)}</small></td><td><b>${esc(x.tickers.slice(0, 3).join(', '))}</b></td>`
       + `<td class="num">${x.n}</td><td class="num">${Math.round(x.hit * 100)} %</td>`
@@ -868,6 +877,12 @@ function renderSignalers() {
       + `<td><span class="verdict ${x.verdict}">${x.verdict}</span></td></tr>`).join('')
     : '<tr><td class="muted">Niemand in dieser Gruppe.</td></tr>';
 }
+$('#sgTable').addEventListener('click', (e) => {
+  const th = e.target.closest('[data-sort]'); if (!th) return;
+  const k = th.dataset.sort;
+  sgSort = k === sgSort.key ? { key: k, dir: -sgSort.dir } : { key: k, dir: ['owner', 'firma', 'verdict'].includes(k) ? 1 : -1 };
+  renderSignalers();
+});
 $('#sgFilter').addEventListener('click', (e) => { const b = e.target.closest('[data-sg]'); if (!b) return; sgVerdict = b.dataset.sg; loadSignalers(); });
 
 function renderSmartView() {

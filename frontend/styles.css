@@ -1223,3 +1223,8 @@ body.card-drag, body.card-drag * { cursor: grabbing !important; user-select: non
 .t-figrow .tile-figure { flex: none; }
 .t-figrow .tile-spark { flex: 1; min-width: 60px; height: 40px; margin: 10px 0 0; }
 .a-trading .kpis { margin-top: 12px; }
+
+/* sortable column heads (Profis table) */
+th.sortable { cursor: pointer; user-select: none; white-space: nowrap; }
+th.sortable:hover { color: var(--accent, #4fd1ff); }
+th.sortable.on { color: var(--accent, #4fd1ff); }
