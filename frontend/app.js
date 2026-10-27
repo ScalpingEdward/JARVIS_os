@@ -802,7 +802,7 @@ let sgVerdict = 'profi', sgData = null, follows = [];
 let sgSort = { key: null, dir: -1 };
 const SG_COLS = [['owner', 'INSIDER', (x) => x.owner.toLowerCase()], ['firma', 'FIRMA', (x) => (x.tickers[0] || '').toLowerCase()],
   ['n', 'KÄUFE', (x) => x.n], ['hit', 'TREFFER', (x) => x.hit], ['avg', 'Ø GEWINN', (x) => x.avg],
-  ['market', 'MARKT Ø', (x) => x.market], ['last', 'ZULETZT', (x) => new Date(x.last).getTime()], ['verdict', 'URTEIL', (x) => x.verdict]];
+  ['market', 'MARKT Ø', (x) => x.market], ['value', 'VOLUMEN', (x) => x.value], ['last', 'ZULETZT', (x) => new Date(x.last).getTime()], ['verdict', 'URTEIL', (x) => x.verdict]];
 async function loadFollows() {
   try { follows = await get('/v1/smartmoney/follows'); } catch (e) { console.warn(e); return; }
   $('#fwCount').textContent = follows.length;
@@ -867,13 +867,15 @@ function renderSignalers() {
   const rows = col ? [...d.rows].sort((a, b) => { const x = col[2](a), y = col[2](b);
     return (x == null) - (y == null) || (x < y ? -1 : x > y ? 1 : 0) * sgSort.dir; }) : d.rows;
   $('#sgTable').innerHTML = d.rows.length ? '<tr><th></th>' + SG_COLS.map(([k, n]) =>
-      `<th class="sortable${k === sgSort.key ? ' on' : ''}" data-sort="${k}">${n}${k === sgSort.key ? (sgSort.dir < 0 ? ' ▼' : ' ▲') : ''}</th>`).join('') + '</tr>'
+      `<th class="sortable${k === sgSort.key ? ' on' : ''}" data-sort="${k}"${k === 'last' ? ' title="Letzter Kauf, der schon 60 Handelstage Ergebnis hat – neuere Käufe zählen erst danach"' : k === 'value' ? ' title="Dollar, die er in diese Käufe gesteckt hat (Summe)"' : ''}>${n}${k === sgSort.key ? (sgSort.dir < 0 ? ' ▼' : ' ▲') : ''}</th>`).join('') + '</tr>'
     + rows.map((x) => `<tr><td><button type="button" class="star${watched.has(x.owner) ? ' on' : ''}" data-follow="${esc(x.owner)}"`
       + ` title="${watched.has(x.owner) ? 'Nicht mehr beobachten' : 'Beobachten: jeder neue Trade per Telegram'}">${watched.has(x.owner) ? '★' : '☆'}</button></td>`
       + `<td>${esc(x.owner)} <small class="muted">${esc(x.role)}</small></td><td><b>${esc(x.tickers.slice(0, 3).join(', '))}</b></td>`
       + `<td class="num">${x.n}</td><td class="num">${Math.round(x.hit * 100)} %</td>`
       + `<td class="num ${x.avg > 0 ? 'up' : 'down'}">${pct(x.avg)}</td>`
-      + `<td class="num muted">${pct(x.market)}</td><td class="muted">${esc(new Date(x.last).toLocaleDateString('de-DE'))}</td>`
+      + `<td class="num muted">${pct(x.market)}</td>`
+      + `<td class="num" title="${x.value == null ? '' : Math.round(x.value).toLocaleString('de-DE') + ' $ in ' + x.n + ' Käufen'}">${x.value == null ? '–' : x.value >= 1e6 ? (x.value / 1e6).toFixed(1) + ' Mio $' : Math.round(x.value / 1e3) + 'k $'}</td>`
+      + `<td class="muted">${esc(new Date(x.last).toLocaleDateString('de-DE'))}</td>`
       + `<td><span class="verdict ${x.verdict}">${x.verdict}</span></td></tr>`).join('')
     : '<tr><td class="muted">Niemand in dieser Gruppe.</td></tr>';
 }

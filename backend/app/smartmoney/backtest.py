@@ -161,7 +161,7 @@ def by_signaler(evts: list[dict], horizon: int = HOLD, codes: tuple = FOLLOW_COD
     """Per insider (the person, across companies): every buy (by default only buys, see
     FOLLOW_CODES) as a position.
     hit = share of positions in profit after costs; avg/total = profit per position and summed;
-    market = the S&P 500 over the same days, on average. verdict: 'profi' (>= 3 signals,
+    market = the S&P 500 over the same days, on average; value = the dollars they put in, summed. verdict: 'profi' (>= 3 signals,
     >= 60 % hits, average in profit), 'weg' (<= 40 % hits or average in loss), else 'offen'."""
     groups: dict[str, list[dict]] = defaultdict(list)
     for e in evts:
@@ -179,7 +179,8 @@ def by_signaler(evts: list[dict], horizon: int = HOLD, codes: tuple = FOLLOW_COD
         out.append({"owner": owner, "tickers": sorted({e["ticker"] for e in lst}), "role": lst[0].get("role", ""),
                     "n": n, "buys": sum(e["code"] == "P" for e in lst), "sales": sum(e["code"] == "S" for e in lst),
                     "hit": round(hit, 3), "avg": round(avg, 4), "total": round(sum(prof), 4),
-                    "market": round(statistics.fmean(mkt), 4), "last": max(e["filed"] for e in lst), "verdict": verdict})
+                    "market": round(statistics.fmean(mkt), 4), "last": max(e["filed"] for e in lst), "verdict": verdict,
+                    "value": round(sum(e.get("value", 0) for e in lst))})   # dollars put in across these positions
     out.sort(key=lambda x: (x["verdict"] != "profi", -x["avg"] * min(x["n"], 10)))
     return out
 

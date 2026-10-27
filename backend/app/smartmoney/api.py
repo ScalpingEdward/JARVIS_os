@@ -42,6 +42,10 @@ def signalers(verdict: str | None = None, limit: int = 300) -> dict:
     bt = smart_money_service.backtest()
     if not bt or "by_signaler" not in bt["summary"]:
         return {"available": False}
+    if bt["summary"]["by_signaler"] and "value" not in bt["summary"]["by_signaler"][0]:
+        # a backtest stored before the dollar sums (2026-10-27): rebuilt from its own events, a tenth of a second
+        from .backtest import by_signaler
+        bt["summary"]["by_signaler"] = by_signaler(bt["events"])
     rows = bt["summary"]["by_signaler"]
     counts = {v: sum(1 for x in rows if x["verdict"] == v) for v in ("profi", "weg", "offen")}
     if verdict:
