@@ -12,7 +12,9 @@
   let tf = 'M5', real = null;
   const box = document.createElement('section');
   box.className = 'pos-chart'; box.hidden = true;
-  box.innerHTML = `<header class="pc-head"><b class="pc-title"></b><span class="pc-pl mono"></span><span class="pc-sum mono"></span>
+  box.innerHTML = `<header class="pc-head"><b class="pc-title"></b>
+      <select class="pc-acct" hidden title="Konto: daher kommen die Kerzen, darauf handeln Buy und Sell"></select>
+      <span class="pc-pl mono"></span><span class="pc-sum mono"></span>
       <span class="pc-tf">${TFS.map((t) => `<button type="button" data-tf="${t}">${t}</button>`).join('')}</span>
       <span class="pc-tools" title="Zeichnen: Klick, Klick -- Rechtsklick auf eine Zeichnung löscht sie, Esc beendet">
         <button type="button" data-tool="hline" title="Horizontale Linie">─</button><button type="button" data-tool="trend" title="Trendlinie">╱</button>
@@ -123,10 +125,29 @@
   const marks = () => box.querySelectorAll('.pc-tf button').forEach((b) => b.classList.toggle('on', b.dataset.tf === tf));
   marks();
 
+  // a symbol's own chart can come from any copier's terminal: chosen in the head, remembered for the next
+  // one (Brano, 2026-10-29: Gold from the watchlist always showed "Konto ICT")
+  const acctSel = box.querySelector('.pc-acct');
+  let acctKey = '';
+  function accounts() {
+    const list = window.overview?.accounts || overview?.accounts || [];
+    const key = list.map((a) => `${a.profile}:${a.state}`).join('|');
+    if (key !== acctKey) {
+      acctKey = key;
+      acctSel.innerHTML = list.map((a) => `<option value="${esc(a.profile)}">Konto ${esc(a.label || a.profile)}${a.state === 'live' ? '' : ' (offline)'}</option>`).join('');
+    }
+    if (document.activeElement !== acctSel) acctSel.value = pos.copier;
+  }
+  acctSel.addEventListener('change', () => {
+    try { localStorage.setItem('auron_chart_account', acctSel.value); } catch { /* private window */ }
+    open({ symbol: pos.symbol, copier: acctSel.value, ticket: null }, tf);
+  });
+
   function header() {
+    acctSel.hidden = !!pos.ticket;
     if (!pos.ticket) {                                  // a symbol's own chart: no trade behind it
-      const acct = (window.overview?.accounts || overview?.accounts || []).find((a) => a.profile === pos.copier);
-      box.querySelector('.pc-title').textContent = `${real || pos.symbol} · Konto ${acct?.label || pos.copier}`;
+      accounts();
+      box.querySelector('.pc-title').textContent = real || pos.symbol;
       box.querySelector('.pc-pl').textContent = ''; box.querySelector('.pc-close-pos').hidden = true;
       return;
     }

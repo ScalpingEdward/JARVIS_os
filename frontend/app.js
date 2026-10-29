@@ -1107,7 +1107,11 @@ $('#watchGroups').addEventListener('click', async (e) => {
 
 // a value's chart: its MT5 symbol from the watchlist, candles from a copier's terminal (chart.js)
 function openWatchChart(el) {
-  const sym = el.dataset.sym, acc = (overview?.accounts || []).find((a) => a.state === 'live') || overview?.accounts?.[0];
+  // the account last chosen in the chart's head, while it is live; else the first live one
+  let chosen = null;
+  try { chosen = localStorage.getItem('auron_chart_account'); } catch { /* private window */ }
+  const all = overview?.accounts || [];
+  const sym = el.dataset.sym, acc = all.find((a) => a.profile === chosen && a.state === 'live') || all.find((a) => a.state === 'live') || all[0];
   if (!sym) { alert(`${el.dataset.name}: keine Kursdaten bei PU Prime – kein Chart.`); return; }
   if (!acc) { alert('Kein Kopierer meldet sich – ohne MT5 kein Chart.'); return; }
   window.AURON_chart?.symbol(sym, acc.profile, 'H1');   // over the view: closing the chart leaves the list as it was
