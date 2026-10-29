@@ -158,6 +158,10 @@
   // transform (the turned tiles went flat while floating). Give such an element a copy of its keyframes
   // with both parts in each frame -- composed the way the browser would: single transforms first.
   var madeFrames = {}, madeCss = [];
+  // the dearest ones on the TV, measured one by one (ms per frame, 285 with all paused): floating holo 643,
+  // floating tiles 457 (six big glass cards repainted), sun pulse 409 (a filter), energy 380 (blur),
+  // beam 352. Brano found it too slow with them (2026-10-29); the rings stay.
+  var TV_OFF = ['float', 'hover-float', 'energy', 'beam', 'sunpulse'];
   function ownTransforms(el) {
     var t = { single: null, own: null };
     cfg.transforms.forEach(function (r) { try { if (el.matches(r[0])) { if (r[1] != null) t.single = r[1]; if (r[2] != null) t.own = r[2]; } } catch (e) { /* bad selector */ } });
@@ -176,6 +180,7 @@
         var names = getComputedStyle(el).animationName.split(',').map(function (n) { return n.trim(); });
         var t = ownTransforms(el), changed = false;
         var mapped = names.map(function (n) {
+          if (TV_OFF.indexOf(n) >= 0) { changed = true; return 'none'; }
           var f = frames[n];
           if (!f) return n;
           var keepPos = t.single && f.some(function (x) { return x[1] != null; });   // frames set transform
@@ -223,6 +228,8 @@
       'html.tv-keys :focus { outline: 3px solid rgb(var(--accent-rgb)) !important; outline-offset: 3px; }',
       // a shared 3D space confuses this Chromium: the open panel showed the tiles through it and clicks
       // landed on the wrong element. Flat scene; each tile still carries its own perspective, so it stays turned.
+      // while the remote is in use everything stands still, so each press gets the whole chip (see busy())
+      'html.tv-busy *, html.tv-busy *::before, html.tv-busy *::after { animation-play-state: paused !important; }',
       'html.tv .stage { perspective: none !important; }',
       'html.tv .stage, html.tv .stage * { transform-style: flat !important; }',
       // no backdrop blur here (Chrome 76): the see-through glass of the full views needs more body to read
@@ -372,5 +379,13 @@
     var again = last.id && document.getElementById(last.id);
     if (again) choose(again);
   }).observe(document.documentElement, { childList: true, subtree: true });
-  document.addEventListener('mousemove', function () { root.classList.remove('tv-keys'); }, { passive: true });
+  document.addEventListener('mousemove', function () { root.classList.remove('tv-keys'); busy(); }, { passive: true });
+  // the animations pause while the remote is in use and run again 2 s after the last press or move
+  var busyTimer = 0;
+  function busy() {
+    if (!root.classList.contains('tv-busy')) root.classList.add('tv-busy');
+    clearTimeout(busyTimer);
+    busyTimer = setTimeout(function () { root.classList.remove('tv-busy'); }, 2000);
+  }
+  ['keydown', 'mousedown', 'wheel'].forEach(function (t) { document.addEventListener(t, busy, { capture: true, passive: true }); });
 })();

@@ -192,9 +192,11 @@ Ziel der Instagram-Seite: Reichweite aufbauen fuer den Weg zum hauptberuflichen 
   waere oeffentlich -- deshalb Heimnetz.
 - Gemessen 2026-10-29: ~6 s pro Bild -- das war der geteilte 3D-Raum (.stage perspective +
   preserve-3d), nicht die Animationen. Flache Szene (jede Kachel traegt ihre Perspektive selbst)
-  -> ~0,25 s ohne, ~0,45 s mit allen CSS-Animationen. Brano will die Bewegung (Ringe, schwebende
-  Karten), also laufen die CSS-Animationen; nur die Skripte sehen reduced-motion (Partikelfeld
-  ist eine O(n^2)-Canvas-Schleife). Flach hiess auch: Klicks landen richtig, Detailansichten
+  -> ~0,25 s ohne, ~0,45 s mit allen CSS-Animationen. Brano will die Bewegung, fand aber alle
+  zusammen zu traege: die Ringe laufen, die teuersten (schwebende Karten/Holo, Energie, Strahl,
+  Sonnenpuls -- TV_OFF in shim.js) sind aus, und **waehrend der Bedienung steht alles still**
+  (html.tv-busy, bis 2 s nach dem letzten Druck): Taste bis Bild ~0,3 s statt 0,4-1,2 s.
+  Die Skripte sehen reduced-motion (Partikelfeld ist eine O(n^2)-Canvas-Schleife). Flach hiess auch: Klicks landen richtig, Detailansichten
   dunkler hinterlegt (kein backdrop-filter vor Chrome 76). Die Ringe liegen im Design etwas unter
   dem Planeten -- in 3D-Perspektive wirkt das "drumherum", flach nicht: shim.js zentriert sie.
   translate:/rotate:/scale: werden zu transform -- eine Animation auf transform wuerde damit die
