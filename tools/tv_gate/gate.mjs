@@ -26,7 +26,8 @@ const CDN = 'https://cdn.jsdelivr.net/npm/';
 const log = (...a) => console.log(new Date().toISOString().slice(0, 19), ...a);
 
 // what shim.js needs to finish the CSS on the TV; filled while stylesheets pass through
-const config = { gaps: new Set(), autoMargins: new Map(), aspects: new Map(), zooms: new Map(), whiteMix: new Set() };
+const config = { gaps: new Set(), autoMargins: new Map(), aspects: new Map(), zooms: new Map(), whiteMix: new Set(),
+  keyframes: new Map(), transforms: [], animated: new Set() };
 
 // --- CSS --------------------------------------------------------------------------------------------
 
@@ -79,7 +80,8 @@ function resolveSizes(css) {
   return css;
 }
 
-// translate:/rotate:/scale: (Chrome 104) -> one transform, in the order the browser applies them
+// translate:/rotate:/scale: (Chrome 104) -> one transform, in the order the browser applies them.
+// Returns the rewritten body, the single transforms as one string, and the rule's own transform.
 function singleTransforms(body) {
   const take = (prop) => {
     const m = body.match(new RegExp(`(^|[;\\s])${prop}\\s*:\\s*([^;]+);?`));
@@ -88,22 +90,41 @@ function singleTransforms(body) {
     return m[2].trim();
   };
   const t = take('translate'), r = take('rotate'), s = take('scale');
-  if (t == null && r == null && s == null) return body;
+  const own = body.match(/(^|[;\s])transform\s*:\s*([^;]+)/);
+  const transform = own ? own[2].trim() : null;
+  if (t == null && r == null && s == null) return { body, single: null, transform };
   const parts = [];
   if (t != null) parts.push(`translate(${t.split(/\s+/).join(', ')})`);
   if (r != null) parts.push(`rotate(${r})`);
   if (s != null) parts.push(`scale(${s.split(/\s+/).join(', ')})`);
-  const own = body.match(/(^|[;\s])transform\s*:\s*([^;]+)/);
-  if (own) return body.replace(own[0], `${own[1]}transform: ${parts.join(' ')} ${own[2].trim()}`);
-  return `${body.replace(/\s*$/, '')}; transform: ${parts.join(' ')};`;
+  const single = parts.join(' ');
+  if (own) return { body: body.replace(own[0], `${own[1]}transform: ${single} ${transform}`), single, transform };
+  return { body: `${body.replace(/\s*$/, '')}; transform: ${single};`, single, transform };
+}
+
+// The catch with folding translate: into transform: an animation that sets transform then wipes the
+// position out (the orbit rings lost their centre), and one that sets translate: wipes the element's own
+// transform (the turned tiles went flat while floating). shim.js rebuilds such keyframes per element with
+// both parts in -- from these lists: each keyframes' frames, and each rule's single/own transform.
+function collectKeyframes(css) {
+  const re = /@keyframes\s+([\w-]+)\s*\{((?:[^{}]*\{[^{}]*\})*[^{}]*)\}/g;
+  for (const [, name, inner] of css.matchAll(re)) {
+    const frames = [];
+    for (const [, sel, body] of inner.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+      const { single, transform } = singleTransforms(body);
+      const rest = body.replace(/(^|[;\s])(transform|translate|rotate|scale)\s*:[^;]*;?/g, '$1').trim();
+      frames.push([sel.trim(), transform, single, rest]);
+    }
+    if (frames.some((f) => f[1] != null || f[2] != null)) config.keyframes.set(name, frames);
+  }
 }
 
 function perRule(css) {
   return css.replace(/([^{}]*)\{([^{}]*)\}/g, (m, sel, body) => {
     const selector = sel.trim();
     const isRule = selector && !/^(from|to|\d)/.test(selector) && !selector.startsWith('@');
+    const plain = isRule ? selector.split(',').map((s) => s.trim()).filter((s) => s && !/::|:(before|after)\b/.test(s)) : [];
     if (isRule) {
-      const plain = selector.split(',').map((s) => s.trim()).filter((s) => s && !/::|:(before|after)\b/.test(s));
       if (/(^|[;\s])(gap|column-gap|row-gap)\s*:/.test(body)) plain.forEach((s) => config.gaps.add(s));
       for (const side of ['left', 'right']) if (new RegExp(`margin-${side}\\s*:\\s*auto`).test(body)) plain.forEach((s) => config.autoMargins.set(`${s}|${side}`, { sel: s, side }));
       const ar = body.match(/aspect-ratio\s*:\s*([\d.]+)\s*(?:\/\s*([\d.]+))?/);
@@ -111,7 +132,10 @@ function perRule(css) {
       const zoom = body.match(/(^|[;\s])zoom\s*:\s*([\d.]+)/);
       if (zoom && +zoom[2] !== 1) plain.forEach((s) => config.zooms.set(s, +zoom[2]));
     }
-    body = singleTransforms(body);
+    const st = singleTransforms(body);
+    body = st.body;
+    if (isRule && (st.single || st.transform)) plain.forEach((s) => config.transforms.push([s, st.single, st.transform]));
+    if (isRule && /(^|[;\s])animation(-name)?\s*:/.test(body)) plain.forEach((s) => config.animated.add(s));
     // inset (Chrome 87) -- esbuild lowers most, not all
     body = body.replace(/(^|[;\s])inset\s*:\s*([^;!]+)(!important)?/g, (m, pre, v, imp = '') => {
       const [t, r = t, b = t, l = r] = v.trim().split(/\s+/);
@@ -133,9 +157,7 @@ async function cssForTv(css, name) {
   css = colorMix(css);
   css = resolveSizes(css);
   css = css.replace(/:focus-visible/g, ':focus');
-  // the TV's chip manages ~6 s per frame with the animations running (measured 2026-10-29): it always
-  // gets the dashboard's own reduced-motion design; shim.js tells the scripts the same
-  css = css.replace(/@media\s*\(\s*prefers-reduced-motion:\s*reduce\s*\)/g, '@media all');
+  collectKeyframes(css);
   css = perRule(css);
   const left = (css.match(/color-mix\(|(?<![\w.$-])clamp\(/g) || []).length;
   if (left) log(`${name}: ${left} color-mix/clamp the TV cannot read -- extend gate.mjs`);
@@ -220,8 +242,11 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(200, { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'no-store' });
       res.end(fs.readFileSync(path.join(HERE, 'shim.js')));
     } else if (req.url === '/__tv/config') {
+      // the lists fill while stylesheets pass through: right after a restart the TV can ask before that
+      await Promise.all(cache.values());
+      if (!config.keyframes.size) await converted('css', await (await fetch(`${UPSTREAM}/styles.css`)).text(), '/styles.css');
       res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' });
-      res.end(JSON.stringify({ gaps: [...config.gaps], autoMargins: [...config.autoMargins.values()], aspects: [...config.aspects], zooms: [...config.zooms], whiteMix: [...config.whiteMix] }));
+      res.end(JSON.stringify({ gaps: [...config.gaps], autoMargins: [...config.autoMargins.values()], aspects: [...config.aspects], zooms: [...config.zooms], keyframes: [...config.keyframes], transforms: config.transforms, animated: [...config.animated], whiteMix: [...config.whiteMix] }));
     } else if (req.url === '/__tv/ping') {
       res.writeHead(200, { 'content-type': 'text/plain', 'access-control-allow-origin': '*' }); res.end('ok');
     } else if (req.method === 'GET' && req.url.startsWith('/__tv/cdn/')) {

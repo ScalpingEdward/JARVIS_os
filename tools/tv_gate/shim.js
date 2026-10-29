@@ -73,8 +73,8 @@
     return animate.call(this, frames, opts);
   };
 
-  // the TV always gets the dashboard's reduced-motion design -- with animations it renders ~6 s per frame;
-  // gate.mjs switches the CSS side on, this the scripts' (particle field, globe, morphs)
+  // the scripts see reduced motion: the particle field is an O(n^2) canvas loop the TV's chip cannot
+  // carry. The CSS animations (rings, floating tiles) stay -- Brano wants the movement, ~0.45 s per frame.
   var matchMedia = window.matchMedia.bind(window);
   window.matchMedia = function (q) {
     var m = matchMedia(q);
@@ -127,7 +127,7 @@
   new MutationObserver(syncAccent).observe(root, { attributes: true, attributeFilter: ['style'] });
 
   // --- flex gap (Chrome 84) as margins, aspect-ratio (Chrome 88) as a height ---------------------------
-  var cfg = { gaps: [], autoMargins: [], aspects: [], zooms: [] }, gapSheet = document.createElement('style'), gapCss = '';
+  var cfg = { gaps: [], autoMargins: [], aspects: [], zooms: [], keyframes: [], transforms: [], animated: [] }, gapSheet = document.createElement('style'), gapCss = '';
   function firstMatch(sel) { try { return document.querySelector(sel); } catch (e) { return null; } }
   function fixLayout() {
     var rules = [];
@@ -144,11 +144,73 @@
     });
     // a child pushed to the side with margin-left:auto must stay pushed
     cfg.autoMargins.forEach(function (m) { rules.push(m.sel + ' { margin-' + m.side + ': auto !important; }'); });
+    fixAnimations(rules);
+    centreOrbits();
     var css = rules.join('\n');
     if (css !== gapCss) { gapCss = css; gapSheet.textContent = css; }
     cfg.aspects.forEach(function (a) {
       var els; try { els = document.querySelectorAll(a[0]); } catch (e) { return; }
       for (var i = 0; i < els.length; i++) { var w = els[i].offsetWidth; if (w) els[i].style.height = (w / a[1]) + 'px'; }
+    });
+  }
+  // gate.mjs folded translate:/rotate:/scale: into transform. An animation of transform would then wipe
+  // an element's position (the orbit rings slid off the planet), an animation of translate: its own
+  // transform (the turned tiles went flat while floating). Give such an element a copy of its keyframes
+  // with both parts in each frame -- composed the way the browser would: single transforms first.
+  var madeFrames = {}, madeCss = [];
+  function ownTransforms(el) {
+    var t = { single: null, own: null };
+    cfg.transforms.forEach(function (r) { try { if (el.matches(r[0])) { if (r[1] != null) t.single = r[1]; if (r[2] != null) t.own = r[2]; } } catch (e) { /* bad selector */ } });
+    return t;
+  }
+  function fixAnimations(rules) {
+    var frames = {};
+    cfg.keyframes.forEach(function (k) { frames[k[0]] = k[1]; });
+    cfg.animated.forEach(function (sel) {
+      var els; try { els = document.querySelectorAll(sel); } catch (e) { return; }
+      for (var i = 0; i < els.length; i++) {
+        var el = els[i];
+        if (el.__tvClass === el.className) continue;  // done, and its classes have not changed since
+        el.__tvClass = el.className;
+        el.style.animationName = '';
+        var names = getComputedStyle(el).animationName.split(',').map(function (n) { return n.trim(); });
+        var t = ownTransforms(el), changed = false;
+        var mapped = names.map(function (n) {
+          var f = frames[n];
+          if (!f) return n;
+          var keepPos = t.single && f.some(function (x) { return x[1] != null; });   // frames set transform
+          var keepOwn = t.own && f.some(function (x) { return x[2] != null; });      // frames set translate etc.
+          if (!keepPos && !keepOwn) return n;
+          var key = n + '|' + (keepPos ? t.single : '') + '|' + (keepOwn ? t.own : '');
+          if (!madeFrames[key]) {
+            madeFrames[key] = n + '__tv' + madeCss.length;
+            madeCss.push('@keyframes ' + madeFrames[key] + ' { ' + f.map(function (x) {
+              var parts = [];
+              if (x[1] != null || x[2] != null) {
+                parts.push(x[2] != null ? x[2] : keepPos ? t.single : '');
+                parts.push(x[1] != null ? x[1] : keepOwn ? t.own : '');
+              }
+              var tf = parts.join(' ').trim();
+              return x[0] + ' { ' + x[3] + (tf ? (x[3] && !/;\s*$/.test(x[3]) ? '; ' : ' ') + 'transform: ' + tf + ';' : '') + ' }';
+            }).join(' ') + ' }');
+          }
+          changed = true;
+          return madeFrames[key];
+        });
+        if (changed) el.style.animationName = mapped.join(', ');
+      }
+    });
+    Array.prototype.push.apply(rules, madeCss);
+  }
+  // The rings sit a little below the planet by design; in the laptop's 3D perspective that reads as
+  // "around" it, in the flat TV scene as off-centre (Brano, 2026-10-29: "Ringe zentrieren zum Planet").
+  function centreOrbits() {
+    var planet = document.querySelector('.globe-map');
+    if (!planet || !planet.offsetWidth) return;
+    var p = planet.getBoundingClientRect(), py = p.top + p.height / 2;
+    Array.prototype.forEach.call(document.querySelectorAll('.orbit'), function (o) {
+      var r = o.getBoundingClientRect(), dy = py - (r.top + r.height / 2);
+      if (Math.abs(dy) > 1) o.style.top = (parseFloat(getComputedStyle(o).top) + dy) + 'px';
     });
   }
   var layoutTimer = 0;
@@ -170,10 +232,13 @@
       '}'
     ].join('\n');
     document.head.appendChild(tv);
-    fetch('/__tv/config').then(function (r) { return r.json(); }).then(function (c) {
-      cfg = c; whiteMix = c.whiteMix || []; seenAccent = null; syncAccent(); fixLayout();
-    }).catch(function () {});
-    new MutationObserver(soon).observe(document.body, { childList: true, subtree: true });
+    (function load(tries) {
+      fetch('/__tv/config').then(function (r) { return r.json(); }).then(function (c) {
+        cfg = c; whiteMix = c.whiteMix || []; seenAccent = null; syncAccent(); fixLayout();
+        if (!c.keyframes.length && tries < 5) setTimeout(function () { load(tries + 1); }, 2000);
+      }).catch(function () { if (tries < 5) setTimeout(function () { load(tries + 1); }, 2000); });
+    })(0);
+    new MutationObserver(soon).observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] });
     window.addEventListener('resize', soon);
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else start();
