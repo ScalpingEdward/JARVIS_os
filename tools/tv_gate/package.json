@@ -1,0 +1,8 @@
+{
+  "name": "auron-tv-gate",
+  "private": true,
+  "type": "module",
+  "description": "Serves the AURON dashboard to the LG TV (webOS 5, Chromium 68) -- see gate.mjs",
+  "scripts": { "start": "node gate.mjs" },
+  "dependencies": { "esbuild": "0.25.12" }
+}

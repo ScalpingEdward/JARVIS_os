@@ -244,3 +244,5 @@ frontend/site/export/
 windows-theme/
 export/
 neue-raeume/
+tools/tv_gate/node_modules/
+tools/tv_gate/*.log
