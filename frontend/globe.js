@@ -19,7 +19,7 @@
     graticule = d3.geoGraticule10();
   } catch (e) { console.warn('globe map unavailable:', e); return; }
 
-  let size = 0, dpr = 1, zoom = 1;
+  let size = 0, dpr = 1, zoom = 1, drawn = '';
   const projection = d3.geoOrthographic().clipAngle(90).precision(0.6);
   const path = d3.geoPath(projection, g);
   function resize() {
@@ -28,6 +28,7 @@
     size = host.offsetWidth || host.getBoundingClientRect().width;
     canvas.width = canvas.height = Math.round(size * dpr);
     projection.translate([size / 2, size / 2]).scale(size / 2 * 0.985);
+    drawn = '';  // a new canvas size clears it
   }
   new ResizeObserver(resize).observe(host); resize();
 
@@ -44,6 +45,11 @@
       speed += (SPIN - speed) * Math.min(1, dt / 1500);        // a flick slows back to the steady turn
       tilt += (BASE_TILT - tilt) * Math.min(1, dt / 4000);     // and the axis leans back
     }
+    // a globe standing still (reduced motion -- always on the LG TV) is not drawn again: projecting the
+    // whole map each frame took most of the TV's chip (measured 2026-10-29)
+    const now2 = `${lon.toFixed(3)}|${tilt.toFixed(3)}|${size}|${dpr}`;
+    if (now2 === drawn) { requestAnimationFrame(draw); return; }
+    drawn = now2;
     g.setTransform(dpr, 0, 0, dpr, 0, 0);
     g.clearRect(0, 0, size, size);
 

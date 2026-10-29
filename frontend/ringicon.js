@@ -17,5 +17,7 @@
     link.type = 'image/png'; link.href = c.toDataURL('image/png');
   }
   draw(0);
+  // reduced motion: the ring stands still (on the LG TV nobody sees a tab icon, and it cost the chip time)
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
   setInterval(() => { if (!document.hidden) draw(performance.now()); }, 250);
 })();
