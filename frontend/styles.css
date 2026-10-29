@@ -1072,6 +1072,36 @@ html.desk .core.turning { cursor: grabbing; }
 .md-recent img { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 8px; }
 .md-recent span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .md-pl { display: grid; place-items: center; aspect-ratio: 16 / 9; font-size: 28px; color: var(--muted); }
+.md-tabs { display: flex; gap: 6px; }
+.md-tabs button { font: inherit; font-size: 12.5px; letter-spacing: .06em; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--line-2);
+  background: rgba(255,255,255,.04); color: var(--muted); cursor: pointer; }
+.md-tabs button.on { color: var(--text); border-color: color-mix(in srgb, var(--accent) 60%, transparent); background: color-mix(in srgb, var(--accent) 16%, transparent); }
+.md-yt[hidden], .md-sp[hidden] { display: none; }
+/* Spotify: what plays, the buttons, his playlists */
+.md-sp { position: absolute; top: 0; left: 0; right: 0; bottom: 0; overflow: auto; padding: 16px; display: grid; align-content: start; gap: 14px; }
+.sp-now { display: flex; gap: 16px; align-items: center; min-width: 0; }
+.sp-cover { width: 120px; height: 120px; border-radius: 10px; object-fit: cover; flex: none; box-shadow: 0 10px 30px rgba(0,0,0,.5); }
+.sp-cover[hidden] { display: none; }
+.sp-text { display: grid; gap: 4px; min-width: 0; flex: 1; }
+.sp-title { font-size: 20px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sp-artist { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sp-bar { height: 4px; border-radius: 2px; background: rgba(255,255,255,.1); overflow: hidden; margin-top: 6px; }
+.sp-bar i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .9s linear; }
+.sp-ctl { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.sp-ctl button { width: 44px; height: 44px; display: grid; place-items: center; border-radius: 50%; border: 1px solid var(--line-2);
+  background: rgba(255,255,255,.05); color: var(--text); cursor: pointer; }
+.sp-ctl .sp-pp { width: 54px; height: 54px; border-color: color-mix(in srgb, var(--accent) 60%, transparent); background: color-mix(in srgb, var(--accent) 20%, transparent); }
+.sp-vol-l { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12.5px; margin-left: 8px; }
+.sp-vol { width: 140px; accent-color: var(--accent); }
+.sp-devs { margin-left: auto; background: rgba(10,18,32,.85); color: var(--text); border: 1px solid var(--line-2); border-radius: 8px; font: inherit; font-size: 13px; padding: 6px 8px; }
+.sp-msg:empty { display: none; }
+.sp-lists { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; }
+.sp-lists button { display: grid; gap: 6px; text-align: left; padding: 6px; border-radius: 10px; border: 1px solid var(--line-2);
+  background: rgba(255,255,255,.04); color: var(--text); font: inherit; font-size: 12px; cursor: pointer; }
+.sp-lists button:hover { border-color: color-mix(in srgb, var(--accent) 50%, transparent); }
+.sp-lists img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 6px; }
+.sp-lists .md-pl { aspect-ratio: 1; }
+.sp-lists span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pc-pl { font-size: 16px; font-weight: 700; }
 .pc-btns { margin-left: auto; display: flex; gap: 8px; }
 .pc-btns button { font: inherit; font-size: 12.5px; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--line-2); background: rgba(255,255,255,.05); color: var(--text); cursor: pointer; }
