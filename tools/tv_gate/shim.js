@@ -175,11 +175,12 @@
   // transform (the turned tiles went flat while floating). Give such an element a copy of its keyframes
   // with both parts in each frame -- composed the way the browser would: single transforms first.
   var madeFrames = {}, madeCss = [];
-  // Off on the TV: the filter/blur ones (sun pulse, energy, beam). The floating tiles and holo were off
-  // too at first, but the slowness turned out to be the globe redrawn each frame and the trading tile
-  // rebuilt each second; with those fixed the float measured no different (2026-10-29), and Brano
-  // missed the moving cards.
-  var TV_OFF = ['energy', 'beam', 'sunpulse'];
+  // Off on the TV, measured in frames per second with one animation running at a time (2026-10-29;
+  // all paused: 56, rings alone: 34-42, floating holo alone: 49): the floating tiles take it to 5 fps,
+  // whatever the keyframes -- plain translateY, will-change, no shadows, no glass made no difference:
+  // six big cards re-rastered at 4K (devicePixelRatio 2) each frame is more than this chip has.
+  // Also off: the filter/blur ones (sun pulse, energy, beam).
+  var TV_OFF = ['hover-float', 'energy', 'beam', 'sunpulse'];
   function ownTransforms(el) {
     var t = { single: null, own: null };
     cfg.transforms.forEach(function (r) { try { if (el.matches(r[0])) { if (r[1] != null) t.single = r[1]; if (r[2] != null) t.own = r[2]; } } catch (e) { /* bad selector */ } });
