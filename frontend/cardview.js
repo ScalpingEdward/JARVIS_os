@@ -83,8 +83,16 @@
     size(id);
   }
   // the lists are re-rendered with every refresh: fit again once the new rows are in
-  let queued = false;
-  const refitNow = () => { if (queued) return; queued = true; queueMicrotask(() => { queued = false; fitAll(); }); };
+  // only the cards that changed: refitting all of them after every refresh of one took ~90 ms a second
+  // on the LG TV (2026-10-29); a resize or new fonts still fit them all
+  let queued = null;
+  const refitNow = (id) => {
+    const first = !queued;
+    queued = queued || new Set();
+    queued.add(id || '*');
+    if (!first) return;
+    queueMicrotask(() => { const ids = queued; queued = null; if (ids.has('*')) fitAll(); else ids.forEach(size); });
+  };
 
   for (const id of Object.keys(CARDS)) {
     const card = document.getElementById(id);
@@ -154,12 +162,12 @@
     // the countdown and the big figure tick every second without changing any height: not a reason to fit again
     // straight in the observer (a microtask, before the browser paints): with a timer in between, new
     // rows showed for a frame at their plain size every refresh and the card flickered (Brano, 2026-10-19)
-    new MutationObserver((ms) => { if (ms.some((m) => !(m.target.parentElement || m.target).closest?.('.tile-figure'))) refitNow(); })
+    new MutationObserver((ms) => { if (ms.some((m) => !(m.target.parentElement || m.target).closest?.('.tile-figure'))) refitNow(id); })
       .observe(card, { childList: true, subtree: true, characterData: true });
     apply(id);
   }
-  addEventListener('resize', refitNow);
-  document.fonts?.ready.then(refitNow);
+  addEventListener('resize', () => refitNow());
+  document.fonts?.ready.then(() => refitNow());
   // look.js: {cardId: {size, num, font, view}} from AURON's database, and back when changed here
   window.AURON_cards = {
     get: () => Object.fromEntries(Object.keys(CARDS).map((id) => [id, { ...styleOf(id), view: views[id] || 'list' }])),

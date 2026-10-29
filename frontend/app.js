@@ -3,7 +3,10 @@
 const API = localStorage.getItem('auron_api') || (location.protocol === 'file:' ? 'http://localhost:8000' : '/api');
 const $ = (s) => document.querySelector(s);
 const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-const fmt = (v, d = 2) => Number(v || 0).toLocaleString('de-DE', { minimumFractionDigits: d, maximumFractionDigits: d });
+// one formatter per number of decimals: toLocaleString built a new one per number -- every second, for
+// every figure on the trading tile (~25 ms a second on the LG TV)
+const numberFormats = {};
+const fmt = (v, d = 2) => (numberFormats[d] ||= new Intl.NumberFormat('de-DE', { minimumFractionDigits: d, maximumFractionDigits: d })).format(Number(v || 0));
 const signed = (v, cur = '') => `<span class="${v > 0 ? 'up' : v < 0 ? 'down' : ''}">${v > 0 ? '+' : ''}${fmt(v)}${cur ? ' ' + esc(cur) : ''}</span>`;
 const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const nameOf = (a) => a.label || a.profile;  // what people call the account: its group's name
@@ -297,6 +300,7 @@ function alignEquity() {
 }
 
 // --- the trading tile: the short list -------------------------------------------
+let groupsShown = '';
 function renderTradingTile(o) {
   const t = (o.totals || [])[0];
   if (!t) return;
@@ -318,7 +322,7 @@ function renderTradingTile(o) {
   // under each group: its open trades right now -- symbol, side, lots, profit or loss (Brano, 2026-10-19)
   const openOf = (name) => o.accounts.flatMap((a) => (a.open_positions || []).map((p) => ({ ...p, copier: a.profile }))).filter((p) => p.group === name);
   const pl = (v) => `<span class="${v > 0 ? 'up' : v < 0 ? 'down' : 'muted'}">${v > 0 ? '+' : ''}${fmt(v)}</span>`;
-  $('#tGroups').innerHTML = '<div class="cap"><span>Gruppen</span><span>heute</span><span>gesamt</span></div>' + (groups.length ? groups.map((g) => {
+  const groupsHtml = '<div class="cap"><span>Gruppen</span><span>heute</span><span>gesamt</span></div>' + (groups.length ? groups.map((g) => {
     const open = openOf(g.name), sum = open.reduce((x, p) => x + (p.profit || 0), 0);
     // the account(s) behind the group: its size, and with trades open the equity too (Brano, 2026-10-19)
     const accs = o.accounts.filter((a) => (g.accounts || []).includes(a.profile));
@@ -338,7 +342,12 @@ function renderTradingTile(o) {
         + `${open.length > 4 ? `<div class="muted">+ ${open.length - 4} weitere</div>` : ''}</div>` : '');
   }).join('')
     : '<div class="row"><span></span><span class="muted">Noch keine Gruppe hat gehandelt</span><span></span></div>');
-  alignEquity();
+  // written (and measured) only when it changed: every second unchanged rows cost a rebuild, a re-fit of
+  // the card and a forced layout -- on the LG TV a visible hitch each second (2026-10-29)
+  if (groupsHtml !== groupsShown) {
+    $('#tGroups').innerHTML = groupsShown = groupsHtml;
+    alignEquity();
+  }
   $('#kToday').innerHTML = signed(t.pnl_today, t.currency);
   $('#kWeek').innerHTML = signed(t.pnl_week, t.currency);
   $('#kOpen').innerHTML = `${t.open_positions} <small class="muted">${signed(t.open_pnl)}</small>`;
