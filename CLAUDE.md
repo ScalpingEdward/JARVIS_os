@@ -176,6 +176,37 @@ Ziel der Instagram-Seite: Reichweite aufbauen fuer den Weg zum hauptberuflichen 
   keinen Verstoss gegen Nutzungsbedingungen. Ausserdem braucht ein Bot die
   Darstellung nie, nur die Zahlen darunter.
 
+## AURON auf dem LG-TV (tv_app/, tools/tv_gate/)
+- TV: LG 65NANO806NA, webOS 5.6 = **Chromium 68** (2018), Magic Remote, IP 192.168.0.175.
+  Laptop im WLAN: 192.168.0.105. Beide per DHCP -- feste IPs im Router, sonst stimmt
+  `GATE` in tv_app/index.html bzw. `TV_IPS` nicht mehr.
+- Die App ist nur eine Tuer: sie oeffnet `http://<laptop>:8090`. Dort sitzt
+  `tools/tv_gate/gate.mjs` vor dem Dashboard (127.0.0.1:8080) und schreibt es fuer
+  Chromium 68 um (esbuild fuer `?.`/`??`, color-mix -> rgba(var(--accent-rgb)), clamp/min/max
+  bei fester 1920x1080 ausgerechnet, translate:/rotate:/scale: -> transform). Was CSS nicht
+  kann (Flex-gap, aspect-ratio, Akzent aus dem Look-Panel), macht `shim.js` zur Laufzeit.
+  Das Dashboard selbst bleibt unveraendert. Neue moderne CSS/JS-Syntax im Dashboard kann
+  den TV wieder brechen -- gate.mjs loggt uebrig gebliebene color-mix/clamp.
+- Das Gate ist auch das Schloss: die API hat keinen Login, also kommen nur TV_IPS und der
+  Laptop selbst rein, alle anderen bekommen 403. Tailscale gibt es fuer webOS nicht, Funnel
+  waere oeffentlich -- deshalb Heimnetz.
+- Gemessen 2026-10-29: mit Animationen ~6 s pro Bild auf dem TV-Chip. Der TV bekommt deshalb
+  immer das eigene reduced-motion-Design des Dashboards (~0,25 s pro Bild), dazu flache 3D-Szene
+  (geteilter 3D-Raum liess Klicks danebengehen) und dunklere Detailansichten (kein
+  backdrop-filter vor Chrome 76). `zoom: 1.1` auf `.detail .view`: Chromium 68 malt gezoomt,
+  meldet getBoundingClientRect aber ungezoomt -- shim.js rechnet das fuer die Pfeiltasten um.
+- Fernbedienung: Zeiger = Maus. Pfeile springen zum naechsten Bedienelement, OK klickt,
+  Zurueck = Escape. Textfelder werden per Pfeil nur ausgewaehlt (read-only geparkt, damit die
+  TV-Tastatur nicht aufspringt); OK oeffnet sie zum Tippen, Zurueck parkt sie wieder.
+  `confirm()` liefert in der webOS-App sofort "nein", ohne Dialog. shim.js ersetzt es:
+  erster Druck zeigt die Frage und sagt nein, derselbe Knopf nochmal binnen 5 s sagt ja.
+- Neu aufspielen: `ares-package tv_app -o <ordner>` und `ares-install -d lgtv <ipk>`.
+  Debuggen: Web-Inspector des TVs auf 192.168.0.175:9998 (DevTools-Protokoll, auch
+  Page.captureScreenshot). Die LG-App "Developer Mode" laeuft nach ~50 h ab -> dort "Extend".
+- **Beim Testen nie OK/Klick auf echte Aktionsknoepfe** -- das Dashboard am TV ist die echte
+  API. Am 2026-10-29 hat ein Testklick die Caption-Stimme gespeichert und einer "Freigeben"
+  getroffen (nur weil confirm() nein sagte, ist nichts gepostet worden).
+
 ## Signal-Kopierer (signal_copier/)
 - Mögliches Geschäft daraus (Abo, Partnerschaft mit Gruppen, offene Fragen
   an Steuerberater/Anwalt): `docs/signal-copier-business.md`. Nichts
