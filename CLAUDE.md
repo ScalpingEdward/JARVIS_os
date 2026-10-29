@@ -190,10 +190,16 @@ Ziel der Instagram-Seite: Reichweite aufbauen fuer den Weg zum hauptberuflichen 
 - Das Gate ist auch das Schloss: die API hat keinen Login, also kommen nur TV_IPS und der
   Laptop selbst rein, alle anderen bekommen 403. Tailscale gibt es fuer webOS nicht, Funnel
   waere oeffentlich -- deshalb Heimnetz.
-- Gemessen 2026-10-29: mit Animationen ~6 s pro Bild auf dem TV-Chip. Der TV bekommt deshalb
-  immer das eigene reduced-motion-Design des Dashboards (~0,25 s pro Bild), dazu flache 3D-Szene
-  (geteilter 3D-Raum liess Klicks danebengehen) und dunklere Detailansichten (kein
-  backdrop-filter vor Chrome 76). `zoom: 1.1` auf `.detail .view`: Chromium 68 malt gezoomt,
+- Gemessen 2026-10-29: ~6 s pro Bild -- das war der geteilte 3D-Raum (.stage perspective +
+  preserve-3d), nicht die Animationen. Flache Szene (jede Kachel traegt ihre Perspektive selbst)
+  -> ~0,25 s ohne, ~0,45 s mit allen CSS-Animationen. Brano will die Bewegung (Ringe, schwebende
+  Karten), also laufen die CSS-Animationen; nur die Skripte sehen reduced-motion (Partikelfeld
+  ist eine O(n^2)-Canvas-Schleife). Flach hiess auch: Klicks landen richtig, Detailansichten
+  dunkler hinterlegt (kein backdrop-filter vor Chrome 76). Die Ringe liegen im Design etwas unter
+  dem Planeten -- in 3D-Perspektive wirkt das "drumherum", flach nicht: shim.js zentriert sie.
+  translate:/rotate:/scale: werden zu transform -- eine Animation auf transform wuerde damit die
+  Position loeschen (Ringe rutschten weg); shim.js baut solche Keyframes pro Element mit beiden
+  Teilen nach (config.keyframes/transforms aus gate.mjs). `zoom: 1.1` auf `.detail .view`: Chromium 68 malt gezoomt,
   meldet getBoundingClientRect aber ungezoomt -- shim.js rechnet das fuer die Pfeiltasten um.
 - Fernbedienung: Zeiger = Maus. Pfeile springen zum naechsten Bedienelement, OK klickt,
   Zurueck = Escape. Textfelder werden per Pfeil nur ausgewaehlt (read-only geparkt, damit die
