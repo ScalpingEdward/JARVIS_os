@@ -213,6 +213,8 @@ Ziel der Instagram-Seite: Reichweite aufbauen fuer den Weg zum hauptberuflichen 
   Position loeschen (Ringe rutschten weg); shim.js baut solche Keyframes pro Element mit beiden
   Teilen nach (config.keyframes/transforms aus gate.mjs). `zoom: 1.1` auf `.detail .view`: Chromium 68 malt gezoomt,
   meldet getBoundingClientRect aber ungezoomt -- shim.js rechnet das fuer die Pfeiltasten um.
+- Karten auf dem TV gerade statt schraeg (Brano, 2026-10-29) -- gelbe Taste schaltet um, der TV
+  merkt es sich (localStorage auron_tv_straight). Erst nur am TV; spaeter evtl. als Einstellung.
 - Fernbedienung: Zeiger = Maus. Pfeile springen zum naechsten Bedienelement, OK klickt,
   Zurueck = Escape. Textfelder werden per Pfeil nur ausgewaehlt (read-only geparkt, damit die
   TV-Tastatur nicht aufspringt); OK oeffnet sie zum Tippen, Zurueck parkt sie wieder.

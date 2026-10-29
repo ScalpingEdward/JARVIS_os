@@ -94,24 +94,33 @@
   // never go through. It has to stay synchronous for the dashboard, so: the first press shows the
   // question and says no, the same press again within 5 s says yes.
   var asked = null, note = null;
-  window.confirm = function (msg) {
-    var key = String(msg) + '|' + (document.activeElement && document.activeElement.id || '');
-    if (asked && asked.key === key && Date.now() - asked.at < 5000) { asked = null; if (note) note.style.display = 'none'; return true; }
-    asked = { key: key, at: Date.now() };
+  function showNote(text, ms) {
     if (!note) {
       note = document.createElement('div');
       note.style.cssText = 'position:fixed;left:50%;bottom:120px;transform:translateX(-50%);z-index:2147483647;max-width:1100px;padding:22px 34px;border-radius:16px;background:rgba(6,10,18,.96);border:2px solid rgb(var(--accent-rgb));color:#fff;font:600 28px/1.35 sans-serif;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.6)';
       document.body.appendChild(note);
     }
-    note.textContent = msg + ' – zum Bestätigen noch einmal drücken';
+    note.textContent = text;
     note.style.display = 'block';
     clearTimeout(note.timer);
-    note.timer = setTimeout(function () { note.style.display = 'none'; }, 5000);
+    note.timer = setTimeout(function () { note.style.display = 'none'; }, ms);
+  }
+  window.confirm = function (msg) {
+    var key = String(msg) + '|' + (document.activeElement && document.activeElement.id || '');
+    if (asked && asked.key === key && Date.now() - asked.at < 5000) { asked = null; if (note) note.style.display = 'none'; return true; }
+    asked = { key: key, at: Date.now() };
+    showNote(msg + ' – zum Bestätigen noch einmal drücken', 5000);
     return false;
   };
 
   var root = document.documentElement;
   root.classList.add('tv');
+
+  // Cards straight instead of turned -- only on the TV for now (Brano, 2026-10-29: "sieht besser aus").
+  // The yellow button on the remote switches; the TV keeps the choice.
+  var STRAIGHT = 'auron_tv_straight';
+  function straight() { try { return localStorage.getItem(STRAIGHT) !== '0'; } catch (e) { return true; } }
+  root.classList.toggle('tv-straight', straight());
 
   // --- the accent with alpha: gate.mjs wrote rgba(var(--accent-rgb), a); the Look panel sets --accent inline
   var whiteMix = [], seenAccent = null;
@@ -186,6 +195,7 @@
   function ownTransforms(el) {
     var t = { single: null, own: null };
     cfg.transforms.forEach(function (r) { try { if (el.matches(r[0])) { if (r[1] != null) t.single = r[1]; if (r[2] != null) t.own = r[2]; } } catch (e) { /* bad selector */ } });
+    if (root.classList.contains('tv-straight') && el.classList.contains('tile')) t.own = null;  // float, but untilted
     return t;
   }
   var animEls = [];  // what busy() pauses
@@ -254,6 +264,8 @@
       'html.tv-keys :focus { outline: 3px solid rgb(var(--accent-rgb)) !important; outline-offset: 3px; }',
       // a shared 3D space confuses this Chromium: the open panel showed the tiles through it and clicks
       // landed on the wrong element. Flat scene; each tile still carries its own perspective, so it stays turned.
+      // straight cards: not !important, so the float animation still moves them
+      'html.tv-straight .scene .tile { transform: none; }',
       'html.tv .stage { perspective: none !important; }',
       'html.tv .stage, html.tv .stage * { transform-style: flat !important; }',
       // no backdrop blur here (Chrome 76): the see-through glass of the full views needs more body to read
@@ -403,7 +415,25 @@
     var again = last.id && document.getElementById(last.id);
     if (again) choose(again);
   }).observe(document.documentElement, { childList: true, subtree: true });
-  document.addEventListener('mousemove', function () { root.classList.remove('tv-keys'); busy(); }, { passive: true });
+  // the Magic Remote reports the smallest tremble of a hand as a move: only a real one (> 12 px) counts as
+  // use -- otherwise the cards never floated while the remote was merely held (Brano, 2026-10-29)
+  var px = -1, py = -1;
+  document.addEventListener('mousemove', function (e) {
+    if (px >= 0 && Math.abs(e.clientX - px) + Math.abs(e.clientY - py) < 12) return;
+    px = e.clientX; py = e.clientY;
+    root.classList.remove('tv-keys');
+    busy();
+  }, { passive: true });
+  // yellow button: cards straight / turned
+  document.addEventListener('keydown', function (e) {
+    if (e.keyCode !== 405) return;
+    var on = !root.classList.contains('tv-straight');
+    root.classList.toggle('tv-straight', on);
+    try { localStorage.setItem(STRAIGHT, on ? '1' : '0'); } catch (err) { /* private mode: for this session only */ }
+    Array.prototype.forEach.call(document.querySelectorAll('.tile'), function (t) { t.__tvClass = null; });
+    full();
+    showNote(on ? 'Karten gerade' : 'Karten schräg', 1800);
+  });
   // the animations pause while the remote is in use and run again 2 s after the last press or move
   // -- element by element: a class on <html> with "html.tv-busy *" made the chip restyle the whole page,
   // 0.8 s for the first press (2026-10-29)

@@ -156,7 +156,10 @@ async function cssForTv(css, name) {
   css = (await transform(css, { loader: 'css', target: TARGET })).code;  // inset, nesting ...
   css = colorMix(css);
   css = resolveSizes(css);
-  css = css.replace(/:focus-visible/g, ':focus');
+  // :focus-visible (Chrome 86) as :focus -- but only while the arrows are in use (shim.js sets tv-keys):
+  // a plain :focus left a blue edge on every card clicked with the pointer (Brano, 2026-10-29)
+  css = css.replace(/([^{}]+)\{/g, (m, sel) => (!/:focus-visible/.test(sel) ? m
+    : `${sel.split(',').map((s) => (/:focus-visible/.test(s) ? `html.tv-keys ${s.trim().replace(/:focus-visible/g, ':focus')}` : s)).join(',')}{`));
   collectKeyframes(css);
   css = perRule(css);
   const left = (css.match(/color-mix\(|(?<![\w.$-])clamp\(/g) || []).length;
