@@ -220,6 +220,11 @@ Ziel der Instagram-Seite: Reichweite aufbauen fuer den Weg zum hauptberuflichen 
   TV-Tastatur nicht aufspringt); OK oeffnet sie zum Tippen, Zurueck parkt sie wieder.
   `confirm()` liefert in der webOS-App sofort "nein", ohne Dialog. shim.js ersetzt es:
   erster Druck zeigt die Frage und sagt nein, derselbe Knopf nochmal binnen 5 s sagt ja.
+- YouTube im Fenster (media.js) geht am TV nicht: der eingebettete Player stirbt in Chromium 68
+  ("queueMicrotask is not defined" in seinem eigenen Cross-Origin-Rahmen, kein Polyfill erreicht ihn).
+  Am TV startet ▶ deshalb die TV-eigene YouTube-App mit dem Video (PalmServiceBridge ->
+  luna://com.webos.applicationManager/launch, id youtube.leanback.v4, contentTarget v=<id>) --
+  von Brano am TV bestaetigt 2026-10-29. Der Rahmen ist mit Fehler 0 da, also nicht daran messen.
 - Neu aufspielen: `ares-package tv_app -o <ordner>` und `ares-install -d lgtv <ipk>`.
   Debuggen: Web-Inspector des TVs auf 192.168.0.175:9998 (DevTools-Protokoll, auch
   Page.captureScreenshot). Die LG-App "Developer Mode" laeuft nach ~50 h ab -> dort "Extend".

@@ -63,6 +63,9 @@
   }
 
   function play(m, text) {
+    // on the LG TV the embedded player cannot run (its browser is too old for YouTube): the TV's own
+    // YouTube app plays it instead (tools/tv_gate/shim.js)
+    if (window.AURON_tv?.youtube?.(m)) { keep(m, text); return; }
     frame.src = src(m); frame.hidden = false;
     recentEl.hidden = true;
     keep(m, text);

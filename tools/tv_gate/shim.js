@@ -116,6 +116,20 @@
   var root = document.documentElement;
   root.classList.add('tv');
 
+  // YouTube's embedded player dies in this browser ("queueMicrotask is not defined" inside its own
+  // cross-origin frame, where no polyfill reaches -- 2026-10-29). The TV's YouTube app plays the video
+  // instead: the AURON app may start other apps through the webOS bridge. media.js asks this first.
+  var bridge = null;
+  window.AURON_tv = {
+    youtube: function (m) {
+      if (typeof PalmServiceBridge === 'undefined') return false;
+      var target = m.video ? 'v=' + m.video + (m.list ? '&list=' + m.list : '') : 'list=' + m.list;
+      bridge = new PalmServiceBridge();  // kept: a collected bridge drops the call
+      bridge.call('luna://com.webos.applicationManager/launch', JSON.stringify({ id: 'youtube.leanback.v4', params: { contentTarget: target } }));
+      return true;
+    }
+  };
+
   // Cards straight instead of turned -- only on the TV for now (Brano, 2026-10-29: "sieht besser aus").
   // The yellow button on the remote switches; the TV keeps the choice.
   var STRAIGHT = 'auron_tv_straight';
@@ -274,6 +288,11 @@
       '}'
     ].join('\n');
     document.head.appendChild(tv);
+    // the TV's fonts have no ⤢: the full-screen buttons showed an empty box -- drawn instead
+    Array.prototype.forEach.call(document.querySelectorAll('.pc-full'), function (b) {
+      b.innerHTML = '<svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">'
+        + '<path d="M1 5V1h4M9 1h4v4M13 9v4H9M5 13H1V9"/></svg>';
+    });
     (function load(tries) {
       fetch('/__tv/config').then(function (r) { return r.json(); }).then(function (c) {
         cfg = c; whiteMix = c.whiteMix || []; seenAccent = null; syncAccent(); full();
