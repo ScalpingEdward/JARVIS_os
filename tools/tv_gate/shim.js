@@ -82,6 +82,14 @@
     return { matches: true, media: q, onchange: null, addListener: function () {}, removeListener: function () {}, addEventListener: function () {}, removeEventListener: function () {}, dispatchEvent: function () { return false; } };
   };
 
+  // the live prices every 3 s instead of every second: with trades open each refresh rebuilds the
+  // trading tile, ~150 ms on this chip -- Brano saw it as a freeze every second (2026-10-29)
+  var setInterval0 = window.setInterval;
+  window.setInterval = function (fn, ms) {
+    if (typeof fn === 'function' && fn.name === 'refreshLive' && ms === 1000) arguments[1] = 3000;
+    return setInterval0.apply(window, arguments);
+  };
+
   // confirm() answers "no" at once inside a webOS app, without a dialog -- Freigeben, Senden etc. could
   // never go through. It has to stay synchronous for the dashboard, so: the first press shows the
   // question and says no, the same press again within 5 s says yes.
@@ -129,7 +137,23 @@
   // --- flex gap (Chrome 84) as margins, aspect-ratio (Chrome 88) as a height ---------------------------
   var cfg = { gaps: [], autoMargins: [], aspects: [], zooms: [], keyframes: [], transforms: [], animated: [] }, gapSheet = document.createElement('style'), gapCss = '';
   function firstMatch(sel) { try { return document.querySelector(sel); } catch (e) { return null; } }
-  function fixLayout() {
+  // full: the gap rules (per selector, so they hold for re-rendered rows by themselves) and the rings'
+  // centre -- at load, on resize and every 5 s. After a re-render (every second: the trading tile) only
+  // the cheap part runs; the whole pass cost ~35 ms a second on the TV (2026-10-29).
+  var gapRules = [];
+  function fixLayout(full) {
+    if (full) gapRules = gapPass();
+    var rules = gapRules.slice();
+    if (full) fixAnimations(rules); else Array.prototype.push.apply(rules, madeCss);
+    var css = rules.join('\n');
+    if (css !== gapCss) { gapCss = css; gapSheet.textContent = css; }
+    cfg.aspects.forEach(function (a) {
+      var els; try { els = document.querySelectorAll(a[0]); } catch (e) { return; }
+      for (var i = 0; i < els.length; i++) { var w = els[i].offsetWidth; if (w && els[i].__tvW !== w) { els[i].__tvW = w; els[i].style.height = (w / a[1]) + 'px'; } }
+    });
+    if (full) centreOrbits();
+  }
+  function gapPass() {
     var rules = [];
     cfg.gaps.forEach(function (sel) {
       var el = firstMatch(sel);
@@ -144,36 +168,33 @@
     });
     // a child pushed to the side with margin-left:auto must stay pushed
     cfg.autoMargins.forEach(function (m) { rules.push(m.sel + ' { margin-' + m.side + ': auto !important; }'); });
-    fixAnimations(rules);
-    centreOrbits();
-    var css = rules.join('\n');
-    if (css !== gapCss) { gapCss = css; gapSheet.textContent = css; }
-    cfg.aspects.forEach(function (a) {
-      var els; try { els = document.querySelectorAll(a[0]); } catch (e) { return; }
-      for (var i = 0; i < els.length; i++) { var w = els[i].offsetWidth; if (w) els[i].style.height = (w / a[1]) + 'px'; }
-    });
+    return rules;
   }
   // gate.mjs folded translate:/rotate:/scale: into transform. An animation of transform would then wipe
   // an element's position (the orbit rings slid off the planet), an animation of translate: its own
   // transform (the turned tiles went flat while floating). Give such an element a copy of its keyframes
   // with both parts in each frame -- composed the way the browser would: single transforms first.
   var madeFrames = {}, madeCss = [];
-  // the dearest ones on the TV, measured one by one (ms per frame, 285 with all paused): floating holo 643,
-  // floating tiles 457 (six big glass cards repainted), sun pulse 409 (a filter), energy 380 (blur),
-  // beam 352. Brano found it too slow with them (2026-10-29); the rings stay.
-  var TV_OFF = ['float', 'hover-float', 'energy', 'beam', 'sunpulse'];
+  // Off on the TV: the filter/blur ones (sun pulse, energy, beam). The floating tiles and holo were off
+  // too at first, but the slowness turned out to be the globe redrawn each frame and the trading tile
+  // rebuilt each second; with those fixed the float measured no different (2026-10-29), and Brano
+  // missed the moving cards.
+  var TV_OFF = ['energy', 'beam', 'sunpulse'];
   function ownTransforms(el) {
     var t = { single: null, own: null };
     cfg.transforms.forEach(function (r) { try { if (el.matches(r[0])) { if (r[1] != null) t.single = r[1]; if (r[2] != null) t.own = r[2]; } } catch (e) { /* bad selector */ } });
     return t;
   }
+  var animEls = [];  // what busy() pauses
   function fixAnimations(rules) {
     var frames = {};
     cfg.keyframes.forEach(function (k) { frames[k[0]] = k[1]; });
+    animEls = [];
     cfg.animated.forEach(function (sel) {
       var els; try { els = document.querySelectorAll(sel); } catch (e) { return; }
       for (var i = 0; i < els.length; i++) {
         var el = els[i];
+        animEls.push(el);
         if (el.__tvClass === el.className) continue;  // done, and its classes have not changed since
         el.__tvClass = el.className;
         el.style.animationName = '';
@@ -219,7 +240,9 @@
     });
   }
   var layoutTimer = 0;
-  function soon() { clearTimeout(layoutTimer); layoutTimer = setTimeout(fixLayout, 300); }
+  function soon() { clearTimeout(layoutTimer); layoutTimer = setTimeout(function () { fixLayout(false); }, 300); }
+  function full() { fixLayout(true); }
+  setInterval(full, 5000);
 
   function start() {
     document.head.appendChild(gapSheet);
@@ -228,8 +251,6 @@
       'html.tv-keys :focus { outline: 3px solid rgb(var(--accent-rgb)) !important; outline-offset: 3px; }',
       // a shared 3D space confuses this Chromium: the open panel showed the tiles through it and clicks
       // landed on the wrong element. Flat scene; each tile still carries its own perspective, so it stays turned.
-      // while the remote is in use everything stands still, so each press gets the whole chip (see busy())
-      'html.tv-busy *, html.tv-busy *::before, html.tv-busy *::after { animation-play-state: paused !important; }',
       'html.tv .stage { perspective: none !important; }',
       'html.tv .stage, html.tv .stage * { transform-style: flat !important; }',
       // no backdrop blur here (Chrome 76): the see-through glass of the full views needs more body to read
@@ -241,15 +262,15 @@
     document.head.appendChild(tv);
     (function load(tries) {
       fetch('/__tv/config').then(function (r) { return r.json(); }).then(function (c) {
-        cfg = c; whiteMix = c.whiteMix || []; seenAccent = null; syncAccent(); fixLayout();
+        cfg = c; whiteMix = c.whiteMix || []; seenAccent = null; syncAccent(); full();
         if (!c.keyframes.length && tries < 5) setTimeout(function () { load(tries + 1); }, 2000);
       }).catch(function () { if (tries < 5) setTimeout(function () { load(tries + 1); }, 2000); });
     })(0);
     new MutationObserver(soon).observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] });
-    window.addEventListener('resize', soon);
+    window.addEventListener('resize', full);
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else start();
-  window.addEventListener('load', soon);
+  window.addEventListener('load', full);
 
   // --- the remote ---------------------------------------------------------------------------------------
   // Magic Remote pointer = a mouse, nothing to do. Arrows: move to the nearest control in that direction,
@@ -381,11 +402,17 @@
   }).observe(document.documentElement, { childList: true, subtree: true });
   document.addEventListener('mousemove', function () { root.classList.remove('tv-keys'); busy(); }, { passive: true });
   // the animations pause while the remote is in use and run again 2 s after the last press or move
-  var busyTimer = 0;
+  // -- element by element: a class on <html> with "html.tv-busy *" made the chip restyle the whole page,
+  // 0.8 s for the first press (2026-10-29)
+  var busyTimer = 0, paused = false;
+  function pauseAll(on) {
+    paused = on;
+    animEls.forEach(function (el) { el.style.animationPlayState = on ? 'paused' : ''; });
+  }
   function busy() {
-    if (!root.classList.contains('tv-busy')) root.classList.add('tv-busy');
+    if (!paused) pauseAll(true);
     clearTimeout(busyTimer);
-    busyTimer = setTimeout(function () { root.classList.remove('tv-busy'); }, 2000);
+    busyTimer = setTimeout(function () { pauseAll(false); }, 2000);
   }
   ['keydown', 'mousedown', 'wheel'].forEach(function (t) { document.addEventListener(t, busy, { capture: true, passive: true }); });
 })();

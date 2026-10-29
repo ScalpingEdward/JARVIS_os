@@ -192,10 +192,18 @@ Ziel der Instagram-Seite: Reichweite aufbauen fuer den Weg zum hauptberuflichen 
   waere oeffentlich -- deshalb Heimnetz.
 - Gemessen 2026-10-29: ~6 s pro Bild -- das war der geteilte 3D-Raum (.stage perspective +
   preserve-3d), nicht die Animationen. Flache Szene (jede Kachel traegt ihre Perspektive selbst)
-  -> ~0,25 s ohne, ~0,45 s mit allen CSS-Animationen. Brano will die Bewegung, fand aber alle
-  zusammen zu traege: die Ringe laufen, die teuersten (schwebende Karten/Holo, Energie, Strahl,
-  Sonnenpuls -- TV_OFF in shim.js) sind aus, und **waehrend der Bedienung steht alles still**
-  (html.tv-busy, bis 2 s nach dem letzten Druck): Taste bis Bild ~0,3 s statt 0,4-1,2 s.
+  -> ~0,25 s ohne, ~0,45 s mit allen CSS-Animationen. Die echte Traegheit kam danach per Profiler
+  (DevTools-Protokoll, Profiler + Performance.getMetrics): im Leerlauf 82 % Hauptthread, davon
+  2,4 s/6 s Skript -- der Globus projizierte jedes Bild die ganze Weltkarte neu, obwohl er still
+  steht (jetzt nur bei Aenderung, globe.js), das Tab-Icon 4x/s (ringicon.js, bei reduced-motion
+  einmal), die Trading-Kachel jede Sekunde komplett neu inkl. Neuvermessung **aller** Karten
+  (jetzt nur bei geaendertem Inhalt und nur die geaenderte Karte, cardview.js), ein neuer
+  Intl.NumberFormat pro Zahl (jetzt einer pro Nachkommastellen). Auf dem TV kommen die
+  Live-Kurse alle 3 s statt 1 s (shim.js biegt setInterval(refreshLive) um).
+  Animationen: alle an ausser Filter/Blur (Energie, Strahl, Sonnenpuls -- TV_OFF). Waehrend der
+  Bedienung halten die animierten Elemente einzeln an (bis 2 s nach dem letzten Druck) -- eine
+  Klasse an <html> mit `*`-Selektor liess den Chip die ganze Seite neu berechnen (0,8 s).
+  Gemessen Taste bis Bild: erster Druck ~0,25-0,35 s, danach ~0,04 s.
   Die Skripte sehen reduced-motion (Partikelfeld ist eine O(n^2)-Canvas-Schleife). Flach hiess auch: Klicks landen richtig, Detailansichten
   dunkler hinterlegt (kein backdrop-filter vor Chrome 76). Die Ringe liegen im Design etwas unter
   dem Planeten -- in 3D-Perspektive wirkt das "drumherum", flach nicht: shim.js zentriert sie.
