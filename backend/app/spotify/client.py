@@ -163,3 +163,35 @@ class Spotify:
         p = max(0, min(100, int(percent)))
         self._call("PUT", "/me/player/volume", params={"volume_percent": p})
         return {"ok": True, "did": f"Lautstärke {p} %"}
+
+    # ---- the dashboard's Spotify panel (frontend/media.js) -------------------------------------
+    def player(self) -> dict:
+        """What the panel shows: the song with its cover and progress, the device and its volume."""
+        d = self._call("GET", "/me/player")
+        if not d or not d.get("item"):
+            return {"playing": False}
+        it, dev = d["item"], d.get("device") or {}
+        images = (it.get("album") or {}).get("images") or []
+        return {"playing": bool(d.get("is_playing")), "title": it.get("name"),
+                "artist": ", ".join(a["name"] for a in it.get("artists", [])),
+                "album": (it.get("album") or {}).get("name"), "cover": images[0]["url"] if images else None,
+                "progress_ms": d.get("progress_ms") or 0, "duration_ms": it.get("duration_ms") or 0,
+                "device": dev.get("name"), "device_id": dev.get("id"), "volume": dev.get("volume_percent")}
+
+    def playlists(self) -> list[dict]:
+        items = (self._call("GET", "/me/playlists", params={"limit": 50}) or {}).get("items", [])
+        return [{"name": p.get("name"), "uri": p.get("uri"), "cover": ((p.get("images") or [{}])[0] or {}).get("url")}
+                for p in items if p]
+
+    def play_uri(self, uri: str, device_id: str | None = None) -> dict:
+        """A playlist, album or song the panel already knows by its uri."""
+        if not uri.startswith("spotify:"):
+            raise SpotifyError(f"keine Spotify-Adresse: {uri!r}")
+        body = {"uris": [uri]} if uri.startswith("spotify:track:") else {"context_uri": uri}
+        self._call("PUT", "/me/player/play", params={"device_id": device_id} if device_id else {}, json=body)
+        return {"ok": True, "did": "spielt"}
+
+    def transfer(self, device_id: str) -> dict:
+        """Moves the music to another device (laptop, phone, TV) and keeps it playing."""
+        self._call("PUT", "/me/player", json={"device_ids": [device_id], "play": True})
+        return {"ok": True, "did": "Gerät gewechselt"}

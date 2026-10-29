@@ -47,3 +47,28 @@ def test_without_setup_it_says_what_is_missing(monkeypatch):
     monkeypatch.delenv("SPOTIFY_CLIENT_ID", raising=False)
     out, failed = tools.run("spotify", {"action": "pause"})
     assert not failed and "nicht eingerichtet" in out
+
+
+def test_the_dashboard_panel_shows_the_song_and_steers_it(fake, monkeypatch):
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+
+    from app.spotify import api
+    monkeypatch.setattr(api, "_sp", None)   # the shared client, made fresh on the fake
+    app = FastAPI()
+    app.include_router(api.router)
+    web = TestClient(app)
+
+    now = web.get("/v1/spotify/player").json()
+    assert now["playing"] and now["title"] == "One Dance" and now["artist"] == "Drake" and now["volume"] == 40
+    assert web.get("/v1/spotify/playlists").json()["playlists"][0] == {"name": "Gym Hard", "uri": "spotify:playlist:gym", "cover": None}
+
+    assert web.post("/v1/spotify/control", json={"action": "pause"}).json()["ok"]
+    web.post("/v1/spotify/control", json={"action": "play_uri", "uri": "spotify:playlist:gym", "device_id": "tv"})
+    assert any(c[1] == "/v1/me/player/play" and c[2].get("device_id") == "tv" and b"spotify:playlist:gym" in c[3] for c in fake)
+    web.post("/v1/spotify/control", json={"action": "transfer", "device_id": "phone"})
+    assert any(c[0] == "PUT" and c[1] == "/v1/me/player" and b'"phone"' in c[3] for c in fake)
+    # one token for the whole panel, not one per click
+    assert sum(1 for c in fake if c[1] == "/api/token") == 1
+    # a made-up address is refused before it reaches Spotify
+    assert web.post("/v1/spotify/control", json={"action": "play_uri", "uri": "https://evil"}).status_code == 502
