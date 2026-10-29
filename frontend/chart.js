@@ -233,6 +233,7 @@
   }
 
   async function open(p, frame) {
+    document.dispatchEvent(new CustomEvent('auron:chartopen'));   // media.js: one window in the middle at a time
     pos = p; real = null; place();
     if (frame) { tf = frame; marks(); } box.hidden = false; wait.hidden = false;
     box.querySelector('.pc-lots').value = p.volume || 0.01;

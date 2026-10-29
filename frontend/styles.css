@@ -1052,6 +1052,26 @@ html.desk .core.turning { cursor: grabbing; }
 .pc-acct { background: rgba(10,18,32,.85); color: var(--text); border: 1px solid var(--line-2); border-radius: 8px;
   font: inherit; font-size: 13px; padding: 4px 8px; cursor: pointer; }
 .pc-acct[hidden] { display: none; }
+
+/* the window in the middle for YouTube (media.js) -- the chart's glass and place */
+.media-box { grid-template-rows: auto 1fr; }
+.md-yt { display: flex; gap: 8px; flex: 1; min-width: 0; max-width: 560px; }
+.md-yt input { flex: 1; min-width: 0; background: rgba(10,18,32,.85); color: var(--text); border: 1px solid var(--line-2);
+  border-radius: 999px; font: inherit; font-size: 13px; padding: 6px 14px; }
+.md-yt button { font: inherit; font-size: 12.5px; padding: 6px 14px; border-radius: 999px; border: 1px solid color-mix(in srgb, var(--accent) 50%, transparent);
+  background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--text); cursor: pointer; }
+.md-body { position: relative; min-height: 0; border-radius: 12px; overflow: hidden; background: rgba(0,0,0,.35); }
+.md-frame { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: 0; }
+.md-frame[hidden], .md-recent[hidden] { display: none; }
+.md-recent { position: absolute; top: 0; left: 0; right: 0; bottom: 0; overflow: auto; padding: 14px; display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); align-content: start; gap: 12px; }
+.md-recent > small, .md-recent > p { grid-column: 1 / -1; }
+.md-recent button { display: grid; gap: 6px; text-align: left; padding: 8px; border-radius: 12px; border: 1px solid var(--line-2);
+  background: rgba(255,255,255,.04); color: var(--text); font: inherit; font-size: 12.5px; cursor: pointer; }
+.md-recent button:hover { border-color: color-mix(in srgb, var(--accent) 50%, transparent); }
+.md-recent img { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 8px; }
+.md-recent span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.md-pl { display: grid; place-items: center; aspect-ratio: 16 / 9; font-size: 28px; color: var(--muted); }
 .pc-pl { font-size: 16px; font-weight: 700; }
 .pc-btns { margin-left: auto; display: flex; gap: 8px; }
 .pc-btns button { font: inherit; font-size: 12.5px; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--line-2); background: rgba(255,255,255,.05); color: var(--text); cursor: pointer; }
