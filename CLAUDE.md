@@ -232,6 +232,15 @@ Ziel der Instagram-Seite: Reichweite aufbauen fuer den Weg zum hauptberuflichen 
   API. Am 2026-10-29 hat ein Testklick die Caption-Stimme gespeichert und einer "Freigeben"
   getroffen (nur weil confirm() nein sagte, ist nichts gepostet worden).
 
+## Spotify im Dashboard (frontend/media.js, backend/app/spotify/)
+- Verbunden seit 2026-10-29 (eigene Spotify-Entwickler-App "Auron", Redirect
+  http://127.0.0.1:8080/api/v1/spotify/callback, Refresh-Token in der Datenbank). Das Fenster
+  steuert Spotify, es spielt nicht selbst: ohne offenes Spotify-Geraet (Laptop, Handy, TV) lehnt
+  Spotify ab ("Kein aktives Spotify-Geraet") -- das Fenster zeigt das 8 s in Orange.
+- Was Spotify einer **neu registrierten** App nicht gibt (geprueft 2026-10-29): `/playlists/{id}/tracks`
+  (403) -- stattdessen `/playlists/{id}/items`, Songs unter `item` statt `track`; und die Songs von
+  Playlists, denen Brano nur folgt (auch `/items` 403). Die oeffnen sich "gesperrt", ganz abspielbar.
+
 ## Signal-Kopierer (signal_copier/)
 - Mögliches Geschäft daraus (Abo, Partnerschaft mit Gruppen, offene Fragen
   an Steuerberater/Anwalt): `docs/signal-copier-business.md`. Nichts

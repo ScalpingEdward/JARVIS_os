@@ -72,11 +72,17 @@ def playlists() -> dict:
     return {"playlists": _guard(lambda: _spotify().playlists())}
 
 
+@router.get("/playlists/{playlist_id}")
+def playlist(playlist_id: str) -> dict:
+    return _guard(lambda: _spotify().playlist_tracks(playlist_id))
+
+
 class Control(BaseModel):
     action: Literal["play", "pause", "next", "previous", "volume", "transfer", "play_uri", "search"]
     value: int | None = None        # volume in %
     uri: str | None = None          # play_uri
     device_id: str | None = None    # transfer, play_uri
+    offset_uri: str | None = None   # play_uri: start the playlist at this song
     query: str | None = None        # search: a song, artist, album or playlist by name
     kind: Literal["track", "artist", "album", "playlist"] = "track"
 
@@ -89,7 +95,7 @@ def control(c: Control) -> dict:
         "pause": sp.pause, "next": sp.next, "previous": sp.previous,
         "volume": lambda: sp.volume(c.value if c.value is not None else 50),
         "transfer": lambda: sp.transfer(c.device_id or ""),
-        "play_uri": lambda: sp.play_uri(c.uri or "", c.device_id),
+        "play_uri": lambda: sp.play_uri(c.uri or "", c.device_id, c.offset_uri),
         "search": lambda: sp.play(c.query, c.kind),
     }
     return _guard(actions[c.action])

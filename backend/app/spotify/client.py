@@ -172,7 +172,8 @@ class Spotify:
             return {"playing": False}
         it, dev = d["item"], d.get("device") or {}
         images = (it.get("album") or {}).get("images") or []
-        return {"playing": bool(d.get("is_playing")), "title": it.get("name"),
+        return {"playing": bool(d.get("is_playing")), "title": it.get("name"), "uri": it.get("uri"),
+                "context": (d.get("context") or {}).get("uri"),
                 "artist": ", ".join(a["name"] for a in it.get("artists", [])),
                 "album": (it.get("album") or {}).get("name"), "cover": images[0]["url"] if images else None,
                 "progress_ms": d.get("progress_ms") or 0, "duration_ms": it.get("duration_ms") or 0,
@@ -183,11 +184,48 @@ class Spotify:
         return [{"name": p.get("name"), "uri": p.get("uri"), "cover": ((p.get("images") or [{}])[0] or {}).get("url")}
                 for p in items if p]
 
-    def play_uri(self, uri: str, device_id: str | None = None) -> dict:
-        """A playlist, album or song the panel already knows by its uri."""
-        if not uri.startswith("spotify:"):
+    def playlist_tracks(self, playlist_id: str) -> dict:
+        """A playlist opened in the panel: its songs, in order (up to 300).
+
+        Spotify (checked 2026-10-29) gives an app registered now /playlists/{id}/items, not the old
+        /tracks (403), and only for playlists he owns: one he merely follows answers 403 there too.
+        Such a playlist comes back with locked=True -- it can still be played as a whole."""
+        if not playlist_id.replace("_", "").isalnum():
+            raise SpotifyError(f"keine Playlist-ID: {playlist_id!r}")
+        info = self._call("GET", f"/playlists/{playlist_id}", params={"fields": "name,uri,images"}) or {}
+        imgs = info.get("images") or []
+        head = {"name": info.get("name"), "uri": info.get("uri"), "cover": imgs[0]["url"] if imgs else None}
+        tracks, offset = [], 0
+        while offset < 300:
+            try:
+                page = self._call("GET", f"/playlists/{playlist_id}/items", params={
+                    "limit": 100, "offset": offset,
+                    "fields": "next,items(item(name,uri,duration_ms,artists(name),album(images)))"}) or {}
+            except SpotifyError as exc:
+                if offset == 0 and "403" in str(exc):
+                    return {**head, "tracks": [], "locked": True}
+                raise
+            for row in page.get("items") or []:
+                t = (row or {}).get("item") or (row or {}).get("track")
+                if not t or not t.get("uri"):
+                    continue   # a deleted or local song
+                imgs = (t.get("album") or {}).get("images") or []
+                tracks.append({"name": t.get("name"), "uri": t["uri"], "duration_ms": t.get("duration_ms") or 0,
+                               "artist": ", ".join(a["name"] for a in t.get("artists") or []),
+                               "cover": imgs[-1]["url"] if imgs else None})   # the smallest picture
+            if not page.get("next"):
+                break
+            offset += 100
+        return {**head, "tracks": tracks, "locked": False}
+
+    def play_uri(self, uri: str, device_id: str | None = None, offset_uri: str | None = None) -> dict:
+        """A playlist, album or song the panel already knows by its uri -- with offset_uri, that song of
+        the playlist, and the playlist plays on after it (as in Spotify itself)."""
+        if not uri.startswith("spotify:") or (offset_uri and not offset_uri.startswith("spotify:track:")):
             raise SpotifyError(f"keine Spotify-Adresse: {uri!r}")
         body = {"uris": [uri]} if uri.startswith("spotify:track:") else {"context_uri": uri}
+        if offset_uri and "context_uri" in body:
+            body["offset"] = {"uri": offset_uri}
         self._call("PUT", "/me/player/play", params={"device_id": device_id} if device_id else {}, json=body)
         return {"ok": True, "did": "spielt"}
 

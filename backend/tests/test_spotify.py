@@ -72,3 +72,53 @@ def test_the_dashboard_panel_shows_the_song_and_steers_it(fake, monkeypatch):
     assert sum(1 for c in fake if c[1] == "/api/token") == 1
     # a made-up address is refused before it reaches Spotify
     assert web.post("/v1/spotify/control", json={"action": "play_uri", "uri": "https://evil"}).status_code == 502
+
+
+def test_a_playlist_opens_with_its_songs_and_one_of_them_plays_with_the_playlist_after_it(monkeypatch):
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+
+    from app.spotify import api
+    monkeypatch.setenv("SPOTIFY_CLIENT_ID", "cid")
+    monkeypatch.setenv("SPOTIFY_CLIENT_SECRET", "sec")
+    sp._store("refresh-1")
+    calls = []
+
+    def handler(req: httpx.Request) -> httpx.Response:
+        calls.append((req.method, req.url.path, dict(req.url.params), req.content))
+        if req.url.path == "/api/token":
+            return httpx.Response(200, json={"access_token": "tok", "expires_in": 3600})
+        if req.url.path == "/v1/playlists/gym":
+            return httpx.Response(200, json={"name": "Gym Hard", "uri": "spotify:playlist:gym", "images": [{"url": "big.jpg"}]})
+        if req.url.path == "/v1/playlists/gym/tracks":     # the old path: closed for new apps
+            return httpx.Response(403, json={"error": {"status": 403, "message": "Forbidden"}})
+        if req.url.path == "/v1/playlists/followed":
+            return httpx.Response(200, json={"name": "Boxing", "uri": "spotify:playlist:followed", "images": []})
+        if req.url.path == "/v1/playlists/followed/items":  # someone else's playlist
+            return httpx.Response(403, json={"error": {"status": 403, "message": "Forbidden"}})
+        if req.url.path == "/v1/playlists/gym/items":
+            return httpx.Response(200, json={"next": None, "items": [
+                {"item": {"name": "Till I Collapse", "uri": "spotify:track:a", "duration_ms": 297000,
+                           "artists": [{"name": "Eminem"}], "album": {"images": [{"url": "640.jpg"}, {"url": "64.jpg"}]}}},
+                {"track": None},                                   # a song deleted from Spotify
+                {"item": {"name": "Lose Yourself", "uri": "spotify:track:b", "duration_ms": 326000, "artists": [{"name": "Eminem"}]}}]})
+        return httpx.Response(204)
+
+    monkeypatch.setattr(sp.Spotify, "__init__", lambda self, client=None: (
+        setattr(self, "http", httpx.Client(transport=httpx.MockTransport(handler))), setattr(self, "_access", ""), setattr(self, "_until", 0.0))[0])
+    monkeypatch.setattr(api, "_sp", None)
+    app = FastAPI()
+    app.include_router(api.router)
+    web = TestClient(app)
+
+    p = web.get("/v1/spotify/playlists/gym").json()
+    assert p["name"] == "Gym Hard" and [t["name"] for t in p["tracks"]] == ["Till I Collapse", "Lose Yourself"]
+    assert p["tracks"][0]["cover"] == "64.jpg" and p["tracks"][1]["cover"] is None and not p["locked"]
+    # one he only follows: Spotify keeps its songs from new apps -- it opens locked, playable as a whole
+    f = web.get("/v1/spotify/playlists/followed").json()
+    assert f["locked"] and f["tracks"] == [] and f["name"] == "Boxing"
+
+    web.post("/v1/spotify/control", json={"action": "play_uri", "uri": "spotify:playlist:gym", "offset_uri": "spotify:track:b"})
+    assert any(c[1] == "/v1/me/player/play" and b'"offset"' in c[3] and b"spotify:track:b" in c[3] and b"spotify:playlist:gym" in c[3] for c in calls)
+    # a made-up id never becomes part of a Spotify address
+    assert web.get("/v1/spotify/playlists/..%2Fme").status_code in (404, 502)

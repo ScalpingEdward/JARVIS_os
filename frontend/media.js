@@ -33,7 +33,8 @@
           <label class="sp-vol-l">Lautstärke <input class="sp-vol" type="range" min="0" max="100" step="5" /></label>
           <select class="sp-devs" title="Wo die Musik spielt"></select></div>
         <p class="sp-msg"></p>
-        <small class="muted">Deine Playlists</small><div class="sp-lists"></div>
+        <div class="sp-home"><small class="muted">Deine Playlists</small><div class="sp-lists"></div></div>
+        <div class="sp-pl" hidden></div>
       </div></div>`;
   document.body.append(box);
   const $m = (s) => box.querySelector(s);
@@ -149,6 +150,7 @@
     $m('.sp-bar i').style.width = now.duration_ms ? `${(100 * now.progress_ms / now.duration_ms).toFixed(1)}%` : '0';
     $m('.sp-time').textContent = now.duration_ms ? `${mmss(now.progress_ms)} / ${mmss(now.duration_ms)}` : '';
     $m('.sp-pp').innerHTML = now.playing ? ICON.pause : ICON.play;
+    markPlaying();
     const vol = $m('.sp-vol');
     if (now.volume != null && document.activeElement !== vol) vol.value = now.volume;
   }
@@ -187,9 +189,41 @@
   });
   $m('.sp-vol').addEventListener('change', (e) => control({ action: 'volume', value: +e.target.value }));
   $m('.sp-devs').addEventListener('change', (e) => { if (e.target.value) control({ action: 'transfer', device_id: e.target.value }); });
+  // a playlist opens like in Spotify: its songs, one tap plays that song and the playlist goes on after it
+  // (Brano, 2026-10-29: "man kann nicht wie in Spotify öffnen, schauen in Playlist")
+  const plEl = $m('.sp-pl'), homeEl = $m('.sp-home');
+  let openPl = null;
+  const device = () => $m('.sp-devs').value || null;
+  async function openPlaylist(uri) {
+    homeEl.hidden = true; plEl.hidden = false;
+    plEl.innerHTML = '<p class="muted">Hole die Songs …</p>';
+    try { openPl = await get(`/v1/spotify/playlists/${encodeURIComponent(uri.split(':').pop())}`); } catch (e) {
+      plEl.innerHTML = `<button type="button" class="sp-back">← Playlists</button><p class="muted">${esc(e.message)}</p>`; return;
+    }
+    plEl.innerHTML = `<div class="sp-pl-head"><button type="button" class="sp-back">← Playlists</button>
+        ${openPl.cover ? `<img src="${esc(openPl.cover)}" alt="" />` : ''}<div class="sp-pl-name"><b>${esc(openPl.name)}</b>
+        <small class="muted">${openPl.locked ? 'Playlist' : `${openPl.tracks.length} Songs`}</small></div>
+        <button type="button" class="sp-all">${ICON.play}<span>Alle abspielen</span></button></div>
+      ${openPl.locked ? '<p class="muted">Diese Playlist gehört nicht dir -- Spotify gibt ihre Songliste neuen Apps nicht heraus. „Alle abspielen“ geht trotzdem.</p>' : ''}
+      <ol class="sp-tracks">${openPl.tracks.map((t, i) => `<li><button type="button" data-track="${esc(t.uri)}">
+        <span class="sp-n">${i + 1}</span>${t.cover ? `<img src="${esc(t.cover)}" alt="" loading="lazy" />` : '<span class="sp-noimg"></span>'}
+        <span class="sp-t"><b>${esc(t.name)}</b><small>${esc(t.artist)}</small></span><span class="sp-d">${mmss(t.duration_ms)}</span></button></li>`).join('')}</ol>`;
+    markPlaying();
+  }
+  function closePlaylist() { openPl = null; plEl.hidden = true; plEl.innerHTML = ''; homeEl.hidden = false; }
+  function markPlaying() {
+    plEl.querySelectorAll('button[data-track]').forEach((b) => b.classList.toggle('on', !!now && b.dataset.track === now.uri));
+  }
   $m('.sp-lists').addEventListener('click', (e) => {
     const b = e.target.closest('button[data-uri]');
-    if (b) control({ action: 'play_uri', uri: b.dataset.uri, device_id: $m('.sp-devs').value || null });
+    if (b) openPlaylist(b.dataset.uri);
+  });
+  plEl.addEventListener('click', (e) => {
+    if (e.target.closest('.sp-back')) { closePlaylist(); return; }
+    if (!openPl) return;
+    if (e.target.closest('.sp-all')) { control({ action: 'play_uri', uri: openPl.uri, device_id: device() }); return; }
+    const t = e.target.closest('button[data-track]');
+    if (t) control({ action: 'play_uri', uri: openPl.uri, offset_uri: t.dataset.track, device_id: device() });
   });
   $m('.sp-search').addEventListener('submit', (e) => {
     e.preventDefault();
