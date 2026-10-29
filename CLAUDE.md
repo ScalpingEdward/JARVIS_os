@@ -200,7 +200,9 @@ Ziel der Instagram-Seite: Reichweite aufbauen fuer den Weg zum hauptberuflichen 
   (jetzt nur bei geaendertem Inhalt und nur die geaenderte Karte, cardview.js), ein neuer
   Intl.NumberFormat pro Zahl (jetzt einer pro Nachkommastellen). Auf dem TV kommen die
   Live-Kurse alle 3 s statt 1 s (shim.js biegt setInterval(refreshLive) um).
-  Animationen: alle an ausser Filter/Blur (Energie, Strahl, Sonnenpuls -- TV_OFF). Waehrend der
+  Animationen: alle an ausser Filter/Blur (Energie, Strahl, Sonnenpuls -- TV_OFF). Schwebende
+  Karten allein druecken den TV auf 5 fps (alles still: 56, Ringe: 34-42) -- Brano will sie
+  trotzdem ("Schwebend", 2026-10-29). Waehrend der
   Bedienung halten die animierten Elemente einzeln an (bis 2 s nach dem letzten Druck) -- eine
   Klasse an <html> mit `*`-Selektor liess den Chip die ganze Seite neu berechnen (0,8 s).
   Gemessen Taste bis Bild: erster Druck ~0,25-0,35 s, danach ~0,04 s.
