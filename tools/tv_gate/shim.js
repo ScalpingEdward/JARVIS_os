@@ -188,10 +188,9 @@
   // all paused: 56, rings alone: 34-42, floating holo alone: 49): the floating tiles take it to 5 fps,
   // whatever the keyframes -- plain translateY, will-change, no shadows, no glass made no difference:
   // six big cards re-rastered at 4K (devicePixelRatio 2) each frame is more than this chip has.
-  // Brano chose them floating anyway (2026-10-29: "Schwebend") -- they pause while the remote is in use
-  // (busy()), so a press still answers fast; only the idle float is choppy.
-  // Off: the filter/blur ones (sun pulse, energy, beam).
-  var TV_OFF = ['energy', 'beam', 'sunpulse'];
+  // Brano tried them floating and dropped it (2026-10-29: "macht nix") -- the float is off on the TV.
+  // Also off: the filter/blur ones (sun pulse, energy, beam).
+  var TV_OFF = ['hover-float', 'energy', 'beam', 'sunpulse'];
   function ownTransforms(el) {
     var t = { single: null, own: null };
     cfg.transforms.forEach(function (r) { try { if (el.matches(r[0])) { if (r[1] != null) t.single = r[1]; if (r[2] != null) t.own = r[2]; } } catch (e) { /* bad selector */ } });
