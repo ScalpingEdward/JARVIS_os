@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <title>AURON</title>
+  <style>
+    html, body { margin: 0; height: 100%; background: #03050a; color: #cfefff; font: 32px/1.4 sans-serif; }
+    body { display: flex; flex-direction: column; align-items: center; justify-content: center; }
+    h1 { margin: 0 0 24px; font-size: 72px; letter-spacing: .3em; color: #4fd8ff; font-weight: 300; }
+    p { margin: 0; opacity: .75; }
+  </style>
+</head>
+<body>
+  <h1>AURON</h1>
+  <p id="state">verbinde mit dem Laptop ...</p>
+  <script>
+    // The AURON app on the LG TV: only a door. The dashboard comes from the laptop through tools/tv_gate
+    // (it rewrites it for this TV's old browser and lets only this TV in). The laptop's address is fixed
+    // here -- give the laptop a fixed IP in the router, and change it here (then reinstall) if it moves.
+    var GATE = 'http://192.168.0.105:8090';
+    var state = document.getElementById('state'), tries = 0;
+    function attempt() {
+      tries++;
+      var x = new XMLHttpRequest();
+      x.timeout = 4000;
+      x.onload = function () { if (x.status === 200) location.replace(GATE + '/'); else wait('Laptop antwortet mit ' + x.status + ' -- ist der TV freigegeben?'); };
+      x.onerror = x.ontimeout = function () { wait('Laptop nicht erreichbar (' + GATE + '). Läuft er, und läuft tv_gate?'); };
+      x.open('GET', GATE + '/__tv/ping');
+      x.send();
+    }
+    function wait(msg) { state.textContent = msg + '  Neuer Versuch ... (' + tries + ')'; setTimeout(attempt, 3000); }
+    attempt();
+  </script>
+</body>
+</html>
