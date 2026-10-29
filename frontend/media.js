@@ -32,7 +32,7 @@
           <button type="button" data-a="next" aria-label="Weiter">${ICON.next}</button>
           <label class="sp-vol-l">Lautstärke <input class="sp-vol" type="range" min="0" max="100" step="5" /></label>
           <select class="sp-devs" title="Wo die Musik spielt"></select></div>
-        <p class="sp-msg muted"></p>
+        <p class="sp-msg"></p>
         <small class="muted">Deine Playlists</small><div class="sp-lists"></div>
       </div></div>`;
   document.body.append(box);
@@ -125,7 +125,14 @@
 
   // ---- Spotify ----------------------------------------------------------------------------------
   const mmss = (ms) => { const s = Math.round((ms || 0) / 1000); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
-  const msg = (t) => { $m('.sp-msg').textContent = t || ''; };
+  // a refusal stays readable: the poll right after a click used to wipe it at once, so a click on a
+  // playlist with no Spotify open looked like nothing happened (Brano, 2026-10-29)
+  let msgUntil = 0;
+  const msg = (t, keep = 0) => {
+    if (!t && Date.now() < msgUntil) return;
+    $m('.sp-msg').textContent = t || '';
+    msgUntil = t && keep ? Date.now() + keep : 0;
+  };
   let now = null, poll = 0, devPoll = 0, listsShown = false;
 
   async function refresh() {
@@ -169,7 +176,7 @@
   function stopPolling() { clearInterval(poll); clearInterval(devPoll); }
 
   async function control(body) {
-    try { await send('POST', '/v1/spotify/control', body); msg(''); } catch (e) { msg(e.message); }
+    try { await send('POST', '/v1/spotify/control', body); msgUntil = 0; msg(''); } catch (e) { msg(e.message, 8000); }
     setTimeout(refresh, 400);
   }
   $m('.sp-ctl').addEventListener('click', (e) => {

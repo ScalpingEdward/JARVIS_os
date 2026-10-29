@@ -1094,6 +1094,7 @@ html.desk .core.turning { cursor: grabbing; }
 .sp-vol-l { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12.5px; margin-left: 8px; }
 .sp-vol { width: 140px; accent-color: var(--accent); }
 .sp-devs { margin-left: auto; background: rgba(10,18,32,.85); color: var(--text); border: 1px solid var(--line-2); border-radius: 8px; font: inherit; font-size: 13px; padding: 6px 8px; }
+.sp-msg { margin: 0; padding: 10px 14px; border-radius: 10px; color: #ffd9a0; background: rgba(255,150,40,.12); border: 1px solid rgba(255,170,70,.35); }
 .sp-msg:empty { display: none; }
 .sp-lists { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; }
 .sp-lists button { display: grid; gap: 6px; text-align: left; padding: 6px; border-radius: 10px; border: 1px solid var(--line-2);
