@@ -566,10 +566,14 @@ addEventListener('popstate', () => {           // the phone's back button
 });
 
 // --- loops ---------------------------------------------------------------------
+// the clock's formatters made once, and the text written only when it changes (once a minute, not
+// every second: a new DateTimeFormat twice a second was a hitch on the LG TV, 2026-10-29)
+const clockTime = new Intl.DateTimeFormat('de-DE', { hour: '2-digit', minute: '2-digit' });
+const clockDate = new Intl.DateTimeFormat('de-DE', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 setInterval(() => {
-  const now = new Date();
-  $('#clock').textContent = now.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
-  $('#date').textContent = now.toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+  const now = new Date(), time = clockTime.format(now), date = clockDate.format(now);
+  if ($('#clock').textContent !== time) $('#clock').textContent = time;
+  if ($('#date').textContent !== date) $('#date').textContent = date;
   tickCountdown();
 }, 1000);
 
