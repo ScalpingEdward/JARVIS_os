@@ -87,6 +87,7 @@
     return Object.entries(by).map(([c, v]) => `<span class="${v > 0 ? 'up' : v < 0 ? 'down' : ''}">${v > 0 ? '+' : ''}${fmt(v)} ${esc(c)}</span>`).join(' · ');
   };
   function current() {   // the position as the last report and the live numbers know it
+    if (!pos) return null;  // no chart open (a live update can still ask -- it threw on the LG TV, 2026-10-29)
     return openAll().find((p) => p.ticket === pos.ticket) || null;
   }
 
@@ -199,6 +200,7 @@
     header(); list();
     let d;
     try { d = await (await fetch(`${API}/v1/copier/chart?profile=${encodeURIComponent(pos.copier)}&symbol=${encodeURIComponent(pos.symbol)}&tf=${tf}`)).json(); } catch { return; }
+    if (!pos) return;   // closed while the candles were on their way
     if (d.name) real = d.name;
     if (!d.bars?.length) { wait.hidden = false; return; }
     wait.hidden = true;
